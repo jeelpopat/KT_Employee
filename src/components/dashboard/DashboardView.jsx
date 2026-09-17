@@ -603,11 +603,12 @@
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+
 // import React, { useEffect, useState, useCallback } from 'react';
 // import { 
 //   Clock, Pause, LogOut, Calendar, Gift, 
 //   Sun, Users, CheckSquare, FileCheck, TrendingUp, Bell, AlertCircle, Map,
-//   Umbrella, LogIn, Coffee, Loader2
+//   Umbrella, LogIn, Coffee, ChevronLeft, ChevronRight, Loader2
 // } from 'lucide-react';
 // import { useApp } from '../../context/AppContext.jsx';
 // import api from '../../api/axios.js';
@@ -637,6 +638,7 @@
 //   const [tasksStats, setTasksStats] = useState({ todo: 0, inProgress: 0, completed: 0 });
 //   const [leaveBalance, setLeaveBalance] = useState('--');
 //   const [announcements, setAnnouncements] = useState([]);
+//   const [currentAnnIndex, setCurrentAnnIndex] = useState(0);
 //   const [holidays, setHolidays] = useState([]);
 //   const [upcomingBirthdays, setUpcomingBirthdays] = useState([]); 
 //   const [teamOnLeave, setTeamOnLeave] = useState([]); 
@@ -650,6 +652,9 @@
 //   const [geoError, setGeoError] = useState('');
 //   const [isActionLoading, setIsActionLoading] = useState(false);
 //   const [todaySegments, setTodaySegments] = useState([]);
+  
+//   // Track active break start time to calculate duration on break end
+//   const [activeBreakIsoStart, setActiveBreakIsoStart] = useState(null);
 
 //   // Display strings based on API Response
 //   const [checkInTimeDisplay, setCheckInTimeDisplay] = useState('--:--');
@@ -660,6 +665,14 @@
 
 //   const defaultAvatar = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
 //   const userId = user?.employee?._id || user?.profile?._id || user?._id;
+
+//   // --- Announcement Controls ---
+//   const handlePrevAnnouncement = () => {
+//     setCurrentAnnIndex((prev) => (prev === 0 ? announcements.length - 1 : prev - 1));
+//   };
+//   const handleNextAnnouncement = () => {
+//     setCurrentAnnIndex((prev) => (prev + 1) % announcements.length);
+//   };
 
 //   // --- Timeline Converters ---
 //   const convertUTCMinutesToLocal = (utcMinutes) => {
@@ -702,6 +715,9 @@
 //             setBreakInTimeDisplay(breaks[breaks.length - 1].startTimeDisplay || '--:--');
 //             if (breaks[breaks.length - 1].endTime) {
 //               setBreakOutTimeDisplay(breaks[breaks.length - 1].endTimeDisplay || '--:--');
+//               setActiveBreakIsoStart(null);
+//             } else {
+//               setActiveBreakIsoStart(breaks[breaks.length - 1].startTime);
 //             }
 //           }
 
@@ -814,6 +830,7 @@
 //     fetchDashboardData();
 //   }, [userId, user?.name]);
 
+//   // --- Strict Verification and Custom Error Handling ---
 //   const verifyLocationAndExecute = (actionCallback) => {
 //     setGeoError('');
 //     setIsActionLoading(true);
@@ -830,25 +847,35 @@
 //         const distance = calculateDistance(latitude, longitude, TARGET_LAT, TARGET_LNG);
         
 //         if (distance <= GEOFENCE_RADIUS_KM) {
-//           actionCallback(latitude, longitude);
+//           actionCallback(latitude, longitude, distance);
 //         } else {
-//           setGeoError(`Location Error: You are ${distance.toFixed(2)} km away from the office.`);
+//           setGeoError(`Out of Range Location: You are ${distance.toFixed(2)} km away. You must be within ${GEOFENCE_RADIUS_KM * 1000} meters of the office.`);
 //           setIsActionLoading(false);
 //         }
 //       },
 //       (error) => {
-//         setGeoError("Please enable location permissions.");
+//         let errorMsg = "Location error occurred.";
+//         switch(error.code) {
+//           case error.PERMISSION_DENIED:
+//             errorMsg = "Location Permissions Denied: Please allow location access in your device/browser settings.";
+//             break;
+//           case error.POSITION_UNAVAILABLE:
+//             errorMsg = "Location Off: GPS or Location Service is turned off on your device.";
+//             break;
+//           case error.TIMEOUT:
+//             errorMsg = "Time out: Failed to get location in time. Please step outside or connect to a stable network.";
+//             break;
+//         }
+//         setGeoError(errorMsg);
 //         setIsActionLoading(false);
 //       },
 //       { enableHighAccuracy: true, timeout: 30000, maximumAge: 5000 } 
 //     );
 //   };
   
-//   const handleAttendanceAction = async (endpoint, lat, lng) => {
+//   const handleAttendanceAction = async (endpoint, payload) => {
 //     try {
-//       const payload = { userId, latitude: lat, longitude: lng };
 //       const response = await api.post(endpoint, payload);
-      
 //       if (response.data?.success) {
 //         syncAttendance(); 
 //       } else {
@@ -861,21 +888,90 @@
 //     }
 //   };
 
+//   // --- Exact Mapped Action Payloads ---
 //   const onCheckInClick = () => {
 //     if (hasCheckedInToday) return;
-//     verifyLocationAndExecute((lat, lng) => handleAttendanceAction('/api/attendance/check-in', lat, lng));
+//     verifyLocationAndExecute((lat, lng, distance) => {
+//       const payload = {
+//         userId,
+//         date: new Date().toISOString().split('T')[0],
+//         checkInTime: new Date().toISOString(),
+//         checkInLocation: {
+//           latitude: lat,
+//           longitude: lng,
+//           distanceFromOffice: parseFloat(distance.toFixed(2))
+//         },
+//         isLate: false, 
+//         status: "present",
+//         isActiveSession: true
+//       };
+//       handleAttendanceAction('/api/attendance/check-in', payload);
+//     });
 //   };
+
 //   const onStartBreakClick = () => {
 //     if (breakCount >= 2 || attendanceStatus !== 'checked_in') return;
-//     verifyLocationAndExecute((lat, lng) => handleAttendanceAction('/api/attendance/break/start', lat, lng));
+//     verifyLocationAndExecute((lat, lng, distance) => {
+//       const payload = {
+//         userId,
+//         date: new Date().toISOString().split('T')[0],
+//         startTime: new Date().toISOString(),
+//         startLocation: {
+//           latitude: lat,
+//           longitude: lng,
+//           distanceFromOffice: parseFloat(distance.toFixed(2))
+//         }
+//       };
+//       handleAttendanceAction('/api/attendance/break/start', payload);
+//     });
 //   };
+
 //   const onResumeWorkClick = () => {
 //     if (attendanceStatus !== 'on_break') return;
-//     verifyLocationAndExecute((lat, lng) => handleAttendanceAction('/api/attendance/break/end', lat, lng));
+//     verifyLocationAndExecute((lat, lng, distance) => {
+//       const endTime = new Date();
+//       // Calculate duration dynamically based on the start time fetched from backend
+//       const duration = activeBreakIsoStart 
+//         ? Math.max(0, Math.round((endTime - new Date(activeBreakIsoStart)) / 60000)) 
+//         : 0;
+
+//       const payload = {
+//         userId,
+//         date: new Date().toISOString().split('T')[0],
+//         endTime: endTime.toISOString(),
+//         duration: duration,
+//         endLocation: {
+//           latitude: lat,
+//           longitude: lng,
+//           distanceFromOffice: parseFloat(distance.toFixed(2))
+//         }
+//       };
+//       handleAttendanceAction('/api/attendance/break/end', payload);
+//     });
 //   };
+
 //   const onCheckOutClick = () => {
 //     if (attendanceStatus === 'on_break' || hasCheckedOutToday || !hasCheckedInToday) return;
-//     verifyLocationAndExecute((lat, lng) => handleAttendanceAction('/api/attendance/check-out', lat, lng));
+//     verifyLocationAndExecute((lat, lng, distance) => {
+//       const payload = {
+//         userId,
+//         date: new Date().toISOString().split('T')[0],
+//         checkOutTime: new Date().toISOString(),
+//         checkOutLocation: {
+//           latitude: lat,
+//           longitude: lng,
+//           distanceFromOffice: parseFloat(distance.toFixed(2))
+//         },
+//         isActiveSession: false
+//       };
+//       handleAttendanceAction('/api/attendance/check-out', payload);
+//     });
+//   };
+
+//   const formatDateDayMonth = (isoString) => {
+//     if (!isoString) return '';
+//     const d = new Date(isoString);
+//     return `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })}`;
 //   };
 
 //   // --- Calculate Timeline Layout Variables ---
@@ -918,7 +1014,7 @@
 //       {/* KPI Cards (5 items) */}
 //       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
 //         {[
-//           { label: 'Work Hours', value: totalWorkTimeDisplay, icon: Clock, accent: 'border-l-blue-500' },
+//           { label: 'Today Work Hours', value: totalWorkTimeDisplay, icon: Clock, accent: 'border-l-blue-500' },
 //           { label: 'Tasks To Do', value: tasksStats.todo, icon: CheckSquare, accent: 'border-l-slate-400' },
 //           { label: 'In Progress', value: tasksStats.inProgress, icon: TrendingUp, accent: 'border-l-amber-500' },
 //           { label: 'Completed', value: tasksStats.completed, icon: FileCheck, accent: 'border-l-green-500' },
@@ -926,15 +1022,13 @@
 //         ].map((item, idx) => {
 //           const Icon = item.icon;
 //           return (
-//             <div key={`kpi-${idx}`} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
-//               <div className="flex items-start justify-between gap-2">
-//                 <div>
-//                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{item.label}</p>
-//                   <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">
-//                     {isDataLoading && idx !== 0 ? <Loader2 size={20} className="animate-spin text-slate-400 mt-1" /> : item.value}
-//                   </p>
-//                 </div>
-//                 <Icon size={18} className="text-slate-400 dark:text-slate-500" />
+//             <div key={`kpi-${idx}`} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm flex flex-col justify-between h-24`}>
+//               <div className="flex justify-between items-start w-full">
+//                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{item.label}</span>
+//                 <Icon size={14} className="text-slate-400 dark:text-slate-500" />
+//               </div>
+//               <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+//                 {isDataLoading && idx !== 0 ? <Loader2 size={20} className="animate-spin text-slate-400" /> : item.value}
 //               </div>
 //             </div>
 //           );
@@ -944,7 +1038,7 @@
 //       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
 //         {/* TIME & ATTENDANCE - QUICK ACTIONS & TIMELINE */}
-//         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-colors shadow-sm p-4 sm:p-6 flex flex-col justify-between">
+//         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-colors shadow-sm p-4 sm:p-6 flex flex-col justify-center">
 
 //           {geoError && (
 //             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs font-semibold flex items-center justify-center gap-2">
@@ -1023,7 +1117,7 @@
 
 //           {/* Timeline Visualizer */}
 //           <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-//             <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex relative">
+//             <div className="w-full h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex relative">
 //               {activeSegments.length > 0 ? (
 //                 activeSegments.map((seg, sIdx) => {
 //                   const localFrom = convertUTCMinutesToLocal(seg.fromMinutes);
@@ -1032,9 +1126,8 @@
 //                   const startPercent = Math.max(0, ((localFrom - minMinutes) / totalDurationMinutes) * 100);
 //                   const widthPercent = Math.min(100 - startPercent, ((localTo - localFrom) / totalDurationMinutes) * 100);
                   
-//                   let colorClass = 'bg-slate-300 dark:bg-slate-600';
-//                   if (seg.type === 'blue') colorClass = 'bg-blue-500';
-//                   if (seg.type === 'yellow') colorClass = 'bg-amber-400';
+//                   let colorClass = 'bg-[#3B82F6]'; // Default Blue
+//                   if (seg.type === 'yellow') colorClass = 'bg-[#F59E0B]'; // Amber Break
 
 //                   return (
 //                     <div 
@@ -1196,6 +1289,8 @@
 // };
 
 
+
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   Clock, Pause, LogOut, Calendar, Gift, 
@@ -1257,7 +1352,7 @@ export const DashboardView = () => {
 
   const defaultAvatar = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
   
-  // BULLETPROOF USER ID EXTRACTION
+  // --- Bulletproof User ID Extraction ---
   const getUserId = () => {
     if (user?.employee?._id) return user.employee._id;
     if (user?.profile?._id) return user.profile._id;
@@ -1265,7 +1360,7 @@ export const DashboardView = () => {
     if (user?.id) return user.id;
     try {
       const localUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
-      return localUser?.employee?._id || localUser?._id || localUser?.id;
+      return localUser?.employee?._id || localUser?.profile?._id || localUser?._id || localUser?.id;
     } catch (e) { return null; }
   };
   const userId = getUserId();
@@ -1299,14 +1394,11 @@ export const DashboardView = () => {
       const history = res.data?.data || res.data || [];
       if (Array.isArray(history)) {
         const todayStr = new Date().toISOString().split('T')[0];
-        // Safely find today's record (get the latest if multiples exist by accident)
-        const todayRecords = history.filter(r => 
-          r.date === todayStr || 
+        const todayRecord = history.find(r => 
           r.createdAt?.startsWith(todayStr) || 
-          r.checkInTime?.startsWith(todayStr)
+          r.checkInTime?.startsWith(todayStr) ||
+          r.date?.startsWith(todayStr)
         );
-        
-        const todayRecord = todayRecords.sort((a,b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))[0];
 
         if (todayRecord) {
           setHasCheckedInToday(!!todayRecord.checkInTime);
@@ -1370,7 +1462,9 @@ export const DashboardView = () => {
         const pData = pRes.data?.data || pRes.data || {};
         const realName = pData.employee?.firstName || pData.employee?.name || pData.profile?.name || user?.name || 'Employee';
         setLiveFirstName(realName.split(' ')[0]);
-      } catch (e) {}
+      } catch (e) {
+        setLiveFirstName('Team Member');
+      }
 
       try {
         const dashRes = await api.get('/api/employee-panel/dashboard');
@@ -1378,10 +1472,13 @@ export const DashboardView = () => {
           const dData = dashRes.data?.data || dashRes.data || {};
           setUpcomingBirthdays(dData.upcomingBirthdays || dashRes.data.upcomingBirthdays || []);
           setTeamOnLeave(dData.teamMembersOnLeave || dashRes.data.teamMembersOnLeave || []);
+          
           const stats = dData.stats || dashRes.data.stats;
-          if (stats && stats.leaveBalance !== undefined) setLeaveBalance(`${stats.leaveBalance} Days`);
+          if (stats && stats.leaveBalance !== undefined) {
+            setLeaveBalance(`${stats.leaveBalance} Days`);
+          }
         }
-      } catch (e) {}
+      } catch (e) { console.error("Error fetching dash stats", e); }
 
       try {
         if (userId) {
@@ -1394,6 +1491,17 @@ export const DashboardView = () => {
           });
         }
       } catch (e) {}
+
+      if (leaveBalance === '--') {
+        try {
+          if (userId) {
+            const leaveRes = await api.get('/api/employee-panel/leaves/overview');
+            if (leaveRes.data?.success && leaveRes.data?.summary) {
+              setLeaveBalance(`${leaveRes.data.summary.remainingLeaves} Days`);
+            }
+          }
+        } catch (e) {}
+      }
 
       try {
         const annRes = await api.get('/api/notification/announcement/all');
@@ -1421,13 +1529,13 @@ export const DashboardView = () => {
     fetchDashboardData();
   }, [userId, user?.name]);
 
-  // --- Strict Verification and Custom Error Handling ---
+  // --- Geolocation & Verification ---
   const verifyLocationAndExecute = (actionCallback) => {
     setGeoError('');
     setIsActionLoading(true);
 
     if (!userId) {
-      setGeoError("Authentication error: User ID is missing. Please log out and log back in.");
+      setGeoError("User ID is required. Please sign in again.");
       setIsActionLoading(false);
       return;
     }
@@ -1446,46 +1554,36 @@ export const DashboardView = () => {
         if (distance <= GEOFENCE_RADIUS_KM) {
           actionCallback(latitude, longitude, distance);
         } else {
-          setGeoError(`Out of Range: You are ${distance.toFixed(2)} km away. You must be within ${GEOFENCE_RADIUS_KM * 1000} meters of the office.`);
+          setGeoError(`Location Error: You are ${distance.toFixed(2)} km away from the office.`);
           setIsActionLoading(false);
         }
       },
       (error) => {
-        let errorMsg = "Location error occurred.";
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMsg = "Location Permissions Denied: Please allow location access in your device/browser settings.";
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMsg = "Location Off: GPS or Location Service is turned off on your device.";
-            break;
-          case error.TIMEOUT:
-            errorMsg = "Time out: Failed to get location in time. Please step outside or connect to a stable network.";
-            break;
-        }
-        setGeoError(errorMsg);
+        setGeoError("Please enable location permissions.");
         setIsActionLoading(false);
       },
       { enableHighAccuracy: true, timeout: 30000, maximumAge: 5000 } 
     );
   };
   
+  // --- Attendance API Call Handler ---
   const handleAttendanceAction = async (endpoint, payload) => {
     try {
       const response = await api.post(endpoint, payload);
+      
       if (response.data?.success) {
         syncAttendance(); 
       } else {
         setGeoError(response.data?.message || "Action failed.");
       }
     } catch (err) {
-      setGeoError(err.response?.data?.message || err.response?.data?.error || "Server Error. Please ensure your session is active.");
+      setGeoError(err.response?.data?.message || err.message || "Server Error");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  // --- Exact Mapped Action Payloads ---
+  // --- Quick Action Methods with Correct Payloads ---
   const onCheckInClick = () => {
     if (hasCheckedInToday) return;
     verifyLocationAndExecute((lat, lng, distance) => {
@@ -1498,7 +1596,7 @@ export const DashboardView = () => {
           longitude: lng,
           distanceFromOffice: parseFloat(distance.toFixed(2))
         },
-        isLate: false, 
+        isLate: false,
         status: "present",
         isActiveSession: true
       };
@@ -1527,11 +1625,10 @@ export const DashboardView = () => {
     if (attendanceStatus !== 'on_break') return;
     verifyLocationAndExecute((lat, lng, distance) => {
       const endTime = new Date();
-      // Calculate duration dynamically based on the start time fetched from backend
       const duration = activeBreakIsoStart 
         ? Math.max(0, Math.round((endTime - new Date(activeBreakIsoStart)) / 60000)) 
         : 0;
-
+        
       const payload = {
         userId,
         date: new Date().toISOString().split('T')[0],
