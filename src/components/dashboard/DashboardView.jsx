@@ -1256,7 +1256,19 @@ export const DashboardView = () => {
   const [breakOutTimeDisplay, setBreakOutTimeDisplay] = useState('--:--');
 
   const defaultAvatar = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
-  const userId = user?.employee?._id || user?.profile?._id || user?._id;
+  
+  // BULLETPROOF USER ID EXTRACTION
+  const getUserId = () => {
+    if (user?.employee?._id) return user.employee._id;
+    if (user?.profile?._id) return user.profile._id;
+    if (user?._id) return user._id;
+    if (user?.id) return user.id;
+    try {
+      const localUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
+      return localUser?.employee?._id || localUser?._id || localUser?.id;
+    } catch (e) { return null; }
+  };
+  const userId = getUserId();
 
   // --- Announcement Controls ---
   const handlePrevAnnouncement = () => {
@@ -1287,11 +1299,14 @@ export const DashboardView = () => {
       const history = res.data?.data || res.data || [];
       if (Array.isArray(history)) {
         const todayStr = new Date().toISOString().split('T')[0];
-        const todayRecord = history.find(r => 
+        // Safely find today's record (get the latest if multiples exist by accident)
+        const todayRecords = history.filter(r => 
+          r.date === todayStr || 
           r.createdAt?.startsWith(todayStr) || 
-          r.checkInTime?.startsWith(todayStr) ||
-          r.date?.startsWith(todayStr)
+          r.checkInTime?.startsWith(todayStr)
         );
+        
+        const todayRecord = todayRecords.sort((a,b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))[0];
 
         if (todayRecord) {
           setHasCheckedInToday(!!todayRecord.checkInTime);
@@ -1355,9 +1370,7 @@ export const DashboardView = () => {
         const pData = pRes.data?.data || pRes.data || {};
         const realName = pData.employee?.firstName || pData.employee?.name || pData.profile?.name || user?.name || 'Employee';
         setLiveFirstName(realName.split(' ')[0]);
-      } catch (e) {
-        setLiveFirstName('Team Member');
-      }
+      } catch (e) {}
 
       try {
         const dashRes = await api.get('/api/employee-panel/dashboard');
@@ -1365,13 +1378,10 @@ export const DashboardView = () => {
           const dData = dashRes.data?.data || dashRes.data || {};
           setUpcomingBirthdays(dData.upcomingBirthdays || dashRes.data.upcomingBirthdays || []);
           setTeamOnLeave(dData.teamMembersOnLeave || dashRes.data.teamMembersOnLeave || []);
-          
           const stats = dData.stats || dashRes.data.stats;
-          if (stats && stats.leaveBalance !== undefined) {
-            setLeaveBalance(`${stats.leaveBalance} Days`);
-          }
+          if (stats && stats.leaveBalance !== undefined) setLeaveBalance(`${stats.leaveBalance} Days`);
         }
-      } catch (e) { console.error("Error fetching dash stats", e); }
+      } catch (e) {}
 
       try {
         if (userId) {
@@ -1384,17 +1394,6 @@ export const DashboardView = () => {
           });
         }
       } catch (e) {}
-
-      if (leaveBalance === '--') {
-        try {
-          if (userId) {
-            const leaveRes = await api.get('/api/employee-panel/leaves/overview');
-            if (leaveRes.data?.success && leaveRes.data?.summary) {
-              setLeaveBalance(`${leaveRes.data.summary.remainingLeaves} Days`);
-            }
-          }
-        } catch (e) {}
-      }
 
       try {
         const annRes = await api.get('/api/notification/announcement/all');
@@ -1427,6 +1426,12 @@ export const DashboardView = () => {
     setGeoError('');
     setIsActionLoading(true);
 
+    if (!userId) {
+      setGeoError("Authentication error: User ID is missing. Please log out and log back in.");
+      setIsActionLoading(false);
+      return;
+    }
+
     if (!navigator.geolocation) {
       setGeoError("Location tracking is not supported by your browser.");
       setIsActionLoading(false);
@@ -1441,7 +1446,7 @@ export const DashboardView = () => {
         if (distance <= GEOFENCE_RADIUS_KM) {
           actionCallback(latitude, longitude, distance);
         } else {
-          setGeoError(`Out of Range Location: You are ${distance.toFixed(2)} km away. You must be within ${GEOFENCE_RADIUS_KM * 1000} meters of the office.`);
+          setGeoError(`Out of Range: You are ${distance.toFixed(2)} km away. You must be within ${GEOFENCE_RADIUS_KM * 1000} meters of the office.`);
           setIsActionLoading(false);
         }
       },
@@ -1474,7 +1479,7 @@ export const DashboardView = () => {
         setGeoError(response.data?.message || "Action failed.");
       }
     } catch (err) {
-      setGeoError(err.response?.data?.message || err.message || "Server Error");
+      setGeoError(err.response?.data?.message || err.response?.data?.error || "Server Error. Please ensure your session is active.");
     } finally {
       setIsActionLoading(false);
     }
