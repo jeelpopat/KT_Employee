@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
-import logo from '../../../assets/logo.png';
+import logo from '../../assets/Logo.png';
 import api from '../../api/axios.js'; 
 
 export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, ArrowLeft, Loader2, Send, CheckCircle2 } from 'lucide-react';
-import logo from '../../../assets/logo.png';
+import logo from '../../assets/Logo.png';
 import api from '../../api/axios.js';
 
 export const ForgotPasswordView = ({ onBackToLogin }) => {

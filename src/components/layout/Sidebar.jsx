@@ -4,7 +4,7 @@ import {
   CalendarDays, User, LogOut, ChevronLeft, ChevronRight, X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
-import logo from '../../../assets/logo.png';
+import logo from '../../assets/Logo.png';
 
 export const Sidebar = ({ onSignOut }) => {
   const { 
