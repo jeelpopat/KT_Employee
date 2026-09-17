@@ -1321,6 +1321,7 @@ export const DashboardView = () => {
   const { user } = useApp();
 
   // --- Live Data States ---
+  const [actualUserId, setActualUserId] = useState(null); // The true MongoDB _id
   const [liveFirstName, setLiveFirstName] = useState('Loading...');
   const [tasksStats, setTasksStats] = useState({ todo: 0, inProgress: 0, completed: 0 });
   const [leaveBalance, setLeaveBalance] = useState('--');
@@ -1332,38 +1333,27 @@ export const DashboardView = () => {
   const [isDataLoading, setIsDataLoading] = useState(true);
 
   // --- Attendance & Timeline States ---
-  const [attendanceStatus, setAttendanceStatus] = useState('checked_out'); 
-  const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
-  const [hasCheckedOutToday, setHasCheckedOutToday] = useState(false);
-  const [breakCount, setBreakCount] = useState(0);
   const [geoError, setGeoError] = useState('');
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [todaySegments, setTodaySegments] = useState([]);
   
-  // Track active break start time to calculate duration on break end
-  const [activeBreakIsoStart, setActiveBreakIsoStart] = useState(null);
+  const [attendanceStatus, setAttendanceStatus] = useState('not_checked_in'); 
+  const [actionsAvailable, setActionsAvailable] = useState({
+    canCheckIn: true,
+    canStartBreak: false,
+    canEndBreak: false,
+    canCheckOut: false
+  });
 
-  // Display strings based on API Response
+  const [activeBreakIsoStart, setActiveBreakIsoStart] = useState(null);
   const [checkInTimeDisplay, setCheckInTimeDisplay] = useState('--:--');
   const [checkOutTimeDisplay, setCheckOutTimeDisplay] = useState('--:--');
   const [totalWorkTimeDisplay, setTotalWorkTimeDisplay] = useState('0h 0m');
   const [breakInTimeDisplay, setBreakInTimeDisplay] = useState('--:--');
   const [breakOutTimeDisplay, setBreakOutTimeDisplay] = useState('--:--');
+  const [totalBreakTimeDisplay, setTotalBreakTimeDisplay] = useState('0m');
 
   const defaultAvatar = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
-  
-  // --- Bulletproof User ID Extraction ---
-  const getUserId = () => {
-    if (user?.employee?._id) return user.employee._id;
-    if (user?.profile?._id) return user.profile._id;
-    if (user?._id) return user._id;
-    if (user?.id) return user.id;
-    try {
-      const localUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
-      return localUser?.employee?._id || localUser?.profile?._id || localUser?._id || localUser?.id;
-    } catch (e) { return null; }
-  };
-  const userId = getUserId();
 
   // --- Announcement Controls ---
   const handlePrevAnnouncement = () => {
@@ -1386,128 +1376,101 @@ export const DashboardView = () => {
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
-  // --- Sync Attendance Across Devices ---
-  const syncAttendance = useCallback(async () => {
-    if (!userId) return;
+  const formatISOToLocalTime = (isoStr) => {
+    if (!isoStr) return '--:--';
+    const date = new Date(isoStr);
+    if (isNaN(date.getTime())) return '--:--';
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
+  // --- Core Sync Logic ---
+  const syncDashboardAndAttendance = useCallback(async (resolvedUserId) => {
     try {
-      const res = await api.get(`/api/attendance/history/${userId}`);
-      const history = res.data?.data || res.data || [];
-      if (Array.isArray(history)) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayRecord = history.find(r => 
-          r.createdAt?.startsWith(todayStr) || 
-          r.checkInTime?.startsWith(todayStr) ||
-          r.date?.startsWith(todayStr)
-        );
-
-        if (todayRecord) {
-          setHasCheckedInToday(!!todayRecord.checkInTime);
-          setHasCheckedOutToday(!!todayRecord.checkOutTime);
-          
-          if (todayRecord.checkInTimeDisplay) setCheckInTimeDisplay(todayRecord.checkInTimeDisplay);
-          if (todayRecord.checkOutTimeDisplay) setCheckOutTimeDisplay(todayRecord.checkOutTimeDisplay);
-          if (todayRecord.totalWorkTimeDisplay) setTotalWorkTimeDisplay(todayRecord.totalWorkTimeDisplay);
-
-          const breaks = todayRecord.breaks || [];
-          setBreakCount(breaks.length);
-          if (breaks.length > 0) {
-            setBreakInTimeDisplay(breaks[breaks.length - 1].startTimeDisplay || '--:--');
-            if (breaks[breaks.length - 1].endTime) {
-              setBreakOutTimeDisplay(breaks[breaks.length - 1].endTimeDisplay || '--:--');
-              setActiveBreakIsoStart(null);
-            } else {
-              setActiveBreakIsoStart(breaks[breaks.length - 1].startTime);
-            }
-          }
-
-          if (todayRecord.checkOutTime) {
-            setAttendanceStatus('checked_out');
-          } else if (breaks.length > 0 && !breaks[breaks.length - 1].endTime) {
-            setAttendanceStatus('on_break');
-          } else if (todayRecord.checkInTime) {
-            setAttendanceStatus('checked_in');
-          }
-        }
+      // 1. Fetch Dashboard (includes todayAttendance, holidays, birthdays, leaves)
+      const dashRes = await api.get('/api/employee-panel/dashboard');
+      const dData = dashRes.data?.data || dashRes.data || {};
+      
+      setUpcomingBirthdays(dData.upcomingBirthdays || []);
+      setTeamOnLeave(dData.teamMembersOnLeave || []);
+      if (dData.stats?.leaveBalance !== undefined) {
+        setLeaveBalance(`${dData.stats.leaveBalance} Days`);
       }
 
-      // Fetch Today's Timeline Segments
+      // Map Live Attendance Status
+      if (dData.todayAttendance) {
+        const ta = dData.todayAttendance;
+        setAttendanceStatus(ta.status || 'not_checked_in');
+        if (ta.actionsAvailable) setActionsAvailable(ta.actionsAvailable);
+        
+        if (ta.checkInTime) setCheckInTimeDisplay(formatISOToLocalTime(ta.checkInTime));
+        if (ta.currentWorkingHours !== undefined) setTotalWorkTimeDisplay(`${ta.currentWorkingHours}h`);
+        if (ta.breakDuration !== undefined) setTotalBreakTimeDisplay(`${ta.breakDuration}m`);
+      }
+
+      // 2. Fetch Timeline (for the visual bar and specific check-out/break boundaries)
       const tlRes = await api.get('/api/employee-panel/attendance/timeline?filter=today');
       if (tlRes.data?.data && tlRes.data.data.length > 0) {
-        setTodaySegments(tlRes.data.data[0].timelineSegments || []);
+        const todayData = tlRes.data.data[0];
+        const segments = todayData.timelineSegments || [];
+        setTodaySegments(segments);
+
+        if (todayData.checkOutTime) setCheckOutTimeDisplay(formatISOToLocalTime(todayData.checkOutTime));
+
+        // Extract latest break times
+        const yellowSegments = segments.filter(s => s.type === 'yellow');
+        if (yellowSegments.length > 0) {
+          const lastBreak = yellowSegments[yellowSegments.length - 1];
+          setBreakInTimeDisplay(formatMinutesToTimeStr(convertUTCMinutesToLocal(lastBreak.fromMinutes)));
+          if (lastBreak.toMinutes > lastBreak.fromMinutes) {
+            setBreakOutTimeDisplay(formatMinutesToTimeStr(convertUTCMinutesToLocal(lastBreak.toMinutes)));
+          }
+        }
       } else {
         setTodaySegments([]);
       }
 
-    } catch (error) {
-      console.error("Failed to sync attendance:", error);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    syncAttendance();
-    window.addEventListener('focus', syncAttendance);
-    const interval = setInterval(syncAttendance, 30000);
-    return () => {
-      window.removeEventListener('focus', syncAttendance);
-      clearInterval(interval);
-    };
-  }, [syncAttendance]);
-
-  // --- Fetch Dashboard Live Data ---
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      setIsDataLoading(true);
-      try {
-        const pRes = await api.get('/api/users/profile');
-        const pData = pRes.data?.data || pRes.data || {};
-        const realName = pData.employee?.firstName || pData.employee?.name || pData.profile?.name || user?.name || 'Employee';
-        setLiveFirstName(realName.split(' ')[0]);
-      } catch (e) {
-        setLiveFirstName('Team Member');
-      }
-
-      try {
-        const dashRes = await api.get('/api/employee-panel/dashboard');
-        if (dashRes.data?.success) {
-          const dData = dashRes.data?.data || dashRes.data || {};
-          setUpcomingBirthdays(dData.upcomingBirthdays || dashRes.data.upcomingBirthdays || []);
-          setTeamOnLeave(dData.teamMembersOnLeave || dashRes.data.teamMembersOnLeave || []);
-          
-          const stats = dData.stats || dashRes.data.stats;
-          if (stats && stats.leaveBalance !== undefined) {
-            setLeaveBalance(`${stats.leaveBalance} Days`);
-          }
-        }
-      } catch (e) { console.error("Error fetching dash stats", e); }
-
-      try {
-        if (userId) {
-          const taskRes = await api.get(`/api/task/employee/${userId}`);
+      // 3. Fetch Tasks (Using valid MongoDB ID to prevent 500 error)
+      if (resolvedUserId) {
+        try {
+          const taskRes = await api.get(`/api/task/employee/${resolvedUserId}`);
           const tasksList = taskRes.data?.tasks || taskRes.data?.data || taskRes.data || [];
           setTasksStats({
             todo: tasksList.filter(t => t.status === 'Assigned').length,
             inProgress: tasksList.filter(t => t.status === 'In Progress').length,
             completed: tasksList.filter(t => t.status === 'Completed').length,
           });
-        }
-      } catch (e) {}
-
-      if (leaveBalance === '--') {
-        try {
-          if (userId) {
-            const leaveRes = await api.get('/api/employee-panel/leaves/overview');
-            if (leaveRes.data?.success && leaveRes.data?.summary) {
-              setLeaveBalance(`${leaveRes.data.summary.remainingLeaves} Days`);
-            }
-          }
-        } catch (e) {}
+        } catch (e) { console.warn("Tasks sync failed:", e); }
       }
 
+    } catch (error) {
+      console.error("Failed to sync dashboard:", error);
+    }
+  }, []);
+
+  // --- Initial Mount & Bootstrapper ---
+  useEffect(() => {
+    const bootstrapDashboard = async () => {
+      setIsDataLoading(true);
+      let validUserId = null;
+
+      // Ensure we get the correct 24-character MongoDB ID from the profile API
+      try {
+        const pRes = await api.get('/api/users/profile');
+        const prof = pRes.data?.data || pRes.data || {};
+        setLiveFirstName((prof.employee?.firstName || prof.employee?.name || prof.name || 'User').split(' ')[0]);
+        validUserId = prof.employee?._id || prof._id;
+        setActualUserId(validUserId);
+      } catch (e) {
+        console.warn("Profile fetch failed. Using fallback user context.");
+      }
+
+      // Load core module data
+      await syncDashboardAndAttendance(validUserId);
+
+      // Fetch independent data (Announcements, Holidays)
       try {
         const annRes = await api.get('/api/notification/announcement/all');
-        if (annRes.data?.success && annRes.data?.data) {
-          setAnnouncements(annRes.data.data);
-        }
+        if (annRes.data?.success && annRes.data?.data) setAnnouncements(annRes.data.data);
       } catch (e) {}
 
       try {
@@ -1515,27 +1478,30 @@ export const DashboardView = () => {
         if (holRes.data?.success && holRes.data?.holidays) {
           const currentMonth = new Date().getMonth();
           const currentYear = new Date().getFullYear();
-          const upcoming = holRes.data.holidays.filter(h => {
+          setHolidays(holRes.data.holidays.filter(h => {
             const hDate = new Date(h.holidayDate);
             return hDate.getMonth() === currentMonth && hDate.getFullYear() === currentYear && hDate >= new Date();
-          });
-          setHolidays(upcoming);
+          }));
         }
       } catch (e) {}
 
       setIsDataLoading(false);
     };
 
-    fetchDashboardData();
-  }, [userId, user?.name]);
+    bootstrapDashboard();
 
-  // --- Geolocation & Verification ---
+    // Auto-refresh interval
+    const interval = setInterval(() => syncDashboardAndAttendance(actualUserId), 30000);
+    return () => clearInterval(interval);
+  }, [syncDashboardAndAttendance, actualUserId]);
+
+  // --- Robust Geolocation & Verification ---
   const verifyLocationAndExecute = (actionCallback) => {
     setGeoError('');
     setIsActionLoading(true);
 
-    if (!userId) {
-      setGeoError("User ID is required. Please sign in again.");
+    if (!actualUserId) {
+      setGeoError("User profile is syncing. Please wait a moment and try again.");
       setIsActionLoading(false);
       return;
     }
@@ -1554,41 +1520,51 @@ export const DashboardView = () => {
         if (distance <= GEOFENCE_RADIUS_KM) {
           actionCallback(latitude, longitude, distance);
         } else {
-          setGeoError(`Location Error: You are ${distance.toFixed(2)} km away from the office.`);
+          setGeoError(`Out of range location. You are ${distance.toFixed(2)} km away.`);
           setIsActionLoading(false);
         }
       },
       (error) => {
-        setGeoError("Please enable location permissions.");
+        let errorMsg = "Location permission and GPS coordinates are required to mark attendance.";
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMsg = "Location permissions denied. Please allow location access in your browser/app settings.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMsg = "Location off. Please enable GPS on your device.";
+            break;
+          case error.TIMEOUT:
+            errorMsg = "Time out: Failed to get location in time. Please step outside or try again.";
+            break;
+        }
+        setGeoError(errorMsg);
         setIsActionLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 30000, maximumAge: 5000 } 
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } 
     );
   };
   
-  // --- Attendance API Call Handler ---
   const handleAttendanceAction = async (endpoint, payload) => {
     try {
       const response = await api.post(endpoint, payload);
-      
       if (response.data?.success) {
-        syncAttendance(); 
+        syncDashboardAndAttendance(actualUserId); 
       } else {
         setGeoError(response.data?.message || "Action failed.");
       }
     } catch (err) {
-      setGeoError(err.response?.data?.message || err.message || "Server Error");
+      setGeoError(err.response?.data?.message || err.response?.data?.error || "Server Error. Please try again.");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  // --- Quick Action Methods with Correct Payloads ---
+  // --- Strict Mapped Action Payloads ---
   const onCheckInClick = () => {
-    if (hasCheckedInToday) return;
+    if (!actionsAvailable.canCheckIn) return;
     verifyLocationAndExecute((lat, lng, distance) => {
       const payload = {
-        userId,
+        userId: actualUserId,
         date: new Date().toISOString().split('T')[0],
         checkInTime: new Date().toISOString(),
         checkInLocation: {
@@ -1596,7 +1572,7 @@ export const DashboardView = () => {
           longitude: lng,
           distanceFromOffice: parseFloat(distance.toFixed(2))
         },
-        isLate: false,
+        isLate: false, 
         status: "present",
         isActiveSession: true
       };
@@ -1605,12 +1581,14 @@ export const DashboardView = () => {
   };
 
   const onStartBreakClick = () => {
-    if (breakCount >= 2 || attendanceStatus !== 'checked_in') return;
+    if (!actionsAvailable.canStartBreak) return;
+    const isoNow = new Date().toISOString();
+    setActiveBreakIsoStart(isoNow); // Save locally for Break-Out duration calc
     verifyLocationAndExecute((lat, lng, distance) => {
       const payload = {
-        userId,
+        userId: actualUserId,
         date: new Date().toISOString().split('T')[0],
-        startTime: new Date().toISOString(),
+        startTime: isoNow,
         startLocation: {
           latitude: lat,
           longitude: lng,
@@ -1622,15 +1600,15 @@ export const DashboardView = () => {
   };
 
   const onResumeWorkClick = () => {
-    if (attendanceStatus !== 'on_break') return;
+    if (!actionsAvailable.canEndBreak) return;
     verifyLocationAndExecute((lat, lng, distance) => {
       const endTime = new Date();
       const duration = activeBreakIsoStart 
         ? Math.max(0, Math.round((endTime - new Date(activeBreakIsoStart)) / 60000)) 
         : 0;
-        
+
       const payload = {
-        userId,
+        userId: actualUserId,
         date: new Date().toISOString().split('T')[0],
         endTime: endTime.toISOString(),
         duration: duration,
@@ -1645,10 +1623,10 @@ export const DashboardView = () => {
   };
 
   const onCheckOutClick = () => {
-    if (attendanceStatus === 'on_break' || hasCheckedOutToday || !hasCheckedInToday) return;
+    if (!actionsAvailable.canCheckOut) return;
     verifyLocationAndExecute((lat, lng, distance) => {
       const payload = {
-        userId,
+        userId: actualUserId,
         date: new Date().toISOString().split('T')[0],
         checkOutTime: new Date().toISOString(),
         checkOutLocation: {
@@ -1681,8 +1659,8 @@ export const DashboardView = () => {
   });
 
   if (minMinutes === Infinity) {
-    minMinutes = 540; // Fallback 9:00 AM
-    maxMinutes = 1080; // Fallback 6:00 PM
+    minMinutes = 540; 
+    maxMinutes = 1080; 
   }
   const totalDurationMinutes = maxMinutes - minMinutes || 1;
   const breakSegment = activeSegments.find(s => s.type === 'yellow');
@@ -1735,8 +1713,9 @@ export const DashboardView = () => {
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-colors shadow-sm p-4 sm:p-6 flex flex-col justify-center">
 
           {geoError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs font-semibold flex items-center justify-center gap-2">
-              <AlertCircle size={14} /> {geoError}
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs font-semibold flex items-center justify-center gap-2 text-center">
+              <AlertCircle size={16} className="shrink-0" /> 
+              <span>{geoError}</span>
             </div>
           )}
 
@@ -1750,11 +1729,11 @@ export const DashboardView = () => {
               {/* Check In */}
               <button 
                 onClick={onCheckInClick}
-                disabled={isActionLoading || hasCheckedInToday}
-                className={`flex flex-col items-center gap-2 transition-transform active:scale-95 ${hasCheckedInToday ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                disabled={isActionLoading || !actionsAvailable.canCheckIn}
+                className={`flex flex-col items-center gap-2 transition-transform active:scale-95 ${!actionsAvailable.canCheckIn ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${hasCheckedInToday ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#ECFDF5] text-[#10B981] shadow-sm'}`}>
-                  {isActionLoading && !hasCheckedInToday ? <Loader2 className="animate-spin" size={24} /> : <LogIn size={24} />}
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${!actionsAvailable.canCheckIn ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#ECFDF5] text-[#10B981] shadow-sm'}`}>
+                  {isActionLoading && actionsAvailable.canCheckIn ? <Loader2 className="animate-spin" size={24} /> : <LogIn size={24} />}
                 </div>
                 <div className="text-center">
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Check In</p>
@@ -1765,11 +1744,11 @@ export const DashboardView = () => {
               {/* Break In */}
               <button 
                 onClick={onStartBreakClick}
-                disabled={isActionLoading || attendanceStatus !== 'checked_in' || breakCount >= 2}
-                className={`flex flex-col items-center gap-2 transition-transform active:scale-95 ${attendanceStatus !== 'checked_in' || breakCount >= 2 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                disabled={isActionLoading || !actionsAvailable.canStartBreak}
+                className={`flex flex-col items-center gap-2 transition-transform active:scale-95 ${!actionsAvailable.canStartBreak ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${attendanceStatus !== 'checked_in' || breakCount >= 2 ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#FFFBEB] text-[#F59E0B] shadow-sm'}`}>
-                  {isActionLoading && attendanceStatus === 'checked_in' ? <Loader2 className="animate-spin" size={24} /> : <Coffee size={24} />}
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${!actionsAvailable.canStartBreak ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#FFFBEB] text-[#F59E0B] shadow-sm'}`}>
+                  {isActionLoading && actionsAvailable.canStartBreak ? <Loader2 className="animate-spin" size={24} /> : <Coffee size={24} />}
                 </div>
                 <div className="text-center">
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Break In</p>
@@ -1780,11 +1759,11 @@ export const DashboardView = () => {
               {/* Break Out */}
               <button 
                 onClick={onResumeWorkClick}
-                disabled={isActionLoading || attendanceStatus !== 'on_break'}
-                className={`flex flex-col items-center gap-2 transition-transform active:scale-95 ${attendanceStatus !== 'on_break' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                disabled={isActionLoading || !actionsAvailable.canEndBreak}
+                className={`flex flex-col items-center gap-2 transition-transform active:scale-95 ${!actionsAvailable.canEndBreak ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${attendanceStatus !== 'on_break' ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-slate-100 text-slate-600 shadow-sm'}`}>
-                  {isActionLoading && attendanceStatus === 'on_break' ? <Loader2 className="animate-spin" size={24} /> : <Coffee size={24} />}
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${!actionsAvailable.canEndBreak ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-slate-100 text-slate-600 shadow-sm'}`}>
+                  {isActionLoading && actionsAvailable.canEndBreak ? <Loader2 className="animate-spin" size={24} /> : <Coffee size={24} />}
                 </div>
                 <div className="text-center">
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Break Out</p>
@@ -1795,11 +1774,11 @@ export const DashboardView = () => {
               {/* Check Out */}
               <button 
                 onClick={onCheckOutClick}
-                disabled={isActionLoading || !hasCheckedInToday || hasCheckedOutToday || attendanceStatus === 'on_break'}
-                className={`flex flex-col items-center gap-2 transition-transform active:scale-95 ${!hasCheckedInToday || hasCheckedOutToday || attendanceStatus === 'on_break' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                disabled={isActionLoading || !actionsAvailable.canCheckOut}
+                className={`flex flex-col items-center gap-2 transition-transform active:scale-95 ${!actionsAvailable.canCheckOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${!hasCheckedInToday || hasCheckedOutToday || attendanceStatus === 'on_break' ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#FEF2F2] text-[#EF4444] shadow-sm'}`}>
-                  {isActionLoading && attendanceStatus === 'checked_in' ? <Loader2 className="animate-spin" size={24} /> : <LogOut size={24} />}
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${!actionsAvailable.canCheckOut ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#FEF2F2] text-[#EF4444] shadow-sm'}`}>
+                  {isActionLoading && actionsAvailable.canCheckOut ? <Loader2 className="animate-spin" size={24} /> : <LogOut size={24} />}
                 </div>
                 <div className="text-center">
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Check Out</p>
@@ -1820,8 +1799,8 @@ export const DashboardView = () => {
                   const startPercent = Math.max(0, ((localFrom - minMinutes) / totalDurationMinutes) * 100);
                   const widthPercent = Math.min(100 - startPercent, ((localTo - localFrom) / totalDurationMinutes) * 100);
                   
-                  let colorClass = 'bg-[#3B82F6]'; // Default Blue
-                  if (seg.type === 'yellow') colorClass = 'bg-[#F59E0B]'; // Amber Break
+                  let colorClass = 'bg-[#3B82F6]'; 
+                  if (seg.type === 'yellow') colorClass = 'bg-[#F59E0B]'; 
 
                   return (
                     <div 
@@ -1836,10 +1815,10 @@ export const DashboardView = () => {
                 <div className="w-full h-full bg-slate-100 dark:bg-slate-800"></div>
               )}
             </div>
-            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 mt-2 uppercase tracking-wider font-mono">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 mt-3 uppercase tracking-wider font-mono">
               <span>{activeSegments.length > 0 ? formatMinutesToTimeStr(minMinutes) : '--:--'}</span>
               {breakStartTime && <span>{breakStartTime}</span>}
-              <span>{activeSegments.length > 0 && hasCheckedOutToday ? formatMinutesToTimeStr(maxMinutes) : '--:--'}</span>
+              <span>{activeSegments.length > 0 && attendanceStatus === 'checked_out' ? formatMinutesToTimeStr(maxMinutes) : '--:--'}</span>
             </div>
           </div>
         </div>
