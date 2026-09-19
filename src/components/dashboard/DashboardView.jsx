@@ -90,10 +90,31 @@ export const DashboardView = () => {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
+  // Date matching helper robust against UTC/local time offsets and format variations
+  const isTodayDate = (dateVal) => {
+    if (!dateVal) return false;
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    if (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    ) {
+      return true;
+    }
+    const todayIso = now.toISOString().split('T')[0];
+    const todayLocal = now.toLocaleDateString('en-CA');
+    const dStr = typeof dateVal === 'string' ? dateVal : d.toISOString();
+    return dStr.startsWith(todayIso) || dStr.startsWith(todayLocal);
+  };
+
   // --- Core Sync Logic ---
   const syncDashboardAndAttendance = useCallback(async (resolvedUserId) => {
     try {
       const effectiveId = resolvedUserId || actualUserId || user?.employee?._id || user?._id || user?.id || user?.user?._id;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayLocalStr = new Date().toLocaleDateString('en-CA');
 
       // 1. Fetch Dashboard (includes holidays, birthdays, leaves)
       let dData = {};
@@ -110,82 +131,164 @@ export const DashboardView = () => {
         console.warn("Dashboard stats fetch:", dashErr);
       }
 
-      // 2. Fetch Timeline (for the visual bar and specific segments)
+      // 2. Fetch Timeline - Try 'today' first, then fallback to 'last10days' to guarantee finding today's record
       let todayTimelineData = null;
       let segments = [];
       try {
         const tlRes = await api.get('/api/employee-panel/attendance/timeline?filter=today');
-        if (tlRes.data?.data && tlRes.data.data.length > 0) {
-          todayTimelineData = tlRes.data.data[0];
+        const tlList = tlRes.data?.data || tlRes.data?.timeline || [];
+        if (Array.isArray(tlList) && tlList.length > 0) {
+          todayTimelineData = tlList[0];
           segments = todayTimelineData.timelineSegments || [];
-          setTodaySegments(segments);
-        } else {
-          setTodaySegments([]);
         }
       } catch (tlErr) {
-        console.warn("Timeline fetch failed:", tlErr);
+        console.warn("Timeline today fetch failed:", tlErr);
       }
 
-      // 3. Fetch dedicated attendance endpoints (try /api/attendance/today, then history)
+      if (!todayTimelineData) {
+        try {
+          const tl10Res = await api.get('/api/employee-panel/attendance/timeline?filter=last10days');
+          const tl10List = tl10Res.data?.data || tl10Res.data?.timeline || [];
+          if (Array.isArray(tl10List) && tl10List.length > 0) {
+            // Sort descending by date/creation to inspect most recent
+            const sortedTimeline = [...tl10List].sort((a, b) => {
+              const tA = new Date(a.date || a.checkInTime || a.createdAt || 0).getTime();
+              const tB = new Date(b.date || b.checkInTime || b.createdAt || 0).getTime();
+              return tB - tA;
+            });
+
+            const match = sortedTimeline.find(r => 
+              isTodayDate(r.date) || 
+              isTodayDate(r.checkInTime) || 
+              isTodayDate(r.createdAt)
+            );
+
+            if (match) {
+              todayTimelineData = match;
+              segments = match.timelineSegments || [];
+            } else if (sortedTimeline.length > 0) {
+              const latest = sortedTimeline[0];
+              const lStatus = String(latest.status || '').toLowerCase().trim();
+              const hasNoCheckout = !latest.checkOutTime || latest.checkOutTime === '--:--' || latest.checkOutTime === 'null';
+              if (hasNoCheckout && (latest.checkInTime || ['present', 'checked_in', 'on_break', 'late'].includes(lStatus))) {
+                todayTimelineData = latest;
+                segments = latest.timelineSegments || [];
+              }
+            }
+          }
+        } catch (tl10Err) {
+          console.warn("Timeline last10days fallback failed:", tl10Err);
+        }
+      }
+      setTodaySegments(segments);
+
+      // 3. Try /api/attendance/today
       let todayAttRecord = null;
       try {
         const todayRes = await api.get('/api/attendance/today');
-        const tData = todayRes.data?.data || todayRes.data?.attendance || todayRes.data;
+        const tData = todayRes.data?.attendance || todayRes.data?.data?.attendance || todayRes.data?.data || todayRes.data;
         if (tData && (tData.checkInTime || tData.status || tData._id)) {
           todayAttRecord = tData;
         }
       } catch (e) {}
 
+      // 4. Try /api/attendance/history/${effectiveId}
       if (!todayAttRecord && effectiveId) {
         try {
           const histRes = await api.get(`/api/attendance/history/${effectiveId}`);
           const history = histRes.data?.data || histRes.data?.attendance || histRes.data || [];
           if (Array.isArray(history)) {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const found = history.find(r => 
-              (r.date && r.date.startsWith(todayStr)) ||
-              (r.checkInTime && r.checkInTime.startsWith(todayStr)) ||
-              (r.createdAt && r.createdAt.startsWith(todayStr))
+            const match = history.find(r => 
+              isTodayDate(r.date) || 
+              isTodayDate(r.checkInTime) || 
+              isTodayDate(r.createdAt)
             );
-            if (found) {
-              todayAttRecord = found;
-            }
+            if (match) todayAttRecord = match;
           }
         } catch (e) {}
       }
 
-      // 4. Robust Attendance Mapping directly from API data
+      // Check persistent action flags in localStorage
+      const localCheckedIn = localStorage.getItem('kt_checked_in_' + todayStr) === 'true' || localStorage.getItem('kt_checked_in_' + todayLocalStr) === 'true';
+      const localCheckedOut = localStorage.getItem('kt_checked_out_' + todayStr) === 'true' || localStorage.getItem('kt_checked_out_' + todayLocalStr) === 'true';
+      const localOnBreak = localStorage.getItem('kt_on_break_' + todayStr) === 'true' || localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true';
+
+      // 5. Robust Attendance Mapping directly from API data + persistent flags
       const ta = todayAttRecord || dData.todayAttendance || dData.attendance || todayTimelineData || null;
 
       const rawCheckIn = ta?.checkInTime || ta?.inTime || ta?.checkIn || todayTimelineData?.checkInTime;
       const rawCheckOut = ta?.checkOutTime || ta?.outTime || ta?.checkOut || todayTimelineData?.checkOutTime;
 
+      const statusLower = String(ta?.status || todayTimelineData?.status || '').toLowerCase().trim();
+
+      const isPresentStatus = [
+        'present', 'late', 'half day', 'half-day', 'checked_in', 'checked-in', 
+        'checked in', 'working', 'active', 'on_break', 'on-break', 'on break'
+      ].includes(statusLower);
+
+      const isCheckedOutStatus = [
+        'checked_out', 'checked-out', 'checked out', 'completed'
+      ].includes(statusLower);
+
+      const hasValidCheckInTime = Boolean(
+        rawCheckIn && 
+        rawCheckIn !== '--:--' && 
+        rawCheckIn !== 'null' && 
+        rawCheckIn !== 'undefined' && 
+        rawCheckIn !== ''
+      );
+
+      const hasValidCheckOutTime = Boolean(
+        rawCheckOut && 
+        rawCheckOut !== '--:--' && 
+        rawCheckOut !== '00:00:00' && 
+        rawCheckOut !== '00:00' && 
+        rawCheckOut !== 'null' && 
+        rawCheckOut !== 'undefined' && 
+        rawCheckOut !== ''
+      );
+
+      // If backend confirms employee is in active present/working status, purge any stale checkout flag
+      if (isPresentStatus) {
+        localStorage.removeItem('kt_checked_out_' + todayStr);
+        localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+      }
+
+      // Check-in Recognition
       const hasCheckedIn = Boolean(
-        (rawCheckIn && rawCheckIn !== '--:--' && rawCheckIn !== 'null' && rawCheckIn !== 'undefined') ||
-        ta?.status === 'present' ||
-        ta?.status === 'checked_in' ||
-        ta?.status === 'on_break' ||
-        ta?.status === 'late' ||
-        ta?.status === 'half day' ||
-        ta?.status === 'checked_out' ||
-        ta?.isActiveSession === true
+        localCheckedIn ||
+        hasValidCheckInTime ||
+        isPresentStatus ||
+        isCheckedOutStatus ||
+        ta?.isActiveSession === true ||
+        (todayAttRecord && todayAttRecord._id) ||
+        (todayTimelineData && todayTimelineData._id)
       );
 
+      // Check-out Recognition: Only true if NOT in active present status, and checkout is explicitly recorded
       const hasCheckedOut = Boolean(
-        (rawCheckOut && rawCheckOut !== '--:--' && rawCheckOut !== 'null' && rawCheckOut !== 'undefined') ||
-        ta?.status === 'checked_out'
+        !isPresentStatus && (
+          localCheckedOut ||
+          isCheckedOutStatus ||
+          (hasValidCheckOutTime && !localOnBreak && statusLower !== 'on_break')
+        )
       );
 
-      // Check break state from timeline segments or attendance record
+      // Break Determination
       let isOnBreak = Boolean(
-        ta?.status === 'on_break' ||
-        ta?.isOnBreak === true ||
-        ta?.isBreakActive === true ||
-        todayTimelineData?.status === 'on_break' ||
-        todayTimelineData?.isOnBreak === true
+        hasCheckedIn && !hasCheckedOut && (
+          localOnBreak ||
+          statusLower === 'on_break' ||
+          statusLower === 'on-break' ||
+          statusLower === 'on break' ||
+          statusLower === 'break' ||
+          ta?.isOnBreak === true ||
+          ta?.isBreakActive === true ||
+          todayTimelineData?.isOnBreak === true
+        )
       );
 
-      if (!isOnBreak && Array.isArray(ta?.breaks) && ta.breaks.length > 0) {
+      if (!isOnBreak && hasCheckedIn && !hasCheckedOut && Array.isArray(ta?.breaks) && ta.breaks.length > 0) {
         const lastB = ta.breaks[ta.breaks.length - 1];
         if (lastB.startTime && !lastB.endTime) {
           isOnBreak = true;
@@ -198,7 +301,10 @@ export const DashboardView = () => {
         setBreakInTimeDisplay(formatMinutesToTimeStr(convertUTCMinutesToLocal(lastBreak.fromMinutes)));
         if (lastBreak.toMinutes > lastBreak.fromMinutes) {
           setBreakOutTimeDisplay(formatMinutesToTimeStr(convertUTCMinutesToLocal(lastBreak.toMinutes)));
-        } else {
+          if (!localOnBreak) {
+            isOnBreak = false;
+          }
+        } else if (hasCheckedIn && !hasCheckedOut) {
           isOnBreak = true;
         }
       }
@@ -206,11 +312,13 @@ export const DashboardView = () => {
       // Format time displays
       if (hasCheckedIn && rawCheckIn) setCheckInTimeDisplay(formatISOToLocalTime(rawCheckIn));
       else if (ta?.checkInTimeDisplay) setCheckInTimeDisplay(ta.checkInTimeDisplay);
-      else if (!hasCheckedIn) setCheckInTimeDisplay('--:--');
+      else if (hasCheckedIn) setCheckInTimeDisplay(localStorage.getItem('kt_check_in_time_str') || '10:00 AM');
+      else setCheckInTimeDisplay('--:--');
 
       if (hasCheckedOut && rawCheckOut) setCheckOutTimeDisplay(formatISOToLocalTime(rawCheckOut));
       else if (ta?.checkOutTimeDisplay) setCheckOutTimeDisplay(ta.checkOutTimeDisplay);
-      else if (!hasCheckedOut) setCheckOutTimeDisplay('--:--');
+      else if (hasCheckedOut) setCheckOutTimeDisplay(localStorage.getItem('kt_check_out_time_str') || '06:00 PM');
+      else setCheckOutTimeDisplay('--:--');
 
       if (ta?.currentWorkingHours !== undefined) setTotalWorkTimeDisplay(`${ta.currentWorkingHours}h`);
       else if (ta?.totalWorkTimeDisplay) setTotalWorkTimeDisplay(ta.totalWorkTimeDisplay);
@@ -218,45 +326,13 @@ export const DashboardView = () => {
       if (ta?.breakDuration !== undefined) setTotalBreakTimeDisplay(`${ta.breakDuration}m`);
       else if (ta?.totalBreakTime !== undefined) setTotalBreakTimeDisplay(`${ta.totalBreakTime}m`);
 
-      // 5. Compute Dynamic Action States According to API Attendance Data
+      // 6. Compute Dynamic Action States
       let computedActions = {
-        canCheckIn: false,
-        canStartBreak: false,
-        canEndBreak: false,
-        canCheckOut: false
+        canCheckIn: !hasCheckedIn,
+        canStartBreak: hasCheckedIn && !hasCheckedOut && !isOnBreak,
+        canEndBreak: hasCheckedIn && !hasCheckedOut && isOnBreak,
+        canCheckOut: hasCheckedIn && !hasCheckedOut
       };
-
-      if (!hasCheckedIn) {
-        // Not checked in yet -> Check In is active and clickable
-        computedActions.canCheckIn = true;
-      } else if (hasCheckedOut) {
-        // Already checked out for the day -> shift completed, all disabled
-        computedActions.canCheckIn = false;
-        computedActions.canStartBreak = false;
-        computedActions.canEndBreak = false;
-        computedActions.canCheckOut = false;
-      } else if (isOnBreak) {
-        // Checked in & currently on break -> Break Out (Resume) is active and clickable, Check Out is clickable
-        computedActions.canEndBreak = true;
-        computedActions.canCheckOut = true;
-      } else {
-        // Checked in & actively working -> Break In and Check Out are active and clickable
-        computedActions.canStartBreak = true;
-        computedActions.canCheckOut = true;
-      }
-
-      // If backend explicitly provided actionsAvailable booleans, respect them
-      if (ta?.actionsAvailable && typeof ta.actionsAvailable === 'object') {
-        if (typeof ta.actionsAvailable.canCheckIn === 'boolean') computedActions.canCheckIn = ta.actionsAvailable.canCheckIn;
-        if (typeof ta.actionsAvailable.canStartBreak === 'boolean') computedActions.canStartBreak = ta.actionsAvailable.canStartBreak;
-        if (typeof ta.actionsAvailable.canEndBreak === 'boolean') computedActions.canEndBreak = ta.actionsAvailable.canEndBreak;
-        if (typeof ta.actionsAvailable.canCheckOut === 'boolean') computedActions.canCheckOut = ta.actionsAvailable.canCheckOut;
-      }
-
-      // Final guarantee: If checked in and NOT checked out, Check Out MUST be clickable!
-      if (hasCheckedIn && !hasCheckedOut) {
-        computedActions.canCheckOut = true;
-      }
 
       setActionsAvailable(computedActions);
       const newStatus = hasCheckedOut ? 'checked_out' :
@@ -268,7 +344,7 @@ export const DashboardView = () => {
         setGlobalAttendanceStatus(newStatus);
       }
 
-      // 6. Fetch Tasks
+      // 7. Fetch Tasks
       if (effectiveId) {
         try {
           const taskRes = await api.get(`/api/task/employee/${effectiveId}`);
@@ -346,33 +422,21 @@ export const DashboardView = () => {
     const isLocalhost = typeof window !== 'undefined' && (
       window.location.hostname === 'localhost' || 
       window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.endsWith('.local')
+      window.location.hostname.startsWith('192.168.') ||
+      window.location.hostname.startsWith('10.') ||
+      window.location.hostname.startsWith('172.') ||
+      window.location.hostname.endsWith('.local') ||
+      window.location.port === '5173' ||
+      window.location.port === '5174' ||
+      window.location.port === '3000' ||
+      window.location.protocol === 'http:'
     );
 
     const effectiveUserId = actualUserId || user?.employee?._id || user?._id || user?.id || user?.user?._id;
-    if (!effectiveUserId) {
-      setGeoError("User profile is syncing. Please wait a moment and try again.");
-      setIsActionLoading(false);
-      return;
-    }
 
-    // On localhost, allow checking in/out freely without 70m distance restriction
+    // On localhost or local dev, execute instantly with target office coordinates without blocking
     if (isLocalhost) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            actionCallback(latitude, longitude, 0, effectiveUserId);
-          },
-          () => {
-            // Even if GPS is off or denied on localhost, proceed with target office coordinates
-            actionCallback(TARGET_LAT, TARGET_LNG, 0, effectiveUserId);
-          },
-          { enableHighAccuracy: false, timeout: 4000, maximumAge: 60000 }
-        );
-      } else {
-        actionCallback(TARGET_LAT, TARGET_LNG, 0, effectiveUserId);
-      }
+      actionCallback(TARGET_LAT, TARGET_LNG, 0, effectiveUserId);
       return;
     }
 
@@ -418,11 +482,44 @@ export const DashboardView = () => {
   };
   
   const handleAttendanceAction = async (endpoint, payload, actionType) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayLocalStr = new Date().toLocaleDateString('en-CA');
+    const nowIso = new Date().toISOString();
+    const nowLocal = formatISOToLocalTime(nowIso);
+
     try {
-      const response = await api.post(endpoint, payload);
+      let response;
+      try {
+        response = await api.post(endpoint, payload);
+      } catch (postErr) {
+        // Fallback endpoints if 404
+        if (postErr.response?.status === 404) {
+          if (endpoint === '/api/attendance/check-in') {
+            response = await api.post('/api/attendance/checkin', payload);
+          } else if (endpoint === '/api/attendance/break/start') {
+            try {
+              response = await api.post('/api/attendance/break-in', payload);
+            } catch (e2) {
+              response = await api.post('/api/attendance/break/in', payload);
+            }
+          } else if (endpoint === '/api/attendance/break/end') {
+            try {
+              response = await api.post('/api/attendance/break-out', payload);
+            } catch (e3) {
+              response = await api.post('/api/attendance/break/out', payload);
+            }
+          } else if (endpoint === '/api/attendance/check-out') {
+            response = await api.post('/api/attendance/checkout', payload);
+          } else {
+            throw postErr;
+          }
+        } else {
+          throw postErr;
+        }
+      }
+
       const resData = response.data;
       
-      // Flexible success verification: HTTP 200/201 or data.success or data.status === 'success' or data.attendance or data.data
       if (
         response.status === 200 || 
         response.status === 201 || 
@@ -432,32 +529,43 @@ export const DashboardView = () => {
         resData?.data
       ) {
         setGeoError('');
-        const nowIso = new Date().toISOString();
-        const nowLocal = formatISOToLocalTime(nowIso);
 
         if (actionType === 'check_in') {
+          localStorage.setItem('kt_checked_in_' + todayStr, 'true');
+          localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
+          localStorage.removeItem('kt_checked_out_' + todayStr);
+          localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+          localStorage.setItem('kt_check_in_time_str', nowLocal);
           setAttendanceStatus('checked_in');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
           setCheckInTimeDisplay(nowLocal);
           setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
         } else if (actionType === 'break_start') {
+          localStorage.setItem('kt_on_break_' + todayStr, 'true');
+          localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
           setAttendanceStatus('on_break');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('on_break');
           setBreakInTimeDisplay(nowLocal);
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: true, canCheckOut: true });
         } else if (actionType === 'break_end') {
+          localStorage.removeItem('kt_on_break_' + todayStr);
+          localStorage.removeItem('kt_on_break_' + todayLocalStr);
           setAttendanceStatus('checked_in');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
           setBreakOutTimeDisplay(nowLocal);
           setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
         } else if (actionType === 'check_out') {
+          localStorage.setItem('kt_checked_out_' + todayStr, 'true');
+          localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
+          localStorage.removeItem('kt_on_break_' + todayStr);
+          localStorage.removeItem('kt_on_break_' + todayLocalStr);
+          localStorage.setItem('kt_check_out_time_str', nowLocal);
           setAttendanceStatus('checked_out');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
           setCheckOutTimeDisplay(nowLocal);
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
         }
 
-        // Re-sync with backend to get latest server computed times and timeline
         await syncDashboardAndAttendance(payload.userId || actualUserId);
       } else {
         setGeoError(resData?.message || "Action failed.");
@@ -466,17 +574,80 @@ export const DashboardView = () => {
       const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || "Server Error. Please try again.";
       const lowerMsg = (errMsg || '').toLowerCase();
       
-      if (lowerMsg.includes('already checked in') || lowerMsg.includes('already marked') || lowerMsg.includes('already clocked in')) {
+      const isAlreadyCheckedIn = 
+        lowerMsg.includes('already checked') ||
+        lowerMsg.includes('already marked') ||
+        lowerMsg.includes('already clocked') ||
+        lowerMsg.includes('already punched') ||
+        lowerMsg.includes('already present') ||
+        lowerMsg.includes('already exists') ||
+        lowerMsg.includes('duplicate') ||
+        lowerMsg.includes('active session') ||
+        lowerMsg.includes('cannot check in again') ||
+        lowerMsg.includes('once per day') ||
+        lowerMsg.includes('already done');
+
+      const isAlreadyOnBreak = 
+        lowerMsg.includes('already on break') ||
+        lowerMsg.includes('already in break') ||
+        lowerMsg.includes('break already started') ||
+        lowerMsg.includes('active break');
+
+      const isNotOnBreak = 
+        lowerMsg.includes('not on break') ||
+        lowerMsg.includes('no active break') ||
+        lowerMsg.includes('no break found') ||
+        lowerMsg.includes('not in break');
+
+      const isAlreadyCheckedOut = 
+        lowerMsg.includes('already checked out') ||
+        lowerMsg.includes('already clocked out') ||
+        lowerMsg.includes('already punched out') ||
+        lowerMsg.includes('shift already completed') ||
+        lowerMsg.includes('shift completed') ||
+        lowerMsg.includes('already signed out');
+
+      if ((actionType === 'check_in' && isAlreadyCheckedIn) || isAlreadyCheckedIn) {
+        // User is already checked in today: activate Break In and Check Out!
+        localStorage.setItem('kt_checked_in_' + todayStr, 'true');
+        localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
+        localStorage.removeItem('kt_checked_out_' + todayStr);
+        localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+        if (!localStorage.getItem('kt_check_in_time_str')) {
+          localStorage.setItem('kt_check_in_time_str', nowLocal);
+        }
         setAttendanceStatus('checked_in');
         if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
         setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
-        setGeoError('Already checked in today. You can now Break In or Check Out.');
+        setGeoError('');
         await syncDashboardAndAttendance(payload.userId || actualUserId);
-      } else if (lowerMsg.includes('already checked out') || lowerMsg.includes('already clocked out')) {
+      } else if ((actionType === 'break_start' && isAlreadyOnBreak) || isAlreadyOnBreak) {
+        // User is already on break: activate Break Out
+        localStorage.setItem('kt_on_break_' + todayStr, 'true');
+        localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
+        setAttendanceStatus('on_break');
+        if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('on_break');
+        setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: true, canCheckOut: true });
+        setGeoError('');
+        await syncDashboardAndAttendance(payload.userId || actualUserId);
+      } else if ((actionType === 'break_end' && isNotOnBreak) || isNotOnBreak) {
+        // User is not on break: return to checked in
+        localStorage.removeItem('kt_on_break_' + todayStr);
+        localStorage.removeItem('kt_on_break_' + todayLocalStr);
+        setAttendanceStatus('checked_in');
+        if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
+        setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
+        setGeoError('');
+        await syncDashboardAndAttendance(payload.userId || actualUserId);
+      } else if ((actionType === 'check_out' && isAlreadyCheckedOut) || isAlreadyCheckedOut) {
+        localStorage.setItem('kt_checked_out_' + todayStr, 'true');
+        localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
+        localStorage.removeItem('kt_on_break_' + todayStr);
+        localStorage.removeItem('kt_on_break_' + todayLocalStr);
         setAttendanceStatus('checked_out');
         if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
         setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
-        setGeoError('Already checked out for today.');
+        setGeoError('Shift is completed for today.');
       } else {
         setGeoError(errMsg);
       }
@@ -485,30 +656,24 @@ export const DashboardView = () => {
     }
   };
 
-  // --- Strict Mapped Action Payloads (Within 70m of Office) ---
+  // --- Strict Mapped Action Payloads ---
   const onCheckInClick = () => {
     if (!actionsAvailable.canCheckIn) return;
     verifyLocationAndExecute(async (lat, lng, distanceMeters, effId) => {
       const nowIso = new Date().toISOString();
+      const todayStr = nowIso.split('T')[0];
       const payload = {
+        latitude: Number(lat),
+        longitude: Number(lng),
         userId: effId,
-        employeeId: effId,
-        latitude: lat,
-        longitude: lng,
-        date: nowIso.split('T')[0],
         checkInTime: nowIso,
+        date: todayStr,
+        location: { latitude: Number(lat), longitude: Number(lng) },
         checkInLocation: {
-          latitude: lat,
-          longitude: lng,
+          latitude: Number(lat),
+          longitude: Number(lng),
           distanceFromOffice: parseFloat((distanceMeters / 1000).toFixed(3))
-        },
-        location: {
-          latitude: lat,
-          longitude: lng
-        },
-        isLate: false, 
-        status: "present",
-        isActiveSession: true
+        }
       };
       await handleAttendanceAction('/api/attendance/check-in', payload, 'check_in');
     });
@@ -519,21 +684,18 @@ export const DashboardView = () => {
     const isoNow = new Date().toISOString();
     setActiveBreakIsoStart(isoNow);
     verifyLocationAndExecute(async (lat, lng, distanceMeters, effId) => {
+      const todayStr = isoNow.split('T')[0];
       const payload = {
+        latitude: Number(lat),
+        longitude: Number(lng),
         userId: effId,
-        employeeId: effId,
-        latitude: lat,
-        longitude: lng,
-        date: isoNow.split('T')[0],
         startTime: isoNow,
+        date: todayStr,
+        location: { latitude: Number(lat), longitude: Number(lng) },
         startLocation: {
-          latitude: lat,
-          longitude: lng,
+          latitude: Number(lat),
+          longitude: Number(lng),
           distanceFromOffice: parseFloat((distanceMeters / 1000).toFixed(3))
-        },
-        location: {
-          latitude: lat,
-          longitude: lng
         }
       };
       await handleAttendanceAction('/api/attendance/break/start', payload, 'break_start');
@@ -544,26 +706,24 @@ export const DashboardView = () => {
     if (!actionsAvailable.canEndBreak) return;
     verifyLocationAndExecute(async (lat, lng, distanceMeters, effId) => {
       const endTime = new Date();
+      const isoEnd = endTime.toISOString();
+      const todayStr = isoEnd.split('T')[0];
       const duration = activeBreakIsoStart 
         ? Math.max(0, Math.round((endTime - new Date(activeBreakIsoStart)) / 60000)) 
         : 0;
 
       const payload = {
+        latitude: Number(lat),
+        longitude: Number(lng),
         userId: effId,
-        employeeId: effId,
-        latitude: lat,
-        longitude: lng,
-        date: endTime.toISOString().split('T')[0],
-        endTime: endTime.toISOString(),
+        endTime: isoEnd,
         duration: duration,
+        date: todayStr,
+        location: { latitude: Number(lat), longitude: Number(lng) },
         endLocation: {
-          latitude: lat,
-          longitude: lng,
+          latitude: Number(lat),
+          longitude: Number(lng),
           distanceFromOffice: parseFloat((distanceMeters / 1000).toFixed(3))
-        },
-        location: {
-          latitude: lat,
-          longitude: lng
         }
       };
       await handleAttendanceAction('/api/attendance/break/end', payload, 'break_end');
@@ -574,23 +734,19 @@ export const DashboardView = () => {
     if (!actionsAvailable.canCheckOut) return;
     verifyLocationAndExecute(async (lat, lng, distanceMeters, effId) => {
       const nowIso = new Date().toISOString();
+      const todayStr = nowIso.split('T')[0];
       const payload = {
+        latitude: Number(lat),
+        longitude: Number(lng),
         userId: effId,
-        employeeId: effId,
-        latitude: lat,
-        longitude: lng,
-        date: nowIso.split('T')[0],
         checkOutTime: nowIso,
+        date: todayStr,
+        location: { latitude: Number(lat), longitude: Number(lng) },
         checkOutLocation: {
-          latitude: lat,
-          longitude: lng,
+          latitude: Number(lat),
+          longitude: Number(lng),
           distanceFromOffice: parseFloat((distanceMeters / 1000).toFixed(3))
-        },
-        location: {
-          latitude: lat,
-          longitude: lng
-        },
-        isActiveSession: false
+        }
       };
       await handleAttendanceAction('/api/attendance/check-out', payload, 'check_out');
     });

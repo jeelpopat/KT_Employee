@@ -81,11 +81,9 @@ export const Sidebar = ({ onSignOut }) => {
         />
       )}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 transition-all duration-300 ease-in-out border-r border-slate-200 dark:border-slate-800 ${
-          isSidebarCollapsed ? 'w-20' : 'w-64'
-        } ${
-          isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 transition-all duration-300 ease-in-out border-r border-slate-200 dark:border-slate-800 ${isSidebarCollapsed ? 'w-20' : 'w-64'
+          } ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
       >
         {/* Header / Brand */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 transition-colors">
@@ -121,11 +119,10 @@ export const Sidebar = ({ onSignOut }) => {
               <button
                 key={item.tab}
                 onClick={() => handleNavClick(item.tab)}
-                className={`w-full flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                  isActive
+                className={`w-full flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${isActive
                     ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-l-4 border-slate-800 dark:border-slate-300 shadow-sm'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 border-l-4 border-transparent'
-                } ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
+                  } ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
                 title={isSidebarCollapsed ? item.label : undefined}
               >
                 <div className="flex items-center space-x-3">
@@ -152,9 +149,8 @@ export const Sidebar = ({ onSignOut }) => {
               handleCheckOut();
               if (onSignOut) onSignOut();
             }}
-            className={`w-full flex items-center px-3 py-2.5 rounded-md text-sm font-medium text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-800 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer ${
-              isSidebarCollapsed ? 'justify-center' : 'space-x-3'
-            }`}
+            className={`w-full flex items-center px-3 py-2.5 rounded-md text-sm font-medium text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-800 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer ${isSidebarCollapsed ? 'justify-center' : 'space-x-3'
+              }`}
             title="Log Out"
           >
             <LogOut size={18} />
