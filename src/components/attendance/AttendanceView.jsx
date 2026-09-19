@@ -5,6 +5,12 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
+import { 
+  computeNineHourTimeline, 
+  isTodayDate, 
+  formatMinutesToTimeStr, 
+  convertUTCMinutesToLocal 
+} from '../../utils/timelineUtils.js';
 
 export const AttendanceView = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -244,27 +250,18 @@ export const AttendanceView = () => {
           filteredRecords.map((record) => {
             const dateObj = getMonthDate(record.date);
             const statusLabel = (record.status || 'unknown').toLowerCase();
-            const rawSegments = record.timelineSegments || [];
+            const isToday = isTodayDate(record.date) || isTodayDate(record.checkInTime);
             
-            // Filter out 24-hour non-working grey chunks so the bar scales from check-in to check-out
-            const activeSegments = rawSegments.filter(seg => seg.type !== 'grey');
-            
-            let minMinutes = Infinity;
-            let maxMinutes = 0;
-
-            activeSegments.forEach(seg => {
-              const localFrom = convertUTCMinutesToLocal(seg.fromMinutes);
-              const localTo = convertUTCMinutesToLocal(seg.toMinutes);
-              if (localFrom < minMinutes) minMinutes = localFrom;
-              if (localTo > maxMinutes) maxMinutes = localTo;
+            // Fixed 9-Hour Timeline Computation
+            const nineHourTimeline = computeNineHourTimeline({
+              checkInTime: record.checkInTime,
+              checkOutTime: record.checkOutTime,
+              timelineSegments: record.timelineSegments || [],
+              breaks: record.breaks || [],
+              isOnBreak: record.isOnBreak || statusLabel === 'on_break',
+              isCheckedIn: Boolean(record.checkInTime || record.status),
+              isCheckedOut: Boolean(record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null')
             });
-
-            if (minMinutes === Infinity) {
-              minMinutes = 540; // Fallback 9:00 AM
-              maxMinutes = 1080; // Fallback 6:00 PM
-            }
-
-            const totalDurationMinutes = maxMinutes - minMinutes || 1;
 
             return (
               <div key={record._id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-5 flex flex-col transition-colors shadow-sm hover:shadow-md">
@@ -286,14 +283,41 @@ export const AttendanceView = () => {
                   </div>
                   
                   <div className="flex flex-col items-end gap-2">
-                    {statusLabel === 'present' && (
-                      <span className="px-2.5 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 text-[10px] font-bold uppercase tracking-wider">Present</span>
-                    )}
-                    {statusLabel === 'late' && (
-                      <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider">Late</span>
-                    )}
-                    {statusLabel.includes('half day') && (
-                      <span className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 text-[10px] font-bold uppercase tracking-wider">Half Day</span>
+                    {isToday ? (
+                      record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null' ? (
+                        <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">
+                          Checked Out
+                        </span>
+                      ) : record.isOnBreak || statusLabel === 'on_break' ? (
+                        <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 text-[#F59E0B] border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse"></span>
+                          Break In
+                        </span>
+                      ) : record.checkInTime ? (
+                        <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-[#00E676] border border-[#00E676]/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse"></span>
+                          Check In
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-800/50 text-slate-500 border border-slate-200 dark:border-slate-700 text-[10px] font-medium uppercase tracking-wider">
+                          Not Checked In
+                        </span>
+                      )
+                    ) : (
+                      <>
+                        {statusLabel === 'present' && (
+                          <span className="px-2.5 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 text-[10px] font-bold uppercase tracking-wider">Present</span>
+                        )}
+                        {statusLabel === 'late' && (
+                          <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider">Late</span>
+                        )}
+                        {statusLabel.includes('half day') && (
+                          <span className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 text-[10px] font-bold uppercase tracking-wider">Half Day</span>
+                        )}
+                        {statusLabel === 'absent' && (
+                          <span className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50 text-[10px] font-bold uppercase tracking-wider">Absent</span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -317,41 +341,64 @@ export const AttendanceView = () => {
                   </div>
                 </div>
 
-                {/* --- Shift-Scaled Timeline Segments Render --- */}
-                {activeSegments.length > 0 && (
-                  <div className="mt-auto pt-3">
-                    <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex relative group cursor-help">
-                      {activeSegments.map((seg, sIdx) => {
-                        const localFrom = convertUTCMinutesToLocal(seg.fromMinutes);
-                        const localTo = convertUTCMinutesToLocal(seg.toMinutes);
-                        
-                        const startPercent = Math.max(0, ((localFrom - minMinutes) / totalDurationMinutes) * 100);
-                        const widthPercent = Math.min(100 - startPercent, ((localTo - localFrom) / totalDurationMinutes) * 100);
-                        
-                        let colorClass = 'bg-slate-300 dark:bg-slate-600';
-                        if (seg.type === 'blue') colorClass = 'bg-blue-500';
-                        if (seg.type === 'yellow') colorClass = 'bg-amber-400';
-
-                        const startTimeFormatted = formatMinutesToTimeStr(localFrom);
-                        const endTimeFormatted = formatMinutesToTimeStr(localTo);
-
-                        return (
-                          <div 
-                            key={sIdx}
-                            title={`${seg.label} (${startTimeFormatted} - ${endTimeFormatted})`}
-                            style={{ left: `${startPercent}%`, width: `${widthPercent}%` }}
-                            className={`absolute top-0 bottom-0 h-full ${colorClass} hover:brightness-110 transition-all border-r border-white/20`}
-                          />
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 mt-2 uppercase tracking-wider font-mono">
-                      <span>{formatMinutesToTimeStr(minMinutes)}</span>
-                      <span>{formatMinutesToTimeStr(minMinutes + totalDurationMinutes / 2)}</span>
-                      <span>{formatMinutesToTimeStr(maxMinutes)}</span>
+                {/* --- 9-Hour Fixed Shift Timeline --- */}
+                <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 mb-2">
+                    <span className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+                      <Clock size={12} className="text-blue-500" />
+                      9-Hour Timeline
+                    </span>
+                    <div className="flex items-center gap-3 text-[10px]">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-[#3B82F6]"></span>
+                        Work
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-[#F59E0B]"></span>
+                        Break (≤ 1h)
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+                        Extra Break (&gt; 1h) / Grey
+                      </span>
                     </div>
                   </div>
-                )}
+
+                  {/* Fixed 9-Hour Track (Grey Base for Early Out / Remaining Time) */}
+                  <div className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex relative group cursor-help shadow-inner">
+                    {nineHourTimeline.displaySegments.map((seg) => (
+                      <div 
+                        key={seg.id}
+                        title={seg.label}
+                        style={{ left: `${seg.leftPercent}%`, width: `${seg.widthPercent}%` }}
+                        className={`absolute top-0 bottom-0 h-full ${seg.colorClass} hover:brightness-110 transition-all border-r border-white/20`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Status Transition Markers Below Timeline (Check In, Break In, Extra Break, Break Out, Check Out, 9h End) */}
+                  <div className="relative w-full h-4 mt-2">
+                    {(nineHourTimeline.statusMarkers || []).map((marker) => {
+                      let alignClass = '-translate-x-1/2';
+                      if (marker.percent <= 3) alignClass = 'translate-x-0';
+                      else if (marker.percent >= 97) alignClass = '-translate-x-full';
+
+                      return (
+                        <div 
+                          key={`tick-${marker.id}`}
+                          style={{ left: `${marker.percent}%` }}
+                          className={`absolute top-0 flex flex-col items-center ${alignClass} transition-all pointer-events-auto group cursor-help`}
+                          title={`${marker.label}: ${marker.timeStr}`}
+                        >
+                          <div className={`w-0.5 h-1.5 rounded-full ${marker.dotClass} mb-0.5`} />
+                          <span className="text-[9px] font-mono font-bold text-slate-700 dark:text-slate-300 leading-none whitespace-nowrap">
+                            {marker.timeStr}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
               </div>
             );

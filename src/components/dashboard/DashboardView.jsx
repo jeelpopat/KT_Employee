@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  Clock, Pause, LogOut, Calendar, Gift, 
+import {
+  Clock, Pause, LogOut, Calendar, Gift,
   Sun, Users, CheckSquare, FileCheck, TrendingUp, Bell, AlertCircle, Map,
   Umbrella, LogIn, Coffee, ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
+import { computeNineHourTimeline, getQuickActionStatusConfig } from '../../utils/timelineUtils.js';
 
 // --- Geofencing Configuration (Office Location & 70 Meter Strict Radius) ---
 const TARGET_LAT = 23.057808;
@@ -16,11 +17,11 @@ const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   const R = 6371000; // Earth radius in meters
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = 
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-    Math.sin(dLon / 2) * Math.sin(dLon / 2); 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in meters
 };
 
@@ -35,16 +36,16 @@ export const DashboardView = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [currentAnnIndex, setCurrentAnnIndex] = useState(0);
   const [holidays, setHolidays] = useState([]);
-  const [upcomingBirthdays, setUpcomingBirthdays] = useState([]); 
-  const [teamOnLeave, setTeamOnLeave] = useState([]); 
+  const [upcomingBirthdays, setUpcomingBirthdays] = useState([]);
+  const [teamOnLeave, setTeamOnLeave] = useState([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
 
   // --- Attendance & Timeline States ---
   const [geoError, setGeoError] = useState('');
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [todaySegments, setTodaySegments] = useState([]);
-  
-  const [attendanceStatus, setAttendanceStatus] = useState('not_checked_in'); 
+
+  const [attendanceStatus, setAttendanceStatus] = useState('not_checked_in');
   const [actionsAvailable, setActionsAvailable] = useState({
     canCheckIn: true,
     canStartBreak: false,
@@ -121,7 +122,7 @@ export const DashboardView = () => {
       try {
         const dashRes = await api.get('/api/employee-panel/dashboard');
         dData = dashRes.data?.data || dashRes.data || {};
-        
+
         setUpcomingBirthdays(dData.upcomingBirthdays || []);
         setTeamOnLeave(dData.teamMembersOnLeave || []);
         if (dData.stats?.leaveBalance !== undefined) {
@@ -157,9 +158,9 @@ export const DashboardView = () => {
               return tB - tA;
             });
 
-            const match = sortedTimeline.find(r => 
-              isTodayDate(r.date) || 
-              isTodayDate(r.checkInTime) || 
+            const match = sortedTimeline.find(r =>
+              isTodayDate(r.date) ||
+              isTodayDate(r.checkInTime) ||
               isTodayDate(r.createdAt)
             );
 
@@ -190,7 +191,7 @@ export const DashboardView = () => {
         if (tData && (tData.checkInTime || tData.status || tData._id)) {
           todayAttRecord = tData;
         }
-      } catch (e) {}
+      } catch (e) { }
 
       // 4. Try /api/attendance/history/${effectiveId}
       if (!todayAttRecord && effectiveId) {
@@ -198,14 +199,14 @@ export const DashboardView = () => {
           const histRes = await api.get(`/api/attendance/history/${effectiveId}`);
           const history = histRes.data?.data || histRes.data?.attendance || histRes.data || [];
           if (Array.isArray(history)) {
-            const match = history.find(r => 
-              isTodayDate(r.date) || 
-              isTodayDate(r.checkInTime) || 
+            const match = history.find(r =>
+              isTodayDate(r.date) ||
+              isTodayDate(r.checkInTime) ||
               isTodayDate(r.createdAt)
             );
             if (match) todayAttRecord = match;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // Check persistent action flags in localStorage
@@ -222,7 +223,7 @@ export const DashboardView = () => {
       const statusLower = String(ta?.status || todayTimelineData?.status || '').toLowerCase().trim();
 
       const isPresentStatus = [
-        'present', 'late', 'half day', 'half-day', 'checked_in', 'checked-in', 
+        'present', 'late', 'half day', 'half-day', 'checked_in', 'checked-in',
         'checked in', 'working', 'active', 'on_break', 'on-break', 'on break'
       ].includes(statusLower);
 
@@ -231,20 +232,20 @@ export const DashboardView = () => {
       ].includes(statusLower);
 
       const hasValidCheckInTime = Boolean(
-        rawCheckIn && 
-        rawCheckIn !== '--:--' && 
-        rawCheckIn !== 'null' && 
-        rawCheckIn !== 'undefined' && 
+        rawCheckIn &&
+        rawCheckIn !== '--:--' &&
+        rawCheckIn !== 'null' &&
+        rawCheckIn !== 'undefined' &&
         rawCheckIn !== ''
       );
 
       const hasValidCheckOutTime = Boolean(
-        rawCheckOut && 
-        rawCheckOut !== '--:--' && 
-        rawCheckOut !== '00:00:00' && 
-        rawCheckOut !== '00:00' && 
-        rawCheckOut !== 'null' && 
-        rawCheckOut !== 'undefined' && 
+        rawCheckOut &&
+        rawCheckOut !== '--:--' &&
+        rawCheckOut !== '00:00:00' &&
+        rawCheckOut !== '00:00' &&
+        rawCheckOut !== 'null' &&
+        rawCheckOut !== 'undefined' &&
         rawCheckOut !== ''
       );
 
@@ -337,8 +338,8 @@ export const DashboardView = () => {
       setActionsAvailable(computedActions);
       const newStatus = hasCheckedOut ? 'checked_out' :
         isOnBreak ? 'on_break' :
-        hasCheckedIn ? 'checked_in' : 'not_checked_in';
-      
+          hasCheckedIn ? 'checked_in' : 'not_checked_in';
+
       setAttendanceStatus(newStatus);
       if (setGlobalAttendanceStatus) {
         setGlobalAttendanceStatus(newStatus);
@@ -390,7 +391,7 @@ export const DashboardView = () => {
       try {
         const annRes = await api.get('/api/notification/announcement/all');
         if (annRes.data?.success && annRes.data?.data) setAnnouncements(annRes.data.data);
-      } catch (e) {}
+      } catch (e) { }
 
       try {
         const holRes = await api.get('/api/holiday/all');
@@ -402,7 +403,7 @@ export const DashboardView = () => {
             return hDate.getMonth() === currentMonth && hDate.getFullYear() === currentYear && hDate >= new Date();
           }));
         }
-      } catch (e) {}
+      } catch (e) { }
 
       setIsDataLoading(false);
     };
@@ -420,7 +421,7 @@ export const DashboardView = () => {
     setIsActionLoading(true);
 
     const isLocalhost = typeof window !== 'undefined' && (
-      window.location.hostname === 'localhost' || 
+      window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1' ||
       window.location.hostname.startsWith('192.168.') ||
       window.location.hostname.startsWith('10.') ||
@@ -451,7 +452,7 @@ export const DashboardView = () => {
       (position) => {
         const { latitude, longitude } = position.coords;
         const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
-        
+
         if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
           actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
         } else {
@@ -463,7 +464,7 @@ export const DashboardView = () => {
       },
       (error) => {
         let errorMsg = "Location permission and GPS coordinates are required to mark attendance.";
-        switch(error.code) {
+        switch (error.code) {
           case error.PERMISSION_DENIED:
             errorMsg = "Location permission denied. Please allow location access in your browser/device settings.";
             break;
@@ -477,10 +478,10 @@ export const DashboardView = () => {
         setGeoError(errorMsg);
         setIsActionLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } 
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
-  
+
   // Extract real user ID from JWT token or user profile (never employee document ID)
   const getRealAuthUserId = () => {
     try {
@@ -493,7 +494,7 @@ export const DashboardView = () => {
           if (tId && /^[a-fA-F0-9]{24}$/.test(String(tId))) return String(tId);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const storedUser = (() => {
       try {
@@ -562,9 +563,9 @@ export const DashboardView = () => {
             const msg = (postErr.response?.data?.message || postErr.response?.data?.error || '').toLowerCase();
             // Don't retry different payloads if backend gave a domain-level message (e.g. already marked, already checked in)
             if (
-              msg.includes('already checked') || 
-              msg.includes('already marked') || 
-              msg.includes('already on break') || 
+              msg.includes('already checked') ||
+              msg.includes('already marked') ||
+              msg.includes('already on break') ||
               msg.includes('already clocked') ||
               msg.includes('already in break') ||
               msg.includes('already checked out')
@@ -580,13 +581,13 @@ export const DashboardView = () => {
       }
 
       const resData = response?.data;
-      
+
       if (
-        response?.status === 200 || 
-        response?.status === 201 || 
-        resData?.success || 
-        resData?.status === 'success' || 
-        resData?.attendance || 
+        response?.status === 200 ||
+        response?.status === 201 ||
+        resData?.success ||
+        resData?.status === 'success' ||
+        resData?.attendance ||
         resData?.data
       ) {
         setGeoError('');
@@ -634,8 +635,8 @@ export const DashboardView = () => {
     } catch (err) {
       const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || "Server Error. Please try again.";
       const lowerMsg = (errMsg || '').toLowerCase();
-      
-      const isAlreadyCheckedIn = 
+
+      const isAlreadyCheckedIn =
         lowerMsg.includes('already checked') ||
         lowerMsg.includes('already marked') ||
         lowerMsg.includes('already clocked') ||
@@ -648,19 +649,19 @@ export const DashboardView = () => {
         lowerMsg.includes('once per day') ||
         lowerMsg.includes('already done');
 
-      const isAlreadyOnBreak = 
+      const isAlreadyOnBreak =
         lowerMsg.includes('already on break') ||
         lowerMsg.includes('already in break') ||
         lowerMsg.includes('break already started') ||
         lowerMsg.includes('active break');
 
-      const isNotOnBreak = 
+      const isNotOnBreak =
         lowerMsg.includes('not on break') ||
         lowerMsg.includes('no active break') ||
         lowerMsg.includes('no break found') ||
         lowerMsg.includes('not in break');
 
-      const isAlreadyCheckedOut = 
+      const isAlreadyCheckedOut =
         lowerMsg.includes('already checked out') ||
         lowerMsg.includes('already clocked out') ||
         lowerMsg.includes('already punched out') ||
@@ -770,25 +771,23 @@ export const DashboardView = () => {
     return `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })}`;
   };
 
-  // --- Calculate Timeline Layout Variables ---
-  const activeSegments = todaySegments.filter(seg => seg.type !== 'grey');
-  let minMinutes = Infinity;
-  let maxMinutes = 0;
-
-  activeSegments.forEach(seg => {
-    const localFrom = convertUTCMinutesToLocal(seg.fromMinutes);
-    const localTo = convertUTCMinutesToLocal(seg.toMinutes);
-    if (localFrom < minMinutes) minMinutes = localFrom;
-    if (localTo > maxMinutes) maxMinutes = localTo;
+  // --- Calculate Fixed 9-Hour Timeline Layout ---
+  const nineHourTimeline = computeNineHourTimeline({
+    checkInTime: checkInTimeDisplay !== '--:--' ? checkInTimeDisplay : null,
+    checkOutTime: checkOutTimeDisplay !== '--:--' ? checkOutTimeDisplay : null,
+    breakInTime: breakInTimeDisplay !== '--:--' ? breakInTimeDisplay : null,
+    breakOutTime: breakOutTimeDisplay !== '--:--' ? breakOutTimeDisplay : null,
+    timelineSegments: todaySegments,
+    isOnBreak: attendanceStatus === 'on_break',
+    isCheckedIn: attendanceStatus !== 'not_checked_in',
+    isCheckedOut: attendanceStatus === 'checked_out'
   });
 
-  if (minMinutes === Infinity) {
-    minMinutes = 540; 
-    maxMinutes = 1080; 
-  }
-  const totalDurationMinutes = maxMinutes - minMinutes || 1;
-  const breakSegment = activeSegments.find(s => s.type === 'yellow');
-  const breakStartTime = breakSegment ? formatMinutesToTimeStr(convertUTCMinutesToLocal(breakSegment.fromMinutes)) : '';
+  const statusConfig = getQuickActionStatusConfig({
+    hasCheckedIn: attendanceStatus === 'checked_in' || attendanceStatus === 'on_break',
+    isOnBreak: attendanceStatus === 'on_break',
+    hasCheckedOut: attendanceStatus === 'checked_out'
+  });
 
   return (
     <div className="min-h-full space-y-6">
@@ -807,7 +806,7 @@ export const DashboardView = () => {
             <div key={`kpi-${idx}`} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm flex flex-col justify-between`}>
               <div className="flex justify-between items-start w-full">
                 <span className="text-2xs  font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</span>
-                {/* <Icon size={14} className="text-slate-400 dark:text-slate-500" /> */}   
+                {/* <Icon size={14} className="text-slate-400 dark:text-slate-500" /> */}
                 <div className="px-2 items-end text-xl font-bold text-slate-900 dark:text-slate-100">
                   {isDataLoading && idx !== 0 ? <Loader2 size={20} className="animate-spin text-slate-400" /> : item.value}
                 </div>
@@ -818,13 +817,13 @@ export const DashboardView = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* TIME & ATTENDANCE - QUICK ACTIONS & TIMELINE */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-colors shadow-sm p-4 sm:p-6 flex flex-col justify-center">
 
           {geoError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs font-semibold flex items-center justify-center gap-2 text-center">
-              <AlertCircle size={16} className="shrink-0" /> 
+              <AlertCircle size={16} className="shrink-0" />
               <span>{geoError}</span>
             </div>
           )}
@@ -836,34 +835,16 @@ export const DashboardView = () => {
                 <Clock size={16} className="text-slate-400" /> Quick Actions
               </h3>
               <div>
-                {attendanceStatus === 'checked_in' && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Checked In / Working
-                  </span>
-                )}
-                {attendanceStatus === 'on_break' && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                    On Break
-                  </span>
-                )}
-                {attendanceStatus === 'checked_out' && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                    Shift Completed
-                  </span>
-                )}
-                {attendanceStatus === 'not_checked_in' && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-slate-500 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-                    Not Checked In
-                  </span>
-                )}
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${statusConfig.badgeColorClass}`}>
+                  <span className={`w-2 h-2 rounded-full ${statusConfig.dotColorClass}`}></span>
+                  {statusConfig.statusText}
+                </span>
               </div>
             </div>
-            
+
             <div className="flex justify-between items-center px-2">
               {/* Check In */}
-              <button 
+              <button
                 onClick={onCheckInClick}
                 disabled={isActionLoading || !actionsAvailable.canCheckIn}
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canCheckIn ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}
@@ -879,7 +860,7 @@ export const DashboardView = () => {
               </button>
 
               {/* Break In */}
-              <button 
+              <button
                 onClick={onStartBreakClick}
                 disabled={isActionLoading || !actionsAvailable.canStartBreak}
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canStartBreak ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}
@@ -895,7 +876,7 @@ export const DashboardView = () => {
               </button>
 
               {/* Break Out */}
-              <button 
+              <button
                 onClick={onResumeWorkClick}
                 disabled={isActionLoading || !actionsAvailable.canEndBreak}
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canEndBreak ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}
@@ -911,7 +892,7 @@ export const DashboardView = () => {
               </button>
 
               {/* Check Out */}
-              <button 
+              <button
                 onClick={onCheckOutClick}
                 disabled={isActionLoading || !actionsAvailable.canCheckOut}
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canCheckOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}
@@ -928,37 +909,60 @@ export const DashboardView = () => {
             </div>
           </div>
 
-          {/* Timeline Visualizer */}
+          {/* Timeline Visualizer - Fixed 9-Hour Timeline */}
           <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-            <div className="w-full h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex relative">
-              {activeSegments.length > 0 ? (
-                activeSegments.map((seg, sIdx) => {
-                  const localFrom = convertUTCMinutesToLocal(seg.fromMinutes);
-                  const localTo = convertUTCMinutesToLocal(seg.toMinutes);
-                  
-                  const startPercent = Math.max(0, ((localFrom - minMinutes) / totalDurationMinutes) * 100);
-                  const widthPercent = Math.min(100 - startPercent, ((localTo - localFrom) / totalDurationMinutes) * 100);
-                  
-                  let colorClass = 'bg-[#3B82F6]'; 
-                  if (seg.type === 'yellow') colorClass = 'bg-[#F59E0B]'; 
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
 
-                  return (
-                    <div 
-                      key={sIdx}
-                      title={`${seg.label} (${formatMinutesToTimeStr(localFrom)} - ${formatMinutesToTimeStr(localTo)})`}
-                      style={{ left: `${startPercent}%`, width: `${widthPercent}%` }}
-                      className={`absolute top-0 bottom-0 h-full ${colorClass} transition-all border-r border-white/20`}
-                    />
-                  );
-                })
-              ) : (
-                <div className="w-full h-full bg-slate-100 dark:bg-slate-800"></div>
-              )}
+              {/* Timeline Legend */}
+              <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></span>
+                  Working Time
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]"></span>
+                  Break
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+                  Extra Break
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 mt-3 uppercase tracking-wider font-mono">
-              <span>{activeSegments.length > 0 ? formatMinutesToTimeStr(minMinutes) : '--:--'}</span>
-              {breakStartTime && <span>{breakStartTime}</span>}
-              <span>{activeSegments.length > 0 && attendanceStatus === 'checked_out' ? formatMinutesToTimeStr(maxMinutes) : '--:--'}</span>
+
+            {/* Fixed 9-Hour Track (Grey Base for Early Out / Remaining Time) */}
+            <div className="w-full h-4 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex relative shadow-inner group cursor-help">
+              {nineHourTimeline.displaySegments.map((seg) => (
+                <div
+                  key={seg.id}
+                  title={seg.label}
+                  style={{ left: `${seg.leftPercent}%`, width: `${seg.widthPercent}%` }}
+                  className={`absolute top-0 bottom-0 h-full ${seg.colorClass} hover:brightness-110 transition-all border-r border-white/20`}
+                />
+              ))}
+            </div>
+
+            {/* Status Transition Markers Below Timeline (Check In, Break In, Extra Break, Break Out, Check Out, 9h End) */}
+            <div className="relative w-full h-5 mt-2">
+              {(nineHourTimeline.statusMarkers || []).map((marker) => {
+                let alignClass = '-translate-x-1/2';
+                if (marker.percent <= 3) alignClass = 'translate-x-0';
+                else if (marker.percent >= 97) alignClass = '-translate-x-full';
+
+                return (
+                  <div
+                    key={`tick-${marker.id}`}
+                    style={{ left: `${marker.percent}%` }}
+                    className={`absolute top-0 flex flex-col items-center ${alignClass} transition-all pointer-events-auto group cursor-help`}
+                    title={`${marker.label}: ${marker.timeStr}`}
+                  >
+                    <div className={`w-1 h-2 rounded-full ${marker.dotClass} mb-0.5`} />
+                    <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 leading-none whitespace-nowrap">
+                      {marker.timeStr}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -993,7 +997,7 @@ export const DashboardView = () => {
                     {ann.message}
                   </p>
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-                    <Calendar size={12} /> 
+                    <Calendar size={12} />
                     {ann.createdAtIST || (ann.createdAt ? new Date(ann.createdAt).toLocaleDateString() : 'Recent')}
                   </div>
                 </div>
@@ -1004,7 +1008,7 @@ export const DashboardView = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        
+
         {/* HOLIDAYS - HORIZONTAL DESIGN */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -1050,13 +1054,13 @@ export const DashboardView = () => {
             {isDataLoading ? (
               <Loader2 size={20} className="animate-spin text-slate-400 mx-auto" />
             ) : upcomingBirthdays.length === 0 ? (
-               <p className="text-sm text-slate-500 w-full text-center">No birthdays upcoming.</p>
+              <p className="text-sm text-slate-500 w-full text-center">No birthdays upcoming.</p>
             ) : (
               upcomingBirthdays.map((b, i) => {
-                const initials = b.name ? b.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : 'BD';
+                const initials = b.name ? b.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'BD';
                 const d = new Date(b.birthdayDate);
                 const dateStr = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })}`;
-                
+
                 return (
                   <div key={i} className="flex flex-col items-center min-w-[80px] text-center group cursor-pointer">
                     <div className="w-14 h-14 rounded-full bg-[#F5F3FF] dark:bg-purple-900/10 flex items-center justify-center text-[#8B5CF6] font-bold text-lg border border-[#E9E4FF] dark:border-purple-800/30 mb-2 group-hover:scale-105 transition-transform">
@@ -1081,9 +1085,9 @@ export const DashboardView = () => {
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
             {isDataLoading ? (
-               <Loader2 size={20} className="animate-spin text-slate-400 mx-auto" />
+              <Loader2 size={20} className="animate-spin text-slate-400 mx-auto" />
             ) : teamOnLeave.length === 0 ? (
-               <p className="text-sm text-slate-500 w-full text-center">Everyone is present today.</p>
+              <p className="text-sm text-slate-500 w-full text-center">Everyone is present today.</p>
             ) : (
               teamOnLeave.map((t, i) => (
                 <div key={i} className="flex flex-col items-center min-w-[80px] text-center group cursor-pointer">
