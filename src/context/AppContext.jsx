@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from '../api/axios.js';
 import { 
   currentUser as initialUser, 
   assignedTasks as initialTasks, 
@@ -12,7 +13,22 @@ import {
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
-  const [user, setUser] = useState(initialUser);
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('auth_user');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        return initialUser;
+      }
+    }
+    return initialUser;
+  });
+
+  const [userRole, setUserRole] = useState('employee');
+  const [roleDetails, setRoleDetails] = useState(null);
+  const [rolePermissions, setRolePermissions] = useState([]);
+  const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -445,6 +461,142 @@ export const AppProvider = ({ children }) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
   };
 
+  const resolveRole = async (userData) => {
+    setIsRoleLoading(true);
+    try {
+      let candidate = userData;
+      const emp = candidate?.employee || {};
+      const prof = candidate?.profile || candidate?.user || candidate || {};
+      let currentRole = candidate?.roleId 
+        || candidate?.role 
+        || emp.role 
+        || emp.roleId 
+        || prof.role 
+        || prof.roleId 
+        || candidate?.data?.role;
+
+      // If user data doesn't have role yet, try fetching profile from backend
+      if (!currentRole && localStorage.getItem('auth_token')) {
+        try {
+          const profileRes = await api.get('/api/users/profile');
+          const pData = profileRes.data?.data || profileRes.data;
+          if (pData) {
+            candidate = pData;
+            setUser(pData);
+            localStorage.setItem('auth_user', JSON.stringify(pData));
+            const pEmp = pData.employee || {};
+            const pProf = pData.profile || pData.user || pData || {};
+            currentRole = pData.roleId || pData.role || pEmp.role || pProf.role;
+          }
+        } catch (e) {
+          console.warn('Profile fetch attempt failed:', e);
+        }
+      }
+
+      let resolvedRoleName = 'Employee';
+      let permissions = [];
+      let rawRoleData = null;
+
+      // Check if role is an object with an ID or roleName
+      if (typeof currentRole === 'object' && currentRole !== null) {
+        rawRoleData = currentRole;
+        if (currentRole._id && !currentRole.roleName && !currentRole.name) {
+          currentRole = currentRole._id;
+        } else {
+          resolvedRoleName = currentRole.roleName || currentRole.name || currentRole.title || 'Employee';
+          permissions = currentRole.permissions || [];
+        }
+      }
+
+      // Check if currentRole is a MongoDB ID (24-character hex string)
+      if (typeof currentRole === 'string' && /^[a-fA-F0-9]{24}$/.test(currentRole.trim())) {
+        try {
+          const res = await api.get(`/api/role/get/${currentRole.trim()}`);
+          const fetched = res.data?.data || res.data?.role || res.data;
+          rawRoleData = fetched;
+          resolvedRoleName = fetched?.roleName || fetched?.name || fetched?.title || 'Employee';
+          permissions = fetched?.permissions || [];
+        } catch (apiErr) {
+          console.warn('Could not fetch role by ID from backend:', apiErr);
+          resolvedRoleName = 'Employee';
+        }
+      } else if (typeof currentRole === 'string' && currentRole.trim() !== '') {
+        resolvedRoleName = currentRole.trim();
+      }
+
+      const normalized = String(resolvedRoleName).toLowerCase().trim();
+      let determinedRole = 'employee';
+      if (normalized.includes('intern')) {
+        determinedRole = 'intern';
+      } else if (normalized.includes('lead') || normalized.includes('tl') || normalized.includes('team lead') || normalized.includes('teamleader')) {
+        determinedRole = 'team_leader';
+      } else {
+        determinedRole = 'employee';
+      }
+
+      setUserRole(determinedRole);
+      setRoleDetails(rawRoleData || { roleName: resolvedRoleName });
+      setRolePermissions(permissions);
+    } catch (err) {
+      console.error('Error resolving role:', err);
+      setUserRole('employee');
+    } finally {
+      setIsRoleLoading(false);
+    }
+  };
+
+  // Sync role and fresh user profile on initial mount
+  useEffect(() => {
+    localStorage.removeItem('active_role');
+    const initRoleAndUser = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        try {
+          const profileRes = await api.get('/api/users/profile');
+          const pData = profileRes.data?.data || profileRes.data;
+          if (pData) {
+            setUser(pData);
+            localStorage.setItem('auth_user', JSON.stringify(pData));
+            await resolveRole(pData);
+            return;
+          }
+        } catch (e) {
+          console.warn('Error fetching initial profile:', e);
+        }
+      }
+      if (user) {
+        resolveRole(user);
+      }
+    };
+
+    initRoleAndUser();
+  }, []);
+
+  const loginUser = async (userData, token) => {
+    if (token) localStorage.setItem('auth_token', token);
+    
+    let activeUser = userData;
+    // Immediately fetch latest profile with role info from backend
+    try {
+      const profRes = await api.get('/api/users/profile');
+      const pData = profRes.data?.data || profRes.data;
+      if (pData) {
+        activeUser = pData;
+      }
+    } catch (e) {
+      console.warn('Profile fetch on login fallback:', e);
+    }
+
+    if (activeUser) {
+      localStorage.setItem('auth_user', JSON.stringify(activeUser));
+      setUser(activeUser);
+      await resolveRole(activeUser);
+    }
+
+    // Always take the user to their role dashboard
+    setCurrentTab('dashboard');
+  };
+
   const updateUserProfile = (updated) => {
     setUser(prev => ({ ...prev, ...updated }));
   };
@@ -452,6 +604,13 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       user,
+      setUser,
+      userRole,
+      roleDetails,
+      rolePermissions,
+      isRoleLoading,
+      resolveRole,
+      loginUser,
       currentTab,
       setCurrentTab,
       isSidebarCollapsed,
@@ -459,6 +618,7 @@ export const AppProvider = ({ children }) => {
       isMobileSidebarOpen,
       setIsMobileSidebarOpen,
       attendanceStatus,
+      setAttendanceStatus,
       sessionId,
       checkInTime,
       checkOutTime,

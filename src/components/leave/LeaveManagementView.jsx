@@ -19,7 +19,7 @@ export const LeaveManagementView = () => {
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   
   // Form States mapped strictly to API schema
-  const [leaveType, setLeaveType] = useState('paid');
+  const [leaveType, setLeaveType] = useState('Paid Leave');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -170,49 +170,64 @@ export const LeaveManagementView = () => {
   return (
     <div className="space-y-6">
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-5 flex flex-col md:flex-row items-center justify-between gap-4 transition-colors shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 rounded-md shrink-0">
-            <Info size={24} />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-800 dark:text-slate-200">Leave Policy Guidelines</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              You are entitled to <strong className="text-slate-900 dark:text-slate-200 font-semibold">12 Paid Leaves</strong> per year. All other leaves (Casual/Sick) are processed as unpaid. Applications require 2 days notice.{' '}
-              <button 
+      {/* Compact policy section with actions aligned to the top-right */}
+       <div>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row  sm:justify-between gap-4">
+              
+            {/* Small, responsive action buttons aligned right */}
+            <div className="flex w-full items-center justify-end gap-2">
+              <button
+                type="button"
                 onClick={() => setIsPolicyModalOpen(true)}
-                className="text-blue-600 dark:text-blue-400 font-medium hover:underline inline-flex items-center gap-1 ml-1 cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-xs sm:text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
               >
-                Read Full Policies
+                <FileText size={15} />
+                Leave Policy
               </button>
-            </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStartDate(minAllowedDateStr);
+                  setEndDate(minAllowedDateStr);
+                  setFormError('');
+                  setSuccessMsg('');
+                  setIsModalOpen(true);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition-colors cursor-pointer"
+              >
+                <Plus size={15} />
+                Apply Leave
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Paid Quota', value: `${leaveBalance.totalLeaves || 12} Days`, note: 'Annual Paid Leaves', icon: Calendar, accent: 'border-l-blue-500', iconColor: 'text-blue-500' },
-          { label: 'Leaves Used', value: `${leaveBalance.usedLeaves || 0} Days`, note: 'Total utilized', icon: Clock, accent: 'border-l-amber-500', iconColor: 'text-amber-500' },
-          { label: 'Paid Balance', value: `${leaveBalance.remainingLeaves || 12} Days`, note: 'Remaining PL', icon: CheckCircle2, accent: 'border-l-green-500', iconColor: 'text-green-500' },
-          { label: 'Pending', value: `${leaveBalance.pendingRequests || 0} Req.`, note: 'Awaiting Review', icon: Clock, accent: 'border-l-slate-400', iconColor: 'text-slate-500' }
+          { label: 'Paid Quota', value: `${leaveBalance.totalLeaves || 12} Days`, icon: Calendar, accent: 'border-l-blue-500', iconColor: 'text-blue-500' },
+          { label: 'Leaves Used', value: `${leaveBalance.usedLeaves || 0} Days`, icon: Clock, accent: 'border-l-amber-500', iconColor: 'text-amber-500' },
+          { label: 'Paid Balance', value: `${leaveBalance.remainingLeaves || 12} Days`, icon: CheckCircle2, accent: 'border-l-green-500', iconColor: 'text-green-500' },
+          { label: 'Pending', value: `${leaveBalance.pendingRequests || 0} Req.`, icon: Clock, accent: 'border-l-slate-400', iconColor: 'text-slate-500' }
         ].map((item, idx) => {
           const Icon = item.icon;
           return (
             <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{item.label}</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">{item.value}</p>
+              <div className="gap-2">
+                <div className="flex justify-between">
+                  <p className="text-2xs  font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                  <p className="px-2 items-end text-xl font-bold text-slate-900 dark:text-slate-100">{item.value} </p>
                 </div>
-                <Icon size={18} className={item.iconColor} />
+                {/* <Icon size={18} className={item.iconColor} /> */}
               </div>
-              <p className="text-xs mt-2 text-slate-400 dark:text-slate-500">{item.note}</p>
+              {/* <p className="text-xs mt-2 text-slate-400 dark:text-slate-500">{item.note}</p> */}
             </div>
           );
         })}
         
-        <button 
+        {/* <button 
           onClick={() => {
             setStartDate(minAllowedDateStr);
             setEndDate(minAllowedDateStr);
@@ -222,7 +237,7 @@ export const LeaveManagementView = () => {
         >
           <Plus size={28} />
           <span className="font-semibold text-sm tracking-wide">Apply For Leave</span>
-        </button>
+        </button> */}
       </div>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden transition-colors shadow-sm">
@@ -333,7 +348,7 @@ export const LeaveManagementView = () => {
       {isPolicyModalOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 dark:bg-black/60 transition-opacity flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-md shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden max-h-[90vh]">
-            <div className="px-6 py-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <FileText size={20} className="text-slate-500" />
@@ -385,7 +400,7 @@ export const LeaveManagementView = () => {
               </div>
             </div>
             
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-end">
               <button 
                 onClick={() => setIsPolicyModalOpen(false)}
                 className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 text-white dark:text-slate-900 font-medium rounded-md transition-colors cursor-pointer"
@@ -401,10 +416,10 @@ export const LeaveManagementView = () => {
         <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 dark:bg-black/60 transition-opacity flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-md shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
             
-            <div className="px-6 py-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-2 sm:py-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Apply For Leave</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Must be applied at least 2 days in advance</p>
+                {/* <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Must be applied at least 2 days in advance</p> */}
               </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
@@ -414,7 +429,7 @@ export const LeaveManagementView = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5 text-sm">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 text-sm">
               
               {formError && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-md text-red-700 dark:text-red-400 font-medium text-sm">
@@ -427,7 +442,7 @@ export const LeaveManagementView = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Leave Category</label>
                   <select 
@@ -467,7 +482,7 @@ export const LeaveManagementView = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Start Date</label>
                   <input 
@@ -504,7 +519,7 @@ export const LeaveManagementView = () => {
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Reason</label>
                 <textarea 
-                  rows={3}
+                  rows={1}
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   placeholder="Provide brief explanation for leave..."
@@ -526,7 +541,7 @@ export const LeaveManagementView = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-5 border-t border-slate-200 dark:border-slate-800 mt-6">
+              <div className="flex justify-end gap-3  mt-6">
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}

@@ -13,11 +13,21 @@ import { InactivityAlertModal } from './components/alerts/InactivityAlertModal.j
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 
+// Import Holiday Calendar & New Placeholders
+import { HolidayCalendarView } from './components/holiday/HolidayCalendarView.jsx';
+import {
+  SalaryView, PerformanceView, ProjectView,
+  TeamMembersView, EmployeesView, LearningHubView, InternshipProgressView,
+  DocumentsView, DailyFollowUpView, TeamTaskManagementView,
+  TeamLeaveManagementView, AttendanceReviewView, ReportView
+} from './components/placeholders/PlaceholderViews.jsx';
+
 const MainLayout = ({ handleSignOut }) => {
   const { currentTab, isSidebarCollapsed } = useApp();
 
   const renderActiveTab = () => {
     switch (currentTab) {
+      // Existing Modules
       case 'dashboard': return <DashboardView />;
       case 'attendance': return <AttendanceView />;
       case 'daily-report': return <DailyReportView />;
@@ -25,6 +35,23 @@ const MainLayout = ({ handleSignOut }) => {
       case 'leave': return <LeaveManagementView />;
       case 'profile': return <ProfileView />;
       case 'admin-screenshots': return <AdminScreenshotPortal />;
+      
+      // New Role-Specific Modules
+      case 'salary': return <SalaryView />;
+      case 'performance': return <PerformanceView />;
+      case 'projects': return <ProjectView />;
+      case 'holiday': return <HolidayCalendarView />;
+      case 'team-members': return <TeamMembersView />;
+      case 'employees': return <EmployeesView />;
+      case 'learning-hub': return <LearningHubView />;
+      case 'internship-progress': return <InternshipProgressView />;
+      case 'documents': return <DocumentsView />;
+      case 'daily-follow-up': return <DailyFollowUpView />;
+      case 'team-tasks': return <TeamTaskManagementView />;
+      case 'team-leaves': return <TeamLeaveManagementView />;
+      case 'attendance-review': return <AttendanceReviewView />;
+      case 'report': return <ReportView />;
+      
       default: return <DashboardView />;
     }
   };
@@ -32,20 +59,16 @@ const MainLayout = ({ handleSignOut }) => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 antialiased font-sans transition-colors">
       <Sidebar onSignOut={handleSignOut} />
-
-      <div 
+      <div
         className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
           isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
         }`}
       >
         <Header onSignOut={handleSignOut} />
-
-        {/* Removed max-w-7xl here to make the layout fully fluid */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full mx-auto space-y-6">
           {renderActiveTab()}
         </main>
       </div>
-
       <InactivityAlertModal />
     </div>
   );
@@ -55,10 +78,8 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem('auth_token');
   });
-  
-  const [authView, setAuthView] = useState('login'); 
+  const [authView, setAuthView] = useState('login');
 
-  // Initialize Dark Mode instantly on root app load
   useEffect(() => {
     const root = document.documentElement;
     const storedTheme = localStorage.getItem('theme');
@@ -74,7 +95,7 @@ export default function App() {
 
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
-    setAuthView('login'); 
+    setAuthView('login');
   };
 
   const handleSignOut = async () => {
@@ -94,6 +115,7 @@ export default function App() {
     } finally {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
+      localStorage.removeItem('active_role');
       setIsAuthenticated(false);
     }
   };
@@ -105,9 +127,9 @@ export default function App() {
       ) : authView === 'forgot_password' ? (
         <ForgotPasswordView onBackToLogin={() => setAuthView('login')} />
       ) : (
-        <LoginView 
-          onLoginSuccess={handleLoginSuccess} 
-          onForgotPassword={() => setAuthView('forgot_password')} 
+        <LoginView
+          onLoginSuccess={handleLoginSuccess}
+          onForgotPassword={() => setAuthView('forgot_password')}
         />
       )}
     </AppProvider>

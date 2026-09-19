@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
 import logo from '../../assets/Logo.png';
 import api from '../../api/axios.js'; 
+import { useApp } from '../../context/AppContext.jsx';
 
 export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
+  const { loginUser } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,13 +28,10 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
 
       // Store session details from backend
       const token = data.token || data.accessToken || data.data?.token;
-      if (token) {
-        localStorage.setItem('auth_token', token);
-      }
-
-      // Extract user data securely
       const userData = data.user || data.data?.user || { email };
-      localStorage.setItem('auth_user', JSON.stringify(userData));
+
+      // Update session in AppContext and resolve role via API
+      loginUser(userData, token);
 
       // Notify App that login is complete
       onLoginSuccess(userData);

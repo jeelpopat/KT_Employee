@@ -85,7 +85,7 @@ export const TaskManagementView = () => {
   };
 
   const kanbanColumns = [
-    { id: 'Assigned', title: 'Assigned', count: pendingCount, borderAccent: 'border-t-slate-400' },
+    { id: 'To do', title: 'To do', count: pendingCount, borderAccent: 'border-t-slate-400' },
     { id: 'In Progress', title: 'In Progress', count: inProgressCount, borderAccent: 'border-t-amber-500' },
     { id: 'Review', title: 'In Review', count: reviewCount, borderAccent: 'border-t-indigo-500' },
     { id: 'Completed', title: 'Completed', count: completedCount, borderAccent: 'border-t-green-500' }
@@ -173,7 +173,7 @@ export const TaskManagementView = () => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
               { label: 'Total Assigned', value: totalCount, icon: CheckSquare, accent: 'border-l-blue-500', iconColor: 'text-blue-500' },
-              { label: 'Assigned', value: pendingCount, icon: Clock, accent: 'border-l-slate-400', iconColor: 'text-slate-500' },
+              { label: 'To do ', value: pendingCount, icon: Clock, accent: 'border-l-slate-400', iconColor: 'text-slate-500' },
               { label: 'In Progress', value: inProgressCount, icon: TrendingUp, accent: 'border-l-amber-500', iconColor: 'text-amber-500' },
               { label: 'In Review', value: reviewCount, icon: AlertCircle, accent: 'border-l-indigo-500', iconColor: 'text-indigo-500' },
               { label: 'Completed', value: completedCount, icon: FileCheck, accent: 'border-l-green-500', iconColor: 'text-green-500' }
@@ -181,12 +181,12 @@ export const TaskManagementView = () => {
               const Icon = item.icon;
               return (
                 <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{item.label}</p>
-                      <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">{item.value}</p>
+                  <div>
+                    <div className="flex items-start justify-between ">
+                      <p className="text-2xs  font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                      <p className="px-2 items-end text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
                     </div>
-                    <Icon size={18} className={item.iconColor} />
+                    {/* <Icon size={18} className={item.iconColor} /> */}
                   </div>
                 </div>
               );

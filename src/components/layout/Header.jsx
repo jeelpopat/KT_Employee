@@ -9,7 +9,8 @@ import api from '../../api/axios.js';
 export const Header = ({ onSignOut }) => {
   const { 
     user, currentTab, setCurrentTab, setIsMobileSidebarOpen, 
-    globalSearchQuery, setGlobalSearchQuery, attendanceStatus, handleCheckOut 
+    globalSearchQuery, setGlobalSearchQuery, attendanceStatus, handleCheckOut,
+    userRole
   } = useApp();
 
   const [timeString, setTimeString] = useState('');
@@ -176,11 +177,26 @@ export const Header = ({ onSignOut }) => {
 
   const pageTitles = {
     'dashboard': 'Dashboard Overview',
-    'attendance': 'Attendance Log',
+    'attendance': 'My Attendance Log',
     'daily-report': 'Daily Work Report',
-    'tasks': 'Task Management',
+    'tasks': 'My Task Management',
     'leave': 'Leave Portal',
-    'profile': 'Employee Profile'
+    'profile': 'Profile Details',
+    'salary': 'Salary & Compensations',
+    'performance': 'My Performance Scorecard',
+    'projects': 'My Projects',
+    'holiday': 'Holiday & Festival Calendar',
+    'team-members': 'Team Members',
+    'employees': 'Kevalon Employee Directory',
+    'learning-hub': 'Internship Learning Hub',
+    'internship-progress': 'Internship Progress Tracker',
+    'documents': 'Documents & Certificates',
+    'daily-follow-up': 'Team Daily Follow Up',
+    'team-tasks': 'Team Task Management',
+    'team-leaves': 'Team Leave Management',
+    'attendance-review': 'Team Attendance Review',
+    'report': 'Team Reports & Analytics',
+    'admin-screenshots': 'Activity & Monitoring Portal'
   };
 
   const emp = headerProfileData?.employee || user?.employee || {};
@@ -206,7 +222,7 @@ export const Header = ({ onSignOut }) => {
         </div>
       </div>
 
-      <div className="hidden md:flex flex-1 max-w-md mx-6">
+      {/* <div className="hidden md:flex flex-1 max-w-md mx-6">
         <div className="relative w-full">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
@@ -217,7 +233,7 @@ export const Header = ({ onSignOut }) => {
             className="w-full pl-9 pr-3 py-2 text-sm bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none transition-colors"
           />
         </div>
-      </div>
+      </div> */}
 
       <div className="flex items-center space-x-3">
         {attendanceStatus === 'checked_in' && (
@@ -325,7 +341,12 @@ export const Header = ({ onSignOut }) => {
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{displayName}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{displayEmail}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono uppercase">
+                      {userRole === 'team_leader' ? 'Team Leader' : userRole === 'intern' ? 'Intern' : 'Employee'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{displayEmail}</p>
                 </div>
               </div>
               <div className="py-1">

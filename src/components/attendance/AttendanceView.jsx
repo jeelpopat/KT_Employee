@@ -124,34 +124,27 @@ export const AttendanceView = () => {
 
   return (
     <div className="space-y-6">
-      
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Attendance Log</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Review your daily timelines, hours, and sessions.</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Hours', value: `${summaryStats.totalWorkingHours.toFixed(1)}h`, note: 'In selected range', icon: Clock, accent: 'border-l-blue-500' },
-          { label: 'Present Days', value: summaryStats.presentDays, note: 'Approved attendance', icon: CheckCircle2, accent: 'border-l-green-500' },
-          { label: 'Absent Days', value: summaryStats.absentDays, note: 'Marked absent', icon: AlertTriangle, accent: 'border-l-red-500' },
-          { label: 'Half Days', value: summaryStats.halfDays, note: 'Approved half days', icon: Clock, accent: 'border-l-purple-500' },
-          { label: 'Avg per day', value: `${summaryStats.averageWorkingHours.toFixed(1)}h`, note: 'In selected range', icon: Calendar, accent: 'border-l-indigo-500' }
+          { label: 'Total Hours', value: `${summaryStats.totalWorkingHours.toFixed(1)}h`, accent: 'border-l-blue-500' },
+          { label: 'Present Days', value: summaryStats.presentDays, accent: 'border-l-green-500' },
+          { label: 'Absent Days', value: summaryStats.absentDays, accent: 'border-l-red-500' },
+          { label: 'Half Days', value: summaryStats.halfDays, accent: 'border-l-purple-500' },
+          // { label: 'Avg per day', value: `${summaryStats.averageWorkingHours.toFixed(1)}h`, accent: 'border-l-indigo-500' }
         ].map((item, idx) => {
           const Icon = item.icon;
           return (
-            <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{item.label}</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">{item.value}</p>
+              <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
+              <div>
+                <div className="flex justify-between">
+                  <p className="text-2xs  font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                  <p className="px-2 items-end text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
                 </div>
-                <Icon size={18} className="text-slate-400 dark:text-slate-500" />
+                {/* <Icon size={18} className="text-slate-400 dark:text-slate-500" /> */}
               </div>
-              <p className="text-xs mt-2 text-slate-400 dark:text-slate-500">{item.note}</p>
-            </div>
+              {/* <p className="text-xs mt-2 text-slate-400 dark:text-slate-500">{item.note}</p> */}
+             </div> 
           );
         })}
       </div>
