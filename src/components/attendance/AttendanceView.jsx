@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Clock, Calendar, Search, RotateCcw, 
+import {
+  Clock, Calendar, Search, RotateCcw,
   CheckCircle2, AlertTriangle, PlayCircle, StopCircle, Coffee, Loader2, MapPin
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
-import { 
-  computeNineHourTimeline, 
-  isTodayDate, 
-  formatMinutesToTimeStr, 
-  convertUTCMinutesToLocal 
+import {
+  computeNineHourTimeline,
+  isTodayDate,
+  formatMinutesToTimeStr,
+  convertUTCMinutesToLocal
 } from '../../utils/timelineUtils.js';
 
 export const AttendanceView = () => {
@@ -22,7 +22,7 @@ export const AttendanceView = () => {
     averageWorkingHours: 0
   });
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [activeFilterTab, setActiveFilterTab] = useState('10days');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
@@ -37,10 +37,10 @@ export const AttendanceView = () => {
 
   const fetchAttendance = async () => {
     setIsLoading(true);
-    
+
     try {
       let endpoint = `/api/employee-panel/attendance/timeline`;
-      
+
       if (activeFilterTab === 'month' && selectedMonthStr) {
         const [year, month] = selectedMonthStr.split('-');
         const startDate = `${year}-${month}-01`;
@@ -59,7 +59,7 @@ export const AttendanceView = () => {
       const response = await api.get(endpoint);
       const data = response.data?.data || [];
       const summary = response.data?.summary || {};
-      
+
       if (summary) {
         setSummaryStats({
           totalWorkingHours: summary.totalWorkingHours || 0,
@@ -141,7 +141,7 @@ export const AttendanceView = () => {
         ].map((item, idx) => {
           const Icon = item.icon;
           return (
-              <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
+            <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
               <div>
                 <div className="flex justify-between">
                   <p className="text-2xs  font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
@@ -150,13 +150,13 @@ export const AttendanceView = () => {
                 {/* <Icon size={18} className="text-slate-400 dark:text-slate-500" /> */}
               </div>
               {/* <p className="text-xs mt-2 text-slate-400 dark:text-slate-500">{item.note}</p> */}
-             </div> 
+            </div>
           );
         })}
       </div>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3 flex flex-col md:flex-row items-center justify-between gap-4 transition-colors shadow-sm">
-        
+
         <div className="flex items-center gap-1 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
           {[
             { id: 'today', label: 'Today' },
@@ -167,11 +167,10 @@ export const AttendanceView = () => {
             <button
               key={tab.id}
               onClick={() => setActiveFilterTab(tab.id)}
-              className={`px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                activeFilterTab === tab.id
+              className={`px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${activeFilterTab === tab.id
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-transparent'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -179,11 +178,11 @@ export const AttendanceView = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-          
+
           {activeFilterTab === 'month' && (
             <div>
               <label htmlFor="monthPicker" className="sr-only">Select Month</label>
-              <input 
+              <input
                 id="monthPicker"
                 name="monthPicker"
                 type="month"
@@ -251,7 +250,7 @@ export const AttendanceView = () => {
             const dateObj = getMonthDate(record.date);
             const statusLabel = (record.status || 'unknown').toLowerCase();
             const isToday = isTodayDate(record.date) || isTodayDate(record.checkInTime);
-            
+
             // Fixed 9-Hour Timeline Computation
             const nineHourTimeline = computeNineHourTimeline({
               checkInTime: record.checkInTime,
@@ -265,7 +264,7 @@ export const AttendanceView = () => {
 
             return (
               <div key={record._id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-5 flex flex-col transition-colors shadow-sm hover:shadow-md">
-                
+
                 <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center shrink-0">
@@ -281,7 +280,7 @@ export const AttendanceView = () => {
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-col items-end gap-2">
                     {isToday ? (
                       record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null' ? (
@@ -324,15 +323,15 @@ export const AttendanceView = () => {
 
                 <div className="grid grid-cols-4 gap-3 mb-6">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><PlayCircle size={10} className="text-green-500"/> In</span>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><PlayCircle size={10} className="text-green-500" /> In</span>
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{formatISOToLocalTime(record.checkInTime)}</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><StopCircle size={10} className="text-red-500"/> Out</span>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><StopCircle size={10} className="text-red-500" /> Out</span>
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{formatISOToLocalTime(record.checkOutTime)}</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><Coffee size={10} className="text-amber-500"/> Break</span>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><Coffee size={10} className="text-amber-500" /> Break</span>
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{record.totalBreakTime || 0}m</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
@@ -344,10 +343,7 @@ export const AttendanceView = () => {
                 {/* --- 9-Hour Fixed Shift Timeline --- */}
                 <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800/80">
                   <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 mb-2">
-                    <span className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
-                      <Clock size={12} className="text-blue-500" />
-                      9-Hour Timeline
-                    </span>
+
                     <div className="flex items-center gap-3 text-[10px]">
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-[#3B82F6]"></span>
@@ -355,11 +351,11 @@ export const AttendanceView = () => {
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-[#F59E0B]"></span>
-                        Break (≤ 1h)
+                        Break
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500"></span>
-                        Extra Break (&gt; 1h) / Grey
+                        Extra Break
                       </span>
                     </div>
                   </div>
@@ -367,7 +363,7 @@ export const AttendanceView = () => {
                   {/* Fixed 9-Hour Track (Grey Base for Early Out / Remaining Time) */}
                   <div className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex relative group cursor-help shadow-inner">
                     {nineHourTimeline.displaySegments.map((seg) => (
-                      <div 
+                      <div
                         key={seg.id}
                         title={seg.label}
                         style={{ left: `${seg.leftPercent}%`, width: `${seg.widthPercent}%` }}
@@ -377,26 +373,29 @@ export const AttendanceView = () => {
                   </div>
 
                   {/* Status Transition Markers Below Timeline (Check In, Break In, Extra Break, Break Out, Check Out, 9h End) */}
-                  <div className="relative w-full h-4 mt-2">
-                    {(nineHourTimeline.statusMarkers || []).map((marker) => {
-                      let alignClass = '-translate-x-1/2';
-                      if (marker.percent <= 3) alignClass = 'translate-x-0';
-                      else if (marker.percent >= 97) alignClass = '-translate-x-full';
+                  <div className="mt-2.5">
+                    {/* Positioned Marker Ticks & Timestamps Along Timeline */}
+                    <div className="relative w-full h-4">
+                      {(nineHourTimeline.statusMarkers || []).map((marker) => {
+                        let alignClass = '-translate-x-1/2';
+                        if (marker.percent <= 3) alignClass = 'translate-x-0';
+                        else if (marker.percent >= 97) alignClass = '-translate-x-full';
 
-                      return (
-                        <div 
-                          key={`tick-${marker.id}`}
-                          style={{ left: `${marker.percent}%` }}
-                          className={`absolute top-0 flex flex-col items-center ${alignClass} transition-all pointer-events-auto group cursor-help`}
-                          title={`${marker.label}: ${marker.timeStr}`}
-                        >
-                          <div className={`w-0.5 h-1.5 rounded-full ${marker.dotClass} mb-0.5`} />
-                          <span className="text-[9px] font-mono font-bold text-slate-700 dark:text-slate-300 leading-none whitespace-nowrap">
-                            {marker.timeStr}
-                          </span>
-                        </div>
-                      );
-                    })}
+                        return (
+                          <div
+                            key={`tick-${marker.id}`}
+                            style={{ left: `${marker.percent}%` }}
+                            className={`absolute top-0 flex flex-col items-center ${alignClass} transition-all pointer-events-auto group cursor-help`}
+                            title={`${marker.label}: ${marker.timeStr}`}
+                          >
+                            <div className={`w-0.5 h-1.5 rounded-full ${marker.dotClass} mb-0.5`} />
+                            <span className="text-[9px] font-mono font-bold text-slate-700 dark:text-slate-300 leading-none">
+                              {marker.timeStr}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 

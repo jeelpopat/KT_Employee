@@ -34,7 +34,8 @@ export const Sidebar = ({ onSignOut }) => {
       { tab: 'team-members', label: 'Team Members', icon: <Users size={18} /> },
       { tab: 'employees', label: 'Employees', icon: <Users size={18} /> },
       { tab: 'daily-report', label: 'My Daily Report', icon: <FileText size={18} /> },
-      { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> }
+      { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> },
+      { tab: 'attendance', label: 'My Attendance Log', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined }
     ],
     intern: [
       { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -42,6 +43,7 @@ export const Sidebar = ({ onSignOut }) => {
       { tab: 'learning-hub', label: 'Learning Hub', icon: <BookOpen size={18} /> },
       { tab: 'internship-progress', label: 'Internship Progress', icon: <GraduationCap size={18} /> },
       { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> },
+      { tab: 'attendance', label: 'My Attendance Log', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
       { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
       { tab: 'documents', label: 'Documents & Certificate', icon: <FileBadge size={18} /> },
       { tab: 'tasks', label: 'My Task', icon: <CheckSquare size={18} /> }
@@ -56,7 +58,7 @@ export const Sidebar = ({ onSignOut }) => {
       { tab: 'report', label: 'Report', icon: <BarChart size={18} /> },
       { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
       { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> },
-      { tab: 'attendance', label: 'My Attendance', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
+      { tab: 'attendance', label: 'My Attendance Log', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
       { tab: 'salary', label: 'My Salary', icon: <Wallet size={18} /> },
       { tab: 'tasks', label: 'My Task', icon: <CheckSquare size={18} /> },
       { tab: 'projects', label: 'My Project', icon: <Briefcase size={18} /> },

@@ -943,26 +943,32 @@ export const DashboardView = () => {
             </div>
 
             {/* Status Transition Markers Below Timeline (Check In, Break In, Extra Break, Break Out, Check Out, 9h End) */}
-            <div className="relative w-full h-5 mt-2">
-              {(nineHourTimeline.statusMarkers || []).map((marker) => {
-                let alignClass = '-translate-x-1/2';
-                if (marker.percent <= 3) alignClass = 'translate-x-0';
-                else if (marker.percent >= 97) alignClass = '-translate-x-full';
+            <div className="mt-3 space-y-2.5">
+              {/* Positioned Marker Ticks & Timestamps along Timeline */}
+              <div className="relative w-full h-5">
+                {(nineHourTimeline.statusMarkers || []).map((marker) => {
+                  let alignClass = '-translate-x-1/2';
+                  if (marker.percent <= 3) alignClass = 'translate-x-0';
+                  else if (marker.percent >= 97) alignClass = '-translate-x-full';
 
-                return (
-                  <div
-                    key={`tick-${marker.id}`}
-                    style={{ left: `${marker.percent}%` }}
-                    className={`absolute top-0 flex flex-col items-center ${alignClass} transition-all pointer-events-auto group cursor-help`}
-                    title={`${marker.label}: ${marker.timeStr}`}
-                  >
-                    <div className={`w-1 h-2 rounded-full ${marker.dotClass} mb-0.5`} />
-                    <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 leading-none whitespace-nowrap">
-                      {marker.timeStr}
-                    </span>
-                  </div>
-                );
-              })}
+                  return (
+                    <div
+                      key={`tick-${marker.id}`}
+                      style={{ left: `${marker.percent}%` }}
+                      className={`absolute top-0 flex flex-col items-center ${alignClass} transition-all pointer-events-auto group cursor-help`}
+                      title={`${marker.label}: ${marker.timeStr}`}
+                    >
+                      <div className={`w-1 h-2 rounded-full ${marker.dotClass} mb-0.5`} />
+                      <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 leading-none">
+                        {marker.timeStr}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Status Change Badges */}
+
             </div>
           </div>
         </div>
