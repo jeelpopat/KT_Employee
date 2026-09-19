@@ -481,48 +481,109 @@ export const DashboardView = () => {
     );
   };
   
-  const handleAttendanceAction = async (endpoint, payload, actionType) => {
+  // Extract real user ID from JWT token or user profile (never employee document ID)
+  const getRealAuthUserId = () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          const tId = payload.id || payload._id || payload.userId || payload.sub;
+          if (tId && /^[a-fA-F0-9]{24}$/.test(String(tId))) return String(tId);
+        }
+      }
+    } catch (e) {}
+
+    const storedUser = (() => {
+      try {
+        const s = localStorage.getItem('auth_user');
+        return s ? JSON.parse(s) : null;
+      } catch (e) { return null; }
+    })();
+
+    const u = storedUser || user || {};
+    const cand = u.user?._id || (typeof u.user === 'string' ? u.user : null) || u._id;
+    if (cand && /^[a-fA-F0-9]{24}$/.test(String(cand))) return String(cand);
+    return null;
+  };
+
+  const handleAttendanceAction = async (endpoint, basePayload, actionType) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const todayLocalStr = new Date().toLocaleDateString('en-CA');
     const nowIso = new Date().toISOString();
     const nowLocal = formatISOToLocalTime(nowIso);
 
+    const realUserId = getRealAuthUserId();
+
+    // Fallback URL candidates if 404
+    const endpointCandidates = [endpoint];
+    if (endpoint === '/api/attendance/check-in') {
+      endpointCandidates.push('/api/attendance/checkin');
+    } else if (endpoint === '/api/attendance/break/start') {
+      endpointCandidates.push('/api/attendance/break-in', '/api/attendance/break/in');
+    } else if (endpoint === '/api/attendance/break/end') {
+      endpointCandidates.push('/api/attendance/break-out', '/api/attendance/break/out');
+    } else if (endpoint === '/api/attendance/check-out') {
+      endpointCandidates.push('/api/attendance/checkout');
+    }
+
+    // Payload variants:
+    // 1st: Clean { latitude, longitude } (uses JWT Bearer token authentication on backend)
+    // 2nd: If backend specifically requires userId in body, attach the real JWT User ID (not employee ID)
+    const payloadVariants = [
+      { latitude: Number(basePayload.latitude), longitude: Number(basePayload.longitude) }
+    ];
+    if (realUserId) {
+      payloadVariants.push({
+        latitude: Number(basePayload.latitude),
+        longitude: Number(basePayload.longitude),
+        userId: realUserId
+      });
+    }
+
     try {
-      let response;
-      try {
-        response = await api.post(endpoint, payload);
-      } catch (postErr) {
-        // Fallback endpoints if 404
-        if (postErr.response?.status === 404) {
-          if (endpoint === '/api/attendance/check-in') {
-            response = await api.post('/api/attendance/checkin', payload);
-          } else if (endpoint === '/api/attendance/break/start') {
-            try {
-              response = await api.post('/api/attendance/break-in', payload);
-            } catch (e2) {
-              response = await api.post('/api/attendance/break/in', payload);
+      let response = null;
+      let lastErr = null;
+
+      outerLoop:
+      for (const ep of endpointCandidates) {
+        for (const pl of payloadVariants) {
+          try {
+            response = await api.post(ep, pl);
+            if (response && (response.status === 200 || response.status === 201)) {
+              break outerLoop;
             }
-          } else if (endpoint === '/api/attendance/break/end') {
-            try {
-              response = await api.post('/api/attendance/break-out', payload);
-            } catch (e3) {
-              response = await api.post('/api/attendance/break/out', payload);
+          } catch (postErr) {
+            lastErr = postErr;
+            if (postErr.response?.status === 404) {
+              break; // Try next candidate endpoint URL
             }
-          } else if (endpoint === '/api/attendance/check-out') {
-            response = await api.post('/api/attendance/checkout', payload);
-          } else {
-            throw postErr;
+            const msg = (postErr.response?.data?.message || postErr.response?.data?.error || '').toLowerCase();
+            // Don't retry different payloads if backend gave a domain-level message (e.g. already marked, already checked in)
+            if (
+              msg.includes('already checked') || 
+              msg.includes('already marked') || 
+              msg.includes('already on break') || 
+              msg.includes('already clocked') ||
+              msg.includes('already in break') ||
+              msg.includes('already checked out')
+            ) {
+              break outerLoop;
+            }
           }
-        } else {
-          throw postErr;
         }
       }
 
-      const resData = response.data;
+      if (!response && lastErr) {
+        throw lastErr;
+      }
+
+      const resData = response?.data;
       
       if (
-        response.status === 200 || 
-        response.status === 201 || 
+        response?.status === 200 || 
+        response?.status === 201 || 
         resData?.success || 
         resData?.status === 'success' || 
         resData?.attendance || 
@@ -566,7 +627,7 @@ export const DashboardView = () => {
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
         }
 
-        await syncDashboardAndAttendance(payload.userId || actualUserId);
+        await syncDashboardAndAttendance(actualUserId);
       } else {
         setGeoError(resData?.message || "Action failed.");
       }
@@ -620,7 +681,7 @@ export const DashboardView = () => {
         if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
         setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
         setGeoError('');
-        await syncDashboardAndAttendance(payload.userId || actualUserId);
+        await syncDashboardAndAttendance(actualUserId);
       } else if ((actionType === 'break_start' && isAlreadyOnBreak) || isAlreadyOnBreak) {
         // User is already on break: activate Break Out
         localStorage.setItem('kt_on_break_' + todayStr, 'true');
@@ -629,7 +690,7 @@ export const DashboardView = () => {
         if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('on_break');
         setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: true, canCheckOut: true });
         setGeoError('');
-        await syncDashboardAndAttendance(payload.userId || actualUserId);
+        await syncDashboardAndAttendance(actualUserId);
       } else if ((actionType === 'break_end' && isNotOnBreak) || isNotOnBreak) {
         // User is not on break: return to checked in
         localStorage.removeItem('kt_on_break_' + todayStr);
@@ -638,7 +699,7 @@ export const DashboardView = () => {
         if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
         setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
         setGeoError('');
-        await syncDashboardAndAttendance(payload.userId || actualUserId);
+        await syncDashboardAndAttendance(actualUserId);
       } else if ((actionType === 'check_out' && isAlreadyCheckedOut) || isAlreadyCheckedOut) {
         localStorage.setItem('kt_checked_out_' + todayStr, 'true');
         localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
@@ -656,24 +717,13 @@ export const DashboardView = () => {
     }
   };
 
-  // --- Strict Mapped Action Payloads ---
+  // --- Strict Mapped Action Payloads (matching attendanceService protocol) ---
   const onCheckInClick = () => {
     if (!actionsAvailable.canCheckIn) return;
-    verifyLocationAndExecute(async (lat, lng, distanceMeters, effId) => {
-      const nowIso = new Date().toISOString();
-      const todayStr = nowIso.split('T')[0];
+    verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
-        longitude: Number(lng),
-        userId: effId,
-        checkInTime: nowIso,
-        date: todayStr,
-        location: { latitude: Number(lat), longitude: Number(lng) },
-        checkInLocation: {
-          latitude: Number(lat),
-          longitude: Number(lng),
-          distanceFromOffice: parseFloat((distanceMeters / 1000).toFixed(3))
-        }
+        longitude: Number(lng)
       };
       await handleAttendanceAction('/api/attendance/check-in', payload, 'check_in');
     });
@@ -683,20 +733,10 @@ export const DashboardView = () => {
     if (!actionsAvailable.canStartBreak) return;
     const isoNow = new Date().toISOString();
     setActiveBreakIsoStart(isoNow);
-    verifyLocationAndExecute(async (lat, lng, distanceMeters, effId) => {
-      const todayStr = isoNow.split('T')[0];
+    verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
-        longitude: Number(lng),
-        userId: effId,
-        startTime: isoNow,
-        date: todayStr,
-        location: { latitude: Number(lat), longitude: Number(lng) },
-        startLocation: {
-          latitude: Number(lat),
-          longitude: Number(lng),
-          distanceFromOffice: parseFloat((distanceMeters / 1000).toFixed(3))
-        }
+        longitude: Number(lng)
       };
       await handleAttendanceAction('/api/attendance/break/start', payload, 'break_start');
     });
@@ -704,27 +744,10 @@ export const DashboardView = () => {
 
   const onResumeWorkClick = () => {
     if (!actionsAvailable.canEndBreak) return;
-    verifyLocationAndExecute(async (lat, lng, distanceMeters, effId) => {
-      const endTime = new Date();
-      const isoEnd = endTime.toISOString();
-      const todayStr = isoEnd.split('T')[0];
-      const duration = activeBreakIsoStart 
-        ? Math.max(0, Math.round((endTime - new Date(activeBreakIsoStart)) / 60000)) 
-        : 0;
-
+    verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
-        longitude: Number(lng),
-        userId: effId,
-        endTime: isoEnd,
-        duration: duration,
-        date: todayStr,
-        location: { latitude: Number(lat), longitude: Number(lng) },
-        endLocation: {
-          latitude: Number(lat),
-          longitude: Number(lng),
-          distanceFromOffice: parseFloat((distanceMeters / 1000).toFixed(3))
-        }
+        longitude: Number(lng)
       };
       await handleAttendanceAction('/api/attendance/break/end', payload, 'break_end');
     });
@@ -732,21 +755,10 @@ export const DashboardView = () => {
 
   const onCheckOutClick = () => {
     if (!actionsAvailable.canCheckOut) return;
-    verifyLocationAndExecute(async (lat, lng, distanceMeters, effId) => {
-      const nowIso = new Date().toISOString();
-      const todayStr = nowIso.split('T')[0];
+    verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
-        longitude: Number(lng),
-        userId: effId,
-        checkOutTime: nowIso,
-        date: todayStr,
-        location: { latitude: Number(lat), longitude: Number(lng) },
-        checkOutLocation: {
-          latitude: Number(lat),
-          longitude: Number(lng),
-          distanceFromOffice: parseFloat((distanceMeters / 1000).toFixed(3))
-        }
+        longitude: Number(lng)
       };
       await handleAttendanceAction('/api/attendance/check-out', payload, 'check_out');
     });
