@@ -110,6 +110,49 @@ export const DashboardView = () => {
     return dStr.startsWith(todayIso) || dStr.startsWith(todayLocal);
   };
 
+  // Resolve employee photo from various nested properties or user directory lookup
+  const resolveEmployeePhoto = (source, uMap = {}) => {
+    if (!source) return '';
+    const directPhoto = (
+      source.profilePhoto ||
+      source.profileImage ||
+      source.photoUrl ||
+      source.avatar ||
+      source.image ||
+      source.photo ||
+      source.employee?.profilePhoto ||
+      source.employee?.photoUrl ||
+      source.employee?.avatar ||
+      source.user?.profilePhoto ||
+      source.user?.photoUrl ||
+      source.user?.avatar ||
+      ''
+    );
+    if (directPhoto) return directPhoto;
+
+    const idStr = String(source._id || source.id || source.employeeId || '');
+    const emailStr = (source.email || '').toLowerCase().trim();
+    const nameStr = (source.name || '').toLowerCase().trim();
+
+    const matched = (idStr && uMap[idStr]) || (emailStr && uMap[emailStr]) || (nameStr && uMap[nameStr]);
+    if (matched) {
+      return (
+        matched.resolvedPhoto ||
+        matched.profilePhoto ||
+        matched.profileImage ||
+        matched.photoUrl ||
+        matched.avatar ||
+        matched.image ||
+        matched.photo ||
+        matched.employee?.profilePhoto ||
+        matched.employee?.photoUrl ||
+        matched.employee?.avatar ||
+        ''
+      );
+    }
+    return '';
+  };
+
   // --- Core Sync Logic ---
   const syncDashboardAndAttendance = useCallback(async (resolvedUserId) => {
     try {
@@ -124,13 +167,117 @@ export const DashboardView = () => {
         dData = dashRes.data?.data || dashRes.data || {};
 
         setUpcomingBirthdays(dData.upcomingBirthdays || []);
-        setTeamOnLeave(dData.teamMembersOnLeave || []);
         if (dData.stats?.leaveBalance !== undefined) {
           setLeaveBalance(`${dData.stats.leaveBalance} Days`);
         }
       } catch (dashErr) {
         console.warn("Dashboard stats fetch:", dashErr);
       }
+
+      // 1.1 Fetch User Directory for comprehensive employee photo resolution
+      const uMap = {};
+      try {
+        const uRes = await api.get('/api/users/all');
+        const rawUsers = uRes.data?.users || uRes.data?.data || (Array.isArray(uRes.data) ? uRes.data : []);
+        if (Array.isArray(rawUsers)) {
+          rawUsers.forEach(u => {
+            const photo = (
+              u.profilePhoto ||
+              u.profileImage ||
+              u.photoUrl ||
+              u.avatar ||
+              u.image ||
+              u.photo ||
+              u.employee?.profilePhoto ||
+              u.employee?.photoUrl ||
+              u.employee?.avatar ||
+              ''
+            );
+            const enriched = { ...u, resolvedPhoto: photo };
+            if (u._id) uMap[String(u._id).toLowerCase()] = enriched;
+            if (u.id) uMap[String(u.id).toLowerCase()] = enriched;
+            if (u.employeeId) uMap[String(u.employeeId).toLowerCase()] = enriched;
+            if (u.email) uMap[u.email.toLowerCase().trim()] = enriched;
+            if (u.name) uMap[u.name.toLowerCase().trim()] = enriched;
+          });
+        }
+      } catch (uErr) {
+        console.warn("Users directory fetch notice for dashboard:", uErr.message);
+      }
+
+      // 1.2 Resolve Team Members On Leave with photos
+      let resolvedTeamOnLeave = [];
+      if (Array.isArray(dData.teamMembersOnLeave) && dData.teamMembersOnLeave.length > 0) {
+        resolvedTeamOnLeave = dData.teamMembersOnLeave.map(t => {
+          const photo = resolveEmployeePhoto(t, uMap);
+          return {
+            ...t,
+            profilePhoto: photo || t.profilePhoto || ''
+          };
+        });
+      }
+
+      // If backend returned empty teamMembersOnLeave, check active approved leaves for today
+      if (resolvedTeamOnLeave.length === 0) {
+        try {
+          const lRes = await api.get('/api/leave/all');
+          const allLeaves = lRes.data?.data || lRes.data?.leaves || lRes.data?.history || (Array.isArray(lRes.data) ? lRes.data : []);
+          if (Array.isArray(allLeaves)) {
+            const todayIso = new Date().toISOString().split('T')[0];
+            const todayLocal = new Date().toLocaleDateString('en-CA');
+
+            const activeLeaves = allLeaves.filter(l => {
+              const status = String(l.status || '').toLowerCase().trim();
+              const tlStatus = String(l.teamLeadStatus || '').toLowerCase().trim();
+              const isApproved = status.includes('approved') || tlStatus === 'approved';
+              if (!isApproved) return false;
+
+              const s = (l.startDate || '').split('T')[0];
+              const e = (l.endDate || '').split('T')[0] || s;
+              return (s <= todayIso && e >= todayIso) || (s <= todayLocal && e >= todayLocal);
+            });
+
+            resolvedTeamOnLeave = activeLeaves.map(l => {
+              const emp = (typeof l.employeeId === 'object' && l.employeeId !== null) ? l.employeeId :
+                          (typeof l.employee === 'object' && l.employee !== null) ? l.employee :
+                          (typeof l.user === 'object' && l.user !== null) ? l.user : null;
+              const idStr = String((typeof l.employeeId === 'string' ? l.employeeId : '') ||
+                                   (typeof l.employee === 'string' ? l.employee : '') ||
+                                   (typeof l.user === 'string' ? l.user : '') ||
+                                   (typeof l.applicantId === 'string' ? l.applicantId : '') ||
+                                   emp?._id || '').toLowerCase();
+              const emailStr = (l.applicantEmail || l.employeeEmail || l.email || emp?.email || '').toLowerCase().trim();
+              const nameStr = (l.applicantName || l.employeeName || l.name || emp?.name || '').toLowerCase().trim();
+
+              const matched = (idStr && uMap[idStr]) || (emailStr && uMap[emailStr]) || (nameStr && uMap[nameStr]) || null;
+
+              const rawName = emp?.name || emp?.fullName || matched?.name || matched?.fullName || l.applicantName || l.employeeName || 'Team Member';
+              const name = rawName.split(' ').map(p => p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '').join(' ').trim();
+
+              const rawDesig = emp?.designation || matched?.designation || matched?.role || l.applicantRole || 'Employee';
+              const designation = typeof rawDesig === 'object' ? (rawDesig.roleName || rawDesig.name || 'Employee') : String(rawDesig);
+
+              const photo = emp?.profilePhoto || emp?.photoUrl || emp?.avatar ||
+                            matched?.resolvedPhoto || matched?.profilePhoto || matched?.photoUrl ||
+                            l.profilePhoto || l.photoUrl || '';
+
+              const leaveType = l.leaveType ? (l.leaveType.charAt(0).toUpperCase() + l.leaveType.slice(1).replace('_', ' ')) : 'Leave';
+
+              return {
+                _id: l._id || idStr,
+                name,
+                designation,
+                profilePhoto: photo,
+                leaveType: `${leaveType}${l.isHalfDay ? ' (Half Day)' : ''}`
+              };
+            });
+          }
+        } catch (lErr) {
+          console.warn("Active leaves fallback notice:", lErr.message);
+        }
+      }
+
+      setTeamOnLeave(resolvedTeamOnLeave);
 
       // 2. Fetch Timeline - Try 'today' first, then fallback to 'last10days' to guarantee finding today's record
       let todayTimelineData = null;
@@ -345,18 +492,33 @@ export const DashboardView = () => {
         setGlobalAttendanceStatus(newStatus);
       }
 
-      // 7. Fetch Tasks
-      if (effectiveId) {
+      // 7. Fetch Live Tasks
+      try {
+        let tasksList = [];
         try {
-          const taskRes = await api.get(`/api/task/employee/${effectiveId}`);
-          const tasksList = taskRes.data?.tasks || taskRes.data?.data || taskRes.data || [];
+          const allRes = await api.get('/api/task/all');
+          tasksList = allRes.data?.data || allRes.data?.tasks || [];
+        } catch (allErr) {
+          if (effectiveId) {
+            const taskRes = await api.get(`/api/task/employee/${effectiveId}`);
+            tasksList = taskRes.data?.tasks || taskRes.data?.data || [];
+          }
+        }
+        if (Array.isArray(tasksList)) {
+          const norm = (s) => {
+            const str = String(s || '').toLowerCase().trim().replace(/[- ]/g, '_');
+            if (['pending', 'assigned', 'to_do', 'todo'].includes(str)) return 'todo';
+            if (['in_progress', 'testing', 'review', 'in_review'].includes(str)) return 'inProgress';
+            if (['completed', 'done'].includes(str)) return 'completed';
+            return 'todo';
+          };
           setTasksStats({
-            todo: tasksList.filter(t => t.status === 'Assigned').length,
-            inProgress: tasksList.filter(t => t.status === 'In Progress').length,
-            completed: tasksList.filter(t => t.status === 'Completed').length,
+            todo: tasksList.filter(t => norm(t.status) === 'todo').length,
+            inProgress: tasksList.filter(t => norm(t.status) === 'inProgress').length,
+            completed: tasksList.filter(t => norm(t.status) === 'completed').length,
           });
-        } catch (e) { console.warn("Tasks sync failed:", e); }
-      }
+        }
+      } catch (e) { console.warn("Tasks sync failed:", e); }
 
     } catch (error) {
       console.error("Failed to sync dashboard:", error);
@@ -966,9 +1128,6 @@ export const DashboardView = () => {
                   );
                 })}
               </div>
-
-              {/* Status Change Badges */}
-
             </div>
           </div>
         </div>
@@ -1086,22 +1245,41 @@ export const DashboardView = () => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Users size={16} className="text-[#F59E0B]" /> Team On Leave
-              <span className="bg-[#FFFBEB] dark:bg-amber-900/20 text-[#F59E0B] px-1.5 py-0.5 rounded-full text-[10px]">{teamOnLeave.length}</span>
+              <span className="bg-[#FFFBEB] dark:bg-amber-900/20 text-[#F59E0B] px-1.5 py-0.5 rounded-full text-[10px] font-bold">{teamOnLeave.length}</span>
             </h3>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
             {isDataLoading ? (
               <Loader2 size={20} className="animate-spin text-slate-400 mx-auto" />
             ) : teamOnLeave.length === 0 ? (
-              <p className="text-sm text-slate-500 w-full text-center">Everyone is present today.</p>
+              <p className="text-sm text-slate-500 w-full text-center py-4">Everyone is present today.</p>
             ) : (
-              teamOnLeave.map((t, i) => (
-                <div key={i} className="flex flex-col items-center min-w-[80px] text-center group cursor-pointer">
-                  <img src={t.profilePhoto || defaultAvatar} alt={t.name} className="w-14 h-14 rounded-full object-cover border-2 border-[#FFFBEB] dark:border-amber-900/30 mb-2 group-hover:scale-105 transition-transform" />
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate w-full px-1">{t.name}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 font-medium truncate w-full px-1">{t.designation}</p>
-                </div>
-              ))
+              teamOnLeave.map((t, i) => {
+                const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name || 'User')}&background=F59E0B&color=fff&bold=true`;
+                return (
+                  <div key={t._id || i} className="flex flex-col items-center min-w-[96px] text-center group cursor-pointer p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all">
+                    <div className="relative mb-2">
+                      <img 
+                        src={t.profilePhoto || avatarFallback} 
+                        alt={t.name} 
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = avatarFallback;
+                        }}
+                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 dark:border-amber-500 shadow-xs group-hover:scale-105 group-hover:border-amber-500 transition-transform" 
+                      />
+                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-amber-500 border-2 border-white dark:border-slate-900 rounded-full" title="On Leave" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate w-full px-1">{t.name}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium truncate w-full px-1">{t.designation || 'Team Member'}</p>
+                    {t.leaveType && (
+                      <span className="mt-1 text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40 truncate max-w-full">
+                        {t.leaveType}
+                      </span>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

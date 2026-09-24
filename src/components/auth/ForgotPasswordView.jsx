@@ -11,7 +11,7 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!email) {
       setError('Please enter your registered email address.');
       return;
@@ -38,11 +38,11 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors">
       <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-xl overflow-hidden transition-colors">
-        
+
         {/* Header */}
         <div className="px-6 py-8 flex flex-col items-center border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-center">
-          <div className="bg-white rounded-md p-2 shadow-sm border border-slate-100 dark:border-slate-700 mb-5">
-            <img src={logo} alt="Kevalon Technology" className="h-8 w-auto object-contain" />
+          <div className=" mb-5">
+            <img src={logo} alt="Kevalon Technology" className="h-10 w-auto object-contain scale-[4]" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Reset Password
@@ -55,7 +55,7 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
         {/* Form */}
         <div className="p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
-            
+
             {/* Error Message */}
             {error && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-md text-red-700 dark:text-red-400 text-sm font-medium text-center">
@@ -81,8 +81,8 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                     <Mail size={18} />
                   </div>
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@kevalon.com"
@@ -95,8 +95,8 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
 
             {/* Submit Button (Hide if success) */}
             {!successMsg && (
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isLoading}
                 className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed transition-all mt-6 cursor-pointer"
               >
@@ -116,7 +116,7 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
 
             {/* Back to Login Link */}
             <div className="pt-4 flex justify-center border-t border-slate-100 dark:border-slate-800 mt-6">
-              <button 
+              <button
                 type="button"
                 onClick={onBackToLogin}
                 className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
@@ -125,7 +125,7 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
                 Back to Sign In
               </button>
             </div>
-            
+
           </form>
         </div>
       </div>

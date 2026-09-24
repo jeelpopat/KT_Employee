@@ -18,8 +18,8 @@ import { HolidayCalendarView } from './components/holiday/HolidayCalendarView.js
 import {
   SalaryView, PerformanceView, ProjectView,
   TeamMembersView, EmployeesView, LearningHubView, InternshipProgressView,
-  DocumentsView, DailyFollowUpView, TeamTaskManagementView,
-  TeamLeaveManagementView, AttendanceReviewView, ReportView
+  DocumentsView, TeamTaskManagementView,
+  TeamLeaveManagementView, ReportView
 } from './components/placeholders/PlaceholderViews.jsx';
 
 const MainLayout = ({ handleSignOut }) => {
@@ -35,7 +35,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'leave': return <LeaveManagementView />;
       case 'profile': return <ProfileView />;
       case 'admin-screenshots': return <AdminScreenshotPortal />;
-      
+
       // New Role-Specific Modules
       case 'salary': return <SalaryView />;
       case 'performance': return <PerformanceView />;
@@ -46,12 +46,12 @@ const MainLayout = ({ handleSignOut }) => {
       case 'learning-hub': return <LearningHubView />;
       case 'internship-progress': return <InternshipProgressView />;
       case 'documents': return <DocumentsView />;
-      case 'daily-follow-up': return <DailyFollowUpView />;
+      //  case 'daily-follow-up': return <DailyFollowUpView />;
       case 'team-tasks': return <TeamTaskManagementView />;
       case 'team-leaves': return <TeamLeaveManagementView />;
-      case 'attendance-review': return <AttendanceReviewView />;
+      // case 'attendance-review': return <AttendanceReviewView />;
       case 'report': return <ReportView />;
-      
+
       default: return <DashboardView />;
     }
   };
@@ -60,9 +60,8 @@ const MainLayout = ({ handleSignOut }) => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 antialiased font-sans transition-colors">
       <Sidebar onSignOut={handleSignOut} />
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-          isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
-        }`}
+        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+          }`}
       >
         <Header onSignOut={handleSignOut} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full mx-auto space-y-6">
@@ -83,7 +82,7 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     const storedTheme = localStorage.getItem('theme');
-    
+
     if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       root.classList.add('dark');
       localStorage.setItem('theme', 'dark');

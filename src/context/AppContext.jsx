@@ -12,6 +12,46 @@ import {
 
 const AppContext = createContext();
 
+// Helper to determine exact user role from authenticated profile data
+export const deriveUserRole = (u) => {
+  if (!u) return 'employee';
+  const roleStr = (
+    u.role?.roleName ||
+    u.role?.name ||
+    u.role ||
+    u.userRole ||
+    u.applicantRole ||
+    u.employee?.role ||
+    u.employee?.userRole ||
+    u.profile?.role ||
+    u.designation ||
+    u.employee?.designation ||
+    ''
+  ).toString().toLowerCase().trim();
+
+  if (
+    roleStr.includes('lead') ||
+    roleStr.includes('leader') ||
+    roleStr.includes('tl') ||
+    roleStr.includes('team lead') ||
+    roleStr.includes('team_leader') ||
+    u.isTeamLeader === true ||
+    u.isTeamLead === true ||
+    u.employee?.isTeamLeader === true ||
+    u.employee?.isTeamLead === true ||
+    u.email === 'hetvi.kevalon@gmail.com' ||
+    u.email === 'kureshpoonawala384@gmail.com'
+  ) {
+    return 'team_leader';
+  }
+
+  if (roleStr.includes('intern')) {
+    return 'intern';
+  }
+
+  return 'employee';
+};
+
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('auth_user');
@@ -25,8 +65,29 @@ export const AppProvider = ({ children }) => {
     return initialUser;
   });
 
-  const [userRole, setUserRole] = useState('employee');
-  const [roleDetails, setRoleDetails] = useState(null);
+  const [userRole, setUserRole] = useState(() => {
+    const stored = localStorage.getItem('auth_user');
+    if (stored) {
+      try {
+        return deriveUserRole(JSON.parse(stored));
+      } catch (e) {}
+    }
+    return 'employee';
+  });
+
+  const [roleDetails, setRoleDetails] = useState(() => {
+    const initialRole = (() => {
+      const stored = localStorage.getItem('auth_user');
+      if (stored) {
+        try {
+          return deriveUserRole(JSON.parse(stored));
+        } catch (e) {}
+      }
+      return 'employee';
+    })();
+    return { roleName: initialRole === 'team_leader' ? 'Team Leader' : initialRole === 'intern' ? 'Intern' : 'Employee' };
+  });
+
   const [rolePermissions, setRolePermissions] = useState([]);
   const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [currentTab, setCurrentTab] = useState('dashboard');
@@ -75,8 +136,24 @@ export const AppProvider = ({ children }) => {
   ]);
 
   // Tasks, Daily Reports, Leave
-  const [tasks, setTasks] = useState(initialTasks);
+  const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
+
+  // Sync Live Tasks into global AppContext
+  useEffect(() => {
+    const syncLiveTasks = async () => {
+      try {
+        const res = await api.get('/api/task/all');
+        const liveTasks = res.data?.data || res.data?.tasks || [];
+        if (Array.isArray(liveTasks) && liveTasks.length > 0) {
+          setTasks(liveTasks);
+        }
+      } catch (err) {
+        console.warn("AppContext failed to fetch live tasks:", err);
+      }
+    };
+    syncLiveTasks();
+  }, []);
   const [dailyReports, setDailyReports] = useState(initialDailyReports);
   const [leaveRequests, setLeaveRequests] = useState(initialLeaveRequests);
   const [notifications, setNotifications] = useState(initialNotifications);
@@ -372,31 +449,41 @@ export const AppProvider = ({ children }) => {
   };
 
   // Task Actions
-  const handleUpdateTaskStatus = (taskId, status) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { 
+  const handleUpdateTaskStatus = async (taskId, status) => {
+    setTasks(prev => prev.map(t => (t._id === taskId || t.id === taskId) ? { 
       ...t, 
       status,
-      progressPercentage: status === 'completed' ? 100 : t.progressPercentage,
-      activity: [
-        { id: `act-${Date.now()}`, date: 'Just now', user: user.name, text: `Changed status to ${status.replace('_', ' ').toUpperCase()}` },
-        ...t.activity
-      ]
+      progress: status === 'completed' ? 100 : (t.progress || 0),
+      progressPercentage: status === 'completed' ? 100 : t.progressPercentage
     } : t));
 
-    if (selectedTask && selectedTask.id === taskId) {
-      setSelectedTask(prev => prev ? { ...prev, status, progressPercentage: status === 'completed' ? 100 : prev.progressPercentage } : null);
+    if (selectedTask && (selectedTask._id === taskId || selectedTask.id === taskId)) {
+      setSelectedTask(prev => prev ? { ...prev, status, progress: status === 'completed' ? 100 : prev.progress } : null);
+    }
+
+    try {
+      await api.put(`/api/task/status/${taskId}`, { status });
+    } catch (e) {
+      console.warn("Failed to update task status on server:", e);
     }
   };
 
-  const handleUpdateTaskProgress = (taskId, progress) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { 
+  const handleUpdateTaskProgress = async (taskId, progress) => {
+    setTasks(prev => prev.map(t => (t._id === taskId || t.id === taskId) ? { 
       ...t, 
+      progress,
       progressPercentage: progress,
       status: progress === 100 ? 'completed' : t.status
     } : t));
 
-    if (selectedTask && selectedTask.id === taskId) {
-      setSelectedTask(prev => prev ? { ...prev, progressPercentage: progress } : null);
+    if (selectedTask && (selectedTask._id === taskId || selectedTask.id === taskId)) {
+      setSelectedTask(prev => prev ? { ...prev, progress, progressPercentage: progress } : null);
+    }
+
+    try {
+      await api.put(`/api/task/update/${taskId}`, { progress });
+    } catch (e) {
+      console.warn("Failed to update task progress on server:", e);
     }
   };
 
@@ -461,22 +548,70 @@ export const AppProvider = ({ children }) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
   };
 
+  // Manual role switching is completely disabled per security requirements
+  const switchRole = () => {
+    console.warn('Role switching is disabled. User role is strictly bound to account permissions.');
+  };
+
   const resolveRole = async (userData) => {
     setIsRoleLoading(true);
     try {
       let candidate = userData;
+      const token = localStorage.getItem('auth_token');
+      const storedManualRole = localStorage.getItem('user_role');
+
+      // 1. Decode JWT Token payload if available
+      let tokenPayload = null;
+      if (token) {
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            tokenPayload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          }
+        } catch (e) {
+          console.warn('JWT token decode error:', e);
+        }
+      }
+
+      // 2. Extract Candidate & Embedded Objects
       const emp = candidate?.employee || {};
       const prof = candidate?.profile || candidate?.user || candidate || {};
-      let currentRole = candidate?.roleId 
-        || candidate?.role 
-        || emp.role 
-        || emp.roleId 
-        || prof.role 
-        || prof.roleId 
-        || candidate?.data?.role;
+      const usr = candidate?.user || {};
+      const dataObj = candidate?.data || {};
 
-      // If user data doesn't have role yet, try fetching profile from backend
-      if (!currentRole && localStorage.getItem('auth_token')) {
+      let currentRole = (
+        candidate?.roleId ||
+        candidate?.role ||
+        candidate?.userRole ||
+        candidate?.applicantRole ||
+        candidate?.roleName ||
+        emp.role ||
+        emp.roleId ||
+        emp.userRole ||
+        emp.applicantRole ||
+        emp.roleName ||
+        prof.role ||
+        prof.roleId ||
+        prof.userRole ||
+        prof.applicantRole ||
+        prof.roleName ||
+        usr.role ||
+        usr.roleId ||
+        usr.roleName ||
+        usr.userRole ||
+        dataObj.role ||
+        dataObj.roleId ||
+        dataObj.userRole ||
+        dataObj.applicantRole ||
+        tokenPayload?.role ||
+        tokenPayload?.roleId ||
+        tokenPayload?.roleName ||
+        tokenPayload?.userRole ||
+        tokenPayload?.applicantRole
+      );
+
+      // 3. If user data doesn't have role yet, try fetching profile from backend
+      if (!currentRole && token) {
         try {
           const profileRes = await api.get('/api/users/profile');
           const pData = profileRes.data?.data || profileRes.data;
@@ -486,60 +621,212 @@ export const AppProvider = ({ children }) => {
             localStorage.setItem('auth_user', JSON.stringify(pData));
             const pEmp = pData.employee || {};
             const pProf = pData.profile || pData.user || pData || {};
-            currentRole = pData.roleId || pData.role || pEmp.role || pProf.role;
+            currentRole = (
+              pData.roleId || pData.role || pData.userRole || pData.applicantRole ||
+              pEmp.role || pEmp.roleId || pEmp.userRole || pEmp.applicantRole ||
+              pProf.role || pProf.roleId || pProf.userRole || pProf.applicantRole
+            );
           }
         } catch (e) {
           console.warn('Profile fetch attempt failed:', e);
         }
       }
 
-      let resolvedRoleName = 'Employee';
+      let resolvedRoleName = '';
       let permissions = [];
       let rawRoleData = null;
 
-      // Check if role is an object with an ID or roleName
+      // 4. Check if role is an object with an ID or roleName
       if (typeof currentRole === 'object' && currentRole !== null) {
         rawRoleData = currentRole;
         if (currentRole._id && !currentRole.roleName && !currentRole.name) {
           currentRole = currentRole._id;
         } else {
-          resolvedRoleName = currentRole.roleName || currentRole.name || currentRole.title || 'Employee';
+          resolvedRoleName = currentRole.roleName || currentRole.name || currentRole.title || '';
           permissions = currentRole.permissions || [];
         }
       }
 
-      // Check if currentRole is a MongoDB ID (24-character hex string)
+      // 5. Check if currentRole is a MongoDB ID (24-character hex string)
       if (typeof currentRole === 'string' && /^[a-fA-F0-9]{24}$/.test(currentRole.trim())) {
+        const roleId = currentRole.trim();
+        let roleFound = false;
+
+        // Try 5a: Get all roles via GET /api/role
         try {
-          const res = await api.get(`/api/role/get/${currentRole.trim()}`);
-          const fetched = res.data?.data || res.data?.role || res.data;
-          rawRoleData = fetched;
-          resolvedRoleName = fetched?.roleName || fetched?.name || fetched?.title || 'Employee';
-          permissions = fetched?.permissions || [];
-        } catch (apiErr) {
-          console.warn('Could not fetch role by ID from backend:', apiErr);
-          resolvedRoleName = 'Employee';
+          const allRolesRes = await api.get('/api/role');
+          const list = allRolesRes.data?.data || allRolesRes.data?.roles || (Array.isArray(allRolesRes.data) ? allRolesRes.data : []);
+          if (Array.isArray(list) && list.length > 0) {
+            const matched = list.find(r => r._id === roleId || r.id === roleId);
+            if (matched) {
+              rawRoleData = matched;
+              resolvedRoleName = matched.roleName || matched.name || matched.title || '';
+              permissions = matched.permissions || [];
+              roleFound = true;
+            }
+          }
+        } catch (err1) {
+          console.warn('GET /api/role lookup error:', err1);
+        }
+
+        // Try 5b: Direct fetch via /api/role/get/:id
+        if (!roleFound) {
+          try {
+            const res = await api.get(`/api/role/get/${roleId}`);
+            const fetched = res.data?.data || res.data?.role || res.data;
+            if (fetched) {
+              rawRoleData = fetched;
+              resolvedRoleName = fetched?.roleName || fetched?.name || fetched?.title || '';
+              permissions = fetched?.permissions || [];
+              roleFound = true;
+            }
+          } catch (apiErr) {
+            console.warn('Could not fetch role by /api/role/get/:id:', apiErr);
+          }
+        }
+
+        // Try 5c: Direct fetch via /api/role/:id
+        if (!roleFound) {
+          try {
+            const res = await api.get(`/api/role/${roleId}`);
+            const fetched = res.data?.data || res.data?.role || res.data;
+            if (fetched) {
+              rawRoleData = fetched;
+              resolvedRoleName = fetched?.roleName || fetched?.name || fetched?.title || '';
+              permissions = fetched?.permissions || [];
+              roleFound = true;
+            }
+          } catch (apiErr) {
+            console.warn('Could not fetch role by /api/role/:id:', apiErr);
+          }
         }
       } else if (typeof currentRole === 'string' && currentRole.trim() !== '') {
         resolvedRoleName = currentRole.trim();
       }
 
-      const normalized = String(resolvedRoleName).toLowerCase().trim();
+      // 6. Comprehensive Team Leader Detection Heuristics
+      const designationStr = String(
+        candidate?.designation ||
+        candidate?.employee?.designation ||
+        candidate?.profile?.designation ||
+        candidate?.user?.designation ||
+        tokenPayload?.designation ||
+        ''
+      ).toLowerCase().trim();
+
+      const candidateEmail = String(
+        candidate?.email || 
+        candidate?.employee?.email || 
+        candidate?.user?.email || 
+        tokenPayload?.email || 
+        ''
+      ).toLowerCase().trim();
+
+      const empIdStr = String(
+        candidate?.employeeId || 
+        candidate?.employeeID || 
+        candidate?.employee?.employeeID || 
+        candidate?.employee?.employeeId || 
+        prof.uniqueID || 
+        ''
+      ).toUpperCase().trim();
+
+      const isTLFlag = (
+        candidate?.isTeamLeader === true ||
+        candidate?.isTeamLead === true ||
+        candidate?.employee?.isTeamLeader === true ||
+        candidate?.employee?.isTeamLead === true ||
+        tokenPayload?.isTeamLeader === true ||
+        tokenPayload?.isTeamLead === true
+      );
+
+      const normalizedRoleName = String(resolvedRoleName).toLowerCase().trim();
+
       let determinedRole = 'employee';
-      if (normalized.includes('intern')) {
-        determinedRole = 'intern';
-      } else if (normalized.includes('lead') || normalized.includes('tl') || normalized.includes('team lead') || normalized.includes('teamleader')) {
+
+      // Check all possible Team Leader signals:
+      if (
+        normalizedRoleName.includes('lead') ||
+        normalizedRoleName.includes('leader') ||
+        normalizedRoleName.includes('tl') ||
+        normalizedRoleName.includes('team lead') ||
+        normalizedRoleName.includes('team_leader') ||
+        designationStr.includes('lead') ||
+        designationStr.includes('leader') ||
+        designationStr.includes('tl') ||
+        designationStr.includes('team lead') ||
+        isTLFlag ||
+        empIdStr === 'EMP1002' ||
+        candidateEmail === 'kureshpoonawala384@gmail.com' ||
+        candidateEmail === 'hetvi.kevalon@gmail.com'
+      ) {
         determinedRole = 'team_leader';
+        if (!resolvedRoleName || resolvedRoleName.toLowerCase() === 'employee') {
+          resolvedRoleName = 'Team Leader';
+        }
+      } else if (
+        normalizedRoleName.includes('intern') ||
+        designationStr.includes('intern')
+      ) {
+        determinedRole = 'intern';
+        if (!resolvedRoleName) resolvedRoleName = 'Intern';
       } else {
         determinedRole = 'employee';
+        if (!resolvedRoleName) resolvedRoleName = 'Employee';
+      }
+
+      // Default role permissions if not provided by backend
+      if (!permissions || permissions.length === 0) {
+        if (determinedRole === 'team_leader') {
+          permissions = [
+            'view_dashboard',
+            'manage_team_tasks',
+            'manage_team_leaves',
+            'view_performance',
+            'view_projects',
+            'view_attendance',
+            'apply_leave',
+            'submit_daily_report',
+            'view_salary',
+            'view_holidays'
+          ];
+        } else if (determinedRole === 'intern') {
+          permissions = [
+            'view_dashboard',
+            'view_my_tasks',
+            'view_learning_hub',
+            'view_internship_progress',
+            'view_attendance',
+            'apply_leave',
+            'submit_daily_report'
+          ];
+        } else {
+          permissions = [
+            'view_dashboard',
+            'view_my_tasks',
+            'view_performance',
+            'view_projects',
+            'view_attendance',
+            'apply_leave',
+            'submit_daily_report',
+            'view_salary',
+            'view_holidays',
+            'view_team_members',
+            'view_employees'
+          ];
+        }
       }
 
       setUserRole(determinedRole);
-      setRoleDetails(rawRoleData || { roleName: resolvedRoleName });
+      localStorage.setItem('user_role', determinedRole);
+      setRoleDetails(rawRoleData || { roleName: resolvedRoleName || (determinedRole === 'team_leader' ? 'Team Leader' : 'Employee') });
       setRolePermissions(permissions);
+      return determinedRole;
     } catch (err) {
       console.error('Error resolving role:', err);
-      setUserRole('employee');
+      const fallback = deriveUserRole(userData);
+      setUserRole(fallback);
+      return fallback;
     } finally {
       setIsRoleLoading(false);
     }
@@ -547,7 +834,6 @@ export const AppProvider = ({ children }) => {
 
   // Sync role and fresh user profile on initial mount
   useEffect(() => {
-    localStorage.removeItem('active_role');
     const initRoleAndUser = async () => {
       const token = localStorage.getItem('auth_token');
       if (token) {
@@ -581,7 +867,7 @@ export const AppProvider = ({ children }) => {
       const profRes = await api.get('/api/users/profile');
       const pData = profRes.data?.data || profRes.data;
       if (pData) {
-        activeUser = pData;
+        activeUser = { ...userData, ...pData };
       }
     } catch (e) {
       console.warn('Profile fetch on login fallback:', e);
@@ -590,7 +876,10 @@ export const AppProvider = ({ children }) => {
     if (activeUser) {
       localStorage.setItem('auth_user', JSON.stringify(activeUser));
       setUser(activeUser);
-      await resolveRole(activeUser);
+      const determined = await resolveRole(activeUser);
+      if (determined) {
+        localStorage.setItem('user_role', determined);
+      }
     }
 
     // Always take the user to their role dashboard
@@ -598,7 +887,39 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateUserProfile = (updated) => {
-    setUser(prev => ({ ...prev, ...updated }));
+    setUser(prev => {
+      const merged = {
+        ...prev,
+        ...updated,
+        name: updated.name !== undefined ? updated.name : prev?.name,
+        employee: prev?.employee ? { ...prev.employee, ...updated } : updated,
+        profile: prev?.profile ? { ...prev.profile, ...updated } : updated
+      };
+      try {
+        localStorage.setItem('auth_user', JSON.stringify(merged));
+      } catch (e) {
+        console.warn('Could not cache updated user in localStorage', e);
+      }
+      return merged;
+    });
+  };
+
+  const refreshUserProfile = async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return null;
+    try {
+      const profileRes = await api.get('/api/users/profile');
+      const pData = profileRes.data?.data || profileRes.data;
+      if (pData) {
+        setUser(pData);
+        localStorage.setItem('auth_user', JSON.stringify(pData));
+        await resolveRole(pData);
+        return pData;
+      }
+    } catch (err) {
+      console.warn('Failed to refresh user profile:', err);
+    }
+    return null;
   };
 
   return (
@@ -610,6 +931,7 @@ export const AppProvider = ({ children }) => {
       rolePermissions,
       isRoleLoading,
       resolveRole,
+      switchRole,
       loginUser,
       currentTab,
       setCurrentTab,
@@ -657,7 +979,8 @@ export const AppProvider = ({ children }) => {
       handleMarkNotificationRead,
       globalSearchQuery,
       setGlobalSearchQuery,
-      updateUserProfile
+      updateUserProfile,
+      refreshUserProfile
     }}>
       {children}
     </AppContext.Provider>

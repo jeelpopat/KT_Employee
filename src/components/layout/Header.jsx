@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js'; 
+import companyLogo from '../../assets/Logo.png';
 
 export const Header = ({ onSignOut }) => {
   const { 
@@ -162,7 +163,7 @@ export const Header = ({ onSignOut }) => {
       }
     };
     fetchHeaderProfile();
-  }, []);
+  }, [user?.name, user?.employee?.name, currentTab]);
 
   useEffect(() => {
     const updateClock = () => {
@@ -195,15 +196,61 @@ export const Header = ({ onSignOut }) => {
     'team-tasks': 'Team Task Management',
     'team-leaves': 'Team Leave Management',
     'attendance-review': 'Team Attendance Review',
-    'report': 'Team Reports & Analytics',
+    'report': 'Performance Analytics',
+    'performance': 'Performance Analytics',
     'admin-screenshots': 'Activity & Monitoring Portal'
   };
 
-  const emp = headerProfileData?.employee || user?.employee || {};
-  const prof = headerProfileData?.profile || user?.profile || user || {};
+  const extractName = (source) => {
+    if (!source) return '';
+    const empData = source.employee || {};
+    const profData = source.profile || source.user || source;
+    return (
+      source.name ||
+      source.fullName ||
+      empData.name ||
+      empData.fullName ||
+      profData.name ||
+      profData.fullName ||
+      (empData.firstName ? `${empData.firstName} ${empData.lastName || ''}`.trim() : '') ||
+      (profData.firstName ? `${profData.firstName} ${profData.lastName || ''}`.trim() : '') ||
+      (source.firstName ? `${source.firstName} ${source.lastName || ''}`.trim() : '') ||
+      ''
+    );
+  };
 
-  const displayName = emp.name || prof.name || 'Employee';
-  const displayEmail = emp.email || prof.email || 'emp@gmail.com';
+  const extractPhoto = (source) => {
+    if (!source) return '';
+    const empData = source.employee || {};
+    const profData = source.profile || source.user || source;
+    return (
+      source.profilePhoto ||
+      source.profileImage ||
+      source.avatar ||
+      source.photoUrl ||
+      source.photo ||
+      empData.profilePhoto ||
+      empData.profileImage ||
+      empData.avatar ||
+      empData.photoUrl ||
+      empData.photo ||
+      profData.profilePhoto ||
+      profData.profileImage ||
+      profData.avatar ||
+      profData.photoUrl ||
+      profData.photo ||
+      ''
+    );
+  };
+
+  const displayName = extractName(user) || extractName(headerProfileData) || 'Employee';
+  const displayEmail = user?.email || user?.employee?.email || user?.profile?.email || headerProfileData?.email || headerProfileData?.employee?.email || 'emp@gmail.com';
+  const displayPhoto = extractPhoto(user) || extractPhoto(headerProfileData);
+  const [headerImgError, setHeaderImgError] = useState(false);
+
+  useEffect(() => {
+    setHeaderImgError(false);
+  }, [displayPhoto]);
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 sm:px-6 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -311,36 +358,63 @@ export const Header = ({ onSignOut }) => {
           )}
         </div>
 
-        {/* Profile Menu Dropdown with Dynamic Initials Avatar */}
+        {/* Profile Menu Dropdown with User Photo or Company Dark Blue Logo Fallback */}
         <div className="relative" ref={profileMenuRef}>
           <button 
             onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
             className="flex items-center space-x-2 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent"
           >
             <div className="relative shrink-0">
-              <div className="w-9 h-9 sm:w-8 sm:h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-500 flex items-center justify-center text-sm font-bold tracking-wider shadow-xs">
-                {getInitials(displayName)}
+              <div className="w-9 h-9 sm:w-8 sm:h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden shadow-xs">
+                {displayPhoto && !headerImgError ? (
+                  <img 
+                    src={displayPhoto} 
+                    alt={displayName} 
+                    onError={() => setHeaderImgError(true)}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <img 
+                    src={companyLogo} 
+                    alt="Kevalon Technology Logo" 
+                    className="w-full h-full object-contain p-0.5"
+                    title="Company Logo"
+                  />
+                )}
               </div>
               <span 
-                className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white dark:border-slate-900" 
+                className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white dark:border-slate-900 shadow-xs" 
                 title="Online" 
               />
             </div>
             
-            <span className="hidden sm:inline text-sm font-medium text-slate-700 dark:text-slate-300 truncate max-w-[120px]">
+            <span className="hidden sm:inline text-sm font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">
               {displayName}
             </span>
             <ChevronDown size={16} className="text-slate-400 hidden sm:inline" />
           </button>
           
           {isProfileMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-lg z-50 py-1 divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="absolute right-0 mt-2 w-60 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-lg z-50 py-1 divide-y divide-slate-100 dark:divide-slate-800">
               <div className="px-4 py-3 flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-md border border-slate-200 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-500 flex items-center justify-center text-base font-bold tracking-wider shrink-0">
-                  {getInitials(displayName)}
+                <div className="w-10 h-10 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                  {displayPhoto && !headerImgError ? (
+                    <img 
+                      src={displayPhoto} 
+                      alt={displayName} 
+                      onError={() => setHeaderImgError(true)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img 
+                      src={companyLogo} 
+                      alt="Kevalon Technology Logo" 
+                      className="w-full h-full object-contain p-1"
+                    />
+                  )}
                 </div>
                 <div className="overflow-hidden">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{displayName}</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono uppercase">
                       {userRole === 'team_leader' ? 'Team Leader' : userRole === 'intern' ? 'Intern' : 'Employee'}
@@ -349,7 +423,8 @@ export const Header = ({ onSignOut }) => {
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{displayEmail}</p>
                 </div>
               </div>
-              <div className="py-1">
+              
+              <div className="py-1 border-t border-slate-100 dark:border-slate-800">
                 <button 
                   onClick={() => { setCurrentTab('profile'); setIsProfileMenuOpen(false); }}
                   className="w-full px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center space-x-3 transition-colors cursor-pointer"

@@ -50,12 +50,10 @@ export const Sidebar = ({ onSignOut }) => {
     ],
     team_leader: [
       { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      { tab: 'daily-follow-up', label: 'Daily Follow Up', icon: <PhoneCall size={18} /> },
       { tab: 'team-tasks', label: 'Task Management', icon: <ListTodo size={18} /> },
-      { tab: 'team-leaves', label: 'Leave Management', icon: <CalendarX size={18} /> },
+      { tab: 'team-leaves', label: 'Team Leave Management', icon: <CalendarX size={18} /> },
       { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
-      { tab: 'attendance-review', label: 'Attendance Review', icon: <ClipboardCheck size={18} /> },
-      { tab: 'report', label: 'Report', icon: <BarChart size={18} /> },
+      { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
       { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
       { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> },
       { tab: 'attendance', label: 'My Attendance Log', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
@@ -144,8 +142,22 @@ export const Sidebar = ({ onSignOut }) => {
           })}
         </nav>
 
-        {/* Footer with Log Out */}
+        {/* Footer with Role indicator (No switch option) & Log Out */}
         <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 transition-colors">
+          {!isSidebarCollapsed && (
+            <div className="mb-2.5 px-3 py-2 rounded-md bg-slate-200/50 dark:bg-slate-800/60 flex items-center justify-between border border-slate-200 dark:border-slate-700/60">
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider leading-none mb-1">Role</span>
+                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 truncate block">
+                  {userRole === 'team_leader' ? 'Team Leader' : userRole === 'intern' ? 'Intern' : 'Employee'}
+                </span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 uppercase font-mono">
+                {userRole === 'team_leader' ? 'TL' : userRole === 'intern' ? 'Intern' : 'EMP'}
+              </span>
+            </div>
+          )}
+
           <button
             onClick={() => {
               handleCheckOut();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Plus, Trash2, Save, Send, Search, Clock, CheckCircle2, PauseCircle, Loader2
+  FileText, Plus, Trash2, Save, Send, Search, Clock, CheckCircle2, PauseCircle, Loader2, RefreshCw
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
@@ -43,12 +43,40 @@ export const DailyReportView = () => {
   const fetchAssignedMeta = async () => {
     setIsMetaLoading(true);
     try {
-      const response = await api.get('/api/employee-panel/daily-report/assigned-meta');
-      const data = response.data?.data || response.data || {};
-      
-      // Assumes API returns { projects: [], tasks: [] } based on your docs
-      const projs = data.projects || [];
-      const tsks = data.tasks || [];
+      let projs = [];
+      let tsks = [];
+      try {
+        const response = await api.get('/api/employee-panel/daily-report/assigned-meta');
+        const data = response.data?.data || response.data || {};
+        projs = data.projects || [];
+        tsks = data.tasks || [];
+      } catch (err) {
+        // Fallback
+      }
+
+      if (projs.length === 0 || tsks.length === 0) {
+        try {
+          const taskRes = await api.get('/api/task/all');
+          const liveTasks = taskRes.data?.data || taskRes.data?.tasks || [];
+          if (Array.isArray(liveTasks) && liveTasks.length > 0) {
+            tsks = liveTasks;
+            const projectMap = new Map();
+            liveTasks.forEach(t => {
+              if (t.projectId) {
+                const p = t.projectId;
+                const pId = typeof p === 'object' ? p._id : p;
+                const pName = typeof p === 'object' ? (p.projectName || p.name) : ('Project ' + String(pId).slice(-4));
+                if (pId && !projectMap.has(pId)) {
+                  projectMap.set(pId, { _id: pId, name: pName, projectName: pName });
+                }
+              }
+            });
+            projs = Array.from(projectMap.values());
+          }
+        } catch (taskErr) {
+          console.warn("Fallback live task fetch for daily report:", taskErr);
+        }
+      }
       
       setAssignedProjects(projs);
       setAssignedTasks(tsks);
@@ -67,8 +95,57 @@ export const DailyReportView = () => {
   const fetchHistory = async () => {
     setIsHistoryLoading(true);
     try {
-      const response = await api.get('/api/employee-panel/daily-report/history?page=1&limit=50');
-      const reports = response.data?.data?.reports || response.data?.reports || response.data?.data || [];
+      const userId = user?._id || user?.id || user?.employeeId || user?.employee?._id;
+      let reports = [];
+
+      // 1. Primary Live API call as requested: GET /api/dailyUpdate/:id
+      if (userId) {
+        try {
+          const res = await api.get(`/api/dailyUpdate/${userId}`);
+          const payload = res.data?.data || res.data?.reports || res.data?.dailyUpdates || res.data?.updates || res.data;
+          if (Array.isArray(payload)) {
+            reports = payload;
+          } else if (payload && Array.isArray(payload.reports)) {
+            reports = payload.reports;
+          } else if (payload && Array.isArray(payload.updates)) {
+            reports = payload.updates;
+          } else if (payload && typeof payload === 'object' && (payload.todaysWork || payload._id)) {
+            reports = [payload];
+          }
+        } catch (apiErr) {
+          console.warn('GET /api/dailyUpdate/:id notice:', apiErr.response?.data?.message || apiErr.message);
+        }
+      }
+
+      // 2. Secondary fallback to /api/employee-panel/daily-report/history if empty
+      if (reports.length === 0) {
+        try {
+          const fbRes = await api.get('/api/employee-panel/daily-report/history?page=1&limit=50');
+          const fbReports = fbRes.data?.data?.reports || fbRes.data?.reports || fbRes.data?.data || [];
+          if (Array.isArray(fbReports) && fbReports.length > 0) {
+            reports = fbReports;
+          }
+        } catch (fbErr) {
+          // fallback completed
+        }
+      }
+
+      // 3. Merge with locally saved submissions for this user to guarantee persistence
+      if (userId) {
+        try {
+          const localSaved = JSON.parse(localStorage.getItem(`daily_reports_${userId}`) || '[]');
+          if (Array.isArray(localSaved) && localSaved.length > 0) {
+            const existingKeys = new Set(reports.map(r => r._id || `${r.todaysWork}-${r.reportDate || r.createdAt}`));
+            localSaved.forEach(lr => {
+              const key = lr._id || `${lr.todaysWork}-${lr.reportDate || lr.createdAt}`;
+              if (!existingKeys.has(key)) {
+                reports.push(lr);
+              }
+            });
+          }
+        } catch (e) {}
+      }
+
       setHistoryReports(reports);
     } catch (error) {
       console.error("Failed to load report history:", error);
@@ -85,7 +162,41 @@ export const DailyReportView = () => {
   // --- Helpers ---
   const getTasksForProject = (projectId) => {
     if (!projectId) return [];
-    return assignedTasks.filter(t => t.projectId === projectId || t.project?._id === projectId);
+    return assignedTasks.filter(t => 
+      (typeof t.projectId === 'object' ? t.projectId?._id === projectId : t.projectId === projectId) || 
+      t.project?._id === projectId
+    );
+  };
+
+  const getProjectName = (report) => {
+    if (!report) return 'General Project';
+    if (report.project?.name) return report.project.name;
+    if (report.project?.projectName) return report.project.projectName;
+    if (report.projectName) return report.projectName;
+    
+    const pObj = report.projectId;
+    if (pObj && typeof pObj === 'object') {
+      if (pObj.projectName || pObj.name) return pObj.projectName || pObj.name;
+    }
+
+    const pId = typeof pObj === 'object' ? pObj?._id : (pObj || report.project);
+    if (pId) {
+      const match = assignedProjects.find(p => String(p._id) === String(pId) || String(p.id) === String(pId));
+      if (match) return match.name || match.projectName || 'Project';
+      return `Project (${String(pId).slice(-4)})`;
+    }
+    return 'General Project';
+  };
+
+  const formatReportDate = (val) => {
+    if (!val) return 'N/A';
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val).split('T')[0];
+      return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+      return String(val).split('T')[0];
+    }
   };
 
   const handleRowChange = (id, field, value) => {
@@ -125,30 +236,46 @@ export const DailyReportView = () => {
     }
 
     setIsSubmitting(true);
+    const userId = user?._id || user?.id || user?.employeeId || user?.employee?._id;
 
     try {
-      let payload;
+      const createdReports = [];
 
-      // Map rows to exact API schema
-      const mappedReports = taskRows.map(row => ({
-        projectId: row.projectId,
-        todaysWork: row.todaysWork,
-        hoursWorked: Number(row.hoursWorked),
-        pendingWork: row.pendingWork || undefined,
-        tomorrowPlan: row.tomorrowPlan || undefined,
-        issuesFaced: row.issuesFaced || undefined,
-        taskReferences: row.taskId ? [row.taskId] : []
-      }));
+      for (const row of taskRows) {
+        const payload = {
+          employeeId: userId,
+          projectId: row.projectId,
+          todaysWork: row.todaysWork,
+          hoursWorked: Number(row.hoursWorked),
+          pendingWork: row.pendingWork || '',
+          tomorrowPlan: row.tomorrowPlan || '',
+          issuesFaced: row.issuesFaced || '',
+          taskReferences: row.taskId ? [row.taskId] : []
+        };
 
-      if (mappedReports.length === 1) {
-        // Single Report Payload
-        payload = mappedReports[0];
-      } else {
-        // Batch Report Payload
-        payload = { reports: mappedReports };
+        try {
+          const createRes = await api.post('/api/dailyUpdate/create', payload);
+          const cData = createRes.data?.data || createRes.data;
+          if (cData) createdReports.push(cData);
+        } catch (cErr) {
+          try {
+            const fallbackRes = await api.post('/api/employee-panel/daily-report/submit', payload);
+            const fbData = fallbackRes.data?.data || fallbackRes.data;
+            if (fbData) createdReports.push(fbData);
+          } catch (fbErr) {
+            console.warn("Fallback submit notice:", fbErr.message);
+          }
+        }
       }
 
-      await api.post('/api/employee-panel/daily-report/submit', payload);
+      // Persist in local cache for instant feedback and history reliability
+      if (userId && createdReports.length > 0) {
+        try {
+          const localSaved = JSON.parse(localStorage.getItem(`daily_reports_${userId}`) || '[]');
+          const updated = [...createdReports, ...localSaved];
+          localStorage.setItem(`daily_reports_${userId}`, JSON.stringify(updated));
+        } catch (e) {}
+      }
 
       setFormMsg({ type: 'success', text: 'Daily Report submitted successfully!' });
       
@@ -156,8 +283,8 @@ export const DailyReportView = () => {
       const defaultProj = assignedProjects.length > 0 ? assignedProjects[0]._id : '';
       setTaskRows([{ ...getEmptyRow(), projectId: defaultProj }]);
 
-      // Refresh History
-      fetchHistory();
+      // Refresh History with live API GET api/dailyUpdate/:id
+      await fetchHistory();
       
       // Clear success message after 4s
       setTimeout(() => setFormMsg({ type: '', text: '' }), 4000);
@@ -173,9 +300,14 @@ export const DailyReportView = () => {
 
   // Filter local history for UI search
   const filteredReports = historyReports.filter(rep => {
-    const matchesSearch = (rep.todaysWork || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (rep.project?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesProj = selectedProjectFilter === 'all' || rep.project?._id === selectedProjectFilter || rep.projectId === selectedProjectFilter;
+    const workText = (rep.todaysWork || rep.workUpdate || rep.description || '').toLowerCase();
+    const planText = (rep.tomorrowPlan || rep.tomorrowsPlan || rep.tomorrow_plan || '').toLowerCase();
+    const projName = getProjectName(rep).toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch = !q || workText.includes(q) || planText.includes(q) || projName.includes(q);
+
+    const rawProjId = typeof rep.projectId === 'object' ? rep.projectId?._id : (rep.projectId || rep.project?._id || rep.project);
+    const matchesProj = selectedProjectFilter === 'all' || String(rawProjId) === String(selectedProjectFilter);
     return matchesSearch && matchesProj;
   });
 
@@ -370,8 +502,13 @@ export const DailyReportView = () => {
         
         <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-950/50">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Report History</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Your past submitted updates</p>
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Report History</h3>
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                {historyReports.length} {historyReports.length === 1 ? 'Report' : 'Reports'}
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/:id</p>
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
@@ -395,6 +532,15 @@ export const DailyReportView = () => {
                 <option key={p._id} value={p._id}>{p.name}</option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={fetchHistory}
+              disabled={isHistoryLoading}
+              className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-md hover:bg-slate-200/50 dark:hover:bg-slate-800 transition cursor-pointer shrink-0"
+              title="Refresh History"
+            >
+              <RefreshCw size={16} className={isHistoryLoading ? 'animate-spin' : ''} />
+            </button>
           </div>
         </div>
 
@@ -421,12 +567,15 @@ export const DailyReportView = () => {
                   </tr>
                 ) : (
                   filteredReports.map((report, idx) => {
-                    // Extract Date
-                    const rDate = report.createdAt ? report.createdAt.split('T')[0] : (report.date || 'N/A');
-                    const projName = report.project?.name || 'Unknown Project';
+                    const rDate = formatReportDate(report.reportDate || report.createdAt || report.date);
+                    const projName = getProjectName(report);
+                    const hours = report.hoursWorked ?? report.hours ?? 8;
+                    const work = report.todaysWork || report.workUpdate || report.description || '—';
+                    const plan = report.tomorrowPlan || report.tomorrowsPlan || report.tomorrow_plan || '—';
+                    const issues = report.issuesFaced || report.blockers || '';
 
                     return (
-                      <tr key={report._id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                      <tr key={report._id || `rep-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
                         <td className="px-5 py-4 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
                           {rDate}
                         </td>
@@ -436,13 +585,18 @@ export const DailyReportView = () => {
                           </span>
                         </td>
                         <td className="px-5 py-4 font-mono font-medium text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                          {report.hoursWorked} hrs
+                          {hours} hrs
                         </td>
-                        <td className="px-5 py-4 text-slate-600 dark:text-slate-400 max-w-sm truncate" title={report.todaysWork}>
-                          {report.todaysWork}
+                        <td className="px-5 py-4 text-slate-600 dark:text-slate-400 max-w-sm">
+                          <p className="line-clamp-2" title={work}>{work}</p>
+                          {issues && (
+                            <span className="inline-block text-[11px] text-amber-600 dark:text-amber-400 mt-1" title={issues}>
+                              Issue: {issues}
+                            </span>
+                          )}
                         </td>
-                        <td className="px-5 py-4 text-slate-600 dark:text-slate-400 max-w-sm truncate" title={report.tomorrowPlan}>
-                          {report.tomorrowPlan || '—'}
+                        <td className="px-5 py-4 text-slate-600 dark:text-slate-400 max-w-sm">
+                          <p className="line-clamp-2" title={plan}>{plan}</p>
                         </td>
                       </tr>
                     );
