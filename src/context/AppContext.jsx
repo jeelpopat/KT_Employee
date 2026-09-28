@@ -1,13 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api/axios.js';
-import { 
-  currentUser as initialUser, 
-  assignedTasks as initialTasks, 
-  initialAttendanceRecords, 
-  initialDailyReports, 
-  initialLeaveRequests, 
-  initialNotifications, 
-  initialScreenshots 
+import {
+  currentUser as initialUser,
+  assignedTasks as initialTasks,
+  initialAttendanceRecords,
+  initialDailyReports,
+  initialLeaveRequests,
+  initialNotifications,
+  initialScreenshots
 } from '../data/mockData.js';
 
 const AppContext = createContext();
@@ -70,7 +70,7 @@ export const AppProvider = ({ children }) => {
     if (stored) {
       try {
         return deriveUserRole(JSON.parse(stored));
-      } catch (e) {}
+      } catch (e) { }
     }
     return 'employee';
   });
@@ -81,7 +81,7 @@ export const AppProvider = ({ children }) => {
       if (stored) {
         try {
           return deriveUserRole(JSON.parse(stored));
-        } catch (e) {}
+        } catch (e) { }
       }
       return 'employee';
     })();
@@ -121,6 +121,7 @@ export const AppProvider = ({ children }) => {
   // 5-Minute Continuous Inactivity Detection System
   const [inactivitySeconds, setInactivitySeconds] = useState(0);
   const [isInactivityAlertOpen, setIsInactivityAlertOpen] = useState(false);
+  const lastActivityTimestampRef = useRef(Date.now());
   const [inactivityEvents, setInactivityEvents] = useState([
     {
       id: 'ina-101',
@@ -128,7 +129,7 @@ export const AppProvider = ({ children }) => {
       employeeId: 'EMP-8492',
       date: '2026-08-20',
       startTime: '11:20:00 AM',
-      duration: '5 Minutes',
+      duration: '2 Minutes',
       sessionId: 'SES-20260820-001',
       attendanceStatus: 'Active',
       responseStatus: 'Acknowledged - Working'
@@ -159,31 +160,120 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState(initialNotifications);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
-  // 1. Session Work & Break Timer Ticker
+  // Activity Tracking: Listen to mouse movers, cursor movements, clicks, keyboard presses, scroll, touch, and tab focus
+  const isEmployeeOrTL = userRole === 'employee' || userRole === 'team_leader' || userRole === 'intern';
+  // INACTIVITY THRESHOLD: 60 seconds (1 Minute) for Testing
+  const INACTIVITY_THRESHOLD_SECONDS = 60;
+
+  useEffect(() => {
+    const activityEvents = [
+      'mousemove',
+      'mousedown',
+      'mouseup',
+      'click',
+      'dblclick',
+      'contextmenu',
+      'pointermove',
+      'pointerdown',
+      'pointerup',
+      'keydown',
+      'keyup',
+      'keypress',
+      'input',
+      'change',
+      'scroll',
+      'wheel',
+      'touchstart',
+      'touchmove',
+      'touchend',
+      'focus'
+    ];
+
+    const handleUserActivity = () => {
+      // Continuously refresh activity timestamp to now
+      lastActivityTimestampRef.current = Date.now();
+
+      // Reset displayed inactivity counter immediately whenever user performs any action
+      setInactivitySeconds(prev => (prev > 0 ? 0 : prev));
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        lastActivityTimestampRef.current = Date.now();
+        setInactivitySeconds(prev => (prev > 0 ? 0 : prev));
+      }
+    };
+
+    activityEvents.forEach(evt => {
+      window.addEventListener(evt, handleUserActivity, { capture: true, passive: true });
+      document.addEventListener(evt, handleUserActivity, { capture: true, passive: true });
+    });
+    document.addEventListener('visibilitychange', handleVisibilityChange, { passive: true });
+
+    return () => {
+      activityEvents.forEach(evt => {
+        window.removeEventListener(evt, handleUserActivity, { capture: true });
+        document.removeEventListener(evt, handleUserActivity, { capture: true });
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // When attendance status changes (check-in, break, resume), reset inactivity tracker
+  useEffect(() => {
+    lastActivityTimestampRef.current = Date.now();
+    setInactivitySeconds(0);
+    if (attendanceStatus !== 'checked_in') {
+      setIsInactivityAlertOpen(false);
+    }
+  }, [attendanceStatus]);
+
+  // 1. Session Work & Break Timer Ticker with Live Inactivity Calculation
   useEffect(() => {
     const timer = setInterval(() => {
+      // ONLY track and process inactivity if employee or TL is actively in work (checked_in), NOT in break or checked out
       if (attendanceStatus === 'checked_in') {
         setWorkSeconds(prev => prev + 1);
-        if (!isInactivityAlertOpen) {
-          setInactivitySeconds(prev => prev + 1);
+
+        // Only evaluate inactivity for Employee / TL and when alarm modal is not already open
+        if (isEmployeeOrTL && !isInactivityAlertOpen) {
+          const idleMs = Date.now() - lastActivityTimestampRef.current;
+          const idleSec = Math.floor(idleMs / 1000);
+          setInactivitySeconds(idleSec);
+
+          // FOR TESTING: 1 MINUTE (60 seconds) TIMER
+          // ONLY trigger alarm if employee has NOT moved mouse/cursor or pressed any key for 60 continuous seconds
+          if (idleSec >= INACTIVITY_THRESHOLD_SECONDS) {
+            triggerInactivityAlert();
+          }
         }
       } else if (attendanceStatus === 'on_break') {
         setBreakSeconds(prev => prev + 1);
+        lastActivityTimestampRef.current = Date.now();
+        setInactivitySeconds(0);
+        if (isInactivityAlertOpen) {
+          setIsInactivityAlertOpen(false);
+        }
+      } else {
+        lastActivityTimestampRef.current = Date.now();
+        setInactivitySeconds(0);
+        if (isInactivityAlertOpen) {
+          setIsInactivityAlertOpen(false);
+        }
       }
     }, 1000);
-    return () => clearInterval(timer);
-  }, [attendanceStatus, isInactivityAlertOpen]);
 
-  // 2. 5-Minute Inactivity Trigger Check (300 seconds)
-  useEffect(() => {
-    if (inactivitySeconds >= 300 && !isInactivityAlertOpen && attendanceStatus === 'checked_in') {
-      triggerInactivityAlert();
-    }
-  }, [inactivitySeconds, isInactivityAlertOpen, attendanceStatus]);
+    return () => clearInterval(timer);
+  }, [attendanceStatus, isInactivityAlertOpen, isEmployeeOrTL]);
 
   const triggerInactivityAlert = () => {
+    // Strictly ONLY trigger if employee or TL is actively in work (checked_in), NOT on break or checked out
+    if (attendanceStatus !== 'checked_in') return;
+    if (!isEmployeeOrTL) return;
+    if (isInactivityAlertOpen) return;
+
     setIsInactivityAlertOpen(true);
-    playAlertSound();
+    lastActivityTimestampRef.current = Date.now();
 
     const now = new Date();
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -191,11 +281,11 @@ export const AppProvider = ({ children }) => {
     // Record Event for HR/Admin
     const newInactivityEvent = {
       id: `ina-${Date.now()}`,
-      employeeName: user.name,
-      employeeId: user.employeeId,
-      date: '2026-08-20',
+      employeeName: user?.name || (userRole === 'team_leader' ? 'Team Leader' : 'Employee'),
+      employeeId: user?.employeeId || user?.id || 'EMP',
+      date: new Date().toISOString().split('T')[0],
       startTime: timeStr,
-      duration: '5 Minutes',
+      duration: '1 Minute',
       sessionId: sessionId,
       attendanceStatus: 'Active',
       responseStatus: 'Waiting for Employee Response'
@@ -203,11 +293,11 @@ export const AppProvider = ({ children }) => {
 
     setInactivityEvents(prev => [newInactivityEvent, ...prev]);
 
-    // Send HR/Admin Notification
+    // Send Notification
     const newNotif = {
       id: `notif-ina-${Date.now()}`,
-      title: '⚠️ 5-Minute Inactivity Alert',
-      message: `No activity detected for ${user.name} (${user.employeeId}) for 5 continuous minutes. Status: Waiting for Response.`,
+      title: '⚠️ 1-Minute Inactivity Alert',
+      message: `No mouse or keyboard activity detected for ${user?.name || (userRole === 'team_leader' ? 'Team Leader' : 'Employee')} for 1 continuous minute. Status: Waiting for Response.`,
       time: 'Just now',
       isRead: false,
       type: 'system'
@@ -215,29 +305,63 @@ export const AppProvider = ({ children }) => {
     setNotifications(prev => [newNotif, ...prev]);
   };
 
-  // Play Alert Sound
-  const playAlertSound = () => {
+  // Play Audible Alert Chime
+  const playAlertSound = useCallback(() => {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); // A5 note
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.4);
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      const audioCtx = new AudioContextClass();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      // Beep 1 (784 Hz - G5)
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(784, audioCtx.currentTime);
+      gain1.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+      osc1.connect(gain1);
+      gain1.connect(audioCtx.destination);
+      osc1.start();
+      osc1.stop(audioCtx.currentTime + 0.25);
+
+      // Beep 2 (1046.5 Hz - C6)
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1046.5, audioCtx.currentTime + 0.28);
+      gain2.gain.setValueAtTime(0.35, audioCtx.currentTime + 0.28);
+      gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.55);
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.start(audioCtx.currentTime + 0.28);
+      osc2.stop(audioCtx.currentTime + 0.55);
     } catch (err) {
-      console.log('Audio alert fallback', err);
+      console.warn('Audio alert notice:', err);
     }
-  };
+  }, []);
+
+  // Repeating alarm sound while 5-minute inactivity alert is open
+  useEffect(() => {
+    if (!isInactivityAlertOpen) return;
+
+    // Immediately play alarm chime
+    playAlertSound();
+
+    // Repeat alarm chime every 6 seconds so user hears the alert until they respond
+    const alarmInterval = setInterval(() => {
+      playAlertSound();
+    }, 6000);
+
+    return () => clearInterval(alarmInterval);
+  }, [isInactivityAlertOpen, playAlertSound]);
 
   // Inactivity Alert Responses
   const handleAcknowledgeWorking = () => {
     setIsInactivityAlertOpen(false);
+    lastActivityTimestampRef.current = Date.now();
     setInactivitySeconds(0);
 
     setInactivityEvents(prev => prev.map((evt, idx) => idx === 0 ? {
@@ -248,7 +372,7 @@ export const AppProvider = ({ children }) => {
     const newNotif = {
       id: `notif-${Date.now()}`,
       title: 'Activity Confirmed',
-      message: `${user.name} confirmed active work. Resumed tracking.`,
+      message: `${user?.name || 'Employee'} confirmed active work. Resumed tracking.`,
       time: 'Just now',
       isRead: false,
       type: 'attendance'
@@ -258,12 +382,20 @@ export const AppProvider = ({ children }) => {
 
   const handleInactivityStartBreak = () => {
     setIsInactivityAlertOpen(false);
+    lastActivityTimestampRef.current = Date.now();
     setInactivitySeconds(0);
 
     setInactivityEvents(prev => prev.map((evt, idx) => idx === 0 ? {
       ...evt,
       responseStatus: 'Switched to Break'
     } : evt));
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayLocalStr = new Date().toLocaleDateString('en-CA');
+    try {
+      localStorage.setItem('kt_on_break_' + todayStr, 'true');
+      localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
+    } catch (e) {}
 
     handleStartBreak();
   };
@@ -450,8 +582,8 @@ export const AppProvider = ({ children }) => {
 
   // Task Actions
   const handleUpdateTaskStatus = async (taskId, status) => {
-    setTasks(prev => prev.map(t => (t._id === taskId || t.id === taskId) ? { 
-      ...t, 
+    setTasks(prev => prev.map(t => (t._id === taskId || t.id === taskId) ? {
+      ...t,
       status,
       progress: status === 'completed' ? 100 : (t.progress || 0),
       progressPercentage: status === 'completed' ? 100 : t.progressPercentage
@@ -469,8 +601,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const handleUpdateTaskProgress = async (taskId, progress) => {
-    setTasks(prev => prev.map(t => (t._id === taskId || t.id === taskId) ? { 
-      ...t, 
+    setTasks(prev => prev.map(t => (t._id === taskId || t.id === taskId) ? {
+      ...t,
       progress,
       progressPercentage: progress,
       status: progress === 100 ? 'completed' : t.status
@@ -715,19 +847,19 @@ export const AppProvider = ({ children }) => {
       ).toLowerCase().trim();
 
       const candidateEmail = String(
-        candidate?.email || 
-        candidate?.employee?.email || 
-        candidate?.user?.email || 
-        tokenPayload?.email || 
+        candidate?.email ||
+        candidate?.employee?.email ||
+        candidate?.user?.email ||
+        tokenPayload?.email ||
         ''
       ).toLowerCase().trim();
 
       const empIdStr = String(
-        candidate?.employeeId || 
-        candidate?.employeeID || 
-        candidate?.employee?.employeeID || 
-        candidate?.employee?.employeeId || 
-        prof.uniqueID || 
+        candidate?.employeeId ||
+        candidate?.employeeID ||
+        candidate?.employee?.employeeID ||
+        candidate?.employee?.employeeId ||
+        prof.uniqueID ||
         ''
       ).toUpperCase().trim();
 
@@ -860,7 +992,7 @@ export const AppProvider = ({ children }) => {
 
   const loginUser = async (userData, token) => {
     if (token) localStorage.setItem('auth_token', token);
-    
+
     let activeUser = userData;
     // Immediately fetch latest profile with role info from backend
     try {

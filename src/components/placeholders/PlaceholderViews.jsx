@@ -14,97 +14,9 @@ import { ProjectView } from '../projects/ProjectView.jsx';
 
 export { ProjectView };
 
-// 1. SALARY VIEW (Employee & Team Leader)
-export const SalaryView = () => {
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-md">
-            <Wallet size={22} />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Salary & Compensation</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Monthly payslips, earnings breakdown, and tax deductions</p>
-          </div>
-        </div>
-        <button className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-xs transition-colors cursor-pointer self-start sm:self-auto">
-          <Download size={14} /> Download Form 16 / Annual Slip
-        </button>
-      </div>
+// 1. SALARY VIEW (Live API with GET /api/payroll/salary/user/:userId and GET /api/payroll/payslips)
+export { SalaryView } from '../salary/SalaryView.jsx';
 
-      {/* Salary Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Annual CTC</span>
-          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">₹ 8,40,000</p>
-          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 inline-block font-medium">Standard Employee Band</span>
-        </div>
-        <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Net Monthly In-Hand</span>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">₹ 64,500</p>
-          <span className="text-[11px] text-slate-500 mt-1 inline-block">Credited by 1st of month</span>
-        </div>
-        <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Deductions</span>
-          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">₹ 5,500</p>
-          <span className="text-[11px] text-slate-500 mt-1 inline-block">PF + PT + Professional Tax</span>
-        </div>
-        <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Performance Bonus</span>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">₹ 15,000</p>
-          <span className="text-[11px] text-purple-600/80 dark:text-purple-400/80 mt-1 inline-block font-medium">Quarterly payout pending</span>
-        </div>
-      </div>
-
-      {/* Payslip History Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors space-y-4">
-        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Payslip History</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs sm:text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
-                <th className="py-3 px-4 font-semibold">Month & Year</th>
-                <th className="py-3 px-4 font-semibold">Gross Pay</th>
-                <th className="py-3 px-4 font-semibold">Deductions</th>
-                <th className="py-3 px-4 font-semibold">Net Pay</th>
-                <th className="py-3 px-4 font-semibold">Payment Date</th>
-                <th className="py-3 px-4 font-semibold">Status</th>
-                <th className="py-3 px-4 font-semibold text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {[
-                { month: 'August 2026', gross: '₹ 70,000', ded: '₹ 5,500', net: '₹ 64,500', date: '31 Aug 2026', status: 'Paid' },
-                { month: 'July 2026', gross: '₹ 70,000', ded: '₹ 5,500', net: '₹ 64,500', date: '31 Jul 2026', status: 'Paid' },
-                { month: 'June 2026', gross: '₹ 70,000', ded: '₹ 5,500', net: '₹ 64,500', date: '30 Jun 2026', status: 'Paid' },
-                { month: 'May 2026', gross: '₹ 70,000', ded: '₹ 5,500', net: '₹ 64,500', date: '31 May 2026', status: 'Paid' }
-              ].map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{item.month}</td>
-                  <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{item.gross}</td>
-                  <td className="py-3 px-4 text-red-600 dark:text-red-400">{item.ded}</td>
-                  <td className="py-3 px-4 font-semibold text-emerald-600 dark:text-emerald-400">{item.net}</td>
-                  <td className="py-3 px-4 text-slate-500 dark:text-slate-400">{item.date}</td>
-                  <td className="py-3 px-4">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <button className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 text-xs font-semibold cursor-pointer">
-                      <Download size={13} /> PDF
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // 2. PERFORMANCE VIEW - Live API integration using GET /api/performance/:id (My Performance Only)
 export const PerformanceView = () => {
@@ -1063,60 +975,8 @@ export const DocumentsView = () => {
   );
 };
 
-// 9. DAILY FOLLOW UP (Team Leader #2)
-// export const DailyFollowUpView = () => {
-//   return (
-//     <div className="space-y-6">
-//       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
-//         <div className="flex items-center gap-3">
-//           <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
-//             <PhoneCall size={22} />
-//           </div>
-//           <div>
-//             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Team Daily Follow-Up</h2>
-//             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Track morning standup check-ins, resolve daily blockers, and conduct status syncs</p>
-//           </div>
-//         </div>
-//         <button className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-xs transition-colors cursor-pointer">
-//           <Plus size={14} /> New Follow-Up Note
-//         </button>
-//       </div>
-
-//       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-//         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-4">
-//           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Today's Standup Roster</h3>
-//           <div className="space-y-2 text-xs">
-//             {[
-//               { name: 'Alex Morgan', status: 'Completed', task: 'Implemented Role-based Sidebar' },
-//               { name: 'Karan Mehta', status: 'Blocker Reported', task: 'Requires API documentation for Leave' },
-//               { name: 'Priya Sharma', status: 'Completed', task: 'Running automation test suite on staging' }
-//             ].map((st, i) => (
-//               <div key={i} className="p-3 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 flex justify-between items-center">
-//                 <div>
-//                   <p className="font-semibold text-slate-900 dark:text-slate-100">{st.name}</p>
-//                   <p className="text-slate-500 dark:text-slate-400 text-[11px]">{st.task}</p>
-//                 </div>
-//                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-//                   st.status.includes('Blocker') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-//                 }`}>
-//                   {st.status}
-//                 </span>
-//               </div>
-//             ))}
-//           </div>
-//         </div>
-
-//         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-4">
-//           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Pending Blockers & Actions</h3>
-//           <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs space-y-1">
-//             <span className="font-bold text-amber-800 dark:text-amber-300">⚠️ 1 Critical Blocker</span>
-//             <p className="text-amber-700 dark:text-amber-400">Backend API for role permission sync is being updated on Render. Follow up scheduled at 4 PM.</p>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
+// 9. DAILY FOLLOW UP (Team Leader #2) - Live API integration
+export { DailyFollowUpView } from '../follow-up/DailyFollowUpView.jsx';
 
 // 10. TEAM TASK MANAGEMENT (Team Leader #3) - Live API integration
 export const TeamTaskManagementView = () => {
@@ -2366,18 +2226,18 @@ export const TeamLeaveManagementView = () => {
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     {applicantPhoto ? (
-                      <img 
-                        src={applicantPhoto} 
-                        alt={applicantName} 
+                      <img
+                        src={applicantPhoto}
+                        alt={applicantName}
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                           const fallback = e.currentTarget.parentElement?.querySelector('.avatar-initial-fallback');
                           if (fallback) fallback.style.display = 'flex';
                         }}
-                        className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-2xs" 
+                        className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-2xs"
                       />
                     ) : null}
-                    <div 
+                    <div
                       className={`avatar-initial-fallback w-9 h-9 rounded-full items-center justify-center font-bold text-xs shadow-2xs ${getAvatarColor(applicantName)}`}
                       style={{ display: applicantPhoto ? 'none' : 'flex' }}
                     >

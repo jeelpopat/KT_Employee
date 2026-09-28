@@ -18,7 +18,7 @@ import { HolidayCalendarView } from './components/holiday/HolidayCalendarView.js
 import {
   SalaryView, PerformanceView, ProjectView,
   TeamMembersView, EmployeesView, LearningHubView, InternshipProgressView,
-  DocumentsView, TeamTaskManagementView,
+  DocumentsView, DailyFollowUpView, TeamTaskManagementView,
   TeamLeaveManagementView, ReportView
 } from './components/placeholders/PlaceholderViews.jsx';
 
@@ -46,7 +46,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'learning-hub': return <LearningHubView />;
       case 'internship-progress': return <InternshipProgressView />;
       case 'documents': return <DocumentsView />;
-      //  case 'daily-follow-up': return <DailyFollowUpView />;
+      case 'daily-follow-up': return <DailyFollowUpView />;
       case 'team-tasks': return <TeamTaskManagementView />;
       case 'team-leaves': return <TeamLeaveManagementView />;
       // case 'attendance-review': return <AttendanceReviewView />;

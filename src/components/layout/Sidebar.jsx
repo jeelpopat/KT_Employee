@@ -52,6 +52,7 @@ export const Sidebar = ({ onSignOut }) => {
       { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
       { tab: 'team-tasks', label: 'Task Management', icon: <ListTodo size={18} /> },
       { tab: 'team-leaves', label: 'Team Leave Management', icon: <CalendarX size={18} /> },
+      { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
       { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
       { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
       { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
@@ -120,8 +121,8 @@ export const Sidebar = ({ onSignOut }) => {
                 key={item.tab}
                 onClick={() => handleNavClick(item.tab)}
                 className={`w-full flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${isActive
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-l-4 border-slate-800 dark:border-slate-300 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 border-l-4 border-transparent'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-l-4 border-slate-800 dark:border-slate-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 border-l-4 border-transparent'
                   } ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
                 title={isSidebarCollapsed ? item.label : undefined}
               >
