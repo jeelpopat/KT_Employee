@@ -9,6 +9,20 @@ import {
   initialNotifications,
   initialScreenshots
 } from '../data/mockData.js';
+import {
+  getMonitoringSettings,
+  updateMonitoringSettings,
+  getAdminScreenshots,
+  uploadScreenshot,
+  generateScreenshotBlob,
+  normalizeScreenshotRecord,
+  startScreenCapture,
+  stopScreenCapture,
+  isScreenCaptureActive,
+  captureRealScreenBlob,
+  addScreenStreamListener,
+  CLOUDINARY_CONFIG
+} from '../services/monitoringService.js';
 
 const AppContext = createContext();
 
@@ -28,6 +42,14 @@ export const deriveUserRole = (u) => {
     u.employee?.designation ||
     ''
   ).toString().toLowerCase().trim();
+
+  if (roleStr.includes('admin')) {
+    return 'admin';
+  }
+
+  if (roleStr.includes('hr')) {
+    return 'hr';
+  }
 
   if (
     roleStr.includes('lead') ||
@@ -66,6 +88,8 @@ export const AppProvider = ({ children }) => {
   });
 
   const [userRole, setUserRole] = useState(() => {
+    const activeRole = localStorage.getItem('active_role') || localStorage.getItem('user_role');
+    if (activeRole) return activeRole;
     const stored = localStorage.getItem('auth_user');
     if (stored) {
       try {
@@ -77,6 +101,8 @@ export const AppProvider = ({ children }) => {
 
   const [roleDetails, setRoleDetails] = useState(() => {
     const initialRole = (() => {
+      const activeRole = localStorage.getItem('active_role') || localStorage.getItem('user_role');
+      if (activeRole) return activeRole;
       const stored = localStorage.getItem('auth_user');
       if (stored) {
         try {
@@ -85,7 +111,12 @@ export const AppProvider = ({ children }) => {
       }
       return 'employee';
     })();
-    return { roleName: initialRole === 'team_leader' ? 'Team Leader' : initialRole === 'intern' ? 'Intern' : 'Employee' };
+    return {
+      roleName: initialRole === 'admin' ? 'Administrator' :
+                initialRole === 'hr' ? 'HR Manager' :
+                initialRole === 'team_leader' ? 'Team Leader' :
+                initialRole === 'intern' ? 'Intern' : 'Employee'
+    };
   });
 
   const [rolePermissions, setRolePermissions] = useState([]);
@@ -105,18 +136,56 @@ export const AppProvider = ({ children }) => {
   const [breakSeconds, setBreakSeconds] = useState(0);
   const [attendanceHistory, setAttendanceHistory] = useState(initialAttendanceRecords);
 
-  // Background Screenshot Monitoring Config & Engine (100% Silent for Employee)
+  // Background Screenshot Monitoring Config & Engine (Every 5 min default, Cloudinary Vault)
   const [screenshotConfig, setScreenshotConfig] = useState({
-    intervalSeconds: 10,
+    intervalSeconds: 300, // 5 Minutes default
+    intervalMinutes: 5,
     isPausedOnBreak: true,
+    pauseOnBreak: true,
     retentionDays: 30,
-    allowEmployeeView: false
+    allowEmployeeView: false,
+    isEnabled: true
   });
 
-  const [screenshots, setScreenshots] = useState(initialScreenshots);
-  const [latestScreenshot, setLatestScreenshot] = useState(initialScreenshots[0]);
-  const [nextScreenshotCountdown, setNextScreenshotCountdown] = useState(screenshotConfig.intervalSeconds);
-  const [sequenceCounter, setSequenceCounter] = useState(146);
+  // Sync screenshot monitoring settings from backend GET /api/employee-panel/monitoring/settings for HR/Admin
+  useEffect(() => {
+    if (userRole !== 'admin' && userRole !== 'hr') {
+      return;
+    }
+    const loadSettings = async () => {
+      try {
+        const s = await getMonitoringSettings();
+        if (s && s.intervalSeconds) {
+          setScreenshotConfig(prev => ({
+            ...prev,
+            intervalSeconds: Number(s.intervalSeconds) || 300,
+            intervalMinutes: Number(s.intervalMinutes) || Math.max(1, Math.round((Number(s.intervalSeconds) || 300) / 60)),
+            isPausedOnBreak: s.pauseOnBreak !== undefined ? s.pauseOnBreak : true,
+            pauseOnBreak: s.pauseOnBreak !== undefined ? s.pauseOnBreak : true,
+            isEnabled: s.isEnabled !== undefined ? s.isEnabled : prev.isEnabled
+          }));
+          setNextScreenshotCountdown(Number(s.intervalSeconds) || 300);
+        }
+      } catch (err) {
+        // Silently keep default
+      }
+    };
+    loadSettings();
+  }, [userRole]);
+
+  const [screenshots, setScreenshots] = useState([]);
+  const [latestScreenshot, setLatestScreenshot] = useState(null);
+  const [nextScreenshotCountdown, setNextScreenshotCountdown] = useState(300);
+  const [sequenceCounter, setSequenceCounter] = useState(1);
+  const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
+
+  // Sync real screen capture stream state across components
+  useEffect(() => {
+    const unsub = addScreenStreamListener((active) => {
+      setIsScreenSharingActive(active);
+    });
+    return unsub;
+  }, []);
 
   // 5-Minute Continuous Inactivity Detection System
   const [inactivitySeconds, setInactivitySeconds] = useState(0);
@@ -404,65 +473,147 @@ export const AppProvider = ({ children }) => {
     triggerInactivityAlert();
   };
 
-  // 3. Silent Background Screenshot Interval Capture Ticker
+  // 3. Real Device Screen Screenshot Interval Capture Ticker (Default: Every 5 Minutes)
+  const isCapturingRef = useRef(false);
+
+  const captureAndUploadScreenshot = useCallback(async (isManualTrigger = false) => {
+    // Strictly forbid screenshots during break time or when not actively working
+    if (attendanceStatus === 'on_break' || attendanceStatus !== 'checked_in') {
+      console.log('⏸️ Screenshot capture skipped: Employee is on break or not in active work session.');
+      return null;
+    }
+    if (screenshotConfig.isEnabled === false) return;
+    if (isCapturingRef.current) return;
+
+    let isStreamActive = isScreenCaptureActive();
+    if (!isStreamActive) {
+      if (isManualTrigger) {
+        // If employee or admin manually clicked "Capture Real Screen Now", prompt for screen permission
+        try {
+          await startScreenCapture();
+          isStreamActive = true;
+        } catch (err) {
+          console.warn('Real screen capture permission was not granted:', err);
+          return null;
+        }
+      } else {
+        // Silent automatic interval: If employee has not enabled screen sharing yet,
+        // do not upload fake random photos. Wait until real screen sharing is active.
+        return null;
+      }
+    }
+
+    isCapturingRef.current = true;
+
+    const empId = user?.employeeId || user?._id || user?.id || 'EMP-8492';
+    const empName = user?.name || user?.fullName || 'Active Employee';
+    const empRole = user?.designation || user?.role?.roleName || user?.role || 'Team Member';
+    const nowObj = new Date();
+    const dateStr = nowObj.toISOString().split('T')[0];
+    const timeStr = nowObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const metadata = {
+      employeeId: empId,
+      employeeName: empName,
+      designation: empRole,
+      sessionId: sessionId || `SES-${dateStr.replace(/-/g, '')}-001`,
+      activeWindow: 'Active Workstation Screen',
+      capturedAt: nowObj.toISOString(),
+      activityLevel: Math.floor(Math.random() * 15 + 85)
+    };
+
+    try {
+      // Capture REAL frame directly from employee's device screen!
+      const blob = await captureRealScreenBlob({
+        addWatermark: true,
+        employeeName: empName,
+        employeeId: empId
+      });
+
+      if (!blob) {
+        console.warn('Screen frame capture returned empty (screen may not be active).');
+        return null;
+      }
+
+      const localBlobUrl = URL.createObjectURL(blob);
+      const tempRecord = normalizeScreenshotRecord({
+        _id: `scr-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+        employeeId: metadata.employeeId,
+        employeeName: metadata.employeeName,
+        designation: metadata.designation,
+        sessionId: metadata.sessionId,
+        activeWindow: metadata.activeWindow,
+        imageUrl: localBlobUrl,
+        thumbnailUrl: localBlobUrl,
+        capturedAt: metadata.capturedAt,
+        date: dateStr,
+        captureTime: timeStr,
+        sequenceNo: sequenceCounter,
+        activityLevel: metadata.activityLevel
+      });
+
+      setScreenshots(prev => [tempRecord, ...prev]);
+      setLatestScreenshot(tempRecord);
+      setSequenceCounter(prev => prev + 1);
+
+      // Upload real captured image directly to Cloudinary and backend
+      try {
+        const uploadResult = await uploadScreenshot(blob, metadata);
+        const remoteUrl = uploadResult?.secure_url || uploadResult?.imageUrl || uploadResult?.data?.imageUrl || uploadResult?.screenshot?.imageUrl || uploadResult?.data?.url || uploadResult?.url;
+        if (remoteUrl) {
+          tempRecord.fullUrl = remoteUrl;
+          tempRecord.thumbnailUrl = remoteUrl;
+          tempRecord.cloudStorage = `Cloudinary (${CLOUDINARY_CONFIG.cloudName})`;
+          if (uploadResult?.public_id) {
+            tempRecord.publicId = uploadResult.public_id;
+          }
+          setScreenshots(prev => prev.map(s => s.id === tempRecord.id ? { 
+            ...s, 
+            fullUrl: remoteUrl, 
+            thumbnailUrl: remoteUrl,
+            cloudStorage: `Cloudinary (${CLOUDINARY_CONFIG.cloudName})`,
+            publicId: uploadResult?.public_id || s.publicId
+          } : s));
+          setLatestScreenshot(prev => prev && prev.id === tempRecord.id ? { 
+            ...prev, 
+            fullUrl: remoteUrl, 
+            thumbnailUrl: remoteUrl,
+            cloudStorage: `Cloudinary (${CLOUDINARY_CONFIG.cloudName})`,
+            publicId: uploadResult?.public_id || prev.publicId
+          } : prev);
+        }
+      } catch (postErr) {
+        console.warn('Screenshot upload notice (saved locally in session):', postErr.message);
+      }
+
+      return tempRecord;
+    } catch (genErr) {
+      console.warn('Screenshot frame capture error:', genErr);
+      return null;
+    } finally {
+      isCapturingRef.current = false;
+    }
+  }, [attendanceStatus, screenshotConfig.isEnabled, user, sessionId, sequenceCounter]);
+
   useEffect(() => {
+    // Strictly pause countdown and do not capture screenshots when on break or not checked in
     if (attendanceStatus !== 'checked_in') {
-      setNextScreenshotCountdown(screenshotConfig.intervalSeconds);
+      setNextScreenshotCountdown(screenshotConfig.intervalSeconds || 300);
       return;
     }
 
     const intervalTimer = setInterval(() => {
       setNextScreenshotCountdown(prev => {
         if (prev <= 1) {
-          captureMockScreenshot();
-          return screenshotConfig.intervalSeconds;
+          captureAndUploadScreenshot(false);
+          return screenshotConfig.intervalSeconds || 300;
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(intervalTimer);
-  }, [attendanceStatus, screenshotConfig.intervalSeconds, sequenceCounter]);
-
-  const captureMockScreenshot = () => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const sampleWindows = [
-      'VS Code - DailyReportView.jsx',
-      'Chrome - Kevalon CRM API Specs',
-      'Figma - Enterprise HRMS Layout',
-      'Terminal - npm run dev',
-      'Slack - #engineering-team'
-    ];
-    const sampleImages = [
-      'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=600&auto=format&fit=crop&q=80'
-    ];
-
-    const randomIdx = Math.floor(Math.random() * sampleWindows.length);
-    const newRecord = {
-      id: `scr-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-      employeeId: user.employeeId,
-      employeeName: user.name,
-      designation: user.designation,
-      date: '2026-08-20',
-      captureTime: timeStr,
-      sessionId: sessionId,
-      checkInTime: checkInTime,
-      sequenceNo: sequenceCounter,
-      thumbnailUrl: sampleImages[randomIdx],
-      fullUrl: sampleImages[randomIdx],
-      activityLevel: Math.floor(Math.random() * 25) + 75,
-      activeWindow: sampleWindows[randomIdx]
-    };
-
-    setScreenshots(prev => [newRecord, ...prev]);
-    setLatestScreenshot(newRecord);
-    setSequenceCounter(prev => prev + 1);
-  };
+  }, [attendanceStatus, screenshotConfig.intervalSeconds, captureAndUploadScreenshot]);
 
   // Actions
   const handleCheckIn = () => {
@@ -475,6 +626,7 @@ export const AppProvider = ({ children }) => {
     setMonitoringStartTime(formattedCheckIn);
     setMonitoringEndTime(null);
     setAttendanceStatus('checked_in');
+    setNextScreenshotCountdown(screenshotConfig.intervalSeconds || 300);
     setWorkSeconds(0);
     setBreakSeconds(0);
     setInactivitySeconds(0);
@@ -482,7 +634,7 @@ export const AppProvider = ({ children }) => {
     const newNotif = {
       id: `notif-${Date.now()}`,
       title: 'Checked In Successfully',
-      message: `Session ${newSessionId} started at ${formattedCheckIn}. Background work monitoring active.`,
+      message: `Session ${newSessionId} started at ${formattedCheckIn}. Background work monitoring active (5 min interval).`,
       time: 'Just now',
       isRead: false,
       type: 'attendance'
@@ -494,6 +646,7 @@ export const AppProvider = ({ children }) => {
     const now = new Date();
     const formattedTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setAttendanceStatus('on_break');
+    setNextScreenshotCountdown(screenshotConfig.intervalSeconds || 300);
     setInactivitySeconds(0);
 
     const newNotif = {
@@ -525,6 +678,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const handleCheckOut = () => {
+    stopScreenCapture();
     const now = new Date();
     const formattedCheckOut = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setAttendanceStatus('checked_out');
@@ -678,11 +832,6 @@ export const AppProvider = ({ children }) => {
 
   const handleMarkNotificationRead = (id) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-  };
-
-  // Manual role switching is completely disabled per security requirements
-  const switchRole = () => {
-    console.warn('Role switching is disabled. User role is strictly bound to account permissions.');
   };
 
   const resolveRole = async (userData) => {
@@ -876,8 +1025,20 @@ export const AppProvider = ({ children }) => {
 
       let determinedRole = 'employee';
 
-      // Check all possible Team Leader signals:
+      // Check all possible signals:
       if (
+        normalizedRoleName.includes('admin') ||
+        designationStr.includes('admin')
+      ) {
+        determinedRole = 'admin';
+        if (!resolvedRoleName) resolvedRoleName = 'Administrator';
+      } else if (
+        normalizedRoleName.includes('hr') ||
+        designationStr.includes('hr')
+      ) {
+        determinedRole = 'hr';
+        if (!resolvedRoleName) resolvedRoleName = 'HR Manager';
+      } else if (
         normalizedRoleName.includes('lead') ||
         normalizedRoleName.includes('leader') ||
         normalizedRoleName.includes('tl') ||
@@ -909,7 +1070,21 @@ export const AppProvider = ({ children }) => {
 
       // Default role permissions if not provided by backend
       if (!permissions || permissions.length === 0) {
-        if (determinedRole === 'team_leader') {
+        if (determinedRole === 'admin' || determinedRole === 'hr') {
+          permissions = [
+            'view_dashboard',
+            'manage_monitoring',
+            'view_screenshots',
+            'view_employees',
+            'manage_team_leaves',
+            'view_attendance',
+            'view_salary',
+            'view_performance',
+            'view_holidays',
+            'view_profile',
+            'view_reports'
+          ];
+        } else if (determinedRole === 'team_leader') {
           permissions = [
             'view_dashboard',
             'manage_team_tasks',
@@ -951,7 +1126,7 @@ export const AppProvider = ({ children }) => {
 
       setUserRole(determinedRole);
       localStorage.setItem('user_role', determinedRole);
-      setRoleDetails(rawRoleData || { roleName: resolvedRoleName || (determinedRole === 'team_leader' ? 'Team Leader' : 'Employee') });
+      setRoleDetails(rawRoleData || { roleName: resolvedRoleName || (determinedRole === 'team_leader' ? 'Team Leader' : determinedRole === 'hr' ? 'HR Manager' : determinedRole === 'admin' ? 'Administrator' : 'Employee') });
       setRolePermissions(permissions);
       return determinedRole;
     } catch (err) {
@@ -962,6 +1137,20 @@ export const AppProvider = ({ children }) => {
     } finally {
       setIsRoleLoading(false);
     }
+  };
+
+  const switchRole = (newRole) => {
+    localStorage.setItem('active_role', newRole);
+    localStorage.setItem('user_role', newRole);
+    setUserRole(newRole);
+    const roleLabels = {
+      admin: 'Administrator',
+      hr: 'HR Manager',
+      team_leader: 'Team Leader',
+      intern: 'Intern',
+      employee: 'Employee'
+    };
+    setRoleDetails({ roleName: roleLabels[newRole] || 'Employee' });
   };
 
   // Sync role and fresh user profile on initial mount
@@ -1091,6 +1280,10 @@ export const AppProvider = ({ children }) => {
       screenshots,
       latestScreenshot,
       nextScreenshotCountdown,
+      isScreenSharingActive,
+      startScreenCapture,
+      stopScreenCapture,
+      captureRealScreenNow: () => captureAndUploadScreenshot(true),
       inactivitySeconds,
       isInactivityAlertOpen,
       inactivityEvents,
@@ -1112,7 +1305,11 @@ export const AppProvider = ({ children }) => {
       globalSearchQuery,
       setGlobalSearchQuery,
       updateUserProfile,
-      refreshUserProfile
+      refreshUserProfile,
+      updateMonitoringSettings,
+      getAdminScreenshots,
+      getMonitoringSettings,
+      CLOUDINARY_CONFIG
     }}>
       {children}
     </AppContext.Provider>

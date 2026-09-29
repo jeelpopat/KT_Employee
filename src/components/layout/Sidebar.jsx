@@ -4,7 +4,7 @@ import {
   CalendarDays, User, LogOut, ChevronLeft, ChevronRight, X,
   Wallet, TrendingUp, Briefcase, Umbrella, Users, BookOpen,
   GraduationCap, FileBadge, PhoneCall, ClipboardCheck, BarChart,
-  ListTodo, CalendarX
+  ListTodo, CalendarX, Camera
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import logo from '../../assets/Logo.png';
@@ -23,6 +23,50 @@ export const Sidebar = ({ onSignOut }) => {
 
   // Strictly defined role menus in the exact order requested
   const ROLE_MENUS = {
+    hr: [
+      { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: <Camera size={18} /> },
+      { tab: 'employees', label: 'Employees', icon: <Users size={18} /> },
+      { tab: 'team-members', label: 'Team Members', icon: <Users size={18} /> },
+      { tab: 'team-leaves', label: 'Leave Requests', icon: <CalendarX size={18} /> },
+      { tab: 'attendance', label: 'Attendance Logs', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
+      { tab: 'salary', label: 'Salary Management', icon: <Wallet size={18} /> },
+      { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
+      { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
+      { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
+      { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
+      { tab: 'report', label: 'Reports', icon: <BarChart size={18} /> }
+    ],
+    admin: [
+      { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: <Camera size={18} /> },
+      { tab: 'employees', label: 'Employees', icon: <Users size={18} /> },
+      { tab: 'team-members', label: 'Team Members', icon: <Users size={18} /> },
+      { tab: 'team-leaves', label: 'Leave Requests', icon: <CalendarX size={18} /> },
+      { tab: 'attendance', label: 'Attendance Logs', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
+      { tab: 'salary', label: 'Salary Management', icon: <Wallet size={18} /> },
+      { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
+      { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
+      { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
+      { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
+      { tab: 'report', label: 'Reports', icon: <BarChart size={18} /> }
+    ],
+    team_leader: [
+      { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: <Camera size={18} /> },
+      { tab: 'team-tasks', label: 'Task Management', icon: <ListTodo size={18} /> },
+      { tab: 'team-leaves', label: 'Team Leave Management', icon: <CalendarX size={18} /> },
+      { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
+      { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
+      { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
+      { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
+      { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> },
+      { tab: 'attendance', label: 'My Attendance Log', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
+      { tab: 'salary', label: 'My Salary', icon: <Wallet size={18} /> },
+      { tab: 'tasks', label: 'My Task', icon: <CheckSquare size={18} /> },
+      { tab: 'projects', label: 'My Project', icon: <Briefcase size={18} /> },
+      { tab: 'daily-report', label: 'Daily Report', icon: <FileText size={18} /> }
+    ],
     employee: [
       { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
       { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
@@ -47,30 +91,17 @@ export const Sidebar = ({ onSignOut }) => {
       { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
       { tab: 'documents', label: 'Documents & Certificate', icon: <FileBadge size={18} /> },
       { tab: 'tasks', label: 'My Task', icon: <CheckSquare size={18} /> }
-    ],
-    team_leader: [
-      { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      { tab: 'team-tasks', label: 'Task Management', icon: <ListTodo size={18} /> },
-      { tab: 'team-leaves', label: 'Team Leave Management', icon: <CalendarX size={18} /> },
-      { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
-      { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
-      { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
-      { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
-      { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> },
-      { tab: 'attendance', label: 'My Attendance Log', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
-      { tab: 'salary', label: 'My Salary', icon: <Wallet size={18} /> },
-      { tab: 'tasks', label: 'My Task', icon: <CheckSquare size={18} /> },
-      { tab: 'projects', label: 'My Project', icon: <Briefcase size={18} /> },
-      { tab: 'daily-report', label: 'Daily Report', icon: <FileText size={18} /> }
     ]
   };
 
   const navItems = ROLE_MENUS[userRole] || ROLE_MENUS['employee'];
 
   const roleLabels = {
-    employee: 'Employee',
+    admin: 'Administrator',
+    hr: 'HR Manager',
+    team_leader: 'Team Leader',
     intern: 'Intern',
-    team_leader: 'Team Leader'
+    employee: 'Employee'
   };
 
   return (
@@ -150,11 +181,11 @@ export const Sidebar = ({ onSignOut }) => {
               <div className="min-w-0">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider leading-none mb-1">Role</span>
                 <span className="text-xs font-bold text-blue-600 dark:text-blue-400 truncate block">
-                  {userRole === 'team_leader' ? 'Team Leader' : userRole === 'intern' ? 'Intern' : 'Employee'}
+                  {userRole === 'admin' ? 'Administrator' : userRole === 'hr' ? 'HR Manager' : userRole === 'team_leader' ? 'Team Leader' : userRole === 'intern' ? 'Intern' : 'Employee'}
                 </span>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 uppercase font-mono">
-                {userRole === 'team_leader' ? 'TL' : userRole === 'intern' ? 'Intern' : 'EMP'}
+                {userRole === 'admin' ? 'ADMIN' : userRole === 'hr' ? 'HR' : userRole === 'team_leader' ? 'TL' : userRole === 'intern' ? 'Intern' : 'EMP'}
               </span>
             </div>
           )}

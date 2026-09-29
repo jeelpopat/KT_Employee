@@ -28,6 +28,164 @@ export const isTodayDate = (dateVal) => {
 };
 
 /**
+ * Checks if a given date string/object is strictly in the past (before today).
+ */
+export const isPastDate = (dateVal) => {
+  if (!dateVal) return false;
+  if (isTodayDate(dateVal)) return false;
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return dMidnight < todayMidnight;
+};
+
+/**
+ * Formats an ISO string or time string into a 12-hour local time string (e.g. "07:00 PM")
+ */
+export const formatISOToLocalTime = (isoStr) => {
+  if (!isoStr || isoStr === '--:--' || isoStr === 'null' || isoStr === 'undefined' || isoStr === '00:00:00' || isoStr === '00:00') {
+    return '--:--';
+  }
+  if (typeof isoStr === 'string' && (isoStr.includes('AM') || isoStr.includes('PM'))) {
+    return isoStr;
+  }
+  const date = new Date(isoStr);
+  if (!isNaN(date.getTime())) {
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  }
+  return String(isoStr);
+};
+
+/**
+ * Returns 7:00 PM (19:00:00) on the given date (or today) for auto check-out.
+ */
+export const getAutoCheckOutTimeForDate = (dateVal) => {
+  const d = dateVal ? new Date(dateVal) : new Date();
+  const base = isNaN(d.getTime()) ? new Date() : new Date(d);
+  base.setHours(19, 0, 0, 0); // 7:00 PM local
+  return {
+    iso: base.toISOString(),
+    timeStr: '07:00 PM',
+    minutes: 19 * 60 // 1140 minutes
+  };
+};
+
+/**
+ * Determines whether auto check-out rule applies for a record:
+ * If employees have not checked out until 11:59 PM, auto check out time is 7:00 PM at that day.
+ */
+export const isAutoCheckOutApplicable = (dateVal) => {
+  if (!dateVal) return false;
+  const now = new Date();
+  const isPast = isPastDate(dateVal);
+  const isToday = isTodayDate(dateVal);
+
+  if (isPast) {
+    // Midnight (11:59 PM) of that past day has already passed
+    return true;
+  }
+
+  if (isToday) {
+    // For today: check if 11:59 PM (23:59) has been reached
+    return now.getHours() === 23 && now.getMinutes() >= 59;
+  }
+
+  return false;
+};
+
+/**
+ * Calculate working hours formatted as "Xh Ym"
+ */
+export const calculateWorkingHours = (checkInVal, checkOutVal, breakDurationMins = 0) => {
+  const inMins = parseTimeToMinutes(checkInVal);
+  if (inMins === null) return '0h 0m';
+
+  const outMins = parseTimeToMinutes(checkOutVal);
+  const now = new Date();
+  const currentMins = now.getHours() * 60 + now.getMinutes();
+
+  const endMins = outMins !== null ? outMins : currentMins;
+  const netMins = Math.max(0, endMins - inMins - (Number(breakDurationMins) || 0));
+
+  const hrs = Math.floor(netMins / 60);
+  const mins = netMins % 60;
+  return `${hrs}h ${mins}m`;
+};
+
+/**
+ * Normalizes an attendance record:
+ * - If employee checked in and NOT checked out until 11:59 PM, auto check out time is set to 7:00 PM at that day!
+ */
+export const normalizeAttendanceRecord = (record) => {
+  if (!record) return record;
+
+  const now = new Date();
+  const recDateStr = record.date || record.checkInTime || record.createdAt;
+  const isToday = isTodayDate(recDateStr);
+
+  const rawCheckIn = record.checkInTime || record.inTime || record.checkIn;
+  const statusStr = String(record.status || '').toLowerCase().trim();
+
+  const hasCheckIn = Boolean(
+    (rawCheckIn && rawCheckIn !== '--:--' && rawCheckIn !== 'null' && rawCheckIn !== 'undefined') ||
+    ['present', 'late', 'half day', 'checked_in', 'on_break', 'completed'].includes(statusStr)
+  );
+
+  const rawCheckOut = record.checkOutTime || record.outTime || record.checkOut;
+  const hasExistingCheckOut = Boolean(
+    rawCheckOut &&
+    rawCheckOut !== '--:--' &&
+    rawCheckOut !== '00:00:00' &&
+    rawCheckOut !== '00:00' &&
+    rawCheckOut !== 'null' &&
+    rawCheckOut !== 'undefined' &&
+    rawCheckOut !== ''
+  );
+
+  // Auto check-out condition:
+  // - If past day: 11:59 PM has already passed.
+  // - If today: current time >= 23:59.
+  const isPast1159PM = !isToday || (now.getHours() === 23 && now.getMinutes() >= 59);
+
+  if (hasCheckIn && !hasExistingCheckOut && isPast1159PM) {
+    let baseDate = new Date(recDateStr || Date.now());
+    if (isNaN(baseDate.getTime())) baseDate = new Date();
+
+    // Auto check out at 7:00 PM (19:00:00) on that day
+    baseDate.setHours(19, 0, 0, 0);
+    const autoCheckOutIso = baseDate.toISOString();
+    const autoCheckOutDisplay = '07:00 PM';
+
+    // Calculate total working hours up to 7:00 PM (1140 mins) minus break
+    const startMins = parseTimeToMinutes(rawCheckIn);
+    let totalWorkHoursNum = 9;
+    if (startMins !== null) {
+      const endMins = 19 * 60; // 1140 mins (7:00 PM)
+      const breakMins = Number(record.totalBreakTime || record.breakDuration || 0) || 0;
+      const netMins = Math.max(0, endMins - startMins - breakMins);
+      totalWorkHoursNum = Number((netMins / 60).toFixed(1));
+    }
+
+    const hrs = Math.floor(totalWorkHoursNum);
+    const mins = Math.round((totalWorkHoursNum - hrs) * 60);
+
+    return {
+      ...record,
+      checkOutTime: autoCheckOutIso,
+      checkOutTimeDisplay: autoCheckOutDisplay,
+      isAutoCheckedOut: true,
+      totalWorkTime: totalWorkHoursNum,
+      totalWorkTimeDisplay: `${hrs}h ${mins}m`,
+      status: (statusStr && statusStr !== 'not_checked_in') ? statusStr : 'present'
+    };
+  }
+
+  return record;
+};
+
+/**
  * Converts UTC minutes (from midnight UTC) to local minutes (from midnight local time)
  * @param {number} utcMinutes 
  * @returns {number} localMinutes
@@ -157,13 +315,18 @@ export const computeNineHourTimeline = ({
 
   // 1. Process backend timelineSegments if present
   if (Array.isArray(timelineSegments) && timelineSegments.length > 0) {
+    const parsedCheckOut = parseTimeToMinutes(checkOutTime);
+    const maxAllowedEnd = (isCheckedOut && parsedCheckOut !== null)
+      ? Math.min(endMinutes, parsedCheckOut)
+      : endMinutes;
+
     timelineSegments.forEach((seg, idx) => {
       const localFrom = convertUTCMinutesToLocal(seg.fromMinutes);
       const localTo = convertUTCMinutesToLocal(seg.toMinutes);
 
-      // Clamp strictly within the 9-hour timeline [startMinutes, endMinutes]
+      // Clamp strictly within the 9-hour timeline [startMinutes, maxAllowedEnd]
       const clampedFrom = Math.max(startMinutes, localFrom);
-      const clampedTo = Math.min(endMinutes, localTo);
+      const clampedTo = Math.min(maxAllowedEnd, localTo);
 
       if (clampedTo > clampedFrom) {
         const isBreak = seg.type === 'yellow' || (seg.label || '').toLowerCase().includes('break');
@@ -564,7 +727,7 @@ export const computeNineHourTimeline = ({
 
   // Check Out marker
   const parsedCheckOut = parseTimeToMinutes(checkOutTime);
-  if ((isCheckedOut || parsedCheckOut !== null) && parsedCheckOut !== null && parsedCheckOut >= startMinutes && parsedCheckOut <= endMinutes) {
+  if ((isCheckedOut || parsedCheckOut !== null) && parsedCheckOut !== null && parsedCheckOut >= startMinutes) {
     if (!statusMarkers.some(m => m.type === 'check_out')) {
       const outPct = Number((Math.max(0, Math.min(100, ((parsedCheckOut - startMinutes) / TOTAL_MINUTES) * 100))).toFixed(1));
       statusMarkers.push({

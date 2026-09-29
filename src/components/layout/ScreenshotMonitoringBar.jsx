@@ -10,7 +10,11 @@ export const ScreenshotMonitoringBar = () => {
     latestScreenshot, 
     screenshots,
     workSeconds,
-    setIsScreenshotModalOpen
+    setIsScreenshotModalOpen,
+    isScreenSharingActive,
+    startScreenCapture,
+    stopScreenCapture,
+    captureRealScreenNow
   } = useApp();
 
   const hrs = Math.floor(workSeconds / 3600);
@@ -18,18 +22,30 @@ export const ScreenshotMonitoringBar = () => {
 
   const getStatusBadge = () => {
     if (attendanceStatus === 'checked_in') {
+      if (isScreenSharingActive) {
+        return (
+          <span className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>🟢 Real Device Screen Monitoring Active</span>
+          </span>
+        );
+      }
       return (
-        <span className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs font-semibold">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>🟢 Work Session Active — Screen Monitoring Active</span>
-        </span>
+        <button
+          onClick={() => startScreenCapture().catch(e => console.warn(e))}
+          className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold cursor-pointer transition"
+          title="Click to grant screen share permission for real device monitoring"
+        >
+          <Camera size={13} className="text-amber-400" />
+          <span>⚠️ Device Screen Inactive — Click to Share Screen</span>
+        </button>
       );
     }
     if (attendanceStatus === 'on_break') {
       return (
-        <span className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs font-semibold">
-          <PauseCircle size={14} className="text-amber-500" />
-          <span>⏸️ On Break — Screen Monitoring Paused</span>
+        <span className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-semibold">
+          <PauseCircle size={14} className="text-amber-400" />
+          <span>⏸️ On Break — Monitoring Paused (No Screenshots Taken)</span>
         </span>
       );
     }
@@ -53,7 +69,7 @@ export const ScreenshotMonitoringBar = () => {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             {getStatusBadge()}
             <span className="text-[11px] text-slate-400 hidden lg:inline">
-              Company Policy Compliant (Interval: Every {screenshotConfig.intervalSeconds}s)
+              Company Policy (Every {Math.round((screenshotConfig.intervalSeconds || 300) / 60)} min • Paused on Break)
             </span>
           </div>
         </div>
@@ -61,11 +77,15 @@ export const ScreenshotMonitoringBar = () => {
         {/* Right: Metrics & Actions */}
         <div className="flex items-center space-x-4 sm:space-x-6 text-slate-300">
           
-          {/* Next Shot Countdown */}
+          {/* Next Shot Countdown (only active during active work session) */}
           {attendanceStatus === 'checked_in' && (
             <div className="flex items-center space-x-1.5 font-mono text-slate-300 bg-slate-800 px-2.5 py-1 rounded-md">
               <Camera size={13} className="text-emerald-400 animate-spin" />
-              <span>Capture in: <strong className="text-white">{nextScreenshotCountdown}s</strong></span>
+              <span>
+                Capture in: <strong className="text-white">
+                  {Math.floor(nextScreenshotCountdown / 60)}m {String(nextScreenshotCountdown % 60).padStart(2, '0')}s
+                </strong>
+              </span>
             </div>
           )}
 
@@ -87,7 +107,18 @@ export const ScreenshotMonitoringBar = () => {
             <span className="font-semibold text-slate-200">{hrs}h {mins}m</span>
           </div>
 
-          {/* Action Trigger */}
+          {/* Action Triggers */}
+          {attendanceStatus === 'checked_in' && (
+            <button
+              onClick={() => captureRealScreenNow().catch(e => console.warn(e))}
+              className="flex items-center space-x-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md font-medium text-xs shadow-xs transition cursor-pointer"
+              title="Capture real employee workstation screen right now"
+            >
+              <Camera size={13} />
+              <span className="hidden sm:inline">Capture Now</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsScreenshotModalOpen(true)}
             className="flex items-center space-x-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-md font-medium text-xs shadow-xs transition"

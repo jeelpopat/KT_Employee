@@ -198,7 +198,7 @@ export const Header = ({ onSignOut }) => {
     'attendance-review': 'Team Attendance Review',
     'report': 'Performance Analytics',
     'performance': 'Performance Analytics',
-    'admin-screenshots': 'Activity & Monitoring Portal'
+    'admin-screenshots': 'Screenshot Monitoring Portal'
   };
 
   const extractName = (source) => {
@@ -284,10 +284,15 @@ export const Header = ({ onSignOut }) => {
 
       <div className="flex items-center space-x-3">
         {attendanceStatus === 'checked_in' && (
-          <div className="flex items-center space-x-2 px-2.5 py-1.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-md text-xs font-medium text-green-700 dark:text-green-400">
+          <button 
+            type="button"
+            onClick={() => setCurrentTab('admin-screenshots')}
+            title="Open Screenshot Monitoring Portal"
+            className="flex items-center space-x-2 px-2.5 py-1.5 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 border border-green-200 dark:border-green-800/50 rounded-md text-xs font-medium text-green-700 dark:text-green-400 transition-colors cursor-pointer"
+          >
             <Camera size={14} className="text-green-600 dark:text-green-500" />
             <span className="hidden sm:inline">Monitoring Active</span>
-          </div>
+          </button>
         )}
 
         <button 

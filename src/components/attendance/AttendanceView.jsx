@@ -9,7 +9,9 @@ import {
   computeNineHourTimeline,
   isTodayDate,
   formatMinutesToTimeStr,
-  convertUTCMinutesToLocal
+  convertUTCMinutesToLocal,
+  formatISOToLocalTime,
+  normalizeAttendanceRecord
 } from '../../utils/timelineUtils.js';
 
 export const AttendanceView = () => {
@@ -60,18 +62,26 @@ export const AttendanceView = () => {
       const data = response.data?.data || [];
       const summary = response.data?.summary || {};
 
-      if (summary) {
-        setSummaryStats({
-          totalWorkingHours: summary.totalWorkingHours || 0,
-          presentDays: summary.presentDays || 0,
-          absentDays: summary.absentDays || 0,
-          halfDays: summary.halfDays || 0,
-          averageWorkingHours: summary.averageWorkingHours || 0
-        });
+      const sortedRecords = [...data].sort((a, b) => new Date(b.date || b.checkInTime) - new Date(a.date || a.checkInTime));
+      // Normalize all records: if employee has not checked out until 11:59 PM, auto check out time 7:00 PM at that day
+      const normalizedRecords = sortedRecords.map(normalizeAttendanceRecord);
+      setAttendanceRecords(normalizedRecords);
+
+      let totalWorkHrs = summary.totalWorkingHours || 0;
+      if (normalizedRecords.length > 0) {
+        const computedTotal = normalizedRecords.reduce((acc, r) => acc + (parseFloat(r.totalWorkTime) || 0), 0);
+        if (computedTotal > totalWorkHrs) {
+          totalWorkHrs = Number(computedTotal.toFixed(1));
+        }
       }
 
-      const sortedRecords = [...data].sort((a, b) => new Date(b.date) - new Date(a.date));
-      setAttendanceRecords(sortedRecords);
+      setSummaryStats({
+        totalWorkingHours: totalWorkHrs,
+        presentDays: summary.presentDays || normalizedRecords.filter(r => r.status === 'present' || r.checkInTime).length,
+        absentDays: summary.absentDays || 0,
+        halfDays: summary.halfDays || 0,
+        averageWorkingHours: summary.averageWorkingHours || (normalizedRecords.length > 0 ? Number((totalWorkHrs / normalizedRecords.length).toFixed(1)) : 0)
+      });
 
     } catch (error) {
       console.error("Failed to fetch timeline attendance:", error);
@@ -90,26 +100,6 @@ export const AttendanceView = () => {
     const matchesStatus = selectedStatusFilter === 'all' || (record.status || '').toLowerCase() === selectedStatusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
-
-  const formatISOToLocalTime = (isoStr) => {
-    if (!isoStr) return '--:--';
-    const date = new Date(isoStr);
-    if (isNaN(date.getTime())) return '--:--';
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
-  // Convert UTC minutes from backend to local time minutes from midnight
-  const convertUTCMinutesToLocal = (utcMinutes) => {
-    const d = new Date();
-    d.setUTCHours(Math.floor(utcMinutes / 60), utcMinutes % 60, 0, 0);
-    return d.getHours() * 60 + d.getMinutes();
-  };
-
-  const formatMinutesToTimeStr = (totalMinutes) => {
-    const d = new Date();
-    d.setHours(Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
 
   const getDayName = (dateString) => {
     if (!dateString) return 'Unknown Day';
@@ -304,17 +294,20 @@ export const AttendanceView = () => {
                       )
                     ) : (
                       <>
-                        {statusLabel === 'present' && (
+                        {record.isAutoCheckedOut ? (
+                          <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">
+                            Checked Out (7:00 PM)
+                          </span>
+                        ) : statusLabel === 'present' ? (
                           <span className="px-2.5 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 text-[10px] font-bold uppercase tracking-wider">Present</span>
-                        )}
-                        {statusLabel === 'late' && (
+                        ) : statusLabel === 'late' ? (
                           <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider">Late</span>
-                        )}
-                        {statusLabel.includes('half day') && (
+                        ) : statusLabel.includes('half day') ? (
                           <span className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 text-[10px] font-bold uppercase tracking-wider">Half Day</span>
-                        )}
-                        {statusLabel === 'absent' && (
+                        ) : statusLabel === 'absent' ? (
                           <span className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50 text-[10px] font-bold uppercase tracking-wider">Absent</span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">Checked Out</span>
                         )}
                       </>
                     )}

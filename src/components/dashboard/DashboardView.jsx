@@ -6,7 +6,19 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
-import { computeNineHourTimeline, getQuickActionStatusConfig } from '../../utils/timelineUtils.js';
+import {
+  computeNineHourTimeline,
+  getQuickActionStatusConfig,
+  isTodayDate,
+  isPastDate,
+  formatISOToLocalTime,
+  calculateWorkingHours,
+  normalizeAttendanceRecord,
+  getAutoCheckOutTimeForDate,
+  formatMinutesToTimeStr,
+  convertUTCMinutesToLocal,
+  parseTimeToMinutes
+} from '../../utils/timelineUtils.js';
 
 // --- Geofencing Configuration (Office Location & 70 Meter Strict Radius) ---
 const TARGET_LAT = 23.057808;
@@ -69,45 +81,6 @@ export const DashboardView = () => {
   };
   const handleNextAnnouncement = () => {
     setCurrentAnnIndex((prev) => (prev + 1) % announcements.length);
-  };
-
-  // --- Timeline Converters ---
-  const convertUTCMinutesToLocal = (utcMinutes) => {
-    const d = new Date();
-    d.setUTCHours(Math.floor(utcMinutes / 60), utcMinutes % 60, 0, 0);
-    return d.getHours() * 60 + d.getMinutes();
-  };
-
-  const formatMinutesToTimeStr = (totalMinutes) => {
-    const d = new Date();
-    d.setHours(Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
-  const formatISOToLocalTime = (isoStr) => {
-    if (!isoStr) return '--:--';
-    const date = new Date(isoStr);
-    if (isNaN(date.getTime())) return '--:--';
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
-  // Date matching helper robust against UTC/local time offsets and format variations
-  const isTodayDate = (dateVal) => {
-    if (!dateVal) return false;
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return false;
-    const now = new Date();
-    if (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate()
-    ) {
-      return true;
-    }
-    const todayIso = now.toISOString().split('T')[0];
-    const todayLocal = now.toLocaleDateString('en-CA');
-    const dStr = typeof dateVal === 'string' ? dateVal : d.toISOString();
-    return dStr.startsWith(todayIso) || dStr.startsWith(todayLocal);
   };
 
   // Resolve employee photo from various nested properties or user directory lookup
@@ -261,14 +234,17 @@ export const DashboardView = () => {
                             matched?.resolvedPhoto || matched?.profilePhoto || matched?.photoUrl ||
                             l.profilePhoto || l.photoUrl || '';
 
-              const leaveType = l.leaveType ? (l.leaveType.charAt(0).toUpperCase() + l.leaveType.slice(1).replace('_', ' ')) : 'Leave';
+              const isHalf = Boolean(l.isHalfDay || l.leaveType === 'half_day');
+              const leaveDisplay = isHalf
+                ? `Half Day${l.halfDayType === 'second-half' ? ' (2nd Half)' : l.halfDayType === 'first-half' ? ' (1st Half)' : ''}`
+                : 'Full Day';
 
               return {
                 _id: l._id || idStr,
                 name,
                 designation,
                 profilePhoto: photo,
-                leaveType: `${leaveType}${l.isHalfDay ? ' (Half Day)' : ''}`
+                leaveType: leaveDisplay
               };
             });
           }
@@ -279,15 +255,22 @@ export const DashboardView = () => {
 
       setTeamOnLeave(resolvedTeamOnLeave);
 
-      // 2. Fetch Timeline - Try 'today' first, then fallback to 'last10days' to guarantee finding today's record
+      // 2. Fetch Timeline - STRICT: TODAY ONLY
+      // If employees did not check out last time, DO NOT show that day's attendance in dashboard!
       let todayTimelineData = null;
       let segments = [];
+      let unclosedPastShift = null;
+
       try {
         const tlRes = await api.get('/api/employee-panel/attendance/timeline?filter=today');
         const tlList = tlRes.data?.data || tlRes.data?.timeline || [];
         if (Array.isArray(tlList) && tlList.length > 0) {
-          todayTimelineData = tlList[0];
-          segments = todayTimelineData.timelineSegments || [];
+          const first = tlList[0];
+          // STRICT RULE: Only accept if this record is truly for today!
+          if (isTodayDate(first.date) || isTodayDate(first.checkInTime) || isTodayDate(first.createdAt)) {
+            todayTimelineData = normalizeAttendanceRecord(first);
+            segments = todayTimelineData.timelineSegments || [];
+          }
         }
       } catch (tlErr) {
         console.warn("Timeline today fetch failed:", tlErr);
@@ -298,13 +281,14 @@ export const DashboardView = () => {
           const tl10Res = await api.get('/api/employee-panel/attendance/timeline?filter=last10days');
           const tl10List = tl10Res.data?.data || tl10Res.data?.timeline || [];
           if (Array.isArray(tl10List) && tl10List.length > 0) {
-            // Sort descending by date/creation to inspect most recent
             const sortedTimeline = [...tl10List].sort((a, b) => {
               const tA = new Date(a.date || a.checkInTime || a.createdAt || 0).getTime();
               const tB = new Date(b.date || b.checkInTime || b.createdAt || 0).getTime();
               return tB - tA;
             });
 
+            // STRICT RULE: Only match if record is from TODAY!
+            // If employees have not checked out last time, do NOT show that day's attendance in dashboard!
             const match = sortedTimeline.find(r =>
               isTodayDate(r.date) ||
               isTodayDate(r.checkInTime) ||
@@ -312,16 +296,17 @@ export const DashboardView = () => {
             );
 
             if (match) {
-              todayTimelineData = match;
+              todayTimelineData = normalizeAttendanceRecord(match);
               segments = match.timelineSegments || [];
-            } else if (sortedTimeline.length > 0) {
-              const latest = sortedTimeline[0];
-              const lStatus = String(latest.status || '').toLowerCase().trim();
-              const hasNoCheckout = !latest.checkOutTime || latest.checkOutTime === '--:--' || latest.checkOutTime === 'null';
-              if (hasNoCheckout && (latest.checkInTime || ['present', 'checked_in', 'on_break', 'late'].includes(lStatus))) {
-                todayTimelineData = latest;
-                segments = latest.timelineSegments || [];
-              }
+            }
+
+            // Identify any lingering unclosed shift from past days so it doesn't block backend
+            const pastUnclosed = sortedTimeline.find(r =>
+              !isTodayDate(r.date) && !isTodayDate(r.checkInTime) &&
+              (!r.checkOutTime || r.checkOutTime === '--:--' || r.checkOutTime === 'null')
+            );
+            if (pastUnclosed) {
+              unclosedPastShift = pastUnclosed;
             }
           }
         } catch (tl10Err) {
@@ -330,17 +315,28 @@ export const DashboardView = () => {
       }
       setTodaySegments(segments);
 
-      // 3. Try /api/attendance/today
+      // Auto-close past unclosed shift on backend if needed
+      if (unclosedPastShift) {
+        const pastKey = 'kt_auto_closed_past_' + (unclosedPastShift.date || unclosedPastShift._id || 'prev');
+        if (!localStorage.getItem(pastKey)) {
+          localStorage.setItem(pastKey, 'true');
+          api.post('/api/attendance/check-out', { latitude: TARGET_LAT, longitude: TARGET_LNG }).catch(() => {});
+        }
+      }
+
+      // 3. Try /api/attendance/today (STRICT: TODAY ONLY)
       let todayAttRecord = null;
       try {
         const todayRes = await api.get('/api/attendance/today');
         const tData = todayRes.data?.attendance || todayRes.data?.data?.attendance || todayRes.data?.data || todayRes.data;
         if (tData && (tData.checkInTime || tData.status || tData._id)) {
-          todayAttRecord = tData;
+          if (isTodayDate(tData.date) || isTodayDate(tData.checkInTime) || isTodayDate(tData.createdAt)) {
+            todayAttRecord = normalizeAttendanceRecord(tData);
+          }
         }
       } catch (e) { }
 
-      // 4. Try /api/attendance/history/${effectiveId}
+      // 4. Try /api/attendance/history/${effectiveId} (STRICT: TODAY ONLY)
       if (!todayAttRecord && effectiveId) {
         try {
           const histRes = await api.get(`/api/attendance/history/${effectiveId}`);
@@ -351,23 +347,39 @@ export const DashboardView = () => {
               isTodayDate(r.checkInTime) ||
               isTodayDate(r.createdAt)
             );
-            if (match) todayAttRecord = match;
+            if (match) todayAttRecord = normalizeAttendanceRecord(match);
           }
         } catch (e) { }
       }
 
-      // Check persistent action flags in localStorage
+      // Check if dashboard API provided today's attendance
+      let validDashboardAtt = null;
+      if (dData.todayAttendance && (isTodayDate(dData.todayAttendance.date) || isTodayDate(dData.todayAttendance.checkInTime) || isTodayDate(dData.todayAttendance.createdAt))) {
+        validDashboardAtt = normalizeAttendanceRecord(dData.todayAttendance);
+      } else if (dData.attendance && (isTodayDate(dData.attendance.date) || isTodayDate(dData.attendance.checkInTime) || isTodayDate(dData.attendance.createdAt))) {
+        validDashboardAtt = normalizeAttendanceRecord(dData.attendance);
+      }
+
+      // Clean up past day un-scoped time string cache when date rolls over to today
+      const lastActiveDate = localStorage.getItem('kt_attendance_date');
+      if (lastActiveDate && lastActiveDate !== todayStr && lastActiveDate !== todayLocalStr) {
+        localStorage.removeItem('kt_check_in_time_str');
+        localStorage.removeItem('kt_check_out_time_str');
+      }
+      localStorage.setItem('kt_attendance_date', todayStr);
+
+      // Check persistent action flags in localStorage strictly for today
       const localCheckedIn = localStorage.getItem('kt_checked_in_' + todayStr) === 'true' || localStorage.getItem('kt_checked_in_' + todayLocalStr) === 'true';
       const localCheckedOut = localStorage.getItem('kt_checked_out_' + todayStr) === 'true' || localStorage.getItem('kt_checked_out_' + todayLocalStr) === 'true';
       const localOnBreak = localStorage.getItem('kt_on_break_' + todayStr) === 'true' || localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true';
 
-      // 5. Robust Attendance Mapping directly from API data + persistent flags
-      const ta = todayAttRecord || dData.todayAttendance || dData.attendance || todayTimelineData || null;
+      // 5. Robust Attendance Mapping directly from API data + persistent flags (STRICT: TODAY ONLY)
+      const ta = todayAttRecord || validDashboardAtt || todayTimelineData || null;
 
-      const rawCheckIn = ta?.checkInTime || ta?.inTime || ta?.checkIn || todayTimelineData?.checkInTime;
-      const rawCheckOut = ta?.checkOutTime || ta?.outTime || ta?.checkOut || todayTimelineData?.checkOutTime;
+      const rawCheckIn = ta?.checkInTime || ta?.inTime || ta?.checkIn;
+      const rawCheckOut = ta?.checkOutTime || ta?.outTime || ta?.checkOut;
 
-      const statusLower = String(ta?.status || todayTimelineData?.status || '').toLowerCase().trim();
+      const statusLower = String(ta?.status || '').toLowerCase().trim();
 
       const isPresentStatus = [
         'present', 'late', 'half day', 'half-day', 'checked_in', 'checked-in',
@@ -396,29 +408,47 @@ export const DashboardView = () => {
         rawCheckOut !== ''
       );
 
-      // If backend confirms employee is in active present/working status, purge any stale checkout flag
+      // If backend confirms employee is in active present/working status TODAY, purge any stale checkout flag
       if (isPresentStatus) {
         localStorage.removeItem('kt_checked_out_' + todayStr);
         localStorage.removeItem('kt_checked_out_' + todayLocalStr);
       }
 
-      // Check-in Recognition
+      // Check-in Recognition (strictly today)
       const hasCheckedIn = Boolean(
         localCheckedIn ||
         hasValidCheckInTime ||
-        isPresentStatus ||
-        isCheckedOutStatus ||
-        ta?.isActiveSession === true ||
-        (todayAttRecord && todayAttRecord._id) ||
-        (todayTimelineData && todayTimelineData._id)
+        (ta && (isPresentStatus || isCheckedOutStatus || ta.isActiveSession === true))
       );
 
-      // Check-out Recognition: Only true if NOT in active present status, and checkout is explicitly recorded
+      // AUTO CHECK-OUT RULE:
+      // If employee has not checked out until 11:59 PM, auto check out time 7:00 PM at that day
+      const nowClock = new Date();
+      const isPast1159PMToday = nowClock.getHours() === 23 && nowClock.getMinutes() >= 59;
+      const shouldAutoCheckOut = Boolean(
+        hasCheckedIn &&
+        isPast1159PMToday &&
+        !localCheckedOut &&
+        !hasValidCheckOutTime &&
+        !isCheckedOutStatus
+      );
+
+      if (shouldAutoCheckOut) {
+        localStorage.setItem('kt_checked_out_' + todayStr, 'true');
+        localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
+        localStorage.setItem('kt_check_out_time_str', '07:00 PM');
+        localStorage.removeItem('kt_on_break_' + todayStr);
+        localStorage.removeItem('kt_on_break_' + todayLocalStr);
+      }
+
+      // Check-out Recognition
       const hasCheckedOut = Boolean(
-        !isPresentStatus && (
+        hasCheckedIn && (
           localCheckedOut ||
+          shouldAutoCheckOut ||
+          ta?.isAutoCheckedOut === true ||
           isCheckedOutStatus ||
-          (hasValidCheckOutTime && !localOnBreak && statusLower !== 'on_break')
+          (hasValidCheckOutTime && !isPresentStatus && !localOnBreak && statusLower !== 'on_break')
         )
       );
 
@@ -431,8 +461,7 @@ export const DashboardView = () => {
           statusLower === 'on break' ||
           statusLower === 'break' ||
           ta?.isOnBreak === true ||
-          ta?.isBreakActive === true ||
-          todayTimelineData?.isOnBreak === true
+          ta?.isBreakActive === true
         )
       );
 
@@ -457,22 +486,45 @@ export const DashboardView = () => {
         }
       }
 
-      // Format time displays
-      if (hasCheckedIn && rawCheckIn) setCheckInTimeDisplay(formatISOToLocalTime(rawCheckIn));
-      else if (ta?.checkInTimeDisplay) setCheckInTimeDisplay(ta.checkInTimeDisplay);
-      else if (hasCheckedIn) setCheckInTimeDisplay(localStorage.getItem('kt_check_in_time_str') || '10:00 AM');
-      else setCheckInTimeDisplay('--:--');
+      // Format time displays strictly for today
+      if (hasCheckedIn && rawCheckIn) {
+        setCheckInTimeDisplay(formatISOToLocalTime(rawCheckIn));
+      } else if (hasCheckedIn && ta?.checkInTimeDisplay) {
+        setCheckInTimeDisplay(ta.checkInTimeDisplay);
+      } else if (hasCheckedIn) {
+        setCheckInTimeDisplay(localStorage.getItem('kt_check_in_time_str') || '10:00 AM');
+      } else {
+        setCheckInTimeDisplay('--:--');
+      }
 
-      if (hasCheckedOut && rawCheckOut) setCheckOutTimeDisplay(formatISOToLocalTime(rawCheckOut));
-      else if (ta?.checkOutTimeDisplay) setCheckOutTimeDisplay(ta.checkOutTimeDisplay);
-      else if (hasCheckedOut) setCheckOutTimeDisplay(localStorage.getItem('kt_check_out_time_str') || '06:00 PM');
-      else setCheckOutTimeDisplay('--:--');
+      if (hasCheckedOut) {
+        if (shouldAutoCheckOut || ta?.isAutoCheckedOut) {
+          setCheckOutTimeDisplay('07:00 PM');
+        } else if (rawCheckOut && hasValidCheckOutTime) {
+          setCheckOutTimeDisplay(formatISOToLocalTime(rawCheckOut));
+        } else if (ta?.checkOutTimeDisplay) {
+          setCheckOutTimeDisplay(ta.checkOutTimeDisplay);
+        } else {
+          setCheckOutTimeDisplay(localStorage.getItem('kt_check_out_time_str') || '07:00 PM');
+        }
+      } else {
+        setCheckOutTimeDisplay('--:--');
+      }
 
-      if (ta?.currentWorkingHours !== undefined) setTotalWorkTimeDisplay(`${ta.currentWorkingHours}h`);
-      else if (ta?.totalWorkTimeDisplay) setTotalWorkTimeDisplay(ta.totalWorkTimeDisplay);
+      if (!hasCheckedIn) {
+        setTotalWorkTimeDisplay('0h 0m');
+      } else {
+        const inVal = rawCheckIn || (hasCheckedIn ? localStorage.getItem('kt_check_in_time_str') : null) || '10:00 AM';
+        const outVal = hasCheckedOut 
+          ? (shouldAutoCheckOut || ta?.isAutoCheckedOut ? '07:00 PM' : (rawCheckOut || localStorage.getItem('kt_check_out_time_str') || '07:00 PM'))
+          : null;
+        const breakMins = Number(ta?.totalBreakTime || ta?.breakDuration || 0) || 0;
+        setTotalWorkTimeDisplay(calculateWorkingHours(inVal, outVal, breakMins));
+      }
 
       if (ta?.breakDuration !== undefined) setTotalBreakTimeDisplay(`${ta.breakDuration}m`);
       else if (ta?.totalBreakTime !== undefined) setTotalBreakTimeDisplay(`${ta.totalBreakTime}m`);
+      else setTotalBreakTimeDisplay('0m');
 
       // 6. Compute Dynamic Action States
       let computedActions = {
@@ -576,6 +628,46 @@ export const DashboardView = () => {
     const interval = setInterval(() => syncDashboardAndAttendance(actualUserId), 30000);
     return () => clearInterval(interval);
   }, [syncDashboardAndAttendance, actualUserId, user]);
+
+  // --- Auto Check-Out Monitor: If employee has not checked out until 11:59 PM, auto check out time 7:00 PM at that day ---
+  useEffect(() => {
+    const checkAutoCheckoutThreshold = async () => {
+      const nowClock = new Date();
+      const hrs = nowClock.getHours();
+      const mins = nowClock.getMinutes();
+
+      // Trigger condition: 11:59 PM (23:59)
+      if (hrs === 23 && mins >= 59) {
+        const todayStr = nowClock.toISOString().split('T')[0];
+        const todayLocalStr = nowClock.toLocaleDateString('en-CA');
+        const alreadyDone = localStorage.getItem('kt_auto_checked_out_' + todayStr) === 'true';
+
+        if (!alreadyDone && attendanceStatus !== 'checked_out' && attendanceStatus !== 'not_checked_in') {
+          localStorage.setItem('kt_auto_checked_out_' + todayStr, 'true');
+          localStorage.setItem('kt_checked_out_' + todayStr, 'true');
+          localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
+          localStorage.setItem('kt_check_out_time_str', '07:00 PM');
+          localStorage.removeItem('kt_on_break_' + todayStr);
+          localStorage.removeItem('kt_on_break_' + todayLocalStr);
+
+          setAttendanceStatus('checked_out');
+          if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
+          setCheckOutTimeDisplay('07:00 PM');
+          setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
+
+          // Send background check-out to backend
+          try {
+            await api.post('/api/attendance/check-out', { latitude: TARGET_LAT, longitude: TARGET_LNG }).catch(() => {});
+          } catch (e) { }
+
+          await syncDashboardAndAttendance(actualUserId);
+        }
+      }
+    };
+
+    const autoTimer = setInterval(checkAutoCheckoutThreshold, 10000);
+    return () => clearInterval(autoTimer);
+  }, [attendanceStatus, actualUserId, syncDashboardAndAttendance, setGlobalAttendanceStatus]);
 
   // --- Robust Geolocation & Verification ---
   const verifyLocationAndExecute = (actionCallback) => {

@@ -2252,11 +2252,12 @@ export const TeamLeaveManagementView = () => {
                       </span>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${l.leaveType === 'sick' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
-                      l.leaveType === 'casual' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
-                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                      }`}>
-                      {l.leaveType || 'Paid'} Leave {l.isHalfDay ? '(Half Day)' : ''}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      (l.leaveType === 'half_day' || l.isHalfDay) 
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' 
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                    }`}>
+                      {(l.leaveType === 'half_day' || l.isHalfDay) ? 'Half Day Leave' : 'Full Day Leave'}
                     </span>
 
                     {/* Status Badge */}

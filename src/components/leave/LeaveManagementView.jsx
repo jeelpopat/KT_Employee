@@ -23,8 +23,8 @@ export const LeaveManagementView = () => {
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   
   // Form States mapped strictly to Mongoose Leave Schema:
-  // enum: ["casual", "sick", "paid", "unpaid", "half_day"]
-  const [leaveType, setLeaveType] = useState('paid');
+  // leaveType enum: ["full_day", "half_day"]
+  const [leaveType, setLeaveType] = useState('full_day');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -49,11 +49,7 @@ export const LeaveManagementView = () => {
   };
 
   const todayStr = getLocalDateString(0);
-  const advance2DaysStr = getLocalDateString(2);
-
-  // Determine minimum allowed date: Sick leave can be applied starting TODAY.
-  // Other leaves require 2 days advance notice according to company policy.
-  const minAllowedDate = leaveType === 'sick' ? todayStr : advance2DaysStr;
+  const minAllowedDate = todayStr;
 
   // Resolve applicant role strictly matching schema enum: ["employee", "intern", "team lead", "hr", "admin"]
   const resolveApplicantRole = () => {
@@ -397,9 +393,11 @@ export const LeaveManagementView = () => {
   });
 
   const handleOpenModal = () => {
-    const defaultDate = leaveType === 'sick' ? todayStr : advance2DaysStr;
-    setStartDate(defaultDate);
-    setEndDate(defaultDate);
+    setLeaveType('full_day');
+    setIsHalfDay(false);
+    setHalfDayType('first-half');
+    setStartDate(todayStr);
+    setEndDate(todayStr);
     setFormError('');
     setSuccessMsg('');
     setIsModalOpen(true);
@@ -410,14 +408,8 @@ export const LeaveManagementView = () => {
     setFormError('');
     setSuccessMsg('');
 
-    const effectiveMinDate = leaveType === 'sick' ? todayStr : advance2DaysStr;
-
-    if (startDate < effectiveMinDate) {
-      if (leaveType === 'sick') {
-        setFormError('Policy Notice: Sick leave cannot be applied for past dates.');
-      } else {
-        setFormError('Policy Notice: Leave requests must be submitted at least 2 days in advance (except Sick Leave).');
-      }
+    if (startDate < todayStr) {
+      setFormError('Policy Notice: Leave cannot be applied for past dates.');
       return;
     }
 
@@ -437,7 +429,7 @@ export const LeaveManagementView = () => {
       // Sending exact payload mapped strictly to Mongoose Leave Schema
       const payload = {
         applicantRole: resolveApplicantRole(),
-        leaveType: leaveType,
+        leaveType: isHalfDayActive ? 'half_day' : 'full_day',
         startDate: startDate,
         endDate: finalEndDate,
         isHalfDay: isHalfDayActive,
@@ -508,15 +500,8 @@ export const LeaveManagementView = () => {
 
   // Human-readable leave category badge
   const renderLeaveCategoryBadge = (type, isHalf, halfType) => {
-    const norm = String(type || '').toLowerCase();
-    const isPaid = norm === 'paid';
-    const isSick = norm === 'sick';
-
-    let displayTitle = 'Casual Leave';
-    if (norm === 'paid') displayTitle = 'Paid Leave';
-    else if (norm === 'sick') displayTitle = 'Sick Leave';
-    else if (norm === 'unpaid') displayTitle = 'Unpaid Leave';
-    else if (norm === 'half_day') displayTitle = 'Half Day';
+    const isHalfDayActive = Boolean(isHalf || type === 'half_day');
+    const displayTitle = isHalfDayActive ? 'Half Day Leave' : 'Full Day Leave';
 
     return (
       <div>
@@ -525,16 +510,14 @@ export const LeaveManagementView = () => {
         </span>
         <div className="flex flex-wrap items-center gap-1.5 mt-1">
           <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm border ${
-            isPaid 
-              ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800' 
-              : isSick
-              ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800'
-              : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+            isHalfDayActive 
+              ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800' 
+              : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800'
           }`}>
-            {isPaid ? 'Paid' : 'Unpaid'}
+            {isHalfDayActive ? 'Half Day' : 'Full Day'}
           </span>
-          {isHalf && (
-            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm border bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
+          {isHalfDayActive && (
+            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm border bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800">
               {halfType === 'first-half' ? '1st Half' : halfType === 'second-half' ? '2nd Half' : 'Half Day'}
             </span>
           )}
@@ -619,10 +602,10 @@ export const LeaveManagementView = () => {
       {/* Leave Balance Quota Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Paid Quota', value: `${leaveBalance.totalLeaves || 12} Days`, icon: Calendar, accent: 'border-l-blue-500' },
-          { label: 'Leaves Used', value: `${leaveBalance.usedLeaves || 0} Days`, icon: Clock, accent: 'border-l-amber-500' },
-          { label: 'Paid Balance', value: `${leaveBalance.remainingLeaves || 12} Days`, icon: CheckCircle2, accent: 'border-l-green-500' },
-          { label: 'Pending', value: `${leaveBalance.pendingRequests || 0} Req.`, icon: Clock, accent: 'border-l-slate-400' }
+          { label: 'Total Quota', value: `${leaveBalance.totalLeaves || 12} Days`, icon: Calendar, accent: 'border-l-blue-500' },
+          { label: 'Leaves Taken', value: `${leaveBalance.usedLeaves || 0} Days`, icon: Clock, accent: 'border-l-amber-500' },
+          { label: 'Remaining Balance', value: `${leaveBalance.remainingLeaves || 12} Days`, icon: CheckCircle2, accent: 'border-l-green-500' },
+          { label: 'Pending Requests', value: `${leaveBalance.pendingRequests || 0} Req.`, icon: Clock, accent: 'border-l-slate-400' }
         ].map((item, idx) => (
           <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
             <div className="flex justify-between items-start">
@@ -688,7 +671,7 @@ export const LeaveManagementView = () => {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400 uppercase text-xs font-semibold tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="px-5 py-4">Leave Category</th>
+                  <th className="px-5 py-4">Leave Type</th>
                   <th className="px-5 py-4">Duration & Dates</th>
                   <th className="px-5 py-4 w-1/3">Reason & Remarks</th>
                   <th className="px-5 py-4">Status</th>
@@ -770,37 +753,37 @@ export const LeaveManagementView = () => {
             <div className="p-6 overflow-y-auto space-y-6">
               <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950/50 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-500 rounded-md">
+                  <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-500 rounded-md">
                     <Calendar size={20} />
                   </div>
-                  <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Paid Leave (PL)</h4>
+                  <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Full Day Leave</h4>
                 </div>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
-                  Paid leaves are meant for planned vacations, personal time, or extended rest.
+                  Full day leaves cover entire working days for planned vacations, personal commitments, or health rest.
                 </p>
                 <h5 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-3">Policy Rules:</h5>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-400 marker:text-purple-500">
-                  <li>Employees earn <strong className="text-slate-800 dark:text-slate-200">12 days</strong> of paid leave per year (1 per month).</li>
-                  <li>Paid leaves can be carried forward up to a maximum of 30 days.</li>
-                  <li>Prior approval is required at least <strong>2 days in advance</strong>.</li>
+                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-400 marker:text-blue-500">
+                  <li>Total leave days are computed excluding company holidays and weekly off (Sundays).</li>
+                  <li>Applications can be submitted for dates starting from today onwards.</li>
+                  <li>Approval follows the standard hierarchy (Team Lead &rarr; HR &rarr; Admin).</li>
                 </ul>
               </div>
 
               <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950/50 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 rounded-md">
-                    <Info size={20} />
+                    <Clock size={20} />
                   </div>
-                  <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Sick Leave & Casual Leave</h4>
+                  <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Half Day Leave</h4>
                 </div>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
-                  Sick leave is granted for unanticipated health emergencies and can be applied on the <strong>same day</strong> without advance request.
+                  Half day leaves count as 0.5 working day and allow flexibility for urgent morning or afternoon personal matters.
                 </p>
                 <h5 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-3">Policy Rules:</h5>
                 <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-400 marker:text-amber-500">
-                  <li><strong>Same-day application:</strong> Sick leave can be applied starting today without the 2-day advance notice restriction.</li>
-                  <li>Medical documents or doctor prescriptions can be attached for leaves exceeding 2 consecutive days.</li>
-                  <li>Casual and unpaid leaves require 2 days advance notice.</li>
+                  <li>Choose either <strong>First Half (Morning)</strong> or <strong>Second Half (Afternoon)</strong> shift.</li>
+                  <li>Deducts 0.5 days from your leave balance.</li>
+                  <li>Supporting documents or certificates can be optionally attached.</li>
                 </ul>
               </div>
             </div>
@@ -851,82 +834,79 @@ export const LeaveManagementView = () => {
                 </div>
               )}
 
-              {/* Leave Category & Duration Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Leave Category</label>
-                  <select 
-                    value={leaveType}
-                    onChange={e => {
-                      const newType = e.target.value;
-                      setLeaveType(newType);
-                      if (newType === 'half_day') {
-                        setIsHalfDay(true);
-                      }
-                      const newMin = newType === 'sick' ? todayStr : advance2DaysStr;
-                      if (startDate < newMin) {
-                        setStartDate(newMin);
-                        setEndDate(newMin);
-                      }
+              {/* Leave Type Selector (Strictly enum: ["full_day", "half_day"]) */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Leave Type
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLeaveType('full_day');
+                      setIsHalfDay(false);
+                      setHalfDayType(null);
                     }}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+                    className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
+                      leaveType === 'full_day' && !isHalfDay
+                        ? 'border-blue-600 bg-blue-50/70 dark:bg-blue-900/30 text-blue-950 dark:text-blue-200 ring-2 ring-blue-500/20 shadow-sm'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
                   >
-                    <option value="paid">Paid Leave (PL)</option>
-                    <option value="sick">Sick Leave (Same Day Allowed)</option>
-                    <option value="casual">Casual Leave (Unpaid)</option>
-                    <option value="unpaid">Unpaid Leave</option>
-                    <option value="half_day">Half Day Leave</option>
-                  </select>
-                  <div className="text-2xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
-                    <Info size={12} className="text-blue-500 shrink-0" />
-                    {leaveType === 'sick' ? (
-                      <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                        Today ({todayStr}) allowed without 2-day advance
-                      </span>
-                    ) : (
-                      <span>Requires 2 days advance notice (Earliest: {advance2DaysStr})</span>
-                    )}
-                  </div>
-                </div>
+                    <div>
+                      <div className="font-semibold text-sm">Full Day</div>
+                      <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">Whole working day(s)</div>
+                    </div>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      leaveType === 'full_day' && !isHalfDay ? 'border-blue-600 bg-blue-600' : 'border-slate-300 dark:border-slate-600'
+                    }`}>
+                      {leaveType === 'full_day' && !isHalfDay && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      )}
+                    </div>
+                  </button>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Duration</label>
-                  <div className="flex items-center gap-4 mt-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="duration" 
-                        checked={!isHalfDay && leaveType !== 'half_day'}
-                        onChange={() => {
-                          setIsHalfDay(false);
-                          if (leaveType === 'half_day') setLeaveType('paid');
-                        }}
-                        className="accent-blue-600 w-4 h-4"
-                      />
-                      <span className="font-medium text-slate-700 dark:text-slate-300">Full Day</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="duration" 
-                        checked={isHalfDay || leaveType === 'half_day'}
-                        onChange={() => setIsHalfDay(true)}
-                        className="accent-blue-600 w-4 h-4"
-                      />
-                      <span className="font-medium text-slate-700 dark:text-slate-300">Half Day</span>
-                    </label>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLeaveType('half_day');
+                      setIsHalfDay(true);
+                      if (!halfDayType) setHalfDayType('first-half');
+                      setEndDate(startDate || todayStr);
+                    }}
+                    className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
+                      leaveType === 'half_day' || isHalfDay
+                        ? 'border-blue-600 bg-blue-50/70 dark:bg-blue-900/30 text-blue-950 dark:text-blue-200 ring-2 ring-blue-500/20 shadow-sm'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold text-sm">Half Day</div>
+                      <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">0.5 day shift</div>
+                    </div>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      leaveType === 'half_day' || isHalfDay ? 'border-blue-600 bg-blue-600' : 'border-slate-300 dark:border-slate-600'
+                    }`}>
+                      {(leaveType === 'half_day' || isHalfDay) && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      )}
+                    </div>
+                  </button>
                 </div>
               </div>
 
-              {/* Half Day Type Sub-selector if Half Day active */}
+              {/* Half Day Shift Selector (shown when half_day is selected) */}
               {(isHalfDay || leaveType === 'half_day') && (
-                <div className="p-3 bg-blue-50/60 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-900/40">
+                <div className="p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/40">
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 text-xs mb-2">
-                    Shift Selection (Half Day)
+                    Shift Selection
                   </label>
-                  <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800 dark:text-slate-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex items-center gap-2.5 p-2 rounded-md border cursor-pointer text-xs font-medium transition-colors ${
+                      halfDayType === 'first-half'
+                        ? 'bg-white dark:bg-slate-900 border-blue-500 text-blue-700 dark:text-blue-300 shadow-2xs'
+                        : 'bg-white/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                    }`}>
                       <input 
                         type="radio" 
                         name="halfDayType" 
@@ -935,9 +915,14 @@ export const LeaveManagementView = () => {
                         onChange={() => setHalfDayType('first-half')}
                         className="accent-blue-600 w-3.5 h-3.5"
                       />
-                      First Half (Morning)
+                      <span>First Half (Morning)</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800 dark:text-slate-200">
+
+                    <label className={`flex items-center gap-2.5 p-2 rounded-md border cursor-pointer text-xs font-medium transition-colors ${
+                      halfDayType === 'second-half'
+                        ? 'bg-white dark:bg-slate-900 border-blue-500 text-blue-700 dark:text-blue-300 shadow-2xs'
+                        : 'bg-white/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                    }`}>
                       <input 
                         type="radio" 
                         name="halfDayType" 
@@ -946,7 +931,7 @@ export const LeaveManagementView = () => {
                         onChange={() => setHalfDayType('second-half')}
                         className="accent-blue-600 w-3.5 h-3.5"
                       />
-                      Second Half (Afternoon)
+                      <span>Second Half (Afternoon)</span>
                     </label>
                   </div>
                 </div>
