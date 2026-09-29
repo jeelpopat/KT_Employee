@@ -393,9 +393,24 @@ export const Header = ({ onSignOut }) => {
               />
             </div>
             
-            <span className="hidden sm:inline text-sm font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">
-              {displayName}
-            </span>
+            <div className="hidden sm:flex items-center gap-1.5">
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">
+                {displayName}
+              </span>
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase ${
+                userRole === 'team_leader'
+                  ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                  : userRole === 'hr'
+                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                  : userRole === 'admin'
+                  ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300'
+                  : userRole === 'intern'
+                  ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                  : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+              }`}>
+                {userRole === 'team_leader' ? 'TL' : userRole === 'hr' ? 'HR' : userRole === 'admin' ? 'ADMIN' : userRole === 'intern' ? 'INTERN' : 'EMP'}
+              </span>
+            </div>
             <ChevronDown size={16} className="text-slate-400 hidden sm:inline" />
           </button>
           

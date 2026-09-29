@@ -97,6 +97,7 @@ export const isAutoCheckOutApplicable = (dateVal) => {
 
 /**
  * Calculate working hours formatted as "Xh Ym"
+ * Guarantees both X (hours) and Y (minutes) are strictly integers, never floats.
  */
 export const calculateWorkingHours = (checkInVal, checkOutVal, breakDurationMins = 0) => {
   const inMins = parseTimeToMinutes(checkInVal);
@@ -107,11 +108,69 @@ export const calculateWorkingHours = (checkInVal, checkOutVal, breakDurationMins
   const currentMins = now.getHours() * 60 + now.getMinutes();
 
   const endMins = outMins !== null ? outMins : currentMins;
-  const netMins = Math.max(0, endMins - inMins - (Number(breakDurationMins) || 0));
+  const rawBreakNum = parseFloat(String(breakDurationMins).replace(/[^\d.-]/g, '')) || 0;
+  const breakMins = Math.round(rawBreakNum);
+
+  const netMins = Math.max(0, Math.round(endMins - inMins - breakMins));
 
   const hrs = Math.floor(netMins / 60);
   const mins = netMins % 60;
   return `${hrs}h ${mins}m`;
+};
+
+/**
+ * Formats any hours/minutes representation into clean integer "Xh Ym"
+ * Guarantees both hours and minutes are strictly integers (no floating point decimals).
+ */
+export const formatHoursAndMinutes = (val) => {
+  if (val === undefined || val === null || val === '' || val === '--:--') {
+    return '0h 0m';
+  }
+
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed || trimmed === '0h 0m' || trimmed === '0h' || trimmed === '0m') return '0h 0m';
+
+    // Match "Xh Ym" or "Xh Y.YYYm" or "X.Xh"
+    const matchHm = trimmed.match(/^(\d+(?:\.\d+)?)\s*h(?:ours?)?(?:\s*(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?)?/i);
+    if (matchHm) {
+      const rawHrs = parseFloat(matchHm[1]) || 0;
+      const rawMins = matchHm[2] !== undefined ? parseFloat(matchHm[2]) || 0 : (rawHrs % 1) * 60;
+      const totalMinutes = Math.round(Math.floor(rawHrs) * 60 + rawMins);
+      const finalHrs = Math.floor(totalMinutes / 60);
+      const finalMins = totalMinutes % 60;
+      return `${finalHrs}h ${finalMins}m`;
+    }
+
+    // Match "Ym" or "Y.YYm"
+    const matchM = trimmed.match(/^(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?$/i);
+    if (matchM) {
+      const totalMinutes = Math.round(parseFloat(matchM[1]) || 0);
+      const finalHrs = Math.floor(totalMinutes / 60);
+      const finalMins = totalMinutes % 60;
+      return `${finalHrs}h ${finalMins}m`;
+    }
+
+    // Match numeric string like "5.66"
+    const num = parseFloat(trimmed);
+    if (!isNaN(num)) {
+      const totalMinutes = Math.round(num * 60);
+      const finalHrs = Math.floor(totalMinutes / 60);
+      const finalMins = totalMinutes % 60;
+      return `${finalHrs}h ${finalMins}m`;
+    }
+
+    return trimmed;
+  }
+
+  if (typeof val === 'number') {
+    const totalMinutes = Math.round(val * 60);
+    const finalHrs = Math.floor(totalMinutes / 60);
+    const finalMins = totalMinutes % 60;
+    return `${finalHrs}h ${finalMins}m`;
+  }
+
+  return '0h 0m';
 };
 
 /**
@@ -160,23 +219,23 @@ export const normalizeAttendanceRecord = (record) => {
 
     // Calculate total working hours up to 7:00 PM (1140 mins) minus break
     const startMins = parseTimeToMinutes(rawCheckIn);
-    let totalWorkHoursNum = 9;
+    let hrs = 9;
+    let mins = 0;
     if (startMins !== null) {
       const endMins = 19 * 60; // 1140 mins (7:00 PM)
-      const breakMins = Number(record.totalBreakTime || record.breakDuration || 0) || 0;
-      const netMins = Math.max(0, endMins - startMins - breakMins);
-      totalWorkHoursNum = Number((netMins / 60).toFixed(1));
+      const rawBreak = parseFloat(String(record.totalBreakTime || record.breakDuration || 0).replace(/[^\d.-]/g, '')) || 0;
+      const breakMins = Math.round(rawBreak);
+      const netMins = Math.max(0, Math.round(endMins - startMins - breakMins));
+      hrs = Math.floor(netMins / 60);
+      mins = netMins % 60;
     }
-
-    const hrs = Math.floor(totalWorkHoursNum);
-    const mins = Math.round((totalWorkHoursNum - hrs) * 60);
 
     return {
       ...record,
       checkOutTime: autoCheckOutIso,
       checkOutTimeDisplay: autoCheckOutDisplay,
       isAutoCheckedOut: true,
-      totalWorkTime: totalWorkHoursNum,
+      totalWorkTime: hrs,
       totalWorkTimeDisplay: `${hrs}h ${mins}m`,
       status: (statusStr && statusStr !== 'not_checked_in') ? statusStr : 'present'
     };

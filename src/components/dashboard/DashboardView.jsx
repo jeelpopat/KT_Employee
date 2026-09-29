@@ -13,6 +13,7 @@ import {
   isPastDate,
   formatISOToLocalTime,
   calculateWorkingHours,
+  formatHoursAndMinutes,
   normalizeAttendanceRecord,
   getAutoCheckOutTimeForDate,
   formatMinutesToTimeStr,
@@ -376,6 +377,14 @@ export const DashboardView = () => {
       // 5. Robust Attendance Mapping directly from API data + persistent flags (STRICT: TODAY ONLY)
       const ta = todayAttRecord || validDashboardAtt || todayTimelineData || null;
 
+      // Cache active attendance ObjectId for monitoring screenshots
+      const activeAttId = ta?._id || ta?.id || todayAttRecord?._id || validDashboardAtt?._id;
+      if (activeAttId && /^[0-9a-fA-F]{24}$/.test(String(activeAttId))) {
+        try {
+          localStorage.setItem('kt_current_attendance_id', String(activeAttId));
+        } catch (e) {}
+      }
+
       const rawCheckIn = ta?.checkInTime || ta?.inTime || ta?.checkIn;
       const rawCheckOut = ta?.checkOutTime || ta?.outTime || ta?.checkOut;
 
@@ -518,13 +527,13 @@ export const DashboardView = () => {
         const outVal = hasCheckedOut 
           ? (shouldAutoCheckOut || ta?.isAutoCheckedOut ? '07:00 PM' : (rawCheckOut || localStorage.getItem('kt_check_out_time_str') || '07:00 PM'))
           : null;
-        const breakMins = Number(ta?.totalBreakTime || ta?.breakDuration || 0) || 0;
-        setTotalWorkTimeDisplay(calculateWorkingHours(inVal, outVal, breakMins));
+        const rawBreak = parseFloat(String(ta?.totalBreakTime || ta?.breakDuration || 0).replace(/[^\d.-]/g, '')) || 0;
+        const breakMins = Math.round(rawBreak);
+        setTotalWorkTimeDisplay(formatHoursAndMinutes(calculateWorkingHours(inVal, outVal, breakMins)));
       }
 
-      if (ta?.breakDuration !== undefined) setTotalBreakTimeDisplay(`${ta.breakDuration}m`);
-      else if (ta?.totalBreakTime !== undefined) setTotalBreakTimeDisplay(`${ta.totalBreakTime}m`);
-      else setTotalBreakTimeDisplay('0m');
+      const rawBreakDuration = parseFloat(String(ta?.breakDuration !== undefined ? ta.breakDuration : (ta?.totalBreakTime !== undefined ? ta.totalBreakTime : 0)).replace(/[^\d.-]/g, '')) || 0;
+      setTotalBreakTimeDisplay(`${Math.round(rawBreakDuration)}m`);
 
       // 6. Compute Dynamic Action States
       let computedActions = {
@@ -847,6 +856,12 @@ export const DashboardView = () => {
         setGeoError('');
 
         if (actionType === 'check_in') {
+          const newAttId = resData?.attendance?._id || resData?.data?._id || resData?.attendanceId || resData?._id;
+          if (newAttId && /^[0-9a-fA-F]{24}$/.test(String(newAttId))) {
+            try {
+              localStorage.setItem('kt_current_attendance_id', String(newAttId));
+            } catch (e) {}
+          }
           localStorage.setItem('kt_checked_in_' + todayStr, 'true');
           localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
           localStorage.removeItem('kt_checked_out_' + todayStr);
@@ -1049,7 +1064,7 @@ export const DashboardView = () => {
       {/* KPI Cards (5 items) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Today Hours', value: totalWorkTimeDisplay, accent: 'border-l-blue-500' },
+          { label: 'Today Hours', value: formatHoursAndMinutes(totalWorkTimeDisplay), accent: 'border-l-blue-500' },
           { label: 'Tasks To Do', value: tasksStats.todo, accent: 'border-l-slate-400' },
           { label: 'In Progress', value: tasksStats.inProgress, accent: 'border-l-amber-500' },
           { label: 'Completed', value: tasksStats.completed, accent: 'border-l-green-500' },

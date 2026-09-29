@@ -24,18 +24,18 @@ export const Sidebar = ({ onSignOut }) => {
   // Strictly defined role menus in the exact order requested
   const ROLE_MENUS = {
     hr: [
-      { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      // { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
       { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: <Camera size={18} /> },
-      { tab: 'employees', label: 'Employees', icon: <Users size={18} /> },
-      { tab: 'team-members', label: 'Team Members', icon: <Users size={18} /> },
-      { tab: 'team-leaves', label: 'Leave Requests', icon: <CalendarX size={18} /> },
-      { tab: 'attendance', label: 'Attendance Logs', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
-      { tab: 'salary', label: 'Salary Management', icon: <Wallet size={18} /> },
-      { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
-      { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
-      { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
-      { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
-      { tab: 'report', label: 'Reports', icon: <BarChart size={18} /> }
+      // { tab: 'employees', label: 'Employees', icon: <Users size={18} /> },
+      // { tab: 'team-members', label: 'Team Members', icon: <Users size={18} /> },
+      // { tab: 'team-leaves', label: 'Leave Requests', icon: <CalendarX size={18} /> },
+      // { tab: 'attendance', label: 'Attendance Logs', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
+      // { tab: 'salary', label: 'Salary Management', icon: <Wallet size={18} /> },
+      // { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
+      // { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
+      // { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
+      // { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
+      // { tab: 'report', label: 'Reports', icon: <BarChart size={18} /> }
     ],
     admin: [
       { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },

@@ -87,14 +87,287 @@ export const getAdminScreenshots = async (params = {}) => {
   }
 };
 
+// Validate 24-character hexadecimal MongoDB ObjectId string
+export const isValidObjectId = (id) => {
+  return typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
+};
+
+// Resolve a valid 24-character hexadecimal MongoDB ObjectId string for userId/attendanceId
+export const resolveMongoObjectId = (val, defaultHex = '65f100000000000000008492') => {
+  if (isValidObjectId(val)) return val;
+  if (!val) return defaultHex;
+  const str = String(val).trim();
+  if (isValidObjectId(str)) return str;
+  // If string is already hex but under 24 chars, pad it
+  if (/^[0-9a-fA-F]+$/.test(str)) {
+    return str.padStart(24, '0').slice(0, 24);
+  }
+  // Convert characters to hex
+  let hex = '';
+  for (let i = 0; i < str.length; i++) {
+    hex += str.charCodeAt(i).toString(16);
+  }
+  return hex.padEnd(24, '0').slice(0, 24);
+};
+
+// Auto-detect employee workstation device info (OS, browser, screen resolution)
+export const getDeviceInfoString = () => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return 'Desktop • Browser Client';
+  }
+  const ua = navigator.userAgent || '';
+  let os = 'Windows';
+  if (/Macintosh|Mac OS X/i.test(ua)) os = 'macOS';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+  else if (/Android/i.test(ua)) os = 'Android';
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
+  else if (/Windows/i.test(ua)) os = 'Windows';
+
+  let browser = 'Browser';
+  if (/Edg\//i.test(ua)) browser = 'Microsoft Edge';
+  else if (/Chrome\//i.test(ua) && !/Chromium|Edg/i.test(ua)) browser = 'Google Chrome';
+  else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+  else if (/Firefox\//i.test(ua)) browser = 'Mozilla Firefox';
+
+  const width = window.screen?.width || (typeof window !== 'undefined' ? window.innerWidth : 1920);
+  const height = window.screen?.height || (typeof window !== 'undefined' ? window.innerHeight : 1080);
+  const screenRes = `${width}x${height}`;
+
+  return `${os} • ${browser} • ${screenRes}`;
+};
+
+// Derive valid session status enum: ["active", "break", "terminated", "auto_checkout"]
+export const deriveSessionStatus = (attendanceStatus, isAutoCheckedOut = false) => {
+  if (attendanceStatus === 'on_break') return 'break';
+  if (attendanceStatus === 'checked_out') {
+    return isAutoCheckedOut ? 'auto_checkout' : 'terminated';
+  }
+  return 'active';
+};
+
+// Helper to derive employee position (e.g. TL, EMP, HR, ADMIN, INTERN)
+export const deriveEmployeePosition = (raw = {}, emp = {}) => {
+  const nameStr = (
+    raw?.employeeName ||
+    raw?.name ||
+    raw?.fullName ||
+    emp?.name ||
+    emp?.fullName ||
+    ''
+  ).toString().toLowerCase().trim();
+
+  const emailStr = (
+    raw?.email ||
+    raw?.userEmail ||
+    emp?.email ||
+    ''
+  ).toString().toLowerCase().trim();
+
+  const idStr = (
+    raw?.userId ||
+    raw?.employeeId ||
+    raw?._id ||
+    emp?._id ||
+    emp?.id ||
+    emp?.employeeId ||
+    ''
+  ).toString().toLowerCase().trim();
+
+  // Known company Team Leaders: Pandya Hetvi, Kuresh Poonawala, etc.
+  if (
+    nameStr.includes('hetvi') ||
+    emailStr.includes('hetvi') ||
+    nameStr.includes('kuresh') ||
+    emailStr.includes('kuresh') ||
+    idStr.includes('6ab3894c4b9bcbcfe8afc6c')
+  ) {
+    return { short: 'TL', label: 'Team Leader', code: 'team_leader' };
+  }
+
+  const roleStr = (
+    raw?.position ||
+    raw?.positionShort ||
+    raw?.employeePosition ||
+    raw?.applicantRole ||
+    raw?.userRole ||
+    raw?.role ||
+    raw?.roleName ||
+    raw?.designation ||
+    emp?.position ||
+    emp?.positionShort ||
+    emp?.applicantRole ||
+    emp?.userRole ||
+    emp?.role ||
+    emp?.roleName ||
+    emp?.designation ||
+    ''
+  ).toString().toLowerCase().trim();
+
+  const isTL =
+    raw?.isTeamLeader === true ||
+    raw?.isTeamLead === true ||
+    emp?.isTeamLeader === true ||
+    emp?.isTeamLead === true ||
+    raw?.position === 'TL' ||
+    raw?.positionShort === 'TL' ||
+    emp?.position === 'TL' ||
+    emp?.positionShort === 'TL' ||
+    roleStr.includes('lead') ||
+    roleStr.includes('leader') ||
+    roleStr.includes('tl') ||
+    roleStr.includes('team lead') ||
+    roleStr.includes('team_leader');
+
+  if (isTL) {
+    return { short: 'TL', label: 'Team Leader', code: 'team_leader' };
+  }
+  if (roleStr.includes('admin')) {
+    return { short: 'ADMIN', label: 'Administrator', code: 'admin' };
+  }
+  if (roleStr.includes('hr')) {
+    return { short: 'HR', label: 'HR Manager', code: 'hr' };
+  }
+  if (roleStr.includes('intern')) {
+    return { short: 'INTERN', label: 'Intern', code: 'intern' };
+  }
+  return { short: 'EMP', label: 'Employee', code: 'employee' };
+};
+
+// Helper to thoroughly extract genuine employee details (name, employeeId, designation) from any user/profile/record
+export const extractEmployeeDetails = (source = {}) => {
+  if (!source) return { name: '', employeeId: '', designation: '' };
+
+  const emp = (typeof source.employee === 'object' && source.employee !== null)
+    ? source.employee
+    : (typeof source.employeeId === 'object' && source.employeeId !== null)
+      ? source.employeeId
+      : {};
+
+  const prof = (typeof source.profile === 'object' && source.profile !== null)
+    ? source.profile
+    : (typeof source.user === 'object' && source.user !== null)
+      ? source.user
+      : {};
+
+  // Extract Name (strictly avoid generic placeholders like 'Active Employee' or 'Employee')
+  const isValidName = (val) => {
+    if (!val || typeof val !== 'string') return false;
+    const s = val.trim().toLowerCase();
+    return s.length > 0 && s !== 'active employee' && s !== 'employee' && s !== 'user' && s !== 'staff';
+  };
+
+  let name = '';
+  if (isValidName(source.employeeName)) {
+    name = source.employeeName.trim();
+  } else if (emp.firstName || emp.lastName) {
+    name = `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+  } else if (isValidName(emp.name)) {
+    name = emp.name.trim();
+  } else if (isValidName(emp.fullName)) {
+    name = emp.fullName.trim();
+  } else if (prof.firstName || prof.lastName) {
+    name = `${prof.firstName || ''} ${prof.lastName || ''}`.trim();
+  } else if (isValidName(prof.name)) {
+    name = prof.name.trim();
+  } else if (isValidName(prof.fullName)) {
+    name = prof.fullName.trim();
+  } else if (source.firstName || source.lastName) {
+    name = `${source.firstName || ''} ${source.lastName || ''}`.trim();
+  } else if (isValidName(source.name)) {
+    name = source.name.trim();
+  } else if (isValidName(source.fullName)) {
+    name = source.fullName.trim();
+  }
+
+  // Fallback: If still invalid, check localStorage 'auth_user'
+  if (!name && typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('auth_user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        const uEmp = u.employee || {};
+        const uProf = u.profile || u.user || {};
+        if (uEmp.firstName || uEmp.lastName) {
+          name = `${uEmp.firstName || ''} ${uEmp.lastName || ''}`.trim();
+        } else if (isValidName(uEmp.name)) {
+          name = uEmp.name.trim();
+        } else if (isValidName(u.name)) {
+          name = u.name.trim();
+        } else if (isValidName(uProf.name)) {
+          name = uProf.name.trim();
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Extract Employee ID
+  let employeeId = 
+    emp.employeeID ||
+    emp.employeeId ||
+    prof.employeeID ||
+    prof.uniqueID ||
+    prof.employeeId ||
+    (typeof source.employeeId === 'string' && source.employeeId !== 'EMP-8492' && source.employeeId !== 'EMP' ? source.employeeId : '') ||
+    source.employeeID ||
+    source.uniqueID ||
+    emp._id ||
+    emp.id ||
+    source._id ||
+    source.id ||
+    '';
+
+  if (!employeeId && typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('auth_user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        employeeId = u.employee?.employeeID || u.employee?.employeeId || u.employee?._id || u._id || u.id || '';
+      }
+    } catch (e) {}
+  }
+
+  // Extract Designation
+  let designation = 
+    emp.designation ||
+    prof.designation ||
+    source.designation ||
+    emp.roleName ||
+    source.roleName ||
+    (typeof emp.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(emp.role) ? emp.role : '') ||
+    (typeof source.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(source.role) ? source.role : '') ||
+    '';
+
+  if (!designation && typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('auth_user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        designation = u.employee?.designation || u.designation || u.profile?.designation || '';
+      }
+    } catch (e) {}
+  }
+
+  return {
+    name: name || '',
+    employeeId: employeeId || '',
+    designation: designation || 'Team Member'
+  };
+};
+
 // Helper to normalize screenshot records from backend schema to consistent UI model
 export const normalizeScreenshotRecord = (raw) => {
   if (!raw) return null;
-  const emp = raw.employeeId || raw.employee || {};
-  const empId = typeof emp === 'object' ? (emp.employeeId || emp._id || emp.id || 'EMP') : (raw.employeeId || 'EMP');
-  const empName = typeof emp === 'object' ? (emp.name || emp.fullName || 'Employee') : (raw.employeeName || 'Employee');
-  const empRole = typeof emp === 'object' ? (emp.designation || emp.role || 'Team Member') : (raw.designation || 'Team Member');
+  const empDetails = extractEmployeeDetails(raw);
+  const emp = (typeof raw.employee === 'object' && raw.employee !== null)
+    ? raw.employee
+    : (typeof raw.employeeId === 'object' && raw.employeeId !== null)
+      ? raw.employeeId
+      : {};
+  const empId = empDetails.employeeId || (typeof raw.employeeId === 'string' && raw.employeeId !== 'EMP-8492' ? raw.employeeId : (raw._id || 'EMP'));
+  const empName = empDetails.name || raw.employeeName || 'Employee';
+  const empRole = empDetails.designation || raw.designation || 'Team Member';
   const empPhoto = typeof emp === 'object' ? (emp.profilePhoto || emp.photoUrl || emp.avatar || '') : (raw.profilePhoto || '');
+  const positionInfo = deriveEmployeePosition(raw, typeof emp === 'object' ? emp : {});
 
   const imgUrl = raw.imageUrl || raw.fullUrl || raw.thumbnailUrl || raw.url || raw.secure_url ||
                  `https://res.cloudinary.com/${CLOUDINARY_CONFIG.cloudName}/image/upload/v${Date.now()}/monitoring/${empId}.jpg`;
@@ -103,11 +376,50 @@ export const normalizeScreenshotRecord = (raw) => {
   const dateStr = dateObj.toISOString().split('T')[0];
   const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+  // Mongoose Session Schema fields:
+  // userId: ObjectId ref 'User'
+  const rawUserId = raw.userId || (typeof raw.user === 'object' ? raw.user?._id : raw.user) || empId;
+  const userId = resolveMongoObjectId(rawUserId);
+
+  // attendanceId: ObjectId ref 'Attendance' or null
+  const rawAttId = raw.attendanceId || (typeof raw.attendance === 'object' ? raw.attendance?._id : raw.attendance);
+  const attendanceId = isValidObjectId(rawAttId) ? rawAttId : null;
+
+  // Timestamps
+  const startTime = raw.startTime || raw.sessionStartTime || dateObj.toISOString();
+  const endTime = raw.endTime || raw.sessionEndTime || null;
+  const lastActiveTime = raw.lastActiveTime || dateObj.toISOString();
+
+  // Status enum: ["active", "break", "terminated", "auto_checkout"]
+  const rawStatus = raw.status || (raw.attendanceStatus === 'on_break' ? 'break' : 'active');
+  const status = ['active', 'break', 'terminated', 'auto_checkout'].includes(rawStatus)
+    ? rawStatus
+    : 'active';
+
+  // Device Info string
+  const deviceInfo = raw.deviceInfo || getDeviceInfoString();
+
+  const createdAt = raw.createdAt || dateObj.toISOString();
+  const updatedAt = raw.updatedAt || raw.createdAt || dateObj.toISOString();
+
   return {
     id: raw._id || raw.id || `scr-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+    _id: raw._id || raw.id,
+    userId,
+    attendanceId,
+    startTime,
+    endTime,
+    lastActiveTime,
+    status,
+    deviceInfo,
+    createdAt,
+    updatedAt,
     employeeId: empId,
     employeeName: empName,
     designation: empRole,
+    position: positionInfo.short,
+    positionShort: positionInfo.short,
+    positionLabel: positionInfo.label,
     profilePhoto: empPhoto,
     date: raw.date || dateStr,
     captureTime: raw.captureTime || raw.time || timeStr,
@@ -118,7 +430,7 @@ export const normalizeScreenshotRecord = (raw) => {
     activityLevel: raw.activityLevel || Math.floor(Math.random() * 20 + 80),
     activeWindow: raw.activeWindow || raw.windowTitle || 'Work Workspace',
     cloudStorage: 'Cloudinary (' + CLOUDINARY_CONFIG.cloudName + ')',
-    capturedAt: raw.capturedAt || raw.createdAt || new Date().toISOString()
+    capturedAt: raw.capturedAt || raw.createdAt || dateObj.toISOString()
   };
 };
 
@@ -261,9 +573,40 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
   let cldResult = null;
   let cldError = null;
 
+  // Normalize Session Schema Attributes:
+  // userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true }
+  const effectiveUserId = resolveMongoObjectId(metadata.userId || metadata.employeeId);
+
+  // attendanceId: { type: mongoose.Schema.Types.ObjectId, ref: "Attendance", default: null }
+  const effectiveAttendanceId = isValidObjectId(metadata.attendanceId) ? metadata.attendanceId : null;
+
+  // startTime: { type: Date, default: Date.now }
+  const effectiveStartTime = metadata.startTime || new Date().toISOString();
+
+  // endTime: { type: Date, default: null }
+  const effectiveEndTime = metadata.endTime || null;
+
+  // lastActiveTime: { type: Date, default: Date.now }
+  const effectiveLastActiveTime = metadata.lastActiveTime || new Date().toISOString();
+
+  // status: { type: String, enum: ["active", "break", "terminated", "auto_checkout"], default: "active" }
+  const effectiveStatus = ['active', 'break', 'terminated', 'auto_checkout'].includes(metadata.status)
+    ? metadata.status
+    : 'active';
+
+  // deviceInfo: { type: String, default: "" }
+  const effectiveDeviceInfo = metadata.deviceInfo || getDeviceInfoString();
+
+  const nowIso = new Date().toISOString();
+  const createdAt = metadata.createdAt || nowIso;
+  const updatedAt = metadata.updatedAt || nowIso;
+
   // 1. Direct Cloudinary upload (guarantees storage in console.cloudinary.com)
   try {
-    cldResult = await uploadToCloudinaryDirect(blobOrFile, metadata);
+    cldResult = await uploadToCloudinaryDirect(blobOrFile, {
+      ...metadata,
+      employeeId: effectiveUserId
+    });
   } catch (err) {
     console.warn('Direct Cloudinary upload notice:', err.message);
     cldError = err;
@@ -274,7 +617,7 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
   // 2. Also submit to backend POST /api/employee-panel/monitoring/screenshot
   const formData = new FormData();
   if (blobOrFile instanceof Blob) {
-    const filename = `screenshot-${metadata.employeeId || 'emp'}-${Date.now()}.jpg`;
+    const filename = `screenshot-${effectiveUserId}-${Date.now()}.jpg`;
     formData.append('screenshot', blobOrFile, filename);
     formData.append('file', blobOrFile, filename);
     formData.append('image', blobOrFile, filename);
@@ -291,11 +634,45 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
     formData.append('publicId', cldResult?.public_id || '');
   }
 
-  formData.append('employeeId', metadata.employeeId || '');
+  // --- Mongoose Session Schema Fields ---
+  formData.append('userId', effectiveUserId);
+  if (effectiveAttendanceId) {
+    formData.append('attendanceId', effectiveAttendanceId);
+  }
+  formData.append('startTime', effectiveStartTime);
+  if (effectiveEndTime) {
+    formData.append('endTime', effectiveEndTime);
+  }
+  formData.append('lastActiveTime', effectiveLastActiveTime);
+  formData.append('status', effectiveStatus);
+  formData.append('deviceInfo', effectiveDeviceInfo);
+  formData.append('createdAt', createdAt);
+  formData.append('updatedAt', updatedAt);
+
+  // Send structured JSON payload as well for multi-field backend parsers
+  formData.append('sessionData', JSON.stringify({
+    userId: effectiveUserId,
+    attendanceId: effectiveAttendanceId,
+    startTime: effectiveStartTime,
+    endTime: effectiveEndTime,
+    lastActiveTime: effectiveLastActiveTime,
+    status: effectiveStatus,
+    deviceInfo: effectiveDeviceInfo,
+    createdAt,
+    updatedAt
+  }));
+
+  // Contextual Employee & Cloudinary info
+  formData.append('employeeId', metadata.employeeId || effectiveUserId);
   formData.append('employeeName', metadata.employeeName || '');
+  formData.append('position', metadata.position || metadata.positionShort || 'EMP');
+  formData.append('positionShort', metadata.positionShort || 'EMP');
+  formData.append('positionLabel', metadata.positionLabel || 'Employee');
+  formData.append('userRole', metadata.userRole || '');
+  formData.append('isTeamLeader', String(metadata.isTeamLeader || false));
   formData.append('activeWindow', metadata.activeWindow || 'Kevalon Workspace');
   formData.append('sessionId', metadata.sessionId || '');
-  formData.append('capturedAt', metadata.capturedAt || new Date().toISOString());
+  formData.append('capturedAt', metadata.capturedAt || createdAt);
   formData.append('activityLevel', metadata.activityLevel ? String(metadata.activityLevel) : '90');
   formData.append('cloudName', CLOUDINARY_CONFIG.cloudName);
   formData.append('apiKey', CLOUDINARY_CONFIG.apiKey);
@@ -337,7 +714,18 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
     secure_url: finalUrl,
     public_id: cldResult?.public_id,
     cloudinary: cldResult,
-    backend: backendResult
+    backend: backendResult,
+    session: {
+      userId: effectiveUserId,
+      attendanceId: effectiveAttendanceId,
+      startTime: effectiveStartTime,
+      endTime: effectiveEndTime,
+      lastActiveTime: effectiveLastActiveTime,
+      status: effectiveStatus,
+      deviceInfo: effectiveDeviceInfo,
+      createdAt,
+      updatedAt
+    }
   };
 };
 
@@ -478,8 +866,13 @@ export const captureRealScreenBlob = async (options = {}) => {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const empName = options.employeeName || 'Employee';
-    const empId = options.employeeId || 'EMP';
+    const resolvedStamp = extractEmployeeDetails(options);
+    const empName = (options.employeeName && options.employeeName !== 'Active Employee' && options.employeeName !== 'Employee')
+      ? options.employeeName
+      : (resolvedStamp.name || 'Employee');
+    const empId = (options.employeeId && options.employeeId !== 'EMP-8492' && options.employeeId !== 'EMP')
+      ? options.employeeId
+      : (resolvedStamp.employeeId || 'EMP');
 
     const barHeight = Math.max(26, Math.round(vHeight * 0.035));
     ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
@@ -529,8 +922,13 @@ export const generateScreenshotBlob = (options = {}) => {
       const now = new Date();
       const dateStr = now.toISOString().split('T')[0];
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const employeeName = options.employeeName || 'Active Employee';
-      const employeeId = options.employeeId || 'EMP-KT';
+      const resolvedGen = extractEmployeeDetails(options);
+      const employeeName = (options.employeeName && options.employeeName !== 'Active Employee' && options.employeeName !== 'Employee')
+        ? options.employeeName
+        : (resolvedGen.name || 'Employee');
+      const employeeId = (options.employeeId && options.employeeId !== 'EMP-8492' && options.employeeId !== 'EMP-KT' && options.employeeId !== 'EMP')
+        ? options.employeeId
+        : (resolvedGen.employeeId || 'EMP-KT');
 
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, height);

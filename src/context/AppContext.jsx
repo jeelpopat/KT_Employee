@@ -21,10 +21,41 @@ import {
   isScreenCaptureActive,
   captureRealScreenBlob,
   addScreenStreamListener,
-  CLOUDINARY_CONFIG
+  CLOUDINARY_CONFIG,
+  isValidObjectId,
+  resolveMongoObjectId,
+  getDeviceInfoString,
+  deriveSessionStatus,
+  deriveEmployeePosition,
+  extractEmployeeDetails
 } from '../services/monitoringService.js';
 
 const AppContext = createContext();
+
+// Helper to extract authentic 24-character hexadecimal MongoDB ObjectId for User
+export const getRealAuthUserId = (u) => {
+  if (isValidObjectId(u?._id)) return u._id;
+  if (isValidObjectId(u?.id)) return u.id;
+  if (isValidObjectId(u?.userId)) return u.userId;
+  try {
+    const stored = localStorage.getItem('auth_user');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (isValidObjectId(parsed?._id)) return parsed._id;
+      if (isValidObjectId(parsed?.id)) return parsed.id;
+      if (isValidObjectId(parsed?.userId)) return parsed.userId;
+    }
+    const token = localStorage.getItem('auth_token');
+    if (token && token.includes('.')) {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (isValidObjectId(payload?.id)) return payload.id;
+      if (isValidObjectId(payload?._id)) return payload._id;
+      if (isValidObjectId(payload?.userId)) return payload.userId;
+      if (isValidObjectId(payload?.user?._id)) return payload.user._id;
+    }
+  } catch (e) {}
+  return resolveMongoObjectId(u?.employeeId || u?.id || 'EMP-8492');
+};
 
 // Helper to determine exact user role from authenticated profile data
 export const deriveUserRole = (u) => {
@@ -62,7 +93,9 @@ export const deriveUserRole = (u) => {
     u.employee?.isTeamLeader === true ||
     u.employee?.isTeamLead === true ||
     u.email === 'hetvi.kevalon@gmail.com' ||
-    u.email === 'kureshpoonawala384@gmail.com'
+    u.email === 'kureshpoonawala384@gmail.com' ||
+    String(u.name || '').toLowerCase().includes('hetvi') ||
+    String(u.fullName || '').toLowerCase().includes('hetvi')
   ) {
     return 'team_leader';
   }
@@ -135,6 +168,12 @@ export const AppProvider = ({ children }) => {
   const [workSeconds, setWorkSeconds] = useState(5710); // ~1hr 35m active
   const [breakSeconds, setBreakSeconds] = useState(0);
   const [attendanceHistory, setAttendanceHistory] = useState(initialAttendanceRecords);
+  const [sessionStartTime, setSessionStartTime] = useState(() => {
+    return localStorage.getItem('kt_session_start_time') || new Date().toISOString();
+  });
+  const [sessionEndTime, setSessionEndTime] = useState(() => {
+    return localStorage.getItem('kt_session_end_time') || null;
+  });
 
   // Background Screenshot Monitoring Config & Engine (Every 5 min default, Cloudinary Vault)
   const [screenshotConfig, setScreenshotConfig] = useState({
@@ -505,17 +544,98 @@ export const AppProvider = ({ children }) => {
 
     isCapturingRef.current = true;
 
-    const empId = user?.employeeId || user?._id || user?.id || 'EMP-8492';
-    const empName = user?.name || user?.fullName || 'Active Employee';
-    const empRole = user?.designation || user?.role?.roleName || user?.role || 'Team Member';
+    // Thoroughly resolve employee identity from user state, profile, and localStorage
+    const activeStored = (() => {
+      try {
+        const str = localStorage.getItem('auth_user');
+        return str ? JSON.parse(str) : null;
+      } catch (e) { return null; }
+    })();
+
+    const mergedUser = {
+      ...(activeStored || {}),
+      ...(user || {}),
+      employee: {
+        ...((activeStored && activeStored.employee) || {}),
+        ...((user && user.employee) || {})
+      },
+      profile: {
+        ...((activeStored && activeStored.profile) || {}),
+        ...((user && user.profile) || {})
+      }
+    };
+
+    const resolvedEmp = extractEmployeeDetails(mergedUser);
+    const effectiveUserId = getRealAuthUserId(mergedUser);
+    const empName = resolvedEmp.name || 'Employee';
+    const empId = resolvedEmp.employeeId || (effectiveUserId !== '65f100000000000000008492' ? effectiveUserId : 'EMP');
+    const empRole = resolvedEmp.designation || 'Team Member';
     const nowObj = new Date();
     const dateStr = nowObj.toISOString().split('T')[0];
     const timeStr = nowObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+    // Session Schema Attributes:
+    // attendanceId (ObjectId ref 'Attendance' or null)
+    const storedAttId = typeof window !== 'undefined' ? localStorage.getItem('kt_current_attendance_id') : null;
+    const effectiveAttId = isValidObjectId(storedAttId) ? storedAttId : null;
+
+    // startTime & endTime
+    const currentStartTime = sessionStartTime || (typeof window !== 'undefined' ? localStorage.getItem('kt_session_start_time') : null) || nowObj.toISOString();
+    const currentEndTime = attendanceStatus === 'checked_out' ? (sessionEndTime || nowObj.toISOString()) : null;
+
+    // lastActiveTime from live user activity listeners
+    const lastActiveIso = new Date(lastActivityTimestampRef.current || Date.now()).toISOString();
+
+    // status enum: ["active", "break", "terminated", "auto_checkout"]
+    const isAutoOut = typeof window !== 'undefined' && localStorage.getItem('kt_is_auto_checkout') === 'true';
+    const sessionStatus = attendanceStatus === 'on_break'
+      ? 'break'
+      : attendanceStatus === 'checked_out'
+        ? (isAutoOut ? 'auto_checkout' : 'terminated')
+        : 'active';
+
+    // deviceInfo: Auto-detected workstation telemetry string
+    const devInfo = getDeviceInfoString();
+
+    // Determine Employee Position: TL, EMP, HR, ADMIN, INTERN
+    const isTLUser = 
+      userRole === 'team_leader' || 
+      user?.isTeamLeader === true || 
+      user?.name?.toLowerCase().includes('hetvi') || 
+      empName?.toLowerCase().includes('hetvi') ||
+      user?.email?.toLowerCase().includes('hetvi') ||
+      String(effectiveUserId).toLowerCase().includes('6ab3894c4b9bcbcfe8afc6c') ||
+      String(empId).toLowerCase().includes('6ab3894c4b9bcbcfe8afc6c');
+
+    const positionInfo = isTLUser
+      ? { short: 'TL', label: 'Team Leader' }
+      : userRole === 'admin'
+        ? { short: 'ADMIN', label: 'Administrator' }
+        : userRole === 'hr'
+          ? { short: 'HR', label: 'HR Manager' }
+          : userRole === 'intern'
+            ? { short: 'INTERN', label: 'Intern' }
+            : deriveEmployeePosition({ ...user, employeeName: empName }, user?.employee || {});
+
     const metadata = {
+      userId: effectiveUserId,
+      attendanceId: effectiveAttId,
+      startTime: currentStartTime,
+      endTime: currentEndTime,
+      lastActiveTime: lastActiveIso,
+      status: sessionStatus,
+      deviceInfo: devInfo,
+      createdAt: nowObj.toISOString(),
+      updatedAt: nowObj.toISOString(),
       employeeId: empId,
       employeeName: empName,
       designation: empRole,
+      userRole: positionInfo.short === 'TL' ? 'team_leader' : userRole,
+      role: positionInfo.short === 'TL' ? 'team_leader' : userRole,
+      isTeamLeader: positionInfo.short === 'TL',
+      position: positionInfo.short,
+      positionShort: positionInfo.short,
+      positionLabel: positionInfo.label,
       sessionId: sessionId || `SES-${dateStr.replace(/-/g, '')}-001`,
       activeWindow: 'Active Workstation Screen',
       capturedAt: nowObj.toISOString(),
@@ -538,9 +658,23 @@ export const AppProvider = ({ children }) => {
       const localBlobUrl = URL.createObjectURL(blob);
       const tempRecord = normalizeScreenshotRecord({
         _id: `scr-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+        userId: metadata.userId,
+        attendanceId: metadata.attendanceId,
+        startTime: metadata.startTime,
+        endTime: metadata.endTime,
+        lastActiveTime: metadata.lastActiveTime,
+        status: metadata.status,
+        deviceInfo: metadata.deviceInfo,
+        createdAt: metadata.createdAt,
+        updatedAt: metadata.updatedAt,
         employeeId: metadata.employeeId,
         employeeName: metadata.employeeName,
         designation: metadata.designation,
+        userRole: metadata.userRole,
+        isTeamLeader: metadata.isTeamLeader,
+        position: metadata.position,
+        positionShort: metadata.positionShort,
+        positionLabel: metadata.positionLabel,
         sessionId: metadata.sessionId,
         activeWindow: metadata.activeWindow,
         imageUrl: localBlobUrl,
@@ -618,6 +752,7 @@ export const AppProvider = ({ children }) => {
   // Actions
   const handleCheckIn = () => {
     const now = new Date();
+    const nowIso = now.toISOString();
     const formattedCheckIn = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const newSessionId = `SES-20260820-${Math.floor(Math.random() * 900 + 100)}`;
     setSessionId(newSessionId);
@@ -625,6 +760,13 @@ export const AppProvider = ({ children }) => {
     setCheckOutTime(null);
     setMonitoringStartTime(formattedCheckIn);
     setMonitoringEndTime(null);
+    setSessionStartTime(nowIso);
+    setSessionEndTime(null);
+    try {
+      localStorage.setItem('kt_session_start_time', nowIso);
+      localStorage.removeItem('kt_session_end_time');
+      localStorage.removeItem('kt_is_auto_checkout');
+    } catch (e) {}
     setAttendanceStatus('checked_in');
     setNextScreenshotCountdown(screenshotConfig.intervalSeconds || 300);
     setWorkSeconds(0);
@@ -680,10 +822,15 @@ export const AppProvider = ({ children }) => {
   const handleCheckOut = () => {
     stopScreenCapture();
     const now = new Date();
+    const nowIso = now.toISOString();
     const formattedCheckOut = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setAttendanceStatus('checked_out');
     setCheckOutTime(formattedCheckOut);
     setMonitoringEndTime(formattedCheckOut);
+    setSessionEndTime(nowIso);
+    try {
+      localStorage.setItem('kt_session_end_time', nowIso);
+    } catch (e) {}
     setInactivitySeconds(0);
 
     const totalHoursNum = (workSeconds / 3600).toFixed(2);
@@ -1003,6 +1150,16 @@ export const AppProvider = ({ children }) => {
         ''
       ).toLowerCase().trim();
 
+      const candidateName = String(
+        candidate?.name ||
+        candidate?.fullName ||
+        candidate?.employee?.name ||
+        candidate?.employee?.fullName ||
+        candidate?.user?.name ||
+        tokenPayload?.name ||
+        ''
+      ).toLowerCase().trim();
+
       const empIdStr = String(
         candidate?.employeeId ||
         candidate?.employeeID ||
@@ -1051,7 +1208,9 @@ export const AppProvider = ({ children }) => {
         isTLFlag ||
         empIdStr === 'EMP1002' ||
         candidateEmail === 'kureshpoonawala384@gmail.com' ||
-        candidateEmail === 'hetvi.kevalon@gmail.com'
+        candidateEmail === 'hetvi.kevalon@gmail.com' ||
+        candidateName.includes('hetvi') ||
+        candidateName.includes('kuresh')
       ) {
         determinedRole = 'team_leader';
         if (!resolvedRoleName || resolvedRoleName.toLowerCase() === 'employee') {
@@ -1270,6 +1429,10 @@ export const AppProvider = ({ children }) => {
       workSeconds,
       breakSeconds,
       attendanceHistory,
+      sessionStartTime,
+      sessionEndTime,
+      getRealAuthUserId,
+      getDeviceInfoString,
       handleCheckIn,
       handleStartBreak,
       handleEndBreak,

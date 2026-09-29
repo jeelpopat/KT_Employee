@@ -325,11 +325,11 @@ export const AttendanceView = () => {
                   </div>
                   <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
                     <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><Coffee size={10} className="text-amber-500" /> Break</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{record.totalBreakTime || 0}m</span>
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{Math.round(parseFloat(String(record.totalBreakTime || 0).replace(/[^\d.-]/g, '')) || 0)}m</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
                     <span className="text-[10px] font-semibold text-blue-500 uppercase mb-1">Work</span>
-                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{record.totalWorkTime || 0}h</span>
+                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{record.totalWorkTimeDisplay || `${Math.round(parseFloat(String(record.totalWorkTime || 0)) || 0)}h`}</span>
                   </div>
                 </div>
 

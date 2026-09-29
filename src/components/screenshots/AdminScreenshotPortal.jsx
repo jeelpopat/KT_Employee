@@ -10,11 +10,14 @@ import {
   getMonitoringSettings, 
   updateMonitoringSettings, 
   getAdminScreenshots,
+  deriveEmployeePosition,
+  extractEmployeeDetails,
   CLOUDINARY_CONFIG 
 } from '../../services/monitoringService.js';
 
 export const AdminScreenshotPortal = () => {
   const { 
+    user,
     screenshots: contextScreenshots, 
     screenshotConfig, 
     setScreenshotConfig,
@@ -45,6 +48,191 @@ export const AdminScreenshotPortal = () => {
   const [isPlayingTimeline, setIsPlayingTimeline] = useState(false);
   const [timelineIndex, setTimelineIndex] = useState(0);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedUserId, setCopiedUserId] = useState(false);
+  const [copiedAttendanceId, setCopiedAttendanceId] = useState(false);
+
+  // Status pill badge helper for Mongoose Session Schema status
+  const renderStatusPill = (status) => {
+    const s = String(status || 'active').toLowerCase().trim();
+    if (s === 'break') {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          Break
+        </span>
+      );
+    }
+    if (s === 'auto_checkout') {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+          Auto Checkout
+        </span>
+      );
+    }
+    if (s === 'terminated') {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+          Terminated
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        Active
+      </span>
+    );
+  };
+
+  // Helper to extract authentic employee name, ID, and designation
+  const getRecordEmployeeInfo = (rec) => {
+    if (!rec) return { name: 'Employee', id: 'EMP', designation: 'Staff' };
+
+    const isValidName = (n) => n && typeof n === 'string' && n.trim().length > 0 && n.trim().toLowerCase() !== 'active employee' && n.trim().toLowerCase() !== 'employee' && n.trim().toLowerCase() !== 'user';
+
+    // 1. Check direct name or employee object on rec
+    let name = '';
+    if (isValidName(rec.employeeName)) {
+      name = rec.employeeName.trim();
+    } else {
+      const extracted = extractEmployeeDetails(rec);
+      if (isValidName(extracted.name)) {
+        name = extracted.name;
+      }
+    }
+
+    // 2. If name is still missing or generic, resolve from active logged-in user or localStorage
+    if (!isValidName(name)) {
+      const activeStored = (() => {
+        try {
+          const str = localStorage.getItem('auth_user');
+          return str ? JSON.parse(str) : null;
+        } catch (e) { return null; }
+      })();
+      const activeUser = user || activeStored;
+      const activeDetails = extractEmployeeDetails(activeUser);
+      if (isValidName(activeDetails.name)) {
+        name = activeDetails.name;
+      }
+    }
+
+    // Resolve Clean ID
+    let id = rec.employeeId;
+    if (!id || id === 'EMP-8492' || id === 'EMP') {
+      const activeStored = (() => {
+        try {
+          const str = localStorage.getItem('auth_user');
+          return str ? JSON.parse(str) : null;
+        } catch (e) { return null; }
+      })();
+      const activeUser = user || activeStored;
+      const activeDetails = extractEmployeeDetails(activeUser);
+      id = rec.userId || activeDetails.employeeId || activeUser?.employeeId || activeUser?._id || 'EMP';
+    }
+
+    // Resolve Clean Designation
+    let designation = rec.designation;
+    if (!designation || designation === 'Team Member' || designation === 'Staff') {
+      const activeStored = (() => {
+        try {
+          const str = localStorage.getItem('auth_user');
+          return str ? JSON.parse(str) : null;
+        } catch (e) { return null; }
+      })();
+      const activeUser = user || activeStored;
+      const activeDetails = extractEmployeeDetails(activeUser);
+      designation = activeDetails.designation || rec.designation || 'Team Member';
+    }
+
+    return {
+      name: name || 'Employee',
+      id: id || 'EMP',
+      designation: designation || 'Staff'
+    };
+  };
+
+  // Helper to extract employee position (EMP, TL, HR, ADMIN, INTERN)
+  const getRecordPosition = (rec) => {
+    if (!rec) return { short: 'EMP', label: 'Employee' };
+
+    const empInfo = getRecordEmployeeInfo(rec);
+    const nameStr = (empInfo.name || rec.employeeName || '').toLowerCase();
+
+    const emailStr = String(
+      rec.email ||
+      rec.userEmail ||
+      rec.employee?.email ||
+      rec.employeeId?.email ||
+      user?.email ||
+      ''
+    ).toLowerCase();
+
+    const idStr = String(
+      rec.userId ||
+      rec.employeeId ||
+      empInfo.id ||
+      rec._id ||
+      rec.id ||
+      rec.employee?._id ||
+      rec.employee?.id ||
+      rec.employeeId?._id ||
+      ''
+    ).toLowerCase();
+
+    // 1. Hetvi or other known TLs are strictly Team Leader (TL)
+    if (
+      nameStr.includes('hetvi') ||
+      emailStr.includes('hetvi') ||
+      nameStr.includes('kuresh') ||
+      emailStr.includes('kuresh') ||
+      idStr.includes('6ab3894c4b9bcbcfe8afc6c')
+    ) {
+      return { short: 'TL', label: 'Team Leader', code: 'team_leader' };
+    }
+
+    // 2. If this screenshot belongs to active logged in user
+    if (user && (
+      rec.employeeId === user.employeeId ||
+      rec.employeeId === user.id ||
+      rec.employeeId === user._id ||
+      rec.userId === user._id ||
+      rec.userId === user.id ||
+      (nameStr && nameStr === String(user.name || user.fullName || '').toLowerCase())
+    )) {
+      if (userRole === 'team_leader' || user.isTeamLeader) {
+        return { short: 'TL', label: 'Team Leader', code: 'team_leader' };
+      }
+      if (userRole === 'admin') return { short: 'ADMIN', label: 'Administrator', code: 'admin' };
+      if (userRole === 'hr') return { short: 'HR', label: 'HR Manager', code: 'hr' };
+      if (userRole === 'intern') return { short: 'INTERN', label: 'Intern', code: 'intern' };
+    }
+
+    // 3. Team leader flags and role strings
+    const isTL =
+      rec.isTeamLeader === true ||
+      rec.isTeamLead === true ||
+      rec.employee?.isTeamLeader === true ||
+      rec.employeeId?.isTeamLeader === true ||
+      rec.userRole === 'team_leader' ||
+      rec.userRole === 'team lead' ||
+      rec.role === 'team_leader' ||
+      rec.role === 'team lead' ||
+      rec.positionShort === 'TL' ||
+      rec.position === 'TL';
+
+    if (isTL) {
+      return { short: 'TL', label: 'Team Leader', code: 'team_leader' };
+    }
+
+    // 4. If explicit non-EMP position was specified in the record
+    if (rec.positionShort && rec.positionShort !== 'EMP' && rec.positionLabel) {
+      return { short: rec.positionShort, label: rec.positionLabel };
+    }
+
+    return deriveEmployeePosition(rec, rec.employee || rec.employeeId);
+  };
 
   // Real Screen Capture Actions
   const handleCaptureRealScreenNow = async () => {
@@ -160,21 +348,43 @@ export const AdminScreenshotPortal = () => {
   const uniqueEmployees = useMemo(() => {
     const list = new Map();
     allScreenshots.forEach(s => {
-      if (s.employeeId && !list.has(s.employeeId)) {
-        list.set(s.employeeId, s.employeeName || s.employeeId);
+      const empInfo = getRecordEmployeeInfo(s);
+      const empKey = empInfo.id || s.employeeId || s.userId;
+      if (!empKey) return;
+      const pos = getRecordPosition(s);
+      const isNamed = empInfo.name && empInfo.name !== 'Active Employee' && empInfo.name !== 'Employee';
+      const existing = list.get(empKey);
+      if (!existing) {
+        list.set(empKey, {
+          id: empKey,
+          name: isNamed ? empInfo.name : empKey,
+          positionShort: pos.short,
+          isNamed
+        });
+      } else {
+        if (!existing.isNamed && isNamed) {
+          existing.name = empInfo.name;
+          existing.isNamed = true;
+        }
+        if (pos.short === 'TL' && existing.positionShort !== 'TL') {
+          existing.positionShort = 'TL';
+        }
       }
     });
-    return Array.from(list.entries()).map(([id, name]) => ({ id, name }));
-  }, [allScreenshots]);
+    return Array.from(list.values());
+  }, [allScreenshots, user]);
 
   // Filtered Screenshots
   const filteredScreenshots = useMemo(() => {
     return allScreenshots.filter(s => {
-      const matchesEmp = selectedEmployeeFilter === 'all' || s.employeeId === selectedEmployeeFilter;
+      const empInfo = getRecordEmployeeInfo(s);
+      const matchesEmp = selectedEmployeeFilter === 'all' || s.employeeId === selectedEmployeeFilter || empInfo.id === selectedEmployeeFilter;
       const matchesDate = !selectedDateFilter || (s.date && s.date.startsWith(selectedDateFilter));
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch = !q ||
+        (empInfo.name && empInfo.name.toLowerCase().includes(q)) ||
         (s.employeeName && s.employeeName.toLowerCase().includes(q)) ||
+        (empInfo.id && empInfo.id.toLowerCase().includes(q)) ||
         (s.employeeId && s.employeeId.toLowerCase().includes(q)) ||
         (s.activeWindow && s.activeWindow.toLowerCase().includes(q));
       return matchesEmp && matchesDate && matchesSearch;
@@ -430,7 +640,7 @@ export const AdminScreenshotPortal = () => {
               <option value="all">All Employees ({allScreenshots.length})</option>
               {uniqueEmployees.map(emp => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.name} ({emp.id})
+                  [{emp.positionShort || 'EMP'}] {emp.name} ({emp.id})
                 </option>
               ))}
             </select>
@@ -535,28 +745,56 @@ export const AdminScreenshotPortal = () => {
                   <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-slate-900/80 text-white text-[10px] font-mono font-semibold backdrop-blur-xs">
                     #{scr.sequenceNo || idx + 1}
                   </span>
+                  <span className="absolute top-2 right-2 backdrop-blur-xs">
+                    {renderStatusPill(scr.status)}
+                  </span>
                   <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-blue-600/90 text-white text-[10px] font-semibold backdrop-blur-xs">
                     {scr.activityLevel || 88}% Activity
                   </span>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
-                      {scr.employeeName || 'Employee'}
-                    </span>
-                    <span className="text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400">
-                      {scr.employeeId}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-normal" title={scr.activeWindow}>
-                    {scr.activeWindow || 'Work Workspace'}
-                  </p>
-                  <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-1.5 border-t border-slate-100 dark:border-slate-800">
-                    <span>{scr.captureTime}</span>
-                    <span>{scr.date}</span>
-                  </div>
-                </div>
+                {(() => {
+                  const cardPos = getRecordPosition(scr);
+                  const cardEmp = getRecordEmployeeInfo(scr);
+                  return (
+                    <div className="space-y-1">
+                      {/* Employee Position above name */}
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide ${
+                          cardPos.short === 'TL'
+                            ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                            : cardPos.short === 'HR'
+                            ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                            : cardPos.short === 'ADMIN'
+                            ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                            : cardPos.short === 'INTERN'
+                            ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                            : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                        }`}>
+                          {cardPos.short} ({cardPos.label})
+                        </span>
+                        <span className="text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+                          {cardEmp.id}
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate block">
+                        {cardEmp.name}
+                      </span>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-normal" title={scr.activeWindow}>
+                        {scr.activeWindow || 'Work Workspace'}
+                      </p>
+                      {scr.deviceInfo && (
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate" title={scr.deviceInfo}>
+                          💻 {scr.deviceInfo}
+                        </p>
+                      )}
+                      <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                        <span>{scr.captureTime}</span>
+                        <span>{scr.date}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -668,11 +906,124 @@ export const AdminScreenshotPortal = () => {
                 </div>
 
                 <div className="space-y-2.5 text-xs">
-                  <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Employee</span>
-                    <span className="text-sm font-bold text-white mt-0.5 block">{lightboxRecord.employeeName}</span>
-                    <span className="text-[10px] text-blue-400 font-mono">{lightboxRecord.employeeId} • {lightboxRecord.designation || 'Staff'}</span>
+                  {/* Session Status & Mongoose Schema Telemetry */}
+                  <div className="p-3 bg-slate-800/90 rounded-xl border border-slate-700/80 space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-700/60 pb-1.5">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1.5 tracking-wider">
+                        <Database size={12} className="text-blue-400" />
+                        Session Telemetry
+                      </span>
+                      {renderStatusPill(lightboxRecord.status)}
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px]">
+                      {/* userId (ObjectId ref User) */}
+                      <div>
+                        <span className="text-slate-400 text-[10px] uppercase font-semibold block">User ID (ObjectId ref User)</span>
+                        <div className="flex items-center justify-between mt-0.5 bg-slate-950/80 px-2 py-1 rounded border border-slate-800 font-mono">
+                          <span className="text-emerald-400 text-[10px] truncate" title={lightboxRecord.userId}>
+                            {lightboxRecord.userId || 'N/A'}
+                          </span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(lightboxRecord.userId || '');
+                              setCopiedUserId(true);
+                              setTimeout(() => setCopiedUserId(false), 2000);
+                            }}
+                            className="p-0.5 hover:text-white text-slate-400 cursor-pointer ml-1"
+                            title="Copy User ObjectId"
+                          >
+                            {copiedUserId ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* attendanceId (ObjectId ref Attendance) */}
+                      <div>
+                        <span className="text-slate-400 text-[10px] uppercase font-semibold block">Attendance ID (ObjectId ref Attendance)</span>
+                        <div className="flex items-center justify-between mt-0.5 bg-slate-950/80 px-2 py-1 rounded border border-slate-800 font-mono">
+                          <span className={`text-[10px] truncate ${lightboxRecord.attendanceId ? 'text-blue-400' : 'text-slate-500'}`} title={lightboxRecord.attendanceId || 'null'}>
+                            {lightboxRecord.attendanceId || 'null (No Active Shift)'}
+                          </span>
+                          {lightboxRecord.attendanceId && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(lightboxRecord.attendanceId || '');
+                                setCopiedAttendanceId(true);
+                                setTimeout(() => setCopiedAttendanceId(false), 2000);
+                              }}
+                              className="p-0.5 hover:text-white text-slate-400 cursor-pointer ml-1"
+                              title="Copy Attendance ObjectId"
+                            >
+                              {copiedAttendanceId ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* startTime & endTime */}
+                      <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                        <div className="bg-slate-950/80 px-2 py-1 rounded border border-slate-800">
+                          <span className="text-[9px] text-slate-400 uppercase block font-semibold">Start Time</span>
+                          <span className="text-[10px] text-slate-200 block truncate font-mono">
+                            {lightboxRecord.startTime ? new Date(lightboxRecord.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A'}
+                          </span>
+                        </div>
+                        <div className="bg-slate-950/80 px-2 py-1 rounded border border-slate-800">
+                          <span className="text-[9px] text-slate-400 uppercase block font-semibold">End Time</span>
+                          <span className="text-[10px] text-slate-200 block truncate font-mono">
+                            {lightboxRecord.endTime ? new Date(lightboxRecord.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'null (Active)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* lastActiveTime */}
+                      <div className="bg-slate-950/80 px-2 py-1 rounded border border-slate-800 flex items-center justify-between">
+                        <span className="text-[9px] text-slate-400 uppercase font-semibold">Last Active</span>
+                        <span className="text-[10px] text-emerald-400 font-mono">
+                          {lightboxRecord.lastActiveTime ? new Date(lightboxRecord.lastActiveTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Just now'}
+                        </span>
+                      </div>
+
+                      {/* deviceInfo */}
+                      <div className="bg-slate-950/80 px-2 py-1 rounded border border-slate-800">
+                        <span className="text-[9px] text-slate-400 uppercase block font-semibold">Device Info</span>
+                        <span className="text-[10px] text-slate-300 block font-mono truncate" title={lightboxRecord.deviceInfo}>
+                          💻 {lightboxRecord.deviceInfo || 'Desktop Workstation'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Employee Position & Name */}
+                  {(() => {
+                    const pos = getRecordPosition(lightboxRecord);
+                    const empInfo = getRecordEmployeeInfo(lightboxRecord);
+                    return (
+                      <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                            Position: <strong className="text-white font-mono">{pos.short}</strong>
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono ${
+                            pos.short === 'TL'
+                              ? 'bg-purple-500/25 text-purple-300 border border-purple-500/40'
+                              : pos.short === 'HR'
+                              ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
+                              : pos.short === 'ADMIN'
+                              ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
+                              : pos.short === 'INTERN'
+                              ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
+                              : 'bg-blue-500/25 text-blue-300 border border-blue-500/40'
+                          }`}>
+                            {pos.short} ({pos.label})
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-white block">{empInfo.name}</span>
+                        <span className="text-[10px] text-blue-400 font-mono mt-0.5 block">{empInfo.id} • {empInfo.designation}</span>
+                      </div>
+                    );
+                  })()}
 
                   <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60">
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">Timestamp & Session</span>
