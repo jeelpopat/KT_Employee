@@ -69,6 +69,7 @@ export const Sidebar = ({ onSignOut }) => {
     ],
     employee: [
       { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: <Camera size={18} /> },
       { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
       { tab: 'tasks', label: 'My Task', icon: <CheckSquare size={18} /> },
       { tab: 'salary', label: 'Salary', icon: <Wallet size={18} /> },
