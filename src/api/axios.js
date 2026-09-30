@@ -53,6 +53,9 @@ const invalidateOnMutation = (url = '') => {
   } else if (urlLower.includes('/salary') || urlLower.includes('/payroll')) {
     invalidateCache(/salary/);
     invalidateCache(/payroll/);
+  } else if (urlLower.includes('/screenshot') || urlLower.includes('/monitoring')) {
+    invalidateCache(/screenshot/);
+    invalidateCache(/monitoring/);
   }
 };
 

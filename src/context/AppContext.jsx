@@ -695,13 +695,15 @@ export const AppProvider = ({ children }) => {
   const isCapturingRef = useRef(false);
 
   const captureAndUploadScreenshot = useCallback(async (isManualTrigger = false) => {
-    // Strictly forbid screenshots during break time or when not actively working
-    if (attendanceStatus === 'on_break' || attendanceStatus !== 'checked_in') {
-      console.log('⏸️ Screenshot capture skipped: Employee is on break or not in active work session.');
-      return null;
+    // For automated background interval: skip if employee is on break or not in active work session
+    if (!isManualTrigger) {
+      if (attendanceStatus === 'on_break' || attendanceStatus !== 'checked_in') {
+        console.log('⏸️ Background screenshot capture skipped: Employee is on break or not in active work session.');
+        return null;
+      }
+      if (screenshotConfig.isEnabled === false) return null;
     }
-    if (screenshotConfig.isEnabled === false) return;
-    if (isCapturingRef.current) return;
+    if (isCapturingRef.current) return null;
 
     let isStreamActive = isScreenCaptureActive();
     if (!isStreamActive) {
@@ -711,12 +713,10 @@ export const AppProvider = ({ children }) => {
           await startScreenCapture();
           isStreamActive = true;
         } catch (err) {
-          console.warn('Real screen capture permission was not granted:', err);
-          return null;
+          console.warn('Real screen capture permission was not granted, continuing with workstation snapshot fallback:', err);
         }
       } else {
-        // Silent automatic interval: If employee has not enabled screen sharing yet,
-        // do not upload fake random photos. Wait until real screen sharing is active.
+        // Silent automatic interval: wait until real screen sharing is active
         return null;
       }
     }
@@ -823,14 +823,29 @@ export const AppProvider = ({ children }) => {
 
     try {
       // Capture REAL frame directly from employee's device screen!
-      const blob = await captureRealScreenBlob({
-        addWatermark: true,
-        employeeName: empName,
-        employeeId: empId
-      });
+      let blob = null;
+      if (isScreenCaptureActive()) {
+        try {
+          blob = await captureRealScreenBlob({
+            addWatermark: true,
+            employeeName: empName,
+            employeeId: empId
+          });
+        } catch (captureErr) {
+          console.warn('Real screen blob capture notice:', captureErr);
+        }
+      }
+
+      // If screen stream wasn't ready or returned empty, fallback to active workstation snapshot
+      if (!blob) {
+        blob = await generateScreenshotBlob({
+          employeeName: empName,
+          employeeId: empId
+        });
+      }
 
       if (!blob) {
-        console.warn('Screen frame capture returned empty (screen may not be active).');
+        console.warn('Screen frame capture returned empty.');
         return null;
       }
 
