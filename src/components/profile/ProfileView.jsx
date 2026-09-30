@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Shield, Save, CheckCircle2, User, 
   Mail, Phone, Briefcase, Calendar, 
@@ -11,7 +11,7 @@ import {
   FileBadge, ArrowRight, Edit3, Check,
   AlertCircle
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext.jsx';
+import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js'; 
 import companyLogo from '../../assets/Logo.png';
 
@@ -33,15 +33,25 @@ export const ProfileView = () => {
   
   const [profileData, setProfileData] = useState(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'documents' | 'security'
 
   // Form States - Personal & Contact
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
+  const [name, setName] = useState(() => resolveEmployeeName(contextUser) || '');
+  const [phone, setPhone] = useState(() => {
+    const emp = resolveEmployeeData(contextUser);
+    return emp.mobile || contextUser?.mobile || contextUser?.phone || '';
+  });
+  const [email, setEmail] = useState(() => {
+    const emp = resolveEmployeeData(contextUser);
+    return emp.email || contextUser?.email || '';
+  });
+  const [address, setAddress] = useState(() => {
+    const emp = resolveEmployeeData(contextUser);
+    return emp.currentAddress || contextUser?.address || '';
+  });
   const [imgError, setImgError] = useState(false);
 
   // Profile Photo Upload State
@@ -99,7 +109,9 @@ export const ProfileView = () => {
 
   // Helper to resolve a valid 24-character hex MongoDB ObjectId matching Mongoose documentSchema
   const resolveEmployeeId = () => {
+    const empDoc = resolveEmployeeData(profileData);
     const candidates = [
+      empDoc?._id,
       profileData?.employee?._id,
       profileData?._id,
       contextUser?._id,
@@ -115,64 +127,64 @@ export const ProfileView = () => {
     return toValidObjectId(currentUserId);
   };
 
-  // Fetch Live Profile Data on Mount
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const response = await api.get('/api/users/profile'); 
-        const data = response.data?.data || response.data;
-        setProfileData(data);
+  // Fetch Real-time Live Profile Data (GET /api/users/profile & /api/employee-panel/profile)
+  const fetchProfile = useCallback(async (manual = false) => {
+    if (manual) setIsRefreshing(true);
+    try {
+      const data = await fetchLiveUserProfile();
+      const effectiveData = data || { profile: contextUser, user: contextUser, ...(contextUser || {}) };
+      setProfileData(effectiveData);
 
-        const emp = data?.employee || {};
-        const prof = data?.profile || data || {};
+      const emp = resolveEmployeeData(effectiveData);
+      const prof = effectiveData?.profile || effectiveData?.user || effectiveData || {};
 
-        const extractedName = (
-          emp.name ||
-          emp.fullName ||
-          prof.name ||
-          prof.fullName ||
-          data?.name ||
-          data?.fullName ||
-          (emp.firstName ? `${emp.firstName} ${emp.lastName || ''}`.trim() : '') ||
-          (prof.firstName ? `${prof.firstName} ${prof.lastName || ''}`.trim() : '') ||
-          (data?.firstName ? `${data.firstName} ${data.lastName || ''}`.trim() : '') ||
-          contextUser?.name ||
-          ''
-        );
+      const extractedName = resolveEmployeeName(effectiveData) || resolveEmployeeName(contextUser) || '';
 
+      if (extractedName) {
         setName(extractedName);
-        setPhone(emp.mobile || prof.phoneNumber || '');
-        setEmail(emp.email || prof.email || contextUser?.email || '');
-        setAddress(emp.currentAddress || prof.address || '');
-
-        // Load cached photo if available
-        const cachedPhoto = localStorage.getItem(localStoragePhotoKey);
-        if (cachedPhoto) {
-          setLocalPhotoUrl(cachedPhoto);
+        if (updateUserProfile && contextUser?.name !== extractedName) {
+          updateUserProfile({ name: extractedName, fullName: extractedName, employee: emp });
         }
-
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        setProfileData({ profile: contextUser });
-        setName(contextUser?.name || '');
-        setPhone(contextUser?.phone || '');
-        setEmail(contextUser?.email || '');
-
-        const cachedPhoto = localStorage.getItem(localStoragePhotoKey);
-        if (cachedPhoto) {
-          setLocalPhotoUrl(cachedPhoto);
-        }
-      } finally {
-        setIsLoadingData(false);
       }
+      setPhone(emp.mobile || prof.phoneNumber || effectiveData.mobile || effectiveData.phoneNumber || '');
+      setEmail(emp.email || prof.email || effectiveData.email || contextUser?.email || '');
+      setAddress(emp.currentAddress || prof.address || effectiveData.address || effectiveData.currentAddress || '');
+
+      // Load cached photo if available
+      const cachedPhoto = localStorage.getItem(localStoragePhotoKey);
+      if (cachedPhoto) {
+        setLocalPhotoUrl(cachedPhoto);
+      }
+
+    } catch (error) {
+      console.error("Error fetching live profile:", error);
+      setProfileData({ profile: contextUser });
+      setName(resolveEmployeeName(contextUser) || contextUser?.name || '');
+      setPhone(contextUser?.phone || '');
+      setEmail(contextUser?.email || '');
+
+      const cachedPhoto = localStorage.getItem(localStoragePhotoKey);
+      if (cachedPhoto) {
+        setLocalPhotoUrl(cachedPhoto);
+      }
+    } finally {
+      setIsLoadingData(false);
+      if (manual) setIsRefreshing(false);
+    }
+  }, [contextUser?._id, localStoragePhotoKey]);
+
+  useEffect(() => {
+    fetchProfile(false);
+    const handleFocus = () => {
+      fetchProfile(false);
     };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchProfile]);
 
-    fetchProfile();
-  }, [contextUser, localStoragePhotoKey]);
-
-  // Extract base profile photo
-  const emp = profileData?.employee || {};
-  const prof = profileData?.profile || profileData || {};
+  // Extract base profile photo & employee subdocuments
+  const emp = resolveEmployeeData(profileData) || {};
+  const prof = profileData?.profile || profileData?.user || profileData || {};
 
   const serverPhotoUrl = (
     emp.profilePhoto ||
@@ -904,20 +916,35 @@ export const ProfileView = () => {
   const handleSaveContact = async (e) => {
     e.preventDefault();
     setIsSaving(true);
+    const cleanName = name.trim();
 
     try {
-      await api.put('/api/users/profile/update', { 
-        name: name.trim(),
-        fullName: name.trim(),
+      // 1. Immediately persist locally so UI never flashes or reverts to old database username
+      if (cleanName) {
+        localStorage.setItem('kt_employee_full_name', cleanName);
+      }
+
+      // 2. Prepare payload with all name representations
+      const payload = { 
+        name: cleanName,
+        fullName: cleanName,
+        employeeName: cleanName,
         phoneNumber: phone, 
         mobile: phone,
         address,
         currentAddress: address
-      });
+      };
+
+      // 3. Update user profile on backend
+      try {
+        await api.put('/api/users/profile/update', payload);
+      } catch (err) {
+        console.warn('PUT /api/users/profile/update notice:', err?.message);
+      }
 
       const updatedFields = {
-        name: name.trim(),
-        fullName: name.trim(),
+        name: cleanName,
+        fullName: cleanName,
         phone,
         mobile: phone,
         address,
@@ -928,12 +955,14 @@ export const ProfileView = () => {
         updateUserProfile(updatedFields);
       }
 
+      await fetchProfile(false);
+
       setProfileData(prev => ({
         ...prev,
-        name: name.trim(),
-        fullName: name.trim(),
-        employee: { ...(prev?.employee || {}), name: name.trim(), fullName: name.trim(), mobile: phone, currentAddress: address },
-        profile: { ...(prev?.profile || {}), name: name.trim(), fullName: name.trim(), phoneNumber: phone, address }
+        name: cleanName,
+        fullName: cleanName,
+        employee: { ...(prev?.employee || {}), name: cleanName, fullName: cleanName, mobile: phone, currentAddress: address },
+        profile: { ...(prev?.profile || {}), name: cleanName, fullName: cleanName, phoneNumber: phone, address }
       }));
 
       setIsSaved(true);
@@ -993,11 +1022,11 @@ export const ProfileView = () => {
     );
   }
 
-  const fullName = name || emp.name || emp.fullName || prof.name || prof.fullName || contextUser?.name || 'Employee';
-  const employeeId = emp.employeeID || prof.uniqueID || 'N/A';
-  const designation = emp.designation || prof.designation || contextUser?.designation || 'N/A';
-  const department = emp.department || prof.department || contextUser?.department || 'N/A';
-  const joiningDateRaw = emp.joiningDate || prof.dob;
+  const fullName = name || resolveEmployeeName(profileData) || resolveEmployeeName(contextUser) || 'Employee';
+  const employeeId = emp.employeeID || prof.uniqueID || profileData?.employeeID || 'N/A';
+  const designation = emp.designation || prof.designation || contextUser?.designation || profileData?.designation || 'N/A';
+  const department = emp.department || prof.department || contextUser?.department || profileData?.department || 'N/A';
+  const joiningDateRaw = emp.joiningDate || prof.dob || profileData?.joiningDate;
   const joiningDate = joiningDateRaw ? joiningDateRaw.split('T')[0] : 'N/A';
   const displayRole = (
     userRole === 'team_leader' 
@@ -1007,10 +1036,10 @@ export const ProfileView = () => {
         : (roleDetails?.roleName || (emp.role && typeof emp.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(emp.role) ? emp.role : 'Employee'))
   );
   
-  const dobRaw = emp.dob || prof.dob;
+  const dobRaw = emp.dob || prof.dob || profileData?.dob;
   const dob = dobRaw ? dobRaw.split('T')[0] : 'N/A';
-  const bloodGroup = emp.bloodGroup || prof.bloodGroup || 'N/A';
-  const gender = emp.gender || 'N/A';
+  const bloodGroup = emp.bloodGroup || prof.bloodGroup || profileData?.bloodGroup || 'N/A';
+  const gender = emp.gender || profileData?.gender || 'N/A';
 
   const emergencyContact = emp.emergencyContact || {};
   const educationList = emp.education || [];
@@ -1164,6 +1193,17 @@ export const ProfileView = () => {
 
           {/* Quick Stats / Navigation Switch */}
           <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto justify-center md:items-end">
+            <button
+              type="button"
+              onClick={() => fetchProfile(true)}
+              disabled={isRefreshing}
+              title="Fetch real-time profile details from server (GET /api/users/profile)"
+              className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer shadow-xs disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"} />
+              <span>{isRefreshing ? 'Fetching...' : 'Sync Live Details'}</span>
+            </button>
+
             <button
               onClick={() => setActiveTab('documents')}
               className="px-4 py-2 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-md text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"

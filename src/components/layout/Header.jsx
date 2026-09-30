@@ -3,7 +3,7 @@ import {
   Search, Bell, Menu, User, LogOut, ChevronDown, 
   Camera, CheckCircle2, AlertCircle, Sun, Moon, CheckCheck
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext.jsx';
+import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js'; 
 import companyLogo from '../../assets/Logo.png';
 
@@ -11,7 +11,7 @@ export const Header = ({ onSignOut }) => {
   const { 
     user, currentTab, setCurrentTab, setIsMobileSidebarOpen, 
     globalSearchQuery, setGlobalSearchQuery, attendanceStatus, handleCheckOut,
-    userRole
+    userRole, updateUserProfile
   } = useApp();
 
   const [timeString, setTimeString] = useState('');
@@ -126,10 +126,14 @@ export const Header = ({ onSignOut }) => {
     }
   };
 
-  // Poll notifications every 30 seconds across screens
+  // Poll notifications every 60 seconds across screens (pause when document is hidden)
   useEffect(() => {
+    if (!localStorage.getItem('auth_token')) return;
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchNotifications();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -154,16 +158,24 @@ export const Header = ({ onSignOut }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
     const fetchHeaderProfile = async () => {
       try {
-        const response = await api.get('/api/users/profile');
-        setHeaderProfileData(response.data?.data || response.data);
+        const pData = await fetchLiveUserProfile();
+        if (pData && isMounted) {
+          setHeaderProfileData(pData);
+          const resolved = resolveEmployeeName(pData);
+          if (resolved && updateUserProfile && user?.name !== resolved) {
+            updateUserProfile({ name: resolved, fullName: resolved, employee: resolveEmployeeData(pData) });
+          }
+        }
       } catch (error) {
         console.error("Failed to load profile for header:", error);
       }
     };
     fetchHeaderProfile();
-  }, [user?.name, user?.employee?.name, currentTab]);
+    return () => { isMounted = false; };
+  }, []);
 
   useEffect(() => {
     const updateClock = () => {
@@ -203,32 +215,14 @@ export const Header = ({ onSignOut }) => {
 
   const extractName = (source) => {
     if (!source) return '';
-    const empData = source.employee || {};
-    const profData = source.profile || source.user || source;
-    return (
-      source.name ||
-      source.fullName ||
-      empData.name ||
-      empData.fullName ||
-      profData.name ||
-      profData.fullName ||
-      (empData.firstName ? `${empData.firstName} ${empData.lastName || ''}`.trim() : '') ||
-      (profData.firstName ? `${profData.firstName} ${profData.lastName || ''}`.trim() : '') ||
-      (source.firstName ? `${source.firstName} ${source.lastName || ''}`.trim() : '') ||
-      ''
-    );
+    return resolveEmployeeName(source) || '';
   };
 
   const extractPhoto = (source) => {
     if (!source) return '';
-    const empData = source.employee || {};
+    const empData = resolveEmployeeData(source);
     const profData = source.profile || source.user || source;
     return (
-      source.profilePhoto ||
-      source.profileImage ||
-      source.avatar ||
-      source.photoUrl ||
-      source.photo ||
       empData.profilePhoto ||
       empData.profileImage ||
       empData.avatar ||
@@ -239,11 +233,16 @@ export const Header = ({ onSignOut }) => {
       profData.avatar ||
       profData.photoUrl ||
       profData.photo ||
+      source.profilePhoto ||
+      source.profileImage ||
+      source.avatar ||
+      source.photoUrl ||
+      source.photo ||
       ''
     );
   };
 
-  const displayName = extractName(user) || extractName(headerProfileData) || 'Employee';
+  const displayName = resolveEmployeeName(headerProfileData) || resolveEmployeeName(user) || 'Employee';
   const displayEmail = user?.email || user?.employee?.email || user?.profile?.email || headerProfileData?.email || headerProfileData?.employee?.email || 'emp@gmail.com';
   const displayPhoto = extractPhoto(user) || extractPhoto(headerProfileData);
   const [headerImgError, setHeaderImgError] = useState(false);

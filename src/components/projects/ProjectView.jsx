@@ -276,17 +276,23 @@ export const ProjectView = () => {
         baseProjects = Array.from(projectMap.values());
       }
 
-      // 2. For each project, fetch its assigned members via GET /api/projectManage/project/members/:projectId
+      // 2. For each project, fetch its assigned members via GET /api/projectManage/project/members/:projectId only if needed
       const projectWithMembersList = await Promise.all(
         baseProjects.map(async (proj) => {
           let membersData = null;
-          try {
-            const memRes = await api.get(`/api/projectManage/project/members/${proj._id}`);
-            if (memRes.data?.success && memRes.data?.data) {
-              membersData = memRes.data.data;
+          const hasEmbeddedMembers = Boolean(
+            proj.teamLeadUser || proj.teamLeadEmployee ||
+            (Array.isArray(proj.employees) && proj.employees.length > 0)
+          );
+          if (!hasEmbeddedMembers && proj._id) {
+            try {
+              const memRes = await api.get(`/api/projectManage/project/members/${proj._id}`);
+              if (memRes.data?.success && memRes.data?.data) {
+                membersData = memRes.data.data;
+              }
+            } catch (err) {
+              // Silently fall back to member information embedded in project
             }
-          } catch (err) {
-            // Silently fall back to member information embedded in project
           }
 
           // Build unified assigned members list

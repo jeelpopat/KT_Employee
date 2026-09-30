@@ -11,7 +11,8 @@ import {
   formatMinutesToTimeStr,
   convertUTCMinutesToLocal,
   formatISOToLocalTime,
-  normalizeAttendanceRecord
+  normalizeAttendanceRecord,
+  deriveAttendanceStatus
 } from '../../utils/timelineUtils.js';
 
 export const AttendanceView = () => {
@@ -35,6 +36,15 @@ export const AttendanceView = () => {
     const y = today.getFullYear();
     const m = String(today.getMonth() + 1).padStart(2, '0');
     setSelectedMonthStr(`${y}-${m}`);
+
+    // Purge any stale rejection overrides from localStorage so real server data is always loaded
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('kt_attendance_rejected_') || key.startsWith('kt_rejection_reason_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {}
   }, []);
 
   const fetchAttendance = async () => {
@@ -58,18 +68,124 @@ export const AttendanceView = () => {
         endpoint += `?filter=today`;
       }
 
-      const response = await api.get(endpoint);
-      const data = response.data?.data || [];
-      const summary = response.data?.summary || {};
+      // Fetch timeline records and authoritative today's attendance simultaneously
+      const [tlResponse, todayResponse] = await Promise.allSettled([
+        api.get(endpoint, { skipCache: true }),
+        api.get('/api/attendance/today', { skipCache: true })
+      ]);
 
-      const sortedRecords = [...data].sort((a, b) => new Date(b.date || b.checkInTime) - new Date(a.date || a.checkInTime));
+      let data = [];
+      let summary = {};
+      if (tlResponse.status === 'fulfilled') {
+        data = tlResponse.value.data?.data || [];
+        summary = tlResponse.value.data?.summary || {};
+      }
+
+      let todayDoc = null;
+      if (todayResponse.status === 'fulfilled') {
+        const tData = todayResponse.value.data?.attendance || todayResponse.value.data?.data?.attendance || todayResponse.value.data?.data || todayResponse.value.data;
+        if (tData && (tData.checkInTime || tData.status || tData.approvalStatus || tData.adminStatus || tData._id)) {
+          todayDoc = tData;
+        }
+      }
+
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const todayLocalStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      // Purge any stale rejection flags from localStorage
+      localStorage.removeItem('kt_attendance_rejected_' + todayStr);
+      localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
+      localStorage.removeItem('kt_rejection_reason_' + todayStr);
+      localStorage.removeItem('kt_rejection_reason_' + todayLocalStr);
+
+      const todayStatusLower = String(todayDoc?.status || '').toLowerCase();
+      const todayApprvLower = String(todayDoc?.approvalStatus || '').toLowerCase();
+      const todayAdminLower = String(todayDoc?.adminStatus || '').toLowerCase();
+
+      // Only reject if authoritative server record explicitly states rejection
+      const isTodayRejected = Boolean(
+        todayDoc?.isRejected === true ||
+        todayStatusLower === 'rejected' ||
+        todayStatusLower.includes('reject') ||
+        todayApprvLower === 'rejected' ||
+        todayApprvLower.includes('reject') ||
+        todayAdminLower === 'rejected' ||
+        todayAdminLower.includes('reject')
+      );
+
+      // Merge authoritative today's state into attendance records
+      let todayFound = false;
+      const mergedRecords = data.map((record) => {
+        const isRecToday = isTodayDate(record.date) || isTodayDate(record.checkInTime);
+        if (isRecToday) {
+          todayFound = true;
+          const statusLower = String(record.status || todayDoc?.status || '').toLowerCase();
+          const apprvLower = String(record.approvalStatus || todayDoc?.approvalStatus || '').toLowerCase();
+          const adminLower = String(record.adminStatus || todayDoc?.adminStatus || '').toLowerCase();
+
+          const isRej = Boolean(
+            isTodayRejected ||
+            record.isRejected === true ||
+            statusLower === 'rejected' ||
+            statusLower.includes('reject') ||
+            apprvLower === 'rejected' ||
+            apprvLower.includes('reject') ||
+            adminLower === 'rejected' ||
+            adminLower.includes('reject')
+          );
+
+          if (isRej) {
+            return {
+              ...record,
+              ...(todayDoc || {}),
+              status: 'rejected',
+              approvalStatus: 'rejected',
+              isRejected: true,
+              rejectionReason: todayDoc?.rejectionReason || record.rejectionReason || 'Rejected by admin',
+              timelineSegments: [],
+              totalWorkTime: 0,
+              totalWorkTimeDisplay: '0h'
+            };
+          } else if (todayDoc) {
+            return {
+              ...record,
+              ...todayDoc,
+              status: todayDoc.status || record.status,
+              approvalStatus: todayDoc.approvalStatus || record.approvalStatus,
+              timelineSegments: record.timelineSegments || todayDoc.timelineSegments || []
+            };
+          }
+        }
+        return record;
+      });
+
+      // If today's record wasn't returned by timeline API but exists or was rejected today, ensure it appears
+      if (!todayFound && (todayDoc || isTodayRejected) && (activeFilterTab === 'today' || activeFilterTab === '10days' || activeFilterTab === '7days' || activeFilterTab === 'month')) {
+        mergedRecords.push({
+          _id: todayDoc?._id || `today-${todayStr}`,
+          date: todayDoc?.date || new Date().toISOString(),
+          checkInTime: todayDoc?.checkInTime || todayDoc?.inTime || localStorage.getItem('kt_check_in_time_str'),
+          checkOutTime: todayDoc?.checkOutTime || todayDoc?.outTime,
+          status: isTodayRejected ? 'rejected' : (todayDoc?.status || 'present'),
+          approvalStatus: isTodayRejected ? 'rejected' : todayDoc?.approvalStatus,
+          isRejected: isTodayRejected,
+          rejectionReason: isTodayRejected ? (todayDoc?.rejectionReason || localRejectionReason) : undefined,
+          timelineSegments: isTodayRejected ? [] : (todayDoc?.timelineSegments || []),
+          totalWorkTime: isTodayRejected ? 0 : (todayDoc?.totalWorkTime || 0),
+          totalWorkTimeDisplay: isTodayRejected ? '0h' : (todayDoc?.totalWorkTimeDisplay || '0h'),
+          totalBreakTime: isTodayRejected ? 0 : (todayDoc?.totalBreakTime || 0)
+        });
+      }
+
+      const sortedRecords = [...mergedRecords].sort((a, b) => new Date(b.date || b.checkInTime) - new Date(a.date || a.checkInTime));
       // Normalize all records: if employee has not checked out until 11:59 PM, auto check out time 7:00 PM at that day
       const normalizedRecords = sortedRecords.map(normalizeAttendanceRecord);
       setAttendanceRecords(normalizedRecords);
 
       let totalWorkHrs = summary.totalWorkingHours || 0;
       if (normalizedRecords.length > 0) {
-        const computedTotal = normalizedRecords.reduce((acc, r) => acc + (parseFloat(r.totalWorkTime) || 0), 0);
+        const computedTotal = normalizedRecords.reduce((acc, r) => acc + (r.isRejected ? 0 : (parseFloat(r.totalWorkTime) || 0)), 0);
         if (computedTotal > totalWorkHrs) {
           totalWorkHrs = Number(computedTotal.toFixed(1));
         }
@@ -77,8 +193,8 @@ export const AttendanceView = () => {
 
       setSummaryStats({
         totalWorkingHours: totalWorkHrs,
-        presentDays: summary.presentDays || normalizedRecords.filter(r => r.status === 'present' || r.checkInTime).length,
-        absentDays: summary.absentDays || 0,
+        presentDays: summary.presentDays || normalizedRecords.filter(r => (r.status === 'present' || r.checkInTime) && !r.isRejected && r.status !== 'rejected').length,
+        absentDays: (summary.absentDays || 0) + (isTodayRejected ? 1 : 0),
         halfDays: summary.halfDays || 0,
         averageWorkingHours: summary.averageWorkingHours || (normalizedRecords.length > 0 ? Number((totalWorkHrs / normalizedRecords.length).toFixed(1)) : 0)
       });
@@ -97,7 +213,9 @@ export const AttendanceView = () => {
 
   const filteredRecords = attendanceRecords.filter(record => {
     const matchesSearch = (record.date || '').includes(searchQuery);
-    const matchesStatus = selectedStatusFilter === 'all' || (record.status || '').toLowerCase() === selectedStatusFilter.toLowerCase();
+    const matchesStatus = selectedStatusFilter === 'all' || 
+      (record.status || '').toLowerCase() === selectedStatusFilter.toLowerCase() ||
+      (selectedStatusFilter === 'rejected' && (record.isRejected || (record.status || '').toLowerCase().includes('reject')));
     return matchesSearch && matchesStatus;
   });
 
@@ -211,6 +329,7 @@ export const AttendanceView = () => {
               <option value="late">Late</option>
               <option value="half day">Half Day</option>
               <option value="absent">Absent</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
 
@@ -241,16 +360,39 @@ export const AttendanceView = () => {
             const statusLabel = (record.status || 'unknown').toLowerCase();
             const isToday = isTodayDate(record.date) || isTodayDate(record.checkInTime);
 
+            const isRecordRejected = Boolean(
+              record.isRejected === true ||
+              statusLabel === 'rejected' ||
+              statusLabel.includes('reject') ||
+              String(record.approvalStatus || '').toLowerCase().includes('reject') ||
+              String(record.adminStatus || '').toLowerCase().includes('reject') ||
+              String(record.checkInStatus || '').toLowerCase().includes('reject')
+            );
+
+            const isRecordPending = Boolean(
+              !isRecordRejected && (
+                record.isPending === true ||
+                statusLabel.includes('pending') ||
+                String(record.approvalStatus || '').toLowerCase().includes('pending') ||
+                String(record.adminStatus || '').toLowerCase().includes('pending') ||
+                String(record.checkInStatus || '').toLowerCase().includes('pending') ||
+                record.isApproved === false
+              )
+            );
+
             // Fixed 9-Hour Timeline Computation
             const nineHourTimeline = computeNineHourTimeline({
               checkInTime: record.checkInTime,
               checkOutTime: record.checkOutTime,
-              timelineSegments: record.timelineSegments || [],
+              timelineSegments: isRecordRejected ? [] : (record.timelineSegments || []),
               breaks: record.breaks || [],
-              isOnBreak: record.isOnBreak || statusLabel === 'on_break',
-              isCheckedIn: Boolean(record.checkInTime || record.status),
-              isCheckedOut: Boolean(record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null')
+              isOnBreak: !isRecordRejected && (record.isOnBreak || statusLabel === 'on_break'),
+              isCheckedIn: !isRecordRejected && !isRecordPending && Boolean(record.checkInTime || record.status),
+              isCheckedOut: !isRecordRejected && Boolean(record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null'),
+              isRejected: isRecordRejected
             });
+
+            const displayRejectionReason = isRecordRejected ? (record.rejectionReason || '') : '';
 
             return (
               <div key={record._id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-5 flex flex-col transition-colors shadow-sm hover:shadow-md">
@@ -268,49 +410,87 @@ export const AttendanceView = () => {
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium font-mono">
                         <MapPin size={12} className="text-slate-400" /> Verified Geofence
                       </p>
+                      {isRecordRejected && displayRejectionReason && (
+                        <p className="text-[11px] text-red-600 dark:text-red-400 mt-1 font-medium">
+                          Rejected: {displayRejectionReason}
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex flex-col items-end gap-2">
-                    {isToday ? (
-                      record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null' ? (
-                        <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">
-                          Checked Out
-                        </span>
-                      ) : record.isOnBreak || statusLabel === 'on_break' ? (
-                        <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 text-[#F59E0B] border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse"></span>
-                          Break In
-                        </span>
-                      ) : record.checkInTime ? (
-                        <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-[#00E676] border border-[#00E676]/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse"></span>
-                          Check In
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-800/50 text-slate-500 border border-slate-200 dark:border-slate-700 text-[10px] font-medium uppercase tracking-wider">
-                          Not Checked In
-                        </span>
-                      )
-                    ) : (
-                      <>
-                        {record.isAutoCheckedOut ? (
-                          <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">
-                            Checked Out (7:00 PM)
+                    {(() => {
+                      const derived = deriveAttendanceStatus({
+                        checkInTime: record.checkInTime,
+                        checkOutTime: record.checkOutTime,
+                        totalBreakMinutes: record.totalBreakTime,
+                        adminStatus: record.adminStatus || record.approvalStatus,
+                        approvalStatus: record.approvalStatus,
+                        checkInStatus: record.checkInStatus,
+                        isRejected: isRecordRejected,
+                        isPending: isRecordPending,
+                        rejectionReason: displayRejectionReason,
+                        status: isRecordRejected ? 'rejected' : record.status,
+                        isCompleted: Boolean(record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null')
+                      });
+
+                      if (isRecordRejected || derived.status === 'rejected') {
+                        return (
+                          <span className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                            Rejected
                           </span>
-                        ) : statusLabel === 'present' ? (
-                          <span className="px-2.5 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 text-[10px] font-bold uppercase tracking-wider">Present</span>
-                        ) : statusLabel === 'late' ? (
-                          <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider">Late</span>
-                        ) : statusLabel.includes('half day') ? (
-                          <span className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 text-[10px] font-bold uppercase tracking-wider">Half Day</span>
-                        ) : statusLabel === 'absent' ? (
-                          <span className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50 text-[10px] font-bold uppercase tracking-wider">Absent</span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">Checked Out</span>
-                        )}
-                      </>
-                    )}
+                        );
+                      }
+
+                      if (isRecordPending || derived.status === 'pending') {
+                        return (
+                          <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            Pending Approval
+                          </span>
+                        );
+                      }
+
+                      if (isToday) {
+                        if (record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null') {
+                          return (
+                            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">
+                              Checked Out ({derived.label})
+                            </span>
+                          );
+                        } else if (record.isOnBreak || statusLabel === 'on_break') {
+                          return (
+                            <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 text-[#F59E0B] border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse"></span>
+                              On Break
+                            </span>
+                          );
+                        } else if (record.checkInTime) {
+                          return (
+                            <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-[#00E676] border border-[#00E676]/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse"></span>
+                              Working ({derived.label})
+                            </span>
+                          );
+                        } else {
+                          return (
+                            <span className="px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-800/50 text-slate-500 border border-slate-200 dark:border-slate-700 text-[10px] font-medium uppercase tracking-wider">
+                              Not Checked In
+                            </span>
+                          );
+                        }
+                      } else {
+                        if (record.isAutoCheckedOut) {
+                          return <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">Checked Out (7:00 PM)</span>;
+                        }
+                        return (
+                          <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${derived.badgeClass || 'bg-slate-100 text-slate-700'}`}>
+                            {derived.label}
+                          </span>
+                        );
+                      }
+                    })()}
                   </div>
                 </div>
 
@@ -325,11 +505,11 @@ export const AttendanceView = () => {
                   </div>
                   <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
                     <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><Coffee size={10} className="text-amber-500" /> Break</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{Math.round(parseFloat(String(record.totalBreakTime || 0).replace(/[^\d.-]/g, '')) || 0)}m</span>
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{isRecordRejected ? '0m' : `${Math.round(parseFloat(String(record.totalBreakTime || 0).replace(/[^\d.-]/g, '')) || 0)}m`}</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
                     <span className="text-[10px] font-semibold text-blue-500 uppercase mb-1">Work</span>
-                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{record.totalWorkTimeDisplay || `${Math.round(parseFloat(String(record.totalWorkTime || 0)) || 0)}h`}</span>
+                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{isRecordRejected ? '0h' : (record.totalWorkTimeDisplay || `${Math.round(parseFloat(String(record.totalWorkTime || 0)) || 0)}h`)}</span>
                   </div>
                 </div>
 

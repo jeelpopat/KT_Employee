@@ -66,6 +66,20 @@ export const checkIn = (location) => attendanceRequest('post', '/api/attendance/
 export const breakIn = (location) => attendanceRequest('post', '/api/attendance/break/start', location);
 export const breakOut = (location) => attendanceRequest('post', '/api/attendance/break/end', location);
 export const checkOut = (location) => attendanceRequest('post', '/api/attendance/check-out', location);
+export const approveAttendance = (id) => api.post('/api/attendance/approve', { id });
+export const rejectAttendance = (id, reason = 'Attendance rejected by admin') => api.post('/api/attendance/reject', { id, reason });
+
+export const ATTENDANCE_LIMITS = {
+  MAX_BREAKS_PER_DAY: 2,
+  MAX_BREAK_MINUTES: 70, // 1h 10m
+  FULL_DAY_MIN_MINUTES: 470, // 7h 50m
+  HALF_DAY_MIN_MINUTES: 240, // 4h
+  CHECKIN_WINDOWS: {
+    ON_TIME_END: 610, // 10:10 AM
+    LATE_END: 630,    // 10:30 AM
+    HALF_DAY_END: 900 // 03:00 PM
+  }
+};
 
 export const getAttendanceErrorMessage = (error) => (
   error.response?.data?.message || error.message || 'Attendance request failed.'

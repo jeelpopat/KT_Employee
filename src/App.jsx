@@ -1,26 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext.jsx';
-import { Sidebar } from './components/layout/Sidebar.jsx';
-import { Header } from './components/layout/Header.jsx';
-import { DashboardView } from './components/dashboard/DashboardView.jsx';
-import { AttendanceView } from './components/attendance/AttendanceView.jsx';
-import { DailyReportView } from './components/daily-report/DailyReportView.jsx';
-import { TaskManagementView } from './components/tasks/TaskManagementView.jsx';
-import { LeaveManagementView } from './components/leave/LeaveManagementView.jsx';
-import { ProfileView } from './components/profile/ProfileView.jsx';
-import { AdminScreenshotPortal } from './components/screenshots/AdminScreenshotPortal.jsx';
-import { InactivityAlertModal } from './components/alerts/InactivityAlertModal.jsx';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 
-// Import Holiday Calendar & New Placeholders
-import { HolidayCalendarView } from './components/holiday/HolidayCalendarView.jsx';
-import {
-  SalaryView, PerformanceView, ProjectView,
-  TeamMembersView, EmployeesView, LearningHubView, InternshipProgressView,
-  DocumentsView, DailyFollowUpView, TeamTaskManagementView,
-  TeamLeaveManagementView, ReportView
-} from './components/placeholders/PlaceholderViews.jsx';
+// Lazy-load layout and views so unauthenticated users download ONLY the Login screen
+const Sidebar = lazy(() => import('./components/layout/Sidebar.jsx').then(m => ({ default: m.Sidebar })));
+const Header = lazy(() => import('./components/layout/Header.jsx').then(m => ({ default: m.Header })));
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView.jsx').then(m => ({ default: m.DashboardView })));
+const AttendanceView = lazy(() => import('./components/attendance/AttendanceView.jsx').then(m => ({ default: m.AttendanceView })));
+const DailyReportView = lazy(() => import('./components/daily-report/DailyReportView.jsx').then(m => ({ default: m.DailyReportView })));
+const TaskManagementView = lazy(() => import('./components/tasks/TaskManagementView.jsx').then(m => ({ default: m.TaskManagementView })));
+const LeaveManagementView = lazy(() => import('./components/leave/LeaveManagementView.jsx').then(m => ({ default: m.LeaveManagementView })));
+const ProfileView = lazy(() => import('./components/profile/ProfileView.jsx').then(m => ({ default: m.ProfileView })));
+const AdminScreenshotPortal = lazy(() => import('./components/screenshots/AdminScreenshotPortal.jsx').then(m => ({ default: m.AdminScreenshotPortal })));
+const InactivityAlertModal = lazy(() => import('./components/alerts/InactivityAlertModal.jsx').then(m => ({ default: m.InactivityAlertModal })));
+const HolidayCalendarView = lazy(() => import('./components/holiday/HolidayCalendarView.jsx').then(m => ({ default: m.HolidayCalendarView })));
+
+// Lazy-load role & placeholder views
+const SalaryView = lazy(() => import('./components/salary/SalaryView.jsx').then(m => ({ default: m.SalaryView })));
+const ProjectView = lazy(() => import('./components/projects/ProjectView.jsx').then(m => ({ default: m.ProjectView })));
+const PerformanceView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.PerformanceView })));
+const TeamMembersView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.TeamMembersView })));
+const EmployeesView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.EmployeesView })));
+const LearningHubView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.LearningHubView })));
+const InternshipProgressView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.InternshipProgressView })));
+const DocumentsView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.DocumentsView })));
+const DailyFollowUpView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.DailyFollowUpView })));
+const TeamTaskManagementView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.TeamTaskManagementView })));
+const TeamLeaveManagementView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.TeamLeaveManagementView })));
+const ReportView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.ReportView })));
 
 const MainLayout = ({ handleSignOut }) => {
   const { currentTab, isSidebarCollapsed } = useApp();
@@ -58,17 +66,29 @@ const MainLayout = ({ handleSignOut }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 antialiased font-sans transition-colors">
-      <Sidebar onSignOut={handleSignOut} />
+      <Suspense fallback={null}>
+        <Sidebar onSignOut={handleSignOut} />
+      </Suspense>
       <div
         className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
           }`}
       >
-        <Header onSignOut={handleSignOut} />
+        <Suspense fallback={<div className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900" />}>
+          <Header onSignOut={handleSignOut} />
+        </Suspense>
         <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full mx-auto space-y-6">
-          {renderActiveTab()}
+          <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[350px]">
+              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          }>
+            {renderActiveTab()}
+          </Suspense>
         </main>
       </div>
-      <InactivityAlertModal />
+      <Suspense fallback={null}>
+        <InactivityAlertModal />
+      </Suspense>
     </div>
   );
 };

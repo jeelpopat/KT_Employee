@@ -107,12 +107,151 @@ export const deriveUserRole = (u) => {
   return 'employee';
 };
 
+// Helper to extract the linked Employee subdocument from any response structure
+export const resolveEmployeeData = (source) => {
+  if (!source || typeof source !== 'object') return {};
+  if (source.employee && typeof source.employee === 'object') return source.employee;
+  if (source.employeeId && typeof source.employeeId === 'object') return source.employeeId;
+  if (source.employeeID && typeof source.employeeID === 'object') return source.employeeID;
+  if (source.emp && typeof source.emp === 'object') return source.emp;
+  if (source.employeeDetails && typeof source.employeeDetails === 'object') return source.employeeDetails;
+  if (source.data?.employee && typeof source.data.employee === 'object') return source.data.employee;
+  if (source.data?.employeeId && typeof source.data.employeeId === 'object') return source.data.employeeId;
+  if (source.user?.employee && typeof source.user.employee === 'object') return source.user.employee;
+  if (source.user?.employeeId && typeof source.user.employeeId === 'object') return source.user.employeeId;
+  if (source.profile?.employee && typeof source.profile.employee === 'object') return source.profile.employee;
+  return {};
+};
+
+// Helper to extract the authoritative employee full name across linked records
+export const resolveEmployeeName = (source) => {
+  if (!source) return '';
+
+  const emp = resolveEmployeeData(source);
+  const prof = (source.profile && typeof source.profile === 'object')
+    ? source.profile
+    : (source.user && typeof source.user === 'object')
+      ? source.user
+      : (source.data && typeof source.data === 'object')
+        ? source.data
+        : {};
+
+  const isValid = (val) => {
+    if (!val || typeof val !== 'string') return false;
+    const s = val.trim().toLowerCase();
+    return s.length > 0 && s !== 'employee' && s !== 'user' && s !== 'active employee' && s !== 'staff' && s !== 'company member' && s !== 'n/a';
+  };
+
+  // 1. Linked Employee document fields (highest authority)
+  const empCandidate = (
+    (emp.firstName && emp.lastName ? `${emp.firstName} ${emp.lastName}`.trim() : '') ||
+    emp.fullName ||
+    emp.employeeName ||
+    emp.name ||
+    emp.empName ||
+    (emp.firstName ? `${emp.firstName} ${emp.lastName || ''}`.trim() : '')
+  );
+  if (isValid(empCandidate)) return empCandidate.trim();
+
+  // 2. Specific employeeName fields on top level
+  if (isValid(source.employeeName)) return source.employeeName.trim();
+  if (isValid(source.empName)) return source.empName.trim();
+  if (isValid(prof.employeeName)) return prof.employeeName.trim();
+  if (isValid(prof.empName)) return prof.empName.trim();
+
+  // 3. User's manually saved employee full name in localStorage (persisted when saved in Profile)
+  if (typeof window !== 'undefined') {
+    try {
+      const savedCustom = localStorage.getItem('kt_employee_full_name');
+      if (isValid(savedCustom)) return savedCustom.trim();
+    } catch (e) {}
+  }
+
+  // 4. Source / profile fullName (or firstName + lastName)
+  const profFullName = (
+    (prof.firstName && prof.lastName ? `${prof.firstName} ${prof.lastName}`.trim() : '') ||
+    prof.fullName ||
+    (source.firstName && source.lastName ? `${source.firstName} ${source.lastName}`.trim() : '') ||
+    source.fullName
+  );
+  if (isValid(profFullName)) return profFullName.trim();
+
+  // 5. Standard name fields
+  const standardName = (
+    prof.name ||
+    source.name ||
+    (prof.firstName ? `${prof.firstName} ${prof.lastName || ''}`.trim() : '') ||
+    (source.firstName ? `${source.firstName} ${source.lastName || ''}`.trim() : '')
+  );
+  if (isValid(standardName)) return standardName.trim();
+
+  return '';
+};
+
+// In-flight request tracker to prevent duplicate simultaneous profile network requests
+let inFlightProfilePromise = null;
+
+// Unified fetcher for live profile data from backend (GET /api/users/profile)
+export const fetchLiveUserProfile = async () => {
+  if (inFlightProfilePromise) {
+    return inFlightProfilePromise;
+  }
+
+  inFlightProfilePromise = (async () => {
+    let profileData = null;
+    try {
+      const res = await api.get('/api/users/profile');
+      const raw = res.data?.data || res.data;
+      const userPart = raw?.user || res.data?.user || raw?.profile || res.data?.profile || raw;
+      const empPart = resolveEmployeeData(raw) || resolveEmployeeData(res.data) || {};
+
+      profileData = {
+        ...(typeof userPart === 'object' ? userPart : {}),
+        ...(typeof raw === 'object' ? raw : {}),
+        employee: (typeof empPart === 'object' && Object.keys(empPart).length > 0)
+          ? empPart
+          : (typeof raw?.employee === 'object' ? raw.employee : (typeof userPart?.employee === 'object' ? userPart.employee : {}))
+      };
+
+      if (profileData) {
+        const resolvedName = resolveEmployeeName(profileData);
+        if (resolvedName) {
+          profileData.name = resolvedName;
+          profileData.fullName = resolvedName;
+        }
+      }
+    } catch (err) {
+      console.warn('GET /api/users/profile notice:', err.message);
+    } finally {
+      // Clear in-flight reference after short delay so future manual syncs get fresh data
+      setTimeout(() => {
+        inFlightProfilePromise = null;
+      }, 500);
+    }
+
+    return profileData;
+  })();
+
+  return inFlightProfilePromise;
+};
+
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('auth_user');
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        const resolved = resolveEmployeeName(parsed);
+        if (resolved) {
+          if (parsed.name !== resolved || parsed.fullName !== resolved) {
+            parsed.name = resolved;
+            parsed.fullName = resolved;
+            try {
+              localStorage.setItem('auth_user', JSON.stringify(parsed));
+            } catch (e) {}
+          }
+        }
+        return parsed;
       } catch (e) {
         return initialUser;
       }
@@ -158,8 +297,47 @@ export const AppProvider = ({ children }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Attendance state initialized as checked_in for rich demonstration
-  const [attendanceStatus, setAttendanceStatus] = useState('checked_in');
+  // Purge any stale rejection overrides from localStorage so real data is always loaded
+  useEffect(() => {
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('kt_attendance_rejected_') || key.startsWith('kt_rejection_reason_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {}
+  }, []);
+
+  // Attendance state initialized from persistent daily flags
+  const [attendanceStatus, setAttendanceStatus] = useState(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayLocalStr = new Date().toLocaleDateString('en-CA');
+    if (
+      localStorage.getItem('kt_attendance_pending_' + todayStr) === 'true' ||
+      localStorage.getItem('kt_attendance_pending_' + todayLocalStr) === 'true'
+    ) {
+      return 'pending';
+    }
+    if (
+      localStorage.getItem('kt_checked_out_' + todayStr) === 'true' ||
+      localStorage.getItem('kt_checked_out_' + todayLocalStr) === 'true'
+    ) {
+      return 'checked_out';
+    }
+    if (
+      localStorage.getItem('kt_on_break_' + todayStr) === 'true' ||
+      localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true'
+    ) {
+      return 'on_break';
+    }
+    if (
+      localStorage.getItem('kt_checked_in_' + todayStr) === 'true' ||
+      localStorage.getItem('kt_checked_in_' + todayLocalStr) === 'true'
+    ) {
+      return 'checked_in';
+    }
+    return 'not_checked_in';
+  });
   const [sessionId, setSessionId] = useState('SES-20260820-001');
   const [checkInTime, setCheckInTime] = useState('10:00:00 AM');
   const [checkOutTime, setCheckOutTime] = useState(null);
@@ -248,8 +426,9 @@ export const AppProvider = ({ children }) => {
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
 
-  // Sync Live Tasks into global AppContext
+  // Sync Live Tasks into global AppContext (only if authenticated)
   useEffect(() => {
+    if (!localStorage.getItem('auth_token')) return;
     const syncLiveTasks = async () => {
       try {
         const res = await api.get('/api/task/all');
@@ -1041,13 +1220,12 @@ export const AppProvider = ({ children }) => {
       // 3. If user data doesn't have role yet, try fetching profile from backend
       if (!currentRole && token) {
         try {
-          const profileRes = await api.get('/api/users/profile');
-          const pData = profileRes.data?.data || profileRes.data;
+          const pData = await fetchLiveUserProfile();
           if (pData) {
             candidate = pData;
             setUser(pData);
             localStorage.setItem('auth_user', JSON.stringify(pData));
-            const pEmp = pData.employee || {};
+            const pEmp = resolveEmployeeData(pData);
             const pProf = pData.profile || pData.user || pData || {};
             currentRole = (
               pData.roleId || pData.role || pData.userRole || pData.applicantRole ||
@@ -1318,9 +1496,13 @@ export const AppProvider = ({ children }) => {
       const token = localStorage.getItem('auth_token');
       if (token) {
         try {
-          const profileRes = await api.get('/api/users/profile');
-          const pData = profileRes.data?.data || profileRes.data;
+          const pData = await fetchLiveUserProfile();
           if (pData) {
+            const resolved = resolveEmployeeName(pData);
+            if (resolved) {
+              pData.name = resolved;
+              pData.fullName = resolved;
+            }
             setUser(pData);
             localStorage.setItem('auth_user', JSON.stringify(pData));
             await resolveRole(pData);
@@ -1342,18 +1524,26 @@ export const AppProvider = ({ children }) => {
     if (token) localStorage.setItem('auth_token', token);
 
     let activeUser = userData;
-    // Immediately fetch latest profile with role info from backend
+    // Immediately fetch latest live profile with role info from backend
     try {
-      const profRes = await api.get('/api/users/profile');
-      const pData = profRes.data?.data || profRes.data;
+      const pData = await fetchLiveUserProfile();
       if (pData) {
-        activeUser = { ...userData, ...pData };
+        activeUser = { 
+          ...userData, 
+          ...pData,
+          employee: { ...resolveEmployeeData(userData), ...resolveEmployeeData(pData) }
+        };
       }
     } catch (e) {
       console.warn('Profile fetch on login fallback:', e);
     }
 
     if (activeUser) {
+      const resolved = resolveEmployeeName(activeUser);
+      if (resolved) {
+        activeUser.name = resolved;
+        activeUser.fullName = resolved;
+      }
       localStorage.setItem('auth_user', JSON.stringify(activeUser));
       setUser(activeUser);
       const determined = await resolveRole(activeUser);
@@ -1368,12 +1558,14 @@ export const AppProvider = ({ children }) => {
 
   const updateUserProfile = (updated) => {
     setUser(prev => {
+      const resolvedName = updated.name || updated.fullName || resolveEmployeeName(updated) || prev?.name;
       const merged = {
         ...prev,
         ...updated,
-        name: updated.name !== undefined ? updated.name : prev?.name,
-        employee: prev?.employee ? { ...prev.employee, ...updated } : updated,
-        profile: prev?.profile ? { ...prev.profile, ...updated } : updated
+        name: resolvedName,
+        fullName: resolvedName,
+        employee: prev?.employee ? { ...prev.employee, ...updated, name: resolvedName, fullName: resolvedName } : { ...updated, name: resolvedName, fullName: resolvedName },
+        profile: prev?.profile ? { ...prev.profile, ...updated, name: resolvedName, fullName: resolvedName } : { ...updated, name: resolvedName, fullName: resolvedName }
       };
       try {
         localStorage.setItem('auth_user', JSON.stringify(merged));
@@ -1388,9 +1580,13 @@ export const AppProvider = ({ children }) => {
     const token = localStorage.getItem('auth_token');
     if (!token) return null;
     try {
-      const profileRes = await api.get('/api/users/profile');
-      const pData = profileRes.data?.data || profileRes.data;
+      const pData = await fetchLiveUserProfile();
       if (pData) {
+        const resolved = resolveEmployeeName(pData);
+        if (resolved) {
+          pData.name = resolved;
+          pData.fullName = resolved;
+        }
         setUser(pData);
         localStorage.setItem('auth_user', JSON.stringify(pData));
         await resolveRole(pData);
@@ -1469,6 +1665,9 @@ export const AppProvider = ({ children }) => {
       setGlobalSearchQuery,
       updateUserProfile,
       refreshUserProfile,
+      resolveEmployeeName,
+      resolveEmployeeData,
+      fetchLiveUserProfile,
       updateMonitoringSettings,
       getAdminScreenshots,
       getMonitoringSettings,

@@ -6,7 +6,7 @@ import {
   ExternalLink, Plus, Settings, Check
 } from 'lucide-react';
 import api from '../../api/axios.js';
-import { useApp } from '../../context/AppContext.jsx';
+import { useApp, resolveEmployeeName } from '../../context/AppContext.jsx';
 
 export const SalaryView = () => {
   const { user } = useApp();
@@ -98,9 +98,10 @@ export const SalaryView = () => {
   }, [user]);
 
   const myName = useMemo(() => {
-    return (user?.name || (() => {
+    return (resolveEmployeeName(user) || user?.employee?.name || user?.employee?.fullName || user?.name || (() => {
       try {
-        return JSON.parse(localStorage.getItem('auth_user') || '{}').name;
+        const parsed = JSON.parse(localStorage.getItem('auth_user') || '{}');
+        return resolveEmployeeName(parsed) || parsed.employee?.name || parsed.employee?.fullName || parsed.name || '';
       } catch { return ''; }
     })() || '').toLowerCase().trim();
   }, [user]);
@@ -421,7 +422,7 @@ export const SalaryView = () => {
     if (directUrl && typeof directUrl === 'string') {
       const link = document.createElement('a');
       link.href = directUrl.startsWith('http') ? directUrl : `https://kt-backend-1.onrender.com${directUrl}`;
-      link.download = `Payslip-${slip.month || 'Salary'}-${user?.name || 'Employee'}.pdf`;
+      link.download = `Payslip-${slip.month || 'Salary'}-${user?.employee?.name || user?.name || 'Employee'}.pdf`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
@@ -442,7 +443,7 @@ export const SalaryView = () => {
         const downloadUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = downloadUrl;
-        link.download = `Payslip-${slip.month || 'Salary'}-${user?.name || 'Employee'}.pdf`;
+        link.download = `Payslip-${slip.month || 'Salary'}-${user?.employee?.name || user?.name || 'Employee'}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -455,7 +456,7 @@ export const SalaryView = () => {
           const link = document.createElement('a');
           link.href = directPdfUrl;
           link.target = '_blank';
-          link.download = `Payslip-${slip.month || 'Salary'}-${user?.name || 'Employee'}.pdf`;
+          link.download = `Payslip-${slip.month || 'Salary'}-${user?.employee?.name || user?.name || 'Employee'}.pdf`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -615,7 +616,7 @@ export const SalaryView = () => {
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Live earnings breakdown, monthly payslips, and deductions for <strong>{user?.name || 'Employee'}</strong>
+              Live earnings breakdown, monthly payslips, and deductions for <strong>{user?.employee?.name || user?.name || 'Employee'}</strong>
             </p>
           </div>
         </div>
@@ -876,7 +877,7 @@ export const SalaryView = () => {
               <span>My Payslip History</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Showing salary slips for <strong>{user?.name || 'you'}</strong> ({primaryUserId || 'Verified ID'})
+              Showing salary slips for <strong>{user?.employee?.name || user?.name || 'you'}</strong> ({primaryUserId || 'Verified ID'})
             </p>
           </div>
 
@@ -1104,7 +1105,7 @@ export const SalaryView = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-lg border border-slate-200 dark:border-slate-700/60">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold">Employee Name</span>
-                  <p className="font-bold text-slate-900 dark:text-slate-100 text-xs mt-0.5">{user?.name || 'Employee'}</p>
+                  <p className="font-bold text-slate-900 dark:text-slate-100 text-xs mt-0.5">{user?.employee?.name || user?.name || 'Employee'}</p>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold">Employee ID / Code</span>

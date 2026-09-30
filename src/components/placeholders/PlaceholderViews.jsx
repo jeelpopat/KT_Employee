@@ -289,13 +289,19 @@ export const TeamMembersView = () => {
         await Promise.all(
           projects.map(async (p) => {
             let pMembers = null;
-            try {
-              const memRes = await api.get(`/api/projectManage/project/members/${p._id}`);
-              if (memRes.data?.success && memRes.data?.data) {
-                pMembers = memRes.data.data;
+            const hasEmbeddedMembers = Boolean(
+              p.teamLeadUser || p.teamLeadEmployee ||
+              (Array.isArray(p.employees) && p.employees.length > 0)
+            );
+            if (!hasEmbeddedMembers && p._id) {
+              try {
+                const memRes = await api.get(`/api/projectManage/project/members/${p._id}`);
+                if (memRes.data?.success && memRes.data?.data) {
+                  pMembers = memRes.data.data;
+                }
+              } catch (e) {
+                // Ignore failure for individual project
               }
-            } catch (e) {
-              // Ignore failure for individual project
             }
 
             // Check if CURRENT USER is assigned to this project

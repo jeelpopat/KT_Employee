@@ -186,6 +186,31 @@ export const normalizeAttendanceRecord = (record) => {
 
   const rawCheckIn = record.checkInTime || record.inTime || record.checkIn;
   const statusStr = String(record.status || '').toLowerCase().trim();
+  const approvalStatusLower = String(record.approvalStatus || '').toLowerCase().trim();
+  const adminStatusLower = String(record.adminStatus || '').toLowerCase().trim();
+  const checkInStatusLower = String(record.checkInStatus || '').toLowerCase().trim();
+
+  // If record was rejected by admin
+  const isRej = Boolean(
+    record.isRejected === true ||
+    statusStr === 'rejected' ||
+    statusStr.includes('reject') ||
+    approvalStatusLower.includes('reject') ||
+    adminStatusLower.includes('reject') ||
+    checkInStatusLower.includes('reject')
+  );
+
+  if (isRej) {
+    return {
+      ...record,
+      status: 'rejected',
+      approvalStatus: 'rejected',
+      isRejected: true,
+      totalWorkTime: 0,
+      totalWorkTimeDisplay: '0h',
+      timelineSegments: []
+    };
+  }
 
   const hasCheckIn = Boolean(
     (rawCheckIn && rawCheckIn !== '--:--' && rawCheckIn !== 'null' && rawCheckIn !== 'undefined') ||
@@ -336,11 +361,59 @@ export const computeNineHourTimeline = ({
   isOnBreak = false,
   isCheckedIn = false,
   isCheckedOut = false,
+  isRejected = false,
   breaks = []
 }) => {
   const TOTAL_MINUTES = TOTAL_SHIFT_MINUTES; // 540 minutes = 9 hours
 
   let startMinutes = parseTimeToMinutes(checkInTime);
+
+  // If rejected by admin: shift was NOT approved/active. Do not draw working time segments or continue progress!
+  if (isRejected) {
+    if (startMinutes === null) {
+      startMinutes = 540; // 09:00 AM default
+    }
+    const endMinutes = startMinutes + TOTAL_MINUTES;
+    const midMinutes = startMinutes + 270;
+
+    const statusMarkers = [];
+    statusMarkers.push({
+      id: 'marker-checkin-rejected',
+      type: 'check_in',
+      label: 'Check In (Rejected)',
+      timeStr: formatMinutesToTimeStr(startMinutes),
+      minutes: startMinutes,
+      percent: 0,
+      color: '#10B981',
+      badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
+      dotClass: 'bg-emerald-500'
+    });
+
+    statusMarkers.push({
+      id: 'marker-shiftend',
+      type: 'shift_end',
+      label: '9h End',
+      timeStr: formatMinutesToTimeStr(endMinutes),
+      minutes: endMinutes,
+      percent: 100,
+      color: '#64748B',
+      badgeClass: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+      dotClass: 'bg-slate-500'
+    });
+
+    return {
+      startMinutes,
+      endMinutes,
+      midMinutes,
+      startTimeStr: formatMinutesToTimeStr(startMinutes),
+      midTimeStr: formatMinutesToTimeStr(midMinutes),
+      endTimeStr: formatMinutesToTimeStr(endMinutes),
+      breakStartTime: '',
+      displaySegments: [], // Strictly EMPTY when rejected - no active work bar!
+      statusMarkers,
+      hasCheckedIn: false
+    };
+  }
 
   // If no check-in time parsed yet, inspect earliest active segment from backend
   if (startMinutes === null && Array.isArray(timelineSegments) && timelineSegments.length > 0) {
@@ -355,7 +428,7 @@ export const computeNineHourTimeline = ({
     }
   }
 
-  const hasCheckedIn = Boolean(isCheckedIn || startMinutes !== null);
+  const hasCheckedIn = Boolean(!isRejected && (isCheckedIn || startMinutes !== null));
 
   // Fallback start time if not checked in: default 9:00 AM (540 minutes from midnight)
   if (startMinutes === null) {
@@ -373,7 +446,7 @@ export const computeNineHourTimeline = ({
   let breakStartTime = '';
 
   // 1. Process backend timelineSegments if present
-  if (Array.isArray(timelineSegments) && timelineSegments.length > 0) {
+  if (!isRejected && Array.isArray(timelineSegments) && timelineSegments.length > 0) {
     const parsedCheckOut = parseTimeToMinutes(checkOutTime);
     const maxAllowedEnd = (isCheckedOut && parsedCheckOut !== null)
       ? Math.min(endMinutes, parsedCheckOut)
@@ -468,7 +541,7 @@ export const computeNineHourTimeline = ({
         }
       }
     });
-  } else if (hasCheckedIn) {
+  } else if (!isRejected && hasCheckedIn) {
     // 2. Fallback: Build live segments dynamically from check-in, breaks, checkout/current time
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -848,14 +921,268 @@ export const computeNineHourTimeline = ({
 };
 
 /**
+ * Evaluates attendance status according to exact business rules:
+ *
+ * 1. Admin Status Check:
+ *    - If record is rejected (status includes 'reject' or adminStatus === 'rejected') -> 'Rejected'
+ *
+ * 2. Break Limit Rule:
+ *    - Max allowed break is 70 minutes (1h 10m).
+ *    - If total break time > 70 minutes -> capped at 'Half Day' (unless hours < 4h -> 'Absent').
+ *
+ * 3. Working Hours Rule (FIRST PRIORITY for evaluated/completed attendance):
+ *    - If net working hours >= 7h 50m (470 mins) -> 'Present' (or 'Half Day' if break > 70m)
+ *    - If net working hours < 7h 50m (470 mins) and >= 4h (240 mins) -> 'Half Day'
+ *    - If net working hours < 4h (240 mins) -> 'Absent'
+ *
+ * 4. Check-in Time Rule (Used upon check-in or when shift is ongoing / before checkout):
+ *    - 09:30 AM to 10:10 AM -> 'Present'
+ *    - 10:11 AM to 10:30 AM -> 'Present (Late)' / 'Late'
+ *    - 10:31 AM to 03:00 PM (15:00) -> 'Half Day'
+ *    - After 03:00 PM (> 15:00) -> 'Absent'
+ *    - Before 09:30 AM -> 'Present' (early/on time)
+ */
+export const deriveAttendanceStatus = ({
+  checkInTime = null,
+  checkOutTime = null,
+  totalWorkMinutes = null,
+  totalBreakMinutes = 0,
+  adminStatus = null,
+  approvalStatus = null,
+  checkInStatus = null,
+  isRejected = false,
+  isPending = false,
+  rejectionReason = '',
+  status = null,
+  isCompleted = false
+}) => {
+  const statusStr = String(status || '').toLowerCase().trim();
+  const adminStr = String(adminStatus || '').toLowerCase().trim();
+  const apprvStr = String(approvalStatus || '').toLowerCase().trim();
+  const checkInStatusStr = String(checkInStatus || '').toLowerCase().trim();
+
+  // 1. Admin Rejection Check: ONLY when rejected status is explicitly indicated
+  if (
+    isRejected ||
+    statusStr === 'rejected' ||
+    statusStr.includes('reject') ||
+    adminStr.includes('reject') ||
+    apprvStr.includes('reject') ||
+    checkInStatusStr.includes('reject')
+  ) {
+    return {
+      status: 'rejected',
+      label: 'Rejected',
+      reason: rejectionReason || 'Attendance request rejected by admin',
+      badgeClass: 'text-red-700 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/50',
+      dotClass: 'bg-red-500'
+    };
+  }
+
+  // 2. Admin Pending Check
+  if (
+    isPending ||
+    statusStr.includes('pending') ||
+    adminStr.includes('pending') ||
+    apprvStr.includes('pending') ||
+    checkInStatusStr.includes('pending')
+  ) {
+    return {
+      status: 'pending',
+      label: 'Pending Approval',
+      reason: 'Check-in request pending admin approval',
+      badgeClass: 'text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50',
+      dotClass: 'bg-amber-500'
+    };
+  }
+
+  // Parse Check-in time to minutes from midnight
+  const inMins = parseTimeToMinutes(checkInTime);
+  const outMins = parseTimeToMinutes(checkOutTime);
+  const hasCheckedOut = Boolean(outMins !== null || isCompleted || statusStr.includes('checked_out') || statusStr.includes('completed'));
+
+  // Calculate or parse break duration in minutes
+  const breakMins = Math.round(parseFloat(String(totalBreakMinutes).replace(/[^\d.-]/g, '')) || 0);
+  const isBreakExceeded = breakMins > 70; // Maximum break 70 mins (1h 10m)
+
+  // Calculate or parse net working minutes
+  let netWorkMins = totalWorkMinutes;
+  if (netWorkMins === null || netWorkMins === undefined) {
+    if (inMins !== null) {
+      const now = new Date();
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      const endMins = outMins !== null ? outMins : currentMins;
+      netWorkMins = Math.max(0, endMins - inMins - breakMins);
+    } else {
+      netWorkMins = 0;
+    }
+  }
+
+  // Check-in Time evaluation:
+  // 09:30 AM = 570 mins, 10:10 AM = 610 mins
+  // 10:11 AM = 611 mins, 10:30 AM = 630 mins
+  // 10:31 AM = 631 mins, 03:00 PM (15:00) = 900 mins
+  let checkInClassification = 'present';
+  if (inMins !== null) {
+    if (inMins > 900) {
+      checkInClassification = 'absent'; // After 3:00 PM
+    } else if (inMins > 630) {
+      checkInClassification = 'half_day'; // 10:31 AM to 3:00 PM
+    } else if (inMins > 610) {
+      checkInClassification = 'late'; // 10:11 AM to 10:30 AM
+    } else {
+      checkInClassification = 'present'; // 09:30 AM to 10:10 AM (or earlier)
+    }
+  }
+
+  // FIRST PRIORITY RULE: Working hours rule (applies when checked out or shift completed)
+  // >= 7h 50m (470 mins) -> Present
+  // < 7h 50m (470 mins) & >= 4h (240 mins) -> Half Day
+  // < 4h (240 mins) -> Absent
+  if (hasCheckedOut) {
+    if (netWorkMins < 240) {
+      return {
+        status: 'absent',
+        label: 'Absent',
+        reason: 'Worked less than 4 hours',
+        badgeClass: 'text-red-700 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/50',
+        dotClass: 'bg-red-500'
+      };
+    }
+
+    if (netWorkMins < 470) {
+      return {
+        status: 'half_day',
+        label: 'Half Day',
+        reason: 'Worked less than 7h 50m',
+        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
+        dotClass: 'bg-blue-500'
+      };
+    }
+
+    // netWorkMins >= 470 (>= 7h 50m)
+    // Check if break exceeded 70 mins:
+    if (isBreakExceeded) {
+      return {
+        status: 'half_day',
+        label: 'Half Day',
+        reason: `Break exceeded 70 mins (${breakMins}m)`,
+        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
+        dotClass: 'bg-blue-500'
+      };
+    }
+
+    // Check-in classification:
+    if (checkInClassification === 'half_day') {
+      return {
+        status: 'half_day',
+        label: 'Half Day',
+        reason: 'Check-in after 10:30 AM',
+        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
+        dotClass: 'bg-blue-500'
+      };
+    }
+
+    if (checkInClassification === 'late') {
+      return {
+        status: 'late',
+        label: 'Present (Late)',
+        reason: 'Checked in between 10:11 - 10:30 AM',
+        badgeClass: 'text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50',
+        dotClass: 'bg-amber-500'
+      };
+    }
+
+    return {
+      status: 'present',
+      label: 'Present',
+      reason: 'Standard shift completed on time',
+      badgeClass: 'text-green-700 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800/50',
+      dotClass: 'bg-green-500'
+    };
+  }
+
+  // If ongoing shift (hasCheckedIn && !hasCheckedOut):
+  if (inMins !== null) {
+    if (isBreakExceeded) {
+      return {
+        status: 'half_day',
+        label: 'Half Day',
+        reason: `Break exceeded 70 mins (${breakMins}m)`,
+        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
+        dotClass: 'bg-blue-500'
+      };
+    }
+
+    if (checkInClassification === 'late') {
+      return {
+        status: 'late',
+        label: 'Late',
+        reason: 'Checked in between 10:11 - 10:30 AM',
+        badgeClass: 'text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50',
+        dotClass: 'bg-amber-500'
+      };
+    }
+
+    if (checkInClassification === 'half_day') {
+      return {
+        status: 'half_day',
+        label: 'Half Day',
+        reason: 'Checked in between 10:31 AM - 3:00 PM',
+        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
+        dotClass: 'bg-blue-500'
+      };
+    }
+
+    if (checkInClassification === 'absent') {
+      return {
+        status: 'absent',
+        label: 'Absent',
+        reason: 'Checked in after 3:00 PM',
+        badgeClass: 'text-red-700 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/50',
+        dotClass: 'bg-red-500'
+      };
+    }
+
+    return {
+      status: 'present',
+      label: 'Present',
+      badgeClass: 'text-green-700 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800/50',
+      dotClass: 'bg-green-500'
+    };
+  }
+
+  return {
+    status: 'not_checked_in',
+    label: 'Not Checked In',
+    badgeClass: 'text-slate-500 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700',
+    dotClass: 'bg-slate-400'
+  };
+};
+
+/**
  * Status text and color resolver matching user specification:
+ * - isRejected -> 'Rejected' (Red)
+ * - isPending -> 'Pending Approval' (Amber)
  * - hasCheckedOut -> 'Checked Out' (Slate/muted)
- * - isOnBreak -> 'Break In' (#F59E0B)
- * - hasCheckedIn -> 'Check In' (#00E676)
+ * - isOnBreak -> 'On Break' (#F59E0B)
+ * - hasCheckedIn -> 'Working' (#00E676)
  * - else -> 'Not Checked In' (Slate/muted)
  */
-export const getQuickActionStatusConfig = ({ hasCheckedIn, isOnBreak, hasCheckedOut }) => {
-  if (hasCheckedOut) {
+export const getQuickActionStatusConfig = ({ hasCheckedIn, isOnBreak, hasCheckedOut, isRejected = false, isPending = false }) => {
+  if (isRejected) {
+    return {
+      statusText: 'Rejected',
+      badgeColorClass: 'text-red-600 dark:text-red-400 bg-red-500/10 border-red-500/30',
+      dotColorClass: 'bg-red-500 animate-pulse'
+    };
+  } else if (isPending) {
+    return {
+      statusText: 'Pending Approval',
+      badgeColorClass: 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30',
+      dotColorClass: 'bg-amber-500 animate-pulse'
+    };
+  } else if (hasCheckedOut) {
     return {
       statusText: 'Checked Out',
       badgeColorClass: 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700',
@@ -863,13 +1190,13 @@ export const getQuickActionStatusConfig = ({ hasCheckedIn, isOnBreak, hasChecked
     };
   } else if (isOnBreak) {
     return {
-      statusText: 'Break In',
+      statusText: 'On Break',
       badgeColorClass: 'text-[#F59E0B] bg-amber-500/10 border-[#F59E0B]/30',
       dotColorClass: 'bg-[#F59E0B] animate-pulse'
     };
   } else if (hasCheckedIn) {
     return {
-      statusText: 'Check In',
+      statusText: 'Working',
       badgeColorClass: 'text-[#00E676] bg-emerald-500/10 border-[#00E676]/30',
       dotColorClass: 'bg-[#00E676] animate-pulse'
     };
