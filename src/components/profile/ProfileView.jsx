@@ -226,8 +226,8 @@ export const ProfileView = () => {
 
       // 2. Fallback default documents if none saved yet
       if (!initialDocs || !Array.isArray(initialDocs) || initialDocs.length === 0) {
-        const aadharNum = emp?.aadharNumber || prof?.aadharNumber || prof?.aadhar || '4829-1092-8834';
-        const panNum = emp?.panNumber || prof?.panNumber || prof?.pan || 'ABCDE1234F';
+        const aadharNum = emp?.aadharNumber || prof?.aadharNumber || prof?.aadhar || '';
+        const panNum = emp?.panNumber || prof?.panNumber || prof?.pan || '';
 
         initialDocs = [
           {
@@ -236,12 +236,12 @@ export const ProfileView = () => {
             title: 'Aadhar Card',
             subtitle: 'Government issued 12-digit Unique Identification (UIDAI)',
             category: 'Identity Proof',
-            docNumber: aadharNum,
-            status: 'uploaded',
-            fileUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1200&q=80',
-            fileName: 'Aadhar_Card_Verified.pdf',
+            docNumber: aadharNum || 'Not Provided',
+            status: aadharNum ? 'uploaded' : 'pending',
+            fileUrl: '',
+            fileName: aadharNum ? 'Aadhar_Card.pdf' : '',
             fileType: 'application/pdf',
-            uploadedAt: '12 Jan 2024',
+            uploadedAt: aadharNum ? 'Recorded' : 'Pending',
             isCore: true
           },
           {
@@ -250,12 +250,12 @@ export const ProfileView = () => {
             title: 'PAN Card',
             subtitle: 'Permanent Account Number issued by Income Tax Department',
             category: 'Tax ID & Proof',
-            docNumber: panNum,
-            status: 'uploaded',
-            fileUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1200&q=80',
-            fileName: 'PAN_Card_Verified.jpg',
+            docNumber: panNum || 'Not Provided',
+            status: panNum ? 'uploaded' : 'pending',
+            fileUrl: '',
+            fileName: panNum ? 'PAN_Card.jpg' : '',
             fileType: 'image/jpeg',
-            uploadedAt: '12 Jan 2024',
+            uploadedAt: panNum ? 'Recorded' : 'Pending',
             isCore: true
           },
           {
@@ -264,12 +264,12 @@ export const ProfileView = () => {
             title: 'Passport Size Photo',
             subtitle: 'Official formal color photograph with solid background',
             category: 'Photograph',
-            docNumber: 'Active Employee Photo',
+            docNumber: activePhotoUrl ? 'Active Employee Photo' : 'Not Uploaded',
             status: activePhotoUrl ? 'uploaded' : 'pending',
             fileUrl: activePhotoUrl || '',
-            fileName: 'Passport_Size_Photo.jpg',
+            fileName: activePhotoUrl ? 'Passport_Size_Photo.jpg' : '',
             fileType: 'image/jpeg',
-            uploadedAt: '15 Jan 2024',
+            uploadedAt: activePhotoUrl ? 'Uploaded' : 'Pending',
             isCore: true
           }
         ];
@@ -496,8 +496,9 @@ export const ProfileView = () => {
             headers: { 'Content-Type': 'multipart/form-data' }
           });
 
-          if (uploadRes.data?.data?.fileUrl) {
-            finalUrl = uploadRes.data.data.fileUrl;
+          const uploadedUrl = uploadRes.data?.data?.fileUrl || uploadRes.data?.fileUrl || uploadRes.data?.data?.url || uploadRes.data?.url || uploadRes.data?.data?.path || uploadRes.data?.path;
+          if (uploadedUrl) {
+            finalUrl = uploadedUrl;
             setLocalPhotoUrl(finalUrl);
           }
         } catch (uploadErr) {
@@ -509,23 +510,48 @@ export const ProfileView = () => {
           await api.put('/api/users/profile/update', {
             profilePhoto: finalUrl,
             photoUrl: finalUrl,
-            avatar: finalUrl
+            avatar: finalUrl,
+            profileImage: finalUrl,
+            image: finalUrl,
+            photo: finalUrl
           });
         } catch (updateErr) {
           console.warn("Backend /api/users/profile/update warning:", updateErr);
         }
 
+        try {
+          await api.put('/api/employee-panel/profile', {
+            profilePhoto: finalUrl,
+            photoUrl: finalUrl,
+            avatar: finalUrl,
+            image: finalUrl
+          });
+        } catch (e) {}
+
         // 4. Update AppContext with final URL
         if (updateUserProfile) {
-          updateUserProfile({ profilePhoto: finalUrl, photoUrl: finalUrl, avatar: finalUrl });
+          updateUserProfile({ profilePhoto: finalUrl, photoUrl: finalUrl, avatar: finalUrl, profileImage: finalUrl, image: finalUrl, photo: finalUrl });
         }
 
-        // 5. Cache photo in localStorage
+        // 5. Cache photo in localStorage & global map
         try {
           localStorage.setItem(localStoragePhotoKey, finalUrl);
+          const empPhotos = JSON.parse(localStorage.getItem('kt_employee_photos') || '{}');
+          const validId = resolveEmployeeId();
+          if (validId) empPhotos[validId.toLowerCase()] = finalUrl;
+          if (contextUser?._id) empPhotos[String(contextUser._id).toLowerCase()] = finalUrl;
+          if (contextUser?.id) empPhotos[String(contextUser.id).toLowerCase()] = finalUrl;
+          if (contextUser?.employeeId) empPhotos[String(contextUser.employeeId).toLowerCase()] = finalUrl;
+          if (contextUser?.email) empPhotos[contextUser.email.toLowerCase().trim()] = finalUrl;
+          if (contextUser?.name) empPhotos[contextUser.name.toLowerCase().trim()] = finalUrl;
+          localStorage.setItem('kt_employee_photos', JSON.stringify(empPhotos));
         } catch (e) {
           console.warn("Could not cache photo:", e);
         }
+
+        try {
+          window.dispatchEvent(new CustomEvent('kt_profile_photo_updated', { detail: { photoUrl: finalUrl } }));
+        } catch (e) {}
 
         // 6. Also sync Passport Size Photo document if present
         setDocuments(prevDocs => {
@@ -573,6 +599,16 @@ export const ProfileView = () => {
 
     try {
       localStorage.removeItem(localStoragePhotoKey);
+      const empPhotos = JSON.parse(localStorage.getItem('kt_employee_photos') || '{}');
+      const validId = resolveEmployeeId();
+      if (validId) delete empPhotos[validId.toLowerCase()];
+      if (contextUser?._id) delete empPhotos[String(contextUser._id).toLowerCase()];
+      if (contextUser?.id) delete empPhotos[String(contextUser.id).toLowerCase()];
+      if (contextUser?.employeeId) delete empPhotos[String(contextUser.employeeId).toLowerCase()];
+      if (contextUser?.email) delete empPhotos[contextUser.email.toLowerCase().trim()];
+      if (contextUser?.name) delete empPhotos[contextUser.name.toLowerCase().trim()];
+      localStorage.setItem('kt_employee_photos', JSON.stringify(empPhotos));
+      window.dispatchEvent(new CustomEvent('kt_profile_photo_updated', { detail: { photoUrl: '' } }));
     } catch (e) {
       console.warn(e);
     }

@@ -1,14 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api/axios.js';
-import {
-  currentUser as initialUser,
-  assignedTasks as initialTasks,
-  initialAttendanceRecords,
-  initialDailyReports,
-  initialLeaveRequests,
-  initialNotifications,
-  initialScreenshots
-} from '../data/mockData.js';
+
 import {
   getMonitoringSettings,
   updateMonitoringSettings,
@@ -53,8 +45,37 @@ export const getRealAuthUserId = (u) => {
       if (isValidObjectId(payload?.userId)) return payload.userId;
       if (isValidObjectId(payload?.user?._id)) return payload.user._id;
     }
-  } catch (e) {}
-  return resolveMongoObjectId(u?.employeeId || u?.id || 'EMP-8492');
+  } catch (e) { }
+  return resolveMongoObjectId(u?.employeeId || u?.id || '');
+};
+
+// Validates if the given role is allowed to access the employee panel
+// Allowed: employee, team_leader (team lead), hr, intern
+// Unauthorized: account, ca, admin (and any other unpermitted role)
+export const isRoleAllowed = (role) => {
+  if (!role) return false;
+  const r = String(role).toLowerCase().trim();
+
+  // Explicit check for unauthorized roles like account, ca, admin
+  if (
+    r.includes('admin') ||
+    r.includes('account') ||
+    /\bca\b/i.test(r) ||
+    r.includes('chartered')
+  ) {
+    return false;
+  }
+
+  return (
+    r === 'employee' ||
+    r === 'team_leader' ||
+    r === 'team lead' ||
+    r === 'team leader' ||
+    r === 'tl' ||
+    r === 'hr' ||
+    r === 'hr manager' ||
+    r === 'intern'
+  );
 };
 
 // Helper to determine exact user role from authenticated profile data
@@ -71,17 +92,30 @@ export const deriveUserRole = (u) => {
     u.profile?.role ||
     u.designation ||
     u.employee?.designation ||
+    u.department ||
+    u.employee?.department ||
     ''
   ).toString().toLowerCase().trim();
 
-  if (roleStr.includes('admin')) {
+  // 1. Explicit check for unauthorized roles
+  if (roleStr.includes('admin') || u.isAdmin === true || u.employee?.isAdmin === true) {
     return 'admin';
   }
 
-  if (roleStr.includes('hr')) {
+  if (roleStr.includes('account')) {
+    return 'account';
+  }
+
+  if (/\bca\b/i.test(roleStr) || roleStr.includes('chartered') || roleStr === 'ca') {
+    return 'ca';
+  }
+
+  // 2. Check for HR
+  if (roleStr.includes('hr') || roleStr.includes('human resource')) {
     return 'hr';
   }
 
+  // 3. Check for Team Leader / Team Lead
   if (
     roleStr.includes('lead') ||
     roleStr.includes('leader') ||
@@ -100,6 +134,7 @@ export const deriveUserRole = (u) => {
     return 'team_leader';
   }
 
+  // 4. Check for Intern
   if (roleStr.includes('intern')) {
     return 'intern';
   }
@@ -164,7 +199,7 @@ export const resolveEmployeeName = (source) => {
     try {
       const savedCustom = localStorage.getItem('kt_employee_full_name');
       if (isValid(savedCustom)) return savedCustom.trim();
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // 4. Source / profile fullName (or firstName + lastName)
@@ -248,24 +283,26 @@ export const AppProvider = ({ children }) => {
             parsed.fullName = resolved;
             try {
               localStorage.setItem('auth_user', JSON.stringify(parsed));
-            } catch (e) {}
+            } catch (e) { }
           }
         }
         return parsed;
       } catch (e) {
-        return initialUser;
+        return null;
       }
     }
-    return initialUser;
+    return null;
   });
 
   const [userRole, setUserRole] = useState(() => {
     const activeRole = localStorage.getItem('active_role') || localStorage.getItem('user_role');
-    if (activeRole) return activeRole;
+    if (activeRole && isRoleAllowed(activeRole)) return activeRole;
     const stored = localStorage.getItem('auth_user');
     if (stored) {
       try {
-        return deriveUserRole(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        const derived = deriveUserRole(parsed);
+        if (isRoleAllowed(derived)) return derived;
       } catch (e) { }
     }
     return 'employee';
@@ -285,15 +322,35 @@ export const AppProvider = ({ children }) => {
     })();
     return {
       roleName: initialRole === 'admin' ? 'Administrator' :
-                initialRole === 'hr' ? 'HR Manager' :
-                initialRole === 'team_leader' ? 'Team Leader' :
+        initialRole === 'account' ? 'Accountant' :
+          initialRole === 'ca' ? 'Chartered Accountant (CA)' :
+            initialRole === 'hr' ? 'HR Manager' :
+              initialRole === 'team_leader' ? 'Team Leader' :
                 initialRole === 'intern' ? 'Intern' : 'Employee'
     };
   });
 
   const [rolePermissions, setRolePermissions] = useState([]);
   const [isRoleLoading, setIsRoleLoading] = useState(false);
-  const [currentTab, setCurrentTab] = useState('dashboard');
+  const [currentTab, setCurrentTabState] = useState(() => {
+    const role = localStorage.getItem('active_role') || localStorage.getItem('user_role');
+    return role === 'hr' ? 'admin-screenshots' : 'dashboard';
+  });
+
+  const setCurrentTab = useCallback((tab) => {
+    if (userRole === 'hr') {
+      setCurrentTabState('admin-screenshots');
+      return;
+    }
+    setCurrentTabState(tab);
+  }, [userRole]);
+
+  useEffect(() => {
+    if (userRole === 'hr') {
+      setCurrentTabState('admin-screenshots');
+    }
+  }, [userRole]);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -305,7 +362,7 @@ export const AppProvider = ({ children }) => {
           localStorage.removeItem(key);
         }
       });
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   // Attendance state initialized from persistent daily flags
@@ -338,14 +395,22 @@ export const AppProvider = ({ children }) => {
     }
     return 'not_checked_in';
   });
-  const [sessionId, setSessionId] = useState('SES-20260820-001');
-  const [checkInTime, setCheckInTime] = useState('10:00:00 AM');
-  const [checkOutTime, setCheckOutTime] = useState(null);
-  const [monitoringStartTime, setMonitoringStartTime] = useState('10:00:00 AM');
+  const [sessionId, setSessionId] = useState(() => {
+    return localStorage.getItem('kt_active_session_id') || null;
+  });
+  const [checkInTime, setCheckInTime] = useState(() => {
+    return localStorage.getItem('kt_check_in_time') || null;
+  });
+  const [checkOutTime, setCheckOutTime] = useState(() => {
+    return localStorage.getItem('kt_check_out_time') || null;
+  });
+  const [monitoringStartTime, setMonitoringStartTime] = useState(() => {
+    return localStorage.getItem('kt_monitoring_start_time') || null;
+  });
   const [monitoringEndTime, setMonitoringEndTime] = useState(null);
-  const [workSeconds, setWorkSeconds] = useState(5710); // ~1hr 35m active
+  const [workSeconds, setWorkSeconds] = useState(0);
   const [breakSeconds, setBreakSeconds] = useState(0);
-  const [attendanceHistory, setAttendanceHistory] = useState(initialAttendanceRecords);
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [sessionStartTime, setSessionStartTime] = useState(() => {
     return localStorage.getItem('kt_session_start_time') || new Date().toISOString();
   });
@@ -408,19 +473,7 @@ export const AppProvider = ({ children }) => {
   const [inactivitySeconds, setInactivitySeconds] = useState(0);
   const [isInactivityAlertOpen, setIsInactivityAlertOpen] = useState(false);
   const lastActivityTimestampRef = useRef(Date.now());
-  const [inactivityEvents, setInactivityEvents] = useState([
-    {
-      id: 'ina-101',
-      employeeName: 'Alex Morgan',
-      employeeId: 'EMP-8492',
-      date: '2026-08-20',
-      startTime: '11:20:00 AM',
-      duration: '2 Minutes',
-      sessionId: 'SES-20260820-001',
-      attendanceStatus: 'Active',
-      responseStatus: 'Acknowledged - Working'
-    }
-  ]);
+  const [inactivityEvents, setInactivityEvents] = useState([]);
 
   // Tasks, Daily Reports, Leave
   const [tasks, setTasks] = useState([]);
@@ -442,15 +495,15 @@ export const AppProvider = ({ children }) => {
     };
     syncLiveTasks();
   }, []);
-  const [dailyReports, setDailyReports] = useState(initialDailyReports);
-  const [leaveRequests, setLeaveRequests] = useState(initialLeaveRequests);
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [dailyReports, setDailyReports] = useState([]);
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
   // Activity Tracking: Listen to mouse movers, cursor movements, clicks, keyboard presses, scroll, touch, and tab focus
   const isEmployeeOrTL = userRole === 'employee' || userRole === 'team_leader' || userRole === 'intern';
-  // INACTIVITY THRESHOLD: 60 seconds (1 Minute) for Testing
-  const INACTIVITY_THRESHOLD_SECONDS = 60;
+  // INACTIVITY THRESHOLD: 60 seconds (5 Minute) for Testing
+  const INACTIVITY_THRESHOLD_SECONDS = 300;
 
   useEffect(() => {
     const activityEvents = [
@@ -682,7 +735,7 @@ export const AppProvider = ({ children }) => {
     try {
       localStorage.setItem('kt_on_break_' + todayStr, 'true');
       localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
-    } catch (e) {}
+    } catch (e) { }
 
     handleStartBreak();
   };
@@ -777,10 +830,10 @@ export const AppProvider = ({ children }) => {
     const devInfo = getDeviceInfoString();
 
     // Determine Employee Position: TL, EMP, HR, ADMIN, INTERN
-    const isTLUser = 
-      userRole === 'team_leader' || 
-      user?.isTeamLeader === true || 
-      user?.name?.toLowerCase().includes('hetvi') || 
+    const isTLUser =
+      userRole === 'team_leader' ||
+      user?.isTeamLeader === true ||
+      user?.name?.toLowerCase().includes('hetvi') ||
       empName?.toLowerCase().includes('hetvi') ||
       user?.email?.toLowerCase().includes('hetvi') ||
       String(effectiveUserId).toLowerCase().includes('6ab3894c4b9bcbcfe8afc6c') ||
@@ -895,16 +948,16 @@ export const AppProvider = ({ children }) => {
           if (uploadResult?.public_id) {
             tempRecord.publicId = uploadResult.public_id;
           }
-          setScreenshots(prev => prev.map(s => s.id === tempRecord.id ? { 
-            ...s, 
-            fullUrl: remoteUrl, 
+          setScreenshots(prev => prev.map(s => s.id === tempRecord.id ? {
+            ...s,
+            fullUrl: remoteUrl,
             thumbnailUrl: remoteUrl,
             cloudStorage: `Cloudinary (${CLOUDINARY_CONFIG.cloudName})`,
             publicId: uploadResult?.public_id || s.publicId
           } : s));
-          setLatestScreenshot(prev => prev && prev.id === tempRecord.id ? { 
-            ...prev, 
-            fullUrl: remoteUrl, 
+          setLatestScreenshot(prev => prev && prev.id === tempRecord.id ? {
+            ...prev,
+            fullUrl: remoteUrl,
             thumbnailUrl: remoteUrl,
             cloudStorage: `Cloudinary (${CLOUDINARY_CONFIG.cloudName})`,
             publicId: uploadResult?.public_id || prev.publicId
@@ -948,7 +1001,8 @@ export const AppProvider = ({ children }) => {
     const now = new Date();
     const nowIso = now.toISOString();
     const formattedCheckIn = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const newSessionId = `SES-20260820-${Math.floor(Math.random() * 900 + 100)}`;
+    const dateCode = now.toISOString().split('T')[0].replace(/-/g, '');
+    const newSessionId = `SES-${dateCode}-${Math.floor(Math.random() * 900 + 100)}`;
     setSessionId(newSessionId);
     setCheckInTime(formattedCheckIn);
     setCheckOutTime(null);
@@ -957,10 +1011,14 @@ export const AppProvider = ({ children }) => {
     setSessionStartTime(nowIso);
     setSessionEndTime(null);
     try {
+      localStorage.setItem('kt_active_session_id', newSessionId);
+      localStorage.setItem('kt_check_in_time', formattedCheckIn);
+      localStorage.setItem('kt_monitoring_start_time', formattedCheckIn);
+      localStorage.removeItem('kt_check_out_time');
       localStorage.setItem('kt_session_start_time', nowIso);
       localStorage.removeItem('kt_session_end_time');
       localStorage.removeItem('kt_is_auto_checkout');
-    } catch (e) {}
+    } catch (e) { }
     setAttendanceStatus('checked_in');
     setNextScreenshotCountdown(screenshotConfig.intervalSeconds || 300);
     setWorkSeconds(0);
@@ -1024,32 +1082,44 @@ export const AppProvider = ({ children }) => {
     setSessionEndTime(nowIso);
     try {
       localStorage.setItem('kt_session_end_time', nowIso);
-    } catch (e) {}
+    } catch (e) { }
     setInactivitySeconds(0);
 
     const totalHoursNum = (workSeconds / 3600).toFixed(2);
     const hrs = Math.floor(workSeconds / 3600);
     const mins = Math.floor((workSeconds % 3600) / 60);
 
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const formattedDate = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+
+    try {
+      localStorage.removeItem('kt_active_session_id');
+      localStorage.removeItem('kt_check_in_time');
+      localStorage.removeItem('kt_monitoring_start_time');
+      localStorage.setItem('kt_check_out_time', formattedCheckOut);
+    } catch (e) { }
+
     const newRecord = {
       id: `att-${Date.now()}`,
-      date: '2026-08-20',
-      formattedDate: '20 Aug 2026',
-      dayName: 'Thursday',
-      checkIn: checkInTime,
+      date: dateStr,
+      formattedDate: formattedDate,
+      dayName: dayName,
+      checkIn: checkInTime || formattedCheckOut,
       checkOut: formattedCheckOut,
-      monitoringStart: monitoringStartTime,
+      monitoringStart: monitoringStartTime || formattedCheckOut,
       monitoringEnd: formattedCheckOut,
       totalShots: screenshots.length,
       breakDuration: `${Math.floor(breakSeconds / 60)} mins`,
       totalWorkingHours: `${hrs} hrs ${mins} mins`,
       status: 'present',
       segments: [
-        { id: 'seg-1', type: 'working', startTime: checkInTime, endTime: formattedCheckOut, startPercent: 0, widthPercent: 100, label: `Working (${totalHoursNum} hrs)`, color: 'blue' }
+        { id: `seg-${Date.now()}`, type: 'working', startTime: checkInTime || formattedCheckOut, endTime: formattedCheckOut, startPercent: 0, widthPercent: 100, label: `Working (${totalHoursNum} hrs)`, color: 'blue' }
       ]
     };
 
-    setAttendanceHistory(prev => [newRecord, ...prev.filter(r => r.date !== '2026-08-20')]);
+    setAttendanceHistory(prev => [newRecord, ...prev.filter(r => r.date !== dateStr)]);
 
     const newNotif = {
       id: `notif-${Date.now()}`,
@@ -1372,19 +1442,45 @@ export const AppProvider = ({ children }) => {
       );
 
       const normalizedRoleName = String(resolvedRoleName).toLowerCase().trim();
+      const departmentStr = String(
+        candidate?.department ||
+        candidate?.employee?.department ||
+        candidate?.profile?.department ||
+        ''
+      ).toLowerCase().trim();
 
       let determinedRole = 'employee';
 
       // Check all possible signals:
       if (
         normalizedRoleName.includes('admin') ||
-        designationStr.includes('admin')
+        designationStr.includes('admin') ||
+        candidate?.isAdmin === true ||
+        candidate?.employee?.isAdmin === true ||
+        tokenPayload?.isAdmin === true
       ) {
         determinedRole = 'admin';
         if (!resolvedRoleName) resolvedRoleName = 'Administrator';
       } else if (
+        normalizedRoleName.includes('account') ||
+        designationStr.includes('account') ||
+        departmentStr.includes('account')
+      ) {
+        determinedRole = 'account';
+        if (!resolvedRoleName) resolvedRoleName = 'Accountant';
+      } else if (
+        /\bca\b/i.test(normalizedRoleName) ||
+        /\bca\b/i.test(designationStr) ||
+        normalizedRoleName.includes('chartered') ||
+        designationStr.includes('chartered')
+      ) {
+        determinedRole = 'ca';
+        if (!resolvedRoleName) resolvedRoleName = 'Chartered Accountant (CA)';
+      } else if (
         normalizedRoleName.includes('hr') ||
-        designationStr.includes('hr')
+        designationStr.includes('hr') ||
+        departmentStr.includes('hr') ||
+        departmentStr.includes('human resources')
       ) {
         determinedRole = 'hr';
         if (!resolvedRoleName) resolvedRoleName = 'HR Manager';
@@ -1478,13 +1574,27 @@ export const AppProvider = ({ children }) => {
 
       setUserRole(determinedRole);
       localStorage.setItem('user_role', determinedRole);
-      setRoleDetails(rawRoleData || { roleName: resolvedRoleName || (determinedRole === 'team_leader' ? 'Team Leader' : determinedRole === 'hr' ? 'HR Manager' : determinedRole === 'admin' ? 'Administrator' : 'Employee') });
+      setRoleDetails(rawRoleData || {
+        roleName: resolvedRoleName || (
+          determinedRole === 'team_leader' ? 'Team Leader' :
+            determinedRole === 'hr' ? 'HR Manager' :
+              determinedRole === 'account' ? 'Accountant' :
+                determinedRole === 'ca' ? 'Chartered Accountant (CA)' :
+                  determinedRole === 'admin' ? 'Administrator' : 'Employee'
+        )
+      });
       setRolePermissions(permissions);
+      if (determinedRole === 'hr') {
+        setCurrentTabState('admin-screenshots');
+      }
       return determinedRole;
     } catch (err) {
       console.error('Error resolving role:', err);
       const fallback = deriveUserRole(userData);
       setUserRole(fallback);
+      if (fallback === 'hr') {
+        setCurrentTabState('admin-screenshots');
+      }
       return fallback;
     } finally {
       setIsRoleLoading(false);
@@ -1492,17 +1602,26 @@ export const AppProvider = ({ children }) => {
   };
 
   const switchRole = (newRole) => {
+    if (!isRoleAllowed(newRole)) {
+      console.warn(`Cannot switch to unauthorized role: ${newRole}`);
+      return;
+    }
     localStorage.setItem('active_role', newRole);
     localStorage.setItem('user_role', newRole);
     setUserRole(newRole);
     const roleLabels = {
       admin: 'Administrator',
+      account: 'Accountant',
+      ca: 'Chartered Accountant (CA)',
       hr: 'HR Manager',
       team_leader: 'Team Leader',
       intern: 'Intern',
       employee: 'Employee'
     };
     setRoleDetails({ roleName: roleLabels[newRole] || 'Employee' });
+    if (newRole === 'hr') {
+      setCurrentTabState('admin-screenshots');
+    }
   };
 
   // Sync role and fresh user profile on initial mount
@@ -1518,9 +1637,19 @@ export const AppProvider = ({ children }) => {
               pData.name = resolved;
               pData.fullName = resolved;
             }
+            const determined = await resolveRole(pData);
+            if (!isRoleAllowed(determined)) {
+              console.warn(`Unauthorized role session detected (${determined}). Clearing auth session.`);
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('auth_user');
+              localStorage.removeItem('active_role');
+              localStorage.removeItem('user_role');
+              setUser(null);
+              window.location.reload();
+              return;
+            }
             setUser(pData);
             localStorage.setItem('auth_user', JSON.stringify(pData));
-            await resolveRole(pData);
             return;
           }
         } catch (e) {
@@ -1528,7 +1657,16 @@ export const AppProvider = ({ children }) => {
         }
       }
       if (user) {
-        resolveRole(user);
+        const determined = await resolveRole(user);
+        if (!isRoleAllowed(determined)) {
+          console.warn(`Unauthorized role session detected (${determined}). Clearing auth session.`);
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+          localStorage.removeItem('active_role');
+          localStorage.removeItem('user_role');
+          setUser(null);
+          window.location.reload();
+        }
       }
     };
 
@@ -1536,6 +1674,21 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const loginUser = async (userData, token) => {
+    // 1. Immediate preliminary check on login response payload
+    const preliminaryRole = deriveUserRole(userData);
+    if (!isRoleAllowed(preliminaryRole)) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('active_role');
+      localStorage.removeItem('user_role');
+      setUser(null);
+      const roleDisplayName = preliminaryRole === 'admin' ? 'Admin' : preliminaryRole === 'account' ? 'Account' : preliminaryRole === 'ca' ? 'CA' : preliminaryRole;
+      const err = new Error(`Unauthorized login: Access denied for role "${roleDisplayName}". Only Employee, Team Lead, and HR are authorized to access this panel.`);
+      err.isUnauthorized = true;
+      throw err;
+    }
+
+    // Temporarily save token so fetchLiveUserProfile can authenticate
     if (token) localStorage.setItem('auth_token', token);
 
     let activeUser = userData;
@@ -1543,8 +1696,8 @@ export const AppProvider = ({ children }) => {
     try {
       const pData = await fetchLiveUserProfile();
       if (pData) {
-        activeUser = { 
-          ...userData, 
+        activeUser = {
+          ...userData,
           ...pData,
           employee: { ...resolveEmployeeData(userData), ...resolveEmployeeData(pData) }
         };
@@ -1553,22 +1706,42 @@ export const AppProvider = ({ children }) => {
       console.warn('Profile fetch on login fallback:', e);
     }
 
+    let determined = null;
     if (activeUser) {
       const resolved = resolveEmployeeName(activeUser);
       if (resolved) {
         activeUser.name = resolved;
         activeUser.fullName = resolved;
       }
+      determined = await resolveRole(activeUser);
+
+      // 2. Strict authorization check after resolving backend role details
+      if (!isRoleAllowed(determined)) {
+        console.warn(`Unauthorized login attempt by role: ${determined}`);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('active_role');
+        localStorage.removeItem('user_role');
+        setUser(null);
+        const roleDisplayName = determined === 'admin' ? 'Admin' : determined === 'account' ? 'Account' : determined === 'ca' ? 'CA' : determined;
+        const err = new Error(`Unauthorized login: Access denied for role "${roleDisplayName}". Only Employee, Team Lead, and HR are authorized to access this panel.`);
+        err.isUnauthorized = true;
+        throw err;
+      }
+
       localStorage.setItem('auth_user', JSON.stringify(activeUser));
       setUser(activeUser);
-      const determined = await resolveRole(activeUser);
       if (determined) {
         localStorage.setItem('user_role', determined);
       }
     }
 
-    // Always take the user to their role dashboard
-    setCurrentTab('dashboard');
+    // Always take the user directly to Screenshot Monitoring for HR, or role dashboard
+    if (determined === 'hr') {
+      setCurrentTabState('admin-screenshots');
+    } else {
+      setCurrentTabState('dashboard');
+    }
   };
 
   const updateUserProfile = (updated) => {
@@ -1683,6 +1856,7 @@ export const AppProvider = ({ children }) => {
       resolveEmployeeName,
       resolveEmployeeData,
       fetchLiveUserProfile,
+      isRoleAllowed,
       updateMonitoringSettings,
       getAdminScreenshots,
       getMonitoringSettings,

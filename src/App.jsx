@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { AppProvider, useApp } from './context/AppContext.jsx';
+import { ShieldAlert } from 'lucide-react';
+import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 
@@ -31,9 +32,47 @@ const TeamLeaveManagementView = lazy(() => import('./components/placeholders/Pla
 const ReportView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.ReportView })));
 
 const MainLayout = ({ handleSignOut }) => {
-  const { currentTab, isSidebarCollapsed } = useApp();
+  const { currentTab, isSidebarCollapsed, userRole, setCurrentTab, isRoleAllowed: roleCheck } = useApp();
+
+  // If user is HR, enforce that active tab is strictly locked to screenshot monitoring
+  useEffect(() => {
+    if (userRole === 'hr' && currentTab !== 'admin-screenshots') {
+      setCurrentTab('admin-screenshots');
+    }
+  }, [userRole, currentTab, setCurrentTab]);
+
+  // Reject unauthorized roles (account, ca, admin, etc.)
+  const checkAllowed = roleCheck || isRoleAllowed;
+  if (!checkAllowed(userRole)) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded-xl shadow-xl p-6 sm:p-8 text-center space-y-4">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto">
+            <ShieldAlert size={36} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            Unauthorized Login
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            Access to this Employee Portal is restricted to <strong>Employee</strong>, <strong>Team Lead</strong>, and <strong>HR</strong> roles only. Access denied for role &quot;<strong>{userRole}</strong>&quot;.
+          </p>
+          <button
+            onClick={handleSignOut}
+            className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow transition-colors cursor-pointer"
+          >
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderActiveTab = () => {
+    // HR is strictly locked to Screenshot Monitoring portal only - no dashboard, profile, etc.
+    if (userRole === 'hr') {
+      return <AdminScreenshotPortal />;
+    }
+
     switch (currentTab) {
       // Existing Modules
       case 'dashboard': return <DashboardView />;
@@ -95,7 +134,30 @@ const MainLayout = ({ handleSignOut }) => {
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!localStorage.getItem('auth_token');
+    const token = localStorage.getItem('auth_token');
+    const storedRole = localStorage.getItem('user_role') || localStorage.getItem('active_role');
+    if (storedRole && !isRoleAllowed(storedRole)) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('active_role');
+      localStorage.removeItem('user_role');
+      return false;
+    }
+    const storedUser = localStorage.getItem('auth_user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        const derived = deriveUserRole(parsed);
+        if (!isRoleAllowed(derived)) {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+          localStorage.removeItem('active_role');
+          localStorage.removeItem('user_role');
+          return false;
+        }
+      } catch (e) { }
+    }
+    return !!token;
   });
   const [authView, setAuthView] = useState('login');
 
@@ -135,6 +197,7 @@ export default function App() {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
       localStorage.removeItem('active_role');
+      localStorage.removeItem('user_role');
       setIsAuthenticated(false);
     }
   };

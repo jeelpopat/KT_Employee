@@ -462,15 +462,15 @@ export const computeNineHourTimeline = ({
 
       if (clampedTo > clampedFrom) {
         const isBreak = seg.type === 'yellow' || (seg.label || '').toLowerCase().includes('break');
-        const isInactiveOrLate = 
-          seg.type === 'grey' || 
-          seg.type === 'gray' || 
-          (seg.label || '').toLowerCase().includes('late') || 
+        const isInactiveOrLate =
+          seg.type === 'grey' ||
+          seg.type === 'gray' ||
+          (seg.label || '').toLowerCase().includes('late') ||
           (seg.label || '').toLowerCase().includes('early');
 
         if (isBreak) {
           if (!breakStartTime) breakStartTime = formatMinutesToTimeStr(clampedFrom);
-          
+
           const breakDuration = clampedTo - clampedFrom;
           const remainingAllowed = Math.max(0, MAX_STANDARD_BREAK_MINUTES - accumulatedBreakMinutes);
           const standardBreakDuration = Math.min(breakDuration, remainingAllowed);
@@ -745,7 +745,7 @@ export const computeNineHourTimeline = ({
       // If no extra break immediately follows and shift hasn't ended on break
       const hasAdjacentExtra = displaySegments.some(
         other => (other.id.includes('extra') || other.type === 'gray') &&
-                 Math.abs(other.leftPercent - (seg.leftPercent + seg.widthPercent)) < 0.5
+          Math.abs(other.leftPercent - (seg.leftPercent + seg.widthPercent)) < 0.5
       );
 
       if (!hasAdjacentExtra && !isOnBreak && segEndMins <= endMinutes) {

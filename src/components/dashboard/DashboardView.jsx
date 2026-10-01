@@ -77,8 +77,6 @@ export const DashboardView = () => {
   const [breakOutTimeDisplay, setBreakOutTimeDisplay] = useState('--:--');
   const [totalBreakTimeDisplay, setTotalBreakTimeDisplay] = useState('0m');
 
-  const defaultAvatar = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
-
   // --- Dynamic Quick Actions Height Tracking for Announcements ---
   const quickActionsRef = useRef(null);
   const [quickActionsHeight, setQuickActionsHeight] = useState(null);
@@ -132,33 +130,119 @@ export const DashboardView = () => {
     setCurrentAnnIndex((prev) => (prev + 1) % announcements.length);
   };
 
+  // Helper to ensure valid and absolute photo URL
+  const cleanPhotoUrl = (raw) => {
+    if (!raw) return '';
+    if (typeof raw === 'object') {
+      raw = raw.fileUrl || raw.url || raw.secure_url || raw.path || '';
+    }
+    if (typeof raw !== 'string') return '';
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return '';
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+      return trimmed;
+    }
+    const base = 'https://kt-backend-1.onrender.com';
+    return trimmed.startsWith('/') ? `${base}${trimmed}` : `${base}/${trimmed}`;
+  };
+
   // Resolve employee photo from various nested properties or user directory lookup
-  const resolveEmployeePhoto = (source, uMap = {}) => {
+  const resolveEmployeePhoto = (source, uMap = {}, extraPhotoMap = {}) => {
     if (!source) return '';
-    const directPhoto = (
+
+    // 1. Direct photo on source
+    const directPhoto = cleanPhotoUrl(
       source.profilePhoto ||
       source.profileImage ||
       source.photoUrl ||
       source.avatar ||
       source.image ||
       source.photo ||
-      source.employee?.profilePhoto ||
-      source.employee?.photoUrl ||
-      source.employee?.avatar ||
-      source.user?.profilePhoto ||
-      source.user?.photoUrl ||
-      source.user?.avatar ||
+      source.fileUrl ||
+      (typeof source.employeeId === 'object' ? (source.employeeId?.profilePhoto || source.employeeId?.profileImage || source.employeeId?.photoUrl || source.employeeId?.avatar || source.employeeId?.image || source.employeeId?.photo) : '') ||
+      (typeof source.employee === 'object' ? (source.employee?.profilePhoto || source.employee?.profileImage || source.employee?.photoUrl || source.employee?.avatar || source.employee?.image || source.employee?.photo) : '') ||
+      (typeof source.user === 'object' ? (source.user?.profilePhoto || source.user?.profileImage || source.user?.photoUrl || source.user?.avatar || source.user?.image || source.user?.photo) : '') ||
       ''
     );
     if (directPhoto) return directPhoto;
 
-    const idStr = String(source._id || source.id || source.employeeId || '');
-    const emailStr = (source.email || '').toLowerCase().trim();
-    const nameStr = (source.name || '').toLowerCase().trim();
+    // 2. Candidate IDs
+    const candidateIds = [
+      source._id,
+      source.id,
+      source.userId,
+      source.applicantId,
+      typeof source.employeeId === 'object' ? source.employeeId?._id : source.employeeId,
+      typeof source.employeeId === 'object' ? source.employeeId?.id : null,
+      typeof source.employeeId === 'object' ? source.employeeId?.employeeId : null,
+      typeof source.employee === 'object' ? source.employee?._id : source.employee,
+      typeof source.employee === 'object' ? source.employee?.id : null,
+      typeof source.employee === 'object' ? source.employee?.employeeId : null,
+      typeof source.user === 'object' ? source.user?._id : source.user,
+      typeof source.user === 'object' ? source.user?.id : null
+    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
 
-    const matched = (idStr && uMap[idStr]) || (emailStr && uMap[emailStr]) || (nameStr && uMap[nameStr]);
+    // 3. Candidate Emails
+    const candidateEmails = [
+      source.email,
+      source.applicantEmail,
+      source.employeeEmail,
+      typeof source.employeeId === 'object' ? source.employeeId?.email : null,
+      typeof source.employee === 'object' ? source.employee?.email : null,
+      typeof source.user === 'object' ? source.user?.email : null
+    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+    // 4. Candidate Names
+    const candidateNames = [
+      source.name,
+      source.fullName,
+      source.employeeName,
+      source.applicantName,
+      (source.firstName || source.lastName) ? `${source.firstName || ''} ${source.lastName || ''}`.trim() : null,
+      typeof source.employeeId === 'object' ? (source.employeeId?.name || source.employeeId?.fullName) : null,
+      typeof source.employee === 'object' ? (source.employee?.name || source.employee?.fullName) : null,
+      typeof source.user === 'object' ? (source.user?.name || source.user?.fullName) : null
+    ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
+
+    // 5. Check extraPhotoMap (from /api/document or localStorage)
+    for (const id of candidateIds) {
+      if (extraPhotoMap[id]) return cleanPhotoUrl(extraPhotoMap[id]);
+    }
+    for (const em of candidateEmails) {
+      if (extraPhotoMap[em]) return cleanPhotoUrl(extraPhotoMap[em]);
+    }
+    for (const nm of candidateNames) {
+      if (extraPhotoMap[nm]) return cleanPhotoUrl(extraPhotoMap[nm]);
+    }
+
+    // 6. Check uMap
+    let matched = null;
+    for (const id of candidateIds) {
+      if (uMap[id]) { matched = uMap[id]; break; }
+    }
+    if (!matched) {
+      for (const em of candidateEmails) {
+        if (uMap[em]) { matched = uMap[em]; break; }
+      }
+    }
+    if (!matched) {
+      for (const nm of candidateNames) {
+        if (uMap[nm]) { matched = uMap[nm]; break; }
+      }
+    }
+    if (!matched && candidateNames.length > 0) {
+      for (const cName of candidateNames) {
+        if (cName.length < 3) continue;
+        const foundKey = Object.keys(uMap).find(k => k.length > 2 && (k === cName || k.includes(cName) || cName.includes(k)));
+        if (foundKey) {
+          matched = uMap[foundKey];
+          break;
+        }
+      }
+    }
+
     if (matched) {
-      return (
+      const photo = cleanPhotoUrl(
         matched.resolvedPhoto ||
         matched.profilePhoto ||
         matched.profileImage ||
@@ -167,11 +251,33 @@ export const DashboardView = () => {
         matched.image ||
         matched.photo ||
         matched.employee?.profilePhoto ||
+        matched.employee?.profileImage ||
         matched.employee?.photoUrl ||
         matched.employee?.avatar ||
-        ''
+        matched.employee?.image ||
+        matched.employee?.photo ||
+        matched.user?.profilePhoto ||
+        matched.user?.photoUrl ||
+        matched.user?.avatar ||
+        matched.profile?.profilePhoto ||
+        matched.profile?.photoUrl ||
+        matched.profile?.avatar
       );
+      if (photo) return photo;
     }
+
+    // 7. Check current logged-in user
+    if (user) {
+      const myIds = [String(user._id || ''), String(user.id || ''), String(user.employeeId || '')].filter(Boolean).map(x => x.toLowerCase());
+      const isMe = candidateIds.some(id => myIds.includes(id)) ||
+                   candidateEmails.some(em => em === (user.email || '').toLowerCase().trim()) ||
+                   candidateNames.some(nm => nm === (user.name || user.fullName || '').toLowerCase().replace(/\s+/g, ' ').trim());
+      if (isMe) {
+        const myPhoto = cleanPhotoUrl(user.profilePhoto || user.photoUrl || user.avatar || user.employee?.profilePhoto || localStorage.getItem(`user_profile_photo_${user._id}`));
+        if (myPhoto) return myPhoto;
+      }
+    }
+
     return '';
   };
 
@@ -612,91 +718,176 @@ export const DashboardView = () => {
         console.warn("Dashboard stats fetch:", dashErr);
       }
 
-      // 2. Fetch User Directory (cached in axios for 5 min)
+      // 2. Fetch User Directory (fresh without stale cache)
       const uMap = {};
       try {
-        const uRes = await api.get('/api/users/all');
+        const uRes = await api.get('/api/users/all', { skipCache: true });
         const rawUsers = uRes.data?.users || uRes.data?.data || (Array.isArray(uRes.data) ? uRes.data : []);
         if (Array.isArray(rawUsers)) {
           rawUsers.forEach(u => {
-            const photo = (
+            const photo = cleanPhotoUrl(
               u.profilePhoto || u.profileImage || u.photoUrl || u.avatar || u.image || u.photo ||
-              u.employee?.profilePhoto || u.employee?.photoUrl || u.employee?.avatar || ''
+              u.employee?.profilePhoto || u.employee?.profileImage || u.employee?.photoUrl || u.employee?.avatar || u.employee?.image || u.employee?.photo ||
+              u.user?.profilePhoto || u.user?.photoUrl || u.user?.avatar ||
+              u.profile?.profilePhoto || u.profile?.photoUrl || u.profile?.avatar || ''
             );
             const enriched = { ...u, resolvedPhoto: photo };
-            if (u._id) uMap[String(u._id).toLowerCase()] = enriched;
-            if (u.id) uMap[String(u.id).toLowerCase()] = enriched;
-            if (u.employeeId) uMap[String(u.employeeId).toLowerCase()] = enriched;
-            if (u.email) uMap[u.email.toLowerCase().trim()] = enriched;
-            if (u.name) uMap[u.name.toLowerCase().trim()] = enriched;
+
+            const registerKey = (val) => {
+              if (!val) return;
+              if (typeof val === 'object') {
+                if (val._id) uMap[String(val._id).toLowerCase()] = enriched;
+                if (val.id) uMap[String(val.id).toLowerCase()] = enriched;
+                if (val.employeeId) uMap[String(val.employeeId).toLowerCase()] = enriched;
+                if (val.email) uMap[val.email.toLowerCase().trim()] = enriched;
+                if (val.name) uMap[val.name.toLowerCase().replace(/\s+/g, ' ').trim()] = enriched;
+                if (val.fullName) uMap[val.fullName.toLowerCase().replace(/\s+/g, ' ').trim()] = enriched;
+                return;
+              }
+              const str = String(val).trim();
+              if (str) uMap[str.toLowerCase()] = enriched;
+            };
+
+            registerKey(u._id);
+            registerKey(u.id);
+            registerKey(u.employeeId);
+            registerKey(u.email);
+            registerKey(u.name);
+            registerKey(u.fullName);
+            registerKey(u.employeeName);
+            if (u.firstName || u.lastName) {
+              registerKey(`${u.firstName || ''} ${u.lastName || ''}`.replace(/\s+/g, ' ').trim());
+            }
+            if (u.employee) registerKey(u.employee);
+            if (u.user) registerKey(u.user);
           });
         }
       } catch (uErr) {
         console.warn("Users directory fetch notice for dashboard:", uErr.message);
       }
 
-      // 3. Resolve Team Members On Leave
-      let resolvedTeamOnLeave = [];
-      if (Array.isArray(dData.teamMembersOnLeave) && dData.teamMembersOnLeave.length > 0) {
-        resolvedTeamOnLeave = dData.teamMembersOnLeave.map(t => ({
-          ...t,
-          profilePhoto: resolveEmployeePhoto(t, uMap) || t.profilePhoto || ''
-        }));
+      // Build extraPhotoMap from localStorage & uploaded /api/document records
+      const extraPhotoMap = {};
+      try {
+        const savedPhotos = JSON.parse(localStorage.getItem('kt_employee_photos') || '{}');
+        Object.assign(extraPhotoMap, savedPhotos);
+      } catch (e) {}
+
+      try {
+        const docRes = await api.get('/api/document');
+        const docList = docRes.data?.data || docRes.data || [];
+        if (Array.isArray(docList)) {
+          docList.forEach(d => {
+            const isPhotoDoc = (
+              String(d.title || '').toLowerCase().includes('photo') ||
+              String(d.fileName || '').toLowerCase().match(/\.(jpg|jpeg|png|webp)$/i) ||
+              String(d.fileType || '').toLowerCase().startsWith('image/')
+            );
+            const fileUrl = cleanPhotoUrl(d.fileUrl || d.url || d.path);
+            if (isPhotoDoc && fileUrl) {
+              if (d.referenceId) extraPhotoMap[String(d.referenceId).toLowerCase().trim()] = fileUrl;
+              if (d.uploadedBy) extraPhotoMap[String(d.uploadedBy).toLowerCase().trim()] = fileUrl;
+            }
+          });
+        }
+      } catch (dErr) {
+        // Document fetch fallback
       }
 
-      // Fallback only if dashboard API returned no team leaves
-      if (resolvedTeamOnLeave.length === 0) {
-        try {
-          const lRes = await api.get('/api/leave/all');
-          const allLeaves = lRes.data?.data || lRes.data?.leaves || lRes.data?.history || (Array.isArray(lRes.data) ? lRes.data : []);
-          if (Array.isArray(allLeaves)) {
-            const todayIso = new Date().toISOString().split('T')[0];
-            const todayLocal = new Date().toLocaleDateString('en-CA');
-            const activeLeaves = allLeaves.filter(l => {
-              const status = String(l.status || '').toLowerCase().trim();
-              const tlStatus = String(l.teamLeadStatus || '').toLowerCase().trim();
-              const isApproved = status.includes('approved') || tlStatus === 'approved';
-              if (!isApproved) return false;
-              const s = (l.startDate || '').split('T')[0];
-              const e = (l.endDate || '').split('T')[0] || s;
-              return (s <= todayIso && e >= todayIso) || (s <= todayLocal && e >= todayLocal);
-            });
+      // 3. Resolve Team Members On Leave
+      // Fetch /api/leave/all to get approved leaves with full employee populate & photos
+      let allLeaves = [];
+      try {
+        const lRes = await api.get('/api/leave/all', { skipCache: true });
+        allLeaves = lRes.data?.data || lRes.data?.leaves || lRes.data?.history || (Array.isArray(lRes.data) ? lRes.data : []);
+      } catch (lErr) {
+        console.warn("Active leaves fetch notice:", lErr.message);
+      }
 
-            resolvedTeamOnLeave = activeLeaves.map(l => {
-              const emp = (typeof l.employeeId === 'object' && l.employeeId !== null) ? l.employeeId :
-                          (typeof l.employee === 'object' && l.employee !== null) ? l.employee :
-                          (typeof l.user === 'object' && l.user !== null) ? l.user : null;
-              const idStr = String((typeof l.employeeId === 'string' ? l.employeeId : '') ||
-                                   (typeof l.employee === 'string' ? l.employee : '') ||
-                                   (typeof l.user === 'string' ? l.user : '') ||
-                                   (typeof l.applicantId === 'string' ? l.applicantId : '') ||
-                                   emp?._id || '').toLowerCase();
-              const emailStr = (l.applicantEmail || l.employeeEmail || l.email || emp?.email || '').toLowerCase().trim();
-              const nameStr = (l.applicantName || l.employeeName || l.name || emp?.name || '').toLowerCase().trim();
-              const matched = (idStr && uMap[idStr]) || (emailStr && uMap[emailStr]) || (nameStr && uMap[nameStr]) || null;
-              const rawName = emp?.name || emp?.fullName || matched?.name || matched?.fullName || l.applicantName || l.employeeName || 'Team Member';
-              const name = rawName.split(' ').map(p => p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '').join(' ').trim();
-              const rawDesig = emp?.designation || matched?.designation || matched?.role || l.applicantRole || 'Employee';
-              const designation = typeof rawDesig === 'object' ? (rawDesig.roleName || rawDesig.name || 'Employee') : String(rawDesig);
-              const photo = emp?.profilePhoto || emp?.photoUrl || emp?.avatar ||
-                            matched?.resolvedPhoto || matched?.profilePhoto || matched?.photoUrl ||
-                            l.profilePhoto || l.photoUrl || '';
-              const isHalf = Boolean(l.isHalfDay || l.leaveType === 'half_day');
-              const leaveDisplay = isHalf
-                ? `Half Day${l.halfDayType === 'second-half' ? ' (2nd Half)' : l.halfDayType === 'first-half' ? ' (1st Half)' : ''}`
-                : 'Full Day';
-              return {
-                _id: l._id || idStr,
-                name,
-                designation,
-                profilePhoto: photo,
-                leaveType: leaveDisplay
-              };
-            });
+      const todayIso = new Date().toISOString().split('T')[0];
+      const todayLocal = new Date().toLocaleDateString('en-CA');
+      const activeLeaves = Array.isArray(allLeaves) ? allLeaves.filter(l => {
+        const status = String(l.status || '').toLowerCase().trim();
+        const tlStatus = String(l.teamLeadStatus || '').toLowerCase().trim();
+        const isApproved = status.includes('approved') || tlStatus === 'approved';
+        if (!isApproved) return false;
+        const s = (l.startDate || '').split('T')[0];
+        const e = (l.endDate || '').split('T')[0] || s;
+        return (s <= todayIso && e >= todayIso) || (s <= todayLocal && e >= todayLocal);
+      }) : [];
+
+      let resolvedTeamOnLeave = [];
+      const dashList = Array.isArray(dData.teamMembersOnLeave) ? dData.teamMembersOnLeave : [];
+
+      if (dashList.length > 0) {
+        resolvedTeamOnLeave = dashList.map(t => {
+          // Cross-reference with matching active leave if available
+          const matchedLeave = activeLeaves.find(l => {
+            const lEmpId = String(typeof l.employeeId === 'object' ? l.employeeId?._id : l.employeeId || l.applicantId || '').toLowerCase();
+            const tId = String(t._id || t.id || (typeof t.employeeId === 'object' ? t.employeeId?._id : t.employeeId) || '').toLowerCase();
+            if (lEmpId && tId && (lEmpId === tId)) return true;
+            const lName = (l.applicantName || l.employeeName || (typeof l.employeeId === 'object' ? l.employeeId?.name : '') || '').toLowerCase().trim();
+            const tName = (t.name || t.fullName || '').toLowerCase().trim();
+            return lName && tName && (lName === tName);
+          });
+
+          let photo = resolveEmployeePhoto(t, uMap, extraPhotoMap);
+          if (!photo && matchedLeave) {
+            photo = resolveEmployeePhoto(matchedLeave, uMap, extraPhotoMap);
           }
-        } catch (lErr) {
-          console.warn("Active leaves fallback notice:", lErr.message);
-        }
+          if (!photo) {
+            photo = cleanPhotoUrl(t.profilePhoto || t.photoUrl || t.avatar || '');
+          }
+
+          return {
+            ...t,
+            profilePhoto: photo
+          };
+        });
+      }
+
+      // If dashboard API returned no team leaves, use resolved active leaves from /api/leave/all
+      if (resolvedTeamOnLeave.length === 0 && activeLeaves.length > 0) {
+        resolvedTeamOnLeave = activeLeaves.map(l => {
+          const emp = (typeof l.employeeId === 'object' && l.employeeId !== null) ? l.employeeId :
+                      (typeof l.employee === 'object' && l.employee !== null) ? l.employee :
+                      (typeof l.user === 'object' && l.user !== null) ? l.user : null;
+          const idStr = String((typeof l.employeeId === 'string' ? l.employeeId : '') ||
+                               (typeof l.employee === 'string' ? l.employee : '') ||
+                               (typeof l.user === 'string' ? l.user : '') ||
+                               (typeof l.applicantId === 'string' ? l.applicantId : '') ||
+                               emp?._id || '').toLowerCase();
+          const emailStr = (l.applicantEmail || l.employeeEmail || l.email || emp?.email || '').toLowerCase().trim();
+          const nameStr = (l.applicantName || l.employeeName || l.name || emp?.name || '').toLowerCase().trim();
+          const matched = (idStr && uMap[idStr]) || (emailStr && uMap[emailStr]) || (nameStr && uMap[nameStr]) || null;
+          const rawName = emp?.name || emp?.fullName || matched?.name || matched?.fullName || l.applicantName || l.employeeName || 'Team Member';
+          const name = rawName.split(' ').map(p => p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '').join(' ').trim();
+          const rawDesig = emp?.designation || matched?.designation || matched?.role || l.applicantRole || 'Employee';
+          const designation = typeof rawDesig === 'object' ? (rawDesig.roleName || rawDesig.name || 'Employee') : String(rawDesig);
+
+          let photo = resolveEmployeePhoto(l, uMap, extraPhotoMap);
+          if (!photo && emp) {
+            photo = resolveEmployeePhoto(emp, uMap, extraPhotoMap);
+          }
+          if (!photo && matched) {
+            photo = resolveEmployeePhoto(matched, uMap, extraPhotoMap);
+          }
+          if (!photo) {
+            photo = cleanPhotoUrl(l.profilePhoto || l.photoUrl || '');
+          }
+
+          const isHalf = Boolean(l.isHalfDay || l.leaveType === 'half_day');
+          const leaveDisplay = isHalf
+            ? `Half Day${l.halfDayType === 'second-half' ? ' (2nd Half)' : l.halfDayType === 'first-half' ? ' (1st Half)' : ''}`
+            : 'Full Day';
+          return {
+            _id: l._id || idStr,
+            name,
+            designation,
+            profilePhoto: photo,
+            leaveType: leaveDisplay
+          };
+        });
       }
       setTeamOnLeave(resolvedTeamOnLeave);
 
@@ -799,6 +990,15 @@ export const DashboardView = () => {
 
     bootstrapDashboard();
     return () => { isMounted = false; };
+  }, [fetchFullDashboard]);
+
+  // Listen to profile photo updates (from ProfileView or other tabs) to refresh dashboard team on leave
+  useEffect(() => {
+    const handlePhotoUpdated = () => {
+      fetchFullDashboard(actualUserIdRef.current);
+    };
+    window.addEventListener('kt_profile_photo_updated', handlePhotoUpdated);
+    return () => window.removeEventListener('kt_profile_photo_updated', handlePhotoUpdated);
   }, [fetchFullDashboard]);
 
   // --- Lightweight Auto-refresh interval (ONLY syncs today's attendance status) ---
@@ -1639,17 +1839,18 @@ export const DashboardView = () => {
             ) : (
               teamOnLeave.map((t, i) => {
                 const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name || 'User')}&background=F59E0B&color=fff&bold=true`;
+                const photoSrc = cleanPhotoUrl(t.profilePhoto) || avatarFallback;
                 return (
                   <div key={t._id || i} className="flex flex-col items-center min-w-[96px] text-center group cursor-pointer p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all">
                     <div className="relative mb-2">
                       <img 
-                        src={t.profilePhoto || avatarFallback} 
+                        src={photoSrc} 
                         alt={t.name} 
                         onError={(e) => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src = avatarFallback;
                         }}
-                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 dark:border-amber-500 shadow-xs group-hover:scale-105 group-hover:border-amber-500 transition-transform" 
+                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 dark:border-amber-500 shadow-xs group-hover:scale-105 group-hover:border-amber-500 transition-transform bg-amber-50 dark:bg-amber-950/30" 
                       />
                       <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-amber-500 border-2 border-white dark:border-slate-900 rounded-full" title="On Leave" />
                     </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, Loader2, ShieldAlert } from 'lucide-react';
 import logo from '../../assets/Logo.png';
 import api from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
@@ -50,7 +50,16 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
 
     } catch (err) {
       console.error('Login error:', err);
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Server is unavailable. Please try again.';
+      let errorMessage = 'Server is unavailable. Please try again.';
+      if (err.message && err.message.toLowerCase().includes('unauthorized')) {
+        errorMessage = err.message;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -79,8 +88,9 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
           <form onSubmit={handleLogin} className="space-y-5">
 
             {error && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-md text-red-700 dark:text-red-400 text-sm font-medium text-center">
-                {error}
+              <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 rounded-md text-red-700 dark:text-red-300 text-sm font-medium flex items-start gap-2.5 shadow-xs">
+                <ShieldAlert size={18} className="shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+                <div className="leading-snug">{error}</div>
               </div>
             )}
 

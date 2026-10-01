@@ -3,10 +3,10 @@ import { AlertTriangle, CheckCircle2, Coffee, BellRing } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 
 export const InactivityAlertModal = () => {
-  const { 
-    isInactivityAlertOpen, 
-    handleAcknowledgeWorking, 
-    handleInactivityStartBreak 
+  const {
+    isInactivityAlertOpen,
+    handleAcknowledgeWorking,
+    handleInactivityStartBreak
   } = useApp();
 
   if (!isInactivityAlertOpen) return null;
@@ -14,7 +14,7 @@ export const InactivityAlertModal = () => {
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        
+
         {/* Warning Header */}
         <div className="bg-amber-600 dark:bg-amber-700 text-white p-5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -22,7 +22,7 @@ export const InactivityAlertModal = () => {
               <AlertTriangle size={24} className="text-white animate-bounce" />
             </div>
             <div>
-              <h3 className="text-base font-bold tracking-tight">1-Minute Inactivity Alarm (Testing Mode)</h3>
+              <h3 className="text-base font-bold tracking-tight">5-Minute Inactivity Alarm</h3>
               <p className="text-xs text-amber-100 font-medium">No mouse or keyboard activity detected</p>
             </div>
           </div>
@@ -39,7 +39,7 @@ export const InactivityAlertModal = () => {
               Are you taking a break or still working?
             </p>
             <p className="text-xs text-slate-600 dark:text-slate-400">
-              Zero mouse movement, cursor movement, or keyboard typing has been detected for <strong>1 continuous minute</strong>.
+              Zero mouse movement, cursor movement, or keyboard typing has been detected for <strong>5 continuous minutes</strong>.
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-500">
               Please choose an option below to ensure your work hours and break time are logged accurately:
@@ -49,7 +49,7 @@ export const InactivityAlertModal = () => {
 
         {/* Actions */}
         <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-end gap-3">
-          
+
           <button
             type="button"
             onClick={handleInactivityStartBreak}

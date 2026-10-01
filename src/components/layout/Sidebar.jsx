@@ -17,6 +17,11 @@ export const Sidebar = ({ onSignOut }) => {
   } = useApp();
 
   const handleNavClick = (tab) => {
+    if (userRole === 'hr') {
+      setCurrentTab('admin-screenshots');
+      setIsMobileSidebarOpen(false);
+      return;
+    }
     setCurrentTab(tab);
     setIsMobileSidebarOpen(false);
   };
@@ -24,32 +29,7 @@ export const Sidebar = ({ onSignOut }) => {
   // Strictly defined role menus in the exact order requested
   const ROLE_MENUS = {
     hr: [
-      // { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: <Camera size={18} /> },
-      // { tab: 'employees', label: 'Employees', icon: <Users size={18} /> },
-      // { tab: 'team-members', label: 'Team Members', icon: <Users size={18} /> },
-      // { tab: 'team-leaves', label: 'Leave Requests', icon: <CalendarX size={18} /> },
-      // { tab: 'attendance', label: 'Attendance Logs', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
-      // { tab: 'salary', label: 'Salary Management', icon: <Wallet size={18} /> },
-      // { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
-      // { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
-      // { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
-      // { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
-      // { tab: 'report', label: 'Reports', icon: <BarChart size={18} /> }
-    ],
-    admin: [
-      { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: <Camera size={18} /> },
-      { tab: 'employees', label: 'Employees', icon: <Users size={18} /> },
-      { tab: 'team-members', label: 'Team Members', icon: <Users size={18} /> },
-      { tab: 'team-leaves', label: 'Leave Requests', icon: <CalendarX size={18} /> },
-      { tab: 'attendance', label: 'Attendance Logs', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
-      { tab: 'salary', label: 'Salary Management', icon: <Wallet size={18} /> },
-      { tab: 'performance', label: 'Performance', icon: <TrendingUp size={18} /> },
-      { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: <Clock size={18} /> },
-      { tab: 'holiday', label: 'Holiday', icon: <Umbrella size={18} /> },
-      { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
-      { tab: 'report', label: 'Reports', icon: <BarChart size={18} /> }
+      { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: <Camera size={18} /> }
     ],
     team_leader: [
       { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -81,27 +61,14 @@ export const Sidebar = ({ onSignOut }) => {
       { tab: 'daily-report', label: 'My Daily Report', icon: <FileText size={18} /> },
       { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> },
       { tab: 'attendance', label: 'My Attendance Log', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined }
-    ],
-    intern: [
-      { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      { tab: 'daily-report', label: 'My Daily Report', icon: <FileText size={18} /> },
-      { tab: 'learning-hub', label: 'Learning Hub', icon: <BookOpen size={18} /> },
-      { tab: 'internship-progress', label: 'Internship Progress', icon: <GraduationCap size={18} /> },
-      { tab: 'leave', label: 'My Leave', icon: <CalendarDays size={18} /> },
-      { tab: 'attendance', label: 'My Attendance Log', icon: <Clock size={18} />, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
-      { tab: 'profile', label: 'Profile', icon: <User size={18} /> },
-      { tab: 'documents', label: 'Documents & Certificate', icon: <FileBadge size={18} /> },
-      { tab: 'tasks', label: 'My Task', icon: <CheckSquare size={18} /> }
     ]
   };
 
   const navItems = ROLE_MENUS[userRole] || ROLE_MENUS['employee'];
 
   const roleLabels = {
-    admin: 'Administrator',
     hr: 'HR Manager',
     team_leader: 'Team Leader',
-    intern: 'Intern',
     employee: 'Employee'
   };
 

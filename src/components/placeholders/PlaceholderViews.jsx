@@ -766,12 +766,7 @@ export const EmployeesView = () => {
 
 // 6. LEARNING HUB (Intern #3)
 export const LearningHubView = () => {
-  const modules = [
-    { title: 'React 19 & Modern Hooks Mastery', level: 'Beginner', hours: '8 hrs', completed: 100 },
-    { title: 'Tailwind CSS v4 Design Systems', level: 'Intermediate', hours: '6 hrs', completed: 75 },
-    { title: 'REST API & Express Authentication', level: 'Advanced', hours: '12 hrs', completed: 40 },
-    { title: 'Git Workflow & Team Collaboration', level: 'Beginner', hours: '4 hrs', completed: 100 }
-  ];
+  const [modules] = useState([]);
 
   return (
     <div className="space-y-6">
@@ -787,41 +782,55 @@ export const LearningHubView = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {modules.map((mod, idx) => (
-          <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
-                  {mod.level}
-                </span>
-                <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-2">{mod.title}</h4>
-              </div>
-              <span className="text-xs font-semibold text-slate-500">{mod.hours}</span>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
-                <span>Completion Status</span>
-                <span>{mod.completed}%</span>
-              </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-purple-600 h-full rounded-full" style={{ width: `${mod.completed}%` }} />
-              </div>
-            </div>
-
-            <button className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer">
-              {mod.completed === 100 ? 'Review Material' : 'Continue Module'}
-            </button>
+      {modules.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto">
+            <BookOpen size={24} />
           </div>
-        ))}
-      </div>
+          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Learning Modules Assigned</h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            Your mentor or team leader has not assigned any training modules to your account yet.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {modules.map((mod, idx) => (
+            <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+                    {mod.level}
+                  </span>
+                  <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-2">{mod.title}</h4>
+                </div>
+                <span className="text-xs font-semibold text-slate-500">{mod.hours}</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                  <span>Completion Status</span>
+                  <span>{mod.completed}%</span>
+                </div>
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div className="bg-purple-600 h-full rounded-full" style={{ width: `${mod.completed}%` }} />
+                </div>
+              </div>
+
+              <button className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer">
+                {mod.completed === 100 ? 'Review Material' : 'Continue Module'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
 // 7. INTERNSHIP PROGRESS (Intern #4)
 export const InternshipProgressView = () => {
+  const checkpoints = [];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
@@ -831,33 +840,38 @@ export const InternshipProgressView = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Internship Progress Tracker</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">3-Month Internship roadmap, weekly evaluations, and mentor checkpoints</p>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Internship roadmap, weekly evaluations, and mentor checkpoints</p>
           </div>
         </div>
-        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-md text-xs font-bold">
-          Month 2 of 3 (65% Completed)
-        </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { month: 'Month 1: Foundation & Onboarding', status: 'Completed', score: '95/100', mentor: 'Sarah Jenkins' },
-          { month: 'Month 2: Core Feature Development', status: 'In Progress', score: 'Ongoing', mentor: 'Alex Morgan' },
-          { month: 'Month 3: Production Review & Capstone', status: 'Upcoming', score: 'Pending', mentor: 'David Miller' }
-        ].map((item, idx) => (
-          <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-3">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.status === 'Completed' ? 'bg-green-100 text-green-700' : item.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-              }`}>
-              {item.status}
-            </span>
-            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">{item.month}</h4>
-            <div className="text-xs text-slate-500 space-y-1">
-              <p>Evaluation Score: <span className="font-semibold text-slate-700 dark:text-slate-300">{item.score}</span></p>
-              <p>Assigned Mentor: <span className="font-semibold text-slate-700 dark:text-slate-300">{item.mentor}</span></p>
-            </div>
+      {checkpoints.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
+            <GraduationCap size={24} />
           </div>
-        ))}
-      </div>
+          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Evaluation Checkpoints Yet</h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            Your monthly roadmap checkpoints and evaluation scores will appear here once submitted by your mentor.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {checkpoints.map((item, idx) => (
+            <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-3">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.status === 'Completed' ? 'bg-green-100 text-green-700' : item.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                }`}>
+                {item.status}
+              </span>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">{item.month}</h4>
+              <div className="text-xs text-slate-500 space-y-1">
+                <p>Evaluation Score: <span className="font-semibold text-slate-700 dark:text-slate-300">{item.score}</span></p>
+                <p>Assigned Mentor: <span className="font-semibold text-slate-700 dark:text-slate-300">{item.mentor}</span></p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -867,26 +881,17 @@ export const DocumentsView = () => {
   const { user, setCurrentTab } = useApp();
   const currentUserId = user?.id || user?._id || user?.employeeId || 'current_user';
 
-  const [employeeDocs, setEmployeeDocs] = useState(() => {
+  const [employeeDocs] = useState(() => {
     try {
       const saved = localStorage.getItem(`employee_documents_${currentUserId}`);
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.warn(e);
     }
-    return [
-      { id: 'aadhar', title: 'Aadhar Card', category: 'Identity Proof', status: 'uploaded', docNumber: '4829-1092-8834', fileName: 'Aadhar_Card_Verified.pdf', uploadedAt: '12 Jan 2024' },
-      { id: 'pan', title: 'PAN Card', category: 'Tax ID', status: 'uploaded', docNumber: 'ABCDE1234F', fileName: 'PAN_Card_Verified.jpg', uploadedAt: '12 Jan 2024' },
-      { id: 'passport_photo', title: 'Passport Size Photo', category: 'Photograph', status: 'uploaded', docNumber: 'Active Photo', fileName: 'Passport_Size_Photo.jpg', uploadedAt: '15 Jan 2024' }
-    ];
+    return [];
   });
 
-  const docs = [
-    { title: 'Internship Offer Letter', date: '01 Jul 2026', size: '1.2 MB', type: 'PDF' },
-    { title: 'Non-Disclosure Agreement (NDA)', date: '01 Jul 2026', size: '850 KB', type: 'PDF' },
-    { title: 'Company Policy & Code of Conduct', date: '05 Jul 2026', size: '2.4 MB', type: 'PDF' },
-    { title: 'Internship Completion Certificate', date: 'Pending Completion (30 Sep 2026)', size: '--', type: 'Certificate' }
-  ];
+  const docs = [];
 
   return (
     <div className="space-y-6">
@@ -925,29 +930,38 @@ export const DocumentsView = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {employeeDocs.slice(0, 3).map((doc) => (
-            <div key={doc.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{doc.title}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50">
-                    {doc.status === 'uploaded' ? 'Uploaded' : 'Pending'}
-                  </span>
+        {employeeDocs.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+            No identity proofs saved yet. You can upload your Aadhar Card, PAN Card, and photo from the{' '}
+            <button onClick={() => setCurrentTab('profile')} className="text-blue-600 dark:text-blue-400 font-semibold underline cursor-pointer">
+              Profile section
+            </button>.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {employeeDocs.slice(0, 3).map((doc) => (
+              <div key={doc.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{doc.title}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50">
+                      {doc.status === 'uploaded' ? 'Uploaded' : 'Pending'}
+                    </span>
+                  </div>
+                  <p className="text-xs font-mono text-slate-500 mb-1">{doc.docNumber || 'Verified'}</p>
+                  <p className="text-[11px] text-slate-400">{doc.fileName || 'Document record'} • {doc.uploadedAt || 'Recent'}</p>
                 </div>
-                <p className="text-xs font-mono text-slate-500 mb-1">{doc.docNumber || 'Verified'}</p>
-                <p className="text-[11px] text-slate-400">{doc.fileName || 'Document record'} • {doc.uploadedAt || 'Recent'}</p>
-              </div>
 
-              <button
-                onClick={() => setCurrentTab('profile')}
-                className="mt-3 w-full py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
-              >
-                <Eye size={13} /> View / Update in Profile
-              </button>
-            </div>
-          ))}
-        </div>
+                <button
+                  onClick={() => setCurrentTab('profile')}
+                  className="mt-3 w-full py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
+                >
+                  <Eye size={13} /> View / Update in Profile
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Onboarding & HR Documents */}
@@ -955,27 +969,33 @@ export const DocumentsView = () => {
         <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
           Onboarding & Corporate Agreements
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {docs.map((doc, idx) => (
-            <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">
-                  <FileText size={20} />
+        {docs.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+            No corporate agreements or onboarding documents currently issued.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {docs.map((doc, idx) => (
+              <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{doc.date} • {doc.size}</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{doc.date} • {doc.size}</p>
-                </div>
+                <button
+                  onClick={() => alert(`Viewing document: ${doc.title}`)}
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Download size={13} /> View
+                </button>
               </div>
-              <button
-                onClick={() => alert(`Viewing document: ${doc.title}`)}
-                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
-              >
-                <Download size={13} /> View
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

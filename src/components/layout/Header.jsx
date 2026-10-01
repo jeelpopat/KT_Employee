@@ -282,7 +282,7 @@ export const Header = ({ onSignOut }) => {
       </div> */}
 
       <div className="flex items-center space-x-3">
-        {attendanceStatus === 'checked_in' && (
+        {userRole !== 'hr' && attendanceStatus === 'checked_in' && (
           <button 
             type="button"
             onClick={() => setCurrentTab('admin-screenshots')}
@@ -436,7 +436,7 @@ export const Header = ({ onSignOut }) => {
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono uppercase">
-                      {userRole === 'team_leader' ? 'Team Leader' : userRole === 'intern' ? 'Intern' : 'Employee'}
+                      {userRole === 'team_leader' ? 'Team Leader' : userRole === 'intern' ? 'Intern' : userRole === 'hr' ? 'HR Manager' : userRole === 'admin' ? 'Administrator' : 'Employee'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{displayEmail}</p>
@@ -444,13 +444,15 @@ export const Header = ({ onSignOut }) => {
               </div>
               
               <div className="py-1 border-t border-slate-100 dark:border-slate-800">
-                <button 
-                  onClick={() => { setCurrentTab('profile'); setIsProfileMenuOpen(false); }}
-                  className="w-full px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center space-x-3 transition-colors cursor-pointer"
-                >
-                  <User size={16} />
-                  <span>My Profile</span>
-                </button>
+                {userRole !== 'hr' && (
+                  <button 
+                    onClick={() => { setCurrentTab('profile'); setIsProfileMenuOpen(false); }}
+                    className="w-full px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center space-x-3 transition-colors cursor-pointer"
+                  >
+                    <User size={16} />
+                    <span>My Profile</span>
+                  </button>
+                )}
                 <button 
                   onClick={() => { 
                     handleCheckOut(); 

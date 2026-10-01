@@ -38,6 +38,12 @@ const invalidateOnMutation = (url = '') => {
     invalidateCache(/dashboard/);
   } else if (urlLower.includes('/users') || urlLower.includes('/profile')) {
     invalidateCache(/users/);
+    invalidateCache(/dashboard/);
+    invalidateCache(/leave/);
+  } else if (urlLower.includes('/document')) {
+    invalidateCache(/document/);
+    invalidateCache(/users/);
+    invalidateCache(/dashboard/);
   } else if (urlLower.includes('/task')) {
     invalidateCache(/task/);
     invalidateCache(/project/);

@@ -118,7 +118,6 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
     }
   };
 
-  const defaultAvatar = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80';
   const comments = displayTask.comments || [];
   const attachments = displayTask.attachments || [];
   const subTasks = displayTask.subTasks || [];
@@ -335,11 +334,9 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                 ) : (
                   comments.map((c, idx) => (
                     <div key={c._id || idx} className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl flex items-start space-x-3 text-xs">
-                      <img 
-                        src={defaultAvatar} 
-                        alt="User" 
-                        className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-slate-200 dark:ring-slate-700 bg-white" 
-                      />
+                      <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 ring-1 ring-slate-200 dark:ring-slate-700">
+                        {String(c.userId?.name || c.commentedBy?.name || 'TM').slice(0, 2).toUpperCase()}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center">
                           <span className="font-semibold text-slate-900 dark:text-slate-100">

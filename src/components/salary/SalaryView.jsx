@@ -399,19 +399,6 @@ export const SalaryView = () => {
     setIsConfigModalOpen(false);
   };
 
-  // 1-Click load Bhavya Shah's live structure from backend
-  const handleLoadBhavyaDemo = async () => {
-    try {
-      const res = await api.get('/api/payroll/salary/user/6ab219cccd45f626cdc52328');
-      const bData = res.data?.data || res.data?.salary || res.data;
-      if (bData) {
-        setSalaryStructure(bData);
-      }
-    } catch (e) {
-      console.warn('Could not load Bhavya structure:', e);
-    }
-  };
-
   // Endpoint 1: Direct .pdf Binary File Download (/api/payroll/payslip/pdf/:id)
   const handleDownloadPdf = async (slip) => {
     const slipId = slip?._id || slip?.id || slip?.payslipId;
@@ -660,19 +647,12 @@ export const SalaryView = () => {
                 No salary document exists in MongoDB for this user account yet.
               </p>
               <p className="text-amber-700 dark:text-amber-400">
-                You can configure your salary breakdown below or load the existing record from MongoDB to test.
+                You can configure your salary breakdown below.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0 self-stretch md:self-auto flex-wrap">
-            <button
-              onClick={handleLoadBhavyaDemo}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-300 dark:border-slate-700"
-              title="Load live salary structure of Bhavya Shah from MongoDB"
-            >
-              Load Demo (Bhavya Shah)
-            </button>
             <button
               onClick={() => setIsConfigModalOpen(true)}
               className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
