@@ -172,10 +172,10 @@ export const Sidebar = ({ onSignOut }) => {
     }
   ];
 
-  const menuSections = 
+  const menuSections =
     userRole === 'admin' ? ADMIN_SECTIONS :
-    userRole === 'hr' ? HR_SECTIONS :
-    userRole === 'team_leader' ? TL_SECTIONS : EMP_SECTIONS;
+      userRole === 'hr' ? HR_SECTIONS :
+        userRole === 'team_leader' ? TL_SECTIONS : EMP_SECTIONS;
 
   const roleLabels = {
     admin: 'Administrator',
@@ -217,18 +217,19 @@ export const Sidebar = ({ onSignOut }) => {
           ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"} 
           lg:translate-x-0`}
       >
-        {/* Logo Header matching KT-admin */}
-        <div className="h-20 flex items-center justify-between px-5 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-2.5">
+        {/* Logo Header */}
+        <div className="h-20 flex items-center justify-between px-5 border-b border-slate-100 shrink-0 overflow-hidden">
+          <div className="flex items-center justify-center h-full flex-1 overflow-hidden">
             <img
               src={logo}
               alt="Kevalon Technology"
-              className="h-10 w-auto max-w-[140px] object-contain"
+              className="h-8 w-auto object-contain scale-[5] origin-center transition-all"
+              style={{ transform: 'scale(1.35)' }}
             />
           </div>
           <button
             onClick={() => setIsMobileSidebarOpen(false)}
-            className="lg:hidden text-slate-400 hover:text-slate-700 cursor-pointer"
+            className="lg:hidden text-slate-400 hover:text-slate-700 cursor-pointer shrink-0 z-10"
           >
             <X size={18} />
           </button>
@@ -250,11 +251,10 @@ export const Sidebar = ({ onSignOut }) => {
                     key={item.tab}
                     type="button"
                     onClick={() => handleNavClick(item.tab)}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-all duration-150 text-xs cursor-pointer text-left ${
-                      isActive
-                        ? "bg-indigo-50/90 text-indigo-700 font-semibold border-l-2 border-indigo-600"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium border-l-2 border-transparent"
-                    }`}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-all duration-150 text-xs cursor-pointer text-left ${isActive
+                      ? "bg-indigo-50/90 text-indigo-700 font-semibold border-l-2 border-indigo-600"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium border-l-2 border-transparent"
+                      }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Icon size={16} className={`shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
