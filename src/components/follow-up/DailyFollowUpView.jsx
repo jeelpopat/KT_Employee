@@ -309,8 +309,8 @@ export const DailyFollowUpView = () => {
   // Avatar initial color generator
   const getAvatarColor = (name = '') => {
     const colors = [
-      'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
       'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+      'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
       'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
       'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
       'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
@@ -351,13 +351,13 @@ export const DailyFollowUpView = () => {
       {/* 1. Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-blue-600 text-white rounded-xl shadow-sm">
+          <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-sm">
             <PhoneCall size={22} className="animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Team Daily Follow-Up</h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800">
                 Live Data
               </span>
             </div>
@@ -377,7 +377,7 @@ export const DailyFollowUpView = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search employee, task, project..."
-              className="w-full pl-9 pr-7 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+              className="w-full pl-9 pr-7 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
             />
             {searchQuery && (
               <button
@@ -395,7 +395,7 @@ export const DailyFollowUpView = () => {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
             title="Refresh live daily reports"
           >
-            <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-blue-600' : ''} />
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-indigo-600' : ''} />
             <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
           </button>
 
@@ -407,7 +407,7 @@ export const DailyFollowUpView = () => {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
             <span className="text-xs font-medium uppercase tracking-wider">Team Members</span>
-            <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
+            <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
               <User size={16} />
             </div>
           </div>
@@ -470,7 +470,7 @@ export const DailyFollowUpView = () => {
       {/* 3. Loading & Error States */}
       {isLoading ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center shadow-xs">
-          <RefreshCw size={28} className="animate-spin text-blue-600 mx-auto mb-3" />
+          <RefreshCw size={28} className="animate-spin text-indigo-600 mx-auto mb-3" />
           <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Loading Team Daily Reports...</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Connecting to /api/dailyUpdate/list?teamLeadId={tlUserId || 'TL_ID'}</p>
         </div>
@@ -498,7 +498,7 @@ export const DailyFollowUpView = () => {
           <div className="flex justify-center gap-2 pt-2">
             <button
               onClick={() => loadData(true)}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
             >
               Refresh Data
             </button>
@@ -537,7 +537,7 @@ export const DailyFollowUpView = () => {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{person.name}</h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
                           {person.designation}
                         </span>
                         {person.role.toLowerCase().includes('lead') && (
@@ -556,7 +556,7 @@ export const DailyFollowUpView = () => {
                   <div className="flex items-center gap-3 self-end sm:self-center">
                     <div className="flex items-center gap-2">
                       <div className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5">
-                        <Clock size={13} className="text-blue-500" />
+                        <Clock size={13} className="text-indigo-600" />
                         <span>{person.totalHours} hrs</span>
                       </div>
 
@@ -604,7 +604,7 @@ export const DailyFollowUpView = () => {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1">
-                                  <Calendar size={12} className="text-blue-500" />
+                                  <Calendar size={12} className="text-indigo-600" />
                                   {formatDate(report.reportDate || report.createdAt)}
                                 </span>
 
@@ -617,7 +617,7 @@ export const DailyFollowUpView = () => {
                               </div>
 
                               <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800">
                                   {report.hoursWorked || 0} Hours Logged
                                 </span>
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -655,7 +655,7 @@ export const DailyFollowUpView = () => {
                               {/* Next Day Plan */}
                               <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
                                 <p className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 text-[11px] uppercase tracking-wider">
-                                  <TrendingUp size={12} className="text-blue-500" /> Next Day Plan
+                                  <TrendingUp size={12} className="text-indigo-600" /> Next Day Plan
                                 </p>
                                 <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
                                   {report.tomorrowPlan || 'None'}
@@ -699,13 +699,13 @@ export const DailyFollowUpView = () => {
                                         <span className="font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
                                           {tRef.taskTitle || 'Untitled Task'}
                                         </span>
-                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
                                           {tRef.progress || 0}%
                                         </span>
                                       </div>
                                       <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                                         <div
-                                          className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                                          className="bg-indigo-600 h-full rounded-full transition-all duration-300"
                                           style={{ width: `${Math.min(100, Math.max(0, tRef.progress || 0))}%` }}
                                         />
                                       </div>
@@ -721,9 +721,9 @@ export const DailyFollowUpView = () => {
                             {/* TL Follow-Up Note & Action Area */}
                             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                               {noteData ? (
-                                <div className="flex-1 p-2 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 rounded-lg flex items-start justify-between gap-2">
+                                <div className="flex-1 p-2 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/40 rounded-lg flex items-start justify-between gap-2">
                                   <div className="space-y-0.5">
-                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
                                       <MessageSquare size={11} />
                                       <span>TL Note by {noteData.author} ({noteData.savedAt}):</span>
                                     </div>
@@ -746,14 +746,14 @@ export const DailyFollowUpView = () => {
                                     value={currentNoteText}
                                     onChange={(e) => setCurrentNoteText(e.target.value)}
                                     placeholder="Add standup note or action item for this report..."
-                                    className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') handleSaveNote(report._id);
                                     }}
                                   />
                                   <button
                                     onClick={() => handleSaveNote(report._id)}
-                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+                                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer"
                                   >
                                     Save
                                   </button>
@@ -773,7 +773,7 @@ export const DailyFollowUpView = () => {
                                     setActiveNoteInput(report._id);
                                     setCurrentNoteText('');
                                   }}
-                                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                  className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                                 >
                                   <Plus size={13} /> Add Follow-Up Note
                                 </button>

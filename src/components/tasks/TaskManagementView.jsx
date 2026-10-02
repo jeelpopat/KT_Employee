@@ -197,7 +197,7 @@ export const TaskManagementView = () => {
       return <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-semibold text-[10px] border border-amber-200 dark:border-amber-800/50">High</span>;
     }
     if (p === 'medium') {
-      return <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-semibold text-[10px] border border-blue-200 dark:border-blue-800/50">Medium</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-semibold text-[10px] border border-indigo-200 dark:border-indigo-800/50">Medium</span>;
     }
     return <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium text-[10px] border border-slate-200 dark:border-slate-700">Low</span>;
   };
@@ -211,7 +211,7 @@ export const TaskManagementView = () => {
 
   // Mobile-Optimized and Desktop List View Table
   const ListViewTable = () => (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden transition-colors w-full shadow-sm">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden transition-colors w-full shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400 uppercase text-xs font-semibold tracking-wider border-b border-slate-200 dark:border-slate-800">
@@ -269,14 +269,14 @@ export const TaskManagementView = () => {
                     <td className="hidden md:table-cell px-5 py-4">
                       <div className="w-24 flex items-center gap-3">
                         <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${task.progress || 0}%` }} />
+                          <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${task.progress || 0}%` }} />
                         </div>
                         <span className="font-mono text-[10px] font-semibold text-slate-700 dark:text-slate-300">{task.progress || 0}%</span>
                       </div>
                     </td>
                     <td className="px-4 md:px-5 py-4" onClick={e => e.stopPropagation()}>
                       <select
-                        className="w-full text-xs font-semibold uppercase tracking-wider bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+                        className="w-full text-xs font-semibold uppercase tracking-wider bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
                         value={normStatus}
                         onChange={(e) => handleUpdateTaskStatus(task._id, e.target.value)}
                       >
@@ -299,14 +299,14 @@ export const TaskManagementView = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
-            <CheckSquare size={22} />
+          <div className="p-2 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shadow-xs">
+            <CheckSquare size={20} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">My Tasks</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-base font-semibold text-slate-900 tracking-tight">My Tasks</h2>
+            <p className="text-xs text-slate-400">
               Personal deliverables and tasks assigned directly to you
             </p>
           </div>
@@ -316,16 +316,16 @@ export const TaskManagementView = () => {
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total Assigned', value: totalCount, icon: CheckSquare, accent: 'border-l-blue-500' },
+          { label: 'Total Assigned', value: totalCount, icon: CheckSquare, accent: 'border-l-indigo-600' },
           { label: 'To Do', value: pendingCount, icon: Clock, accent: 'border-l-slate-400' },
           { label: 'In Progress', value: inProgressCount, icon: TrendingUp, accent: 'border-l-amber-500' },
           { label: 'In Review / Testing', value: reviewCount, icon: AlertCircle, accent: 'border-l-indigo-500' },
-          { label: 'Completed', value: completedCount, icon: FileCheck, accent: 'border-l-green-500' }
+          { label: 'Completed', value: completedCount, icon: FileCheck, accent: 'border-l-emerald-500' }
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
+          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
             <div className="flex items-start justify-between">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">
                 {isLoading ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
               </p>
             </div>
@@ -334,7 +334,7 @@ export const TaskManagementView = () => {
       </div>
 
       {/* Controls Bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-4 flex flex-col md:flex-row items-center justify-between gap-4 transition-colors shadow-sm">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-3 sm:p-4 flex flex-col md:flex-row items-center justify-between gap-4 transition-all shadow-xs">
         
         {/* Board / List switcher & Refresh */}
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -382,7 +382,7 @@ export const TaskManagementView = () => {
               placeholder="Search tasks or projects..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
 
@@ -391,7 +391,7 @@ export const TaskManagementView = () => {
             <select
               value={selectedProjectFilter}
               onChange={e => setSelectedProjectFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer max-w-[160px] truncate"
+              className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer max-w-[160px] truncate"
             >
               <option value="all">All Projects</option>
               {projectOptions.map((name, i) => (
@@ -404,7 +404,7 @@ export const TaskManagementView = () => {
           <select
             value={selectedPriorityFilter}
             onChange={e => setSelectedPriorityFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
           >
             <option value="all">All Priorities</option>
             <option value="high">High</option>
@@ -416,7 +416,7 @@ export const TaskManagementView = () => {
           <select
             value={selectedStatusFilter}
             onChange={e => setSelectedStatusFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="pending">To Do</option>
@@ -429,7 +429,7 @@ export const TaskManagementView = () => {
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center p-16 space-y-3">
-          <Loader2 className="animate-spin text-blue-500" size={32} />
+          <Loader2 className="animate-spin text-indigo-600" size={32} />
           <p className="text-sm text-slate-500">Loading live tasks...</p>
         </div>
       ) : (
@@ -445,8 +445,8 @@ export const TaskManagementView = () => {
                   return (
                     <div
                       key={col.id}
-                      className={`bg-slate-50/50 dark:bg-slate-900/50 border rounded-md p-4 flex flex-col space-y-4 min-h-[520px] border-t-4 ${col.borderAccent} transition-colors ${
-                        isDragOver ? 'border-blue-400 bg-blue-50/20 dark:bg-blue-900/10' : 'border-slate-200 dark:border-slate-800'
+                      className={`bg-slate-50/50 dark:bg-slate-900/50 border rounded-xl p-4 flex flex-col space-y-4 min-h-[520px] border-t-4 ${col.borderAccent} transition-colors shadow-xs ${
+                        isDragOver ? 'border-indigo-400 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-200/80 dark:border-slate-800'
                       }`}
                       onDragOver={(e) => {
                         e.preventDefault();
@@ -490,7 +490,7 @@ export const TaskManagementView = () => {
                                   e.dataTransfer.effectAllowed = 'move';
                                 }}
                                 onClick={() => setSelectedTask(task)}
-                                className="bg-white dark:bg-slate-950 p-4 rounded-md border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 transition-all cursor-grab active:cursor-grabbing flex flex-col gap-3 shadow-sm hover:shadow-md"
+                                className="bg-white dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all cursor-grab active:cursor-grabbing flex flex-col gap-3 shadow-xs hover:shadow-card"
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <span 
@@ -519,7 +519,7 @@ export const TaskManagementView = () => {
                                   </div>
                                   <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
                                     <div
-                                      className="h-full bg-blue-500 rounded-full transition-all"
+                                      className="h-full bg-indigo-600 rounded-full transition-all"
                                       style={{ width: `${task.progress || 0}%` }}
                                     />
                                   </div>

@@ -88,7 +88,7 @@ export const PerformanceView = () => {
 
   const getScoreRating = (val) => {
     if (val >= 90) return { label: 'Outstanding (Exceeding Expectations)', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' };
-    if (val >= 75) return { label: 'Very Good (Above Standard)', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800' };
+    if (val >= 75) return { label: 'Very Good (Above Standard)', color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800' };
     if (val >= 50) return { label: 'Good (Meets Expectations)', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' };
     if (val > 0) return { label: 'Needs Improvement', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800' };
     return { label: 'Evaluation In Progress', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' };
@@ -110,9 +110,9 @@ export const PerformanceView = () => {
   return (
     <div className="space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
+          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
             <TrendingUp size={24} />
           </div>
           <div>
@@ -126,7 +126,7 @@ export const PerformanceView = () => {
         <button
           onClick={fetchMyPerformance}
           disabled={isLoading}
-          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
           Refresh
@@ -134,14 +134,14 @@ export const PerformanceView = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
-          <Loader2 size={32} className="animate-spin text-blue-500" />
+        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+          <Loader2 size={32} className="animate-spin text-indigo-500" />
           <p className="text-xs text-slate-500 font-medium">Loading your performance metrics...</p>
         </div>
       ) : (
         <>
           {/* Main Scorecard Banner */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6 shadow-xs transition-colors">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 shadow-xs transition-colors">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
 
               {/* Left Details */}
@@ -171,7 +171,7 @@ export const PerformanceView = () => {
                   </div>
                   <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${score >= 75 ? 'bg-emerald-500' : score >= 50 ? 'bg-blue-600' : score > 0 ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                      className={`h-full rounded-full transition-all duration-500 ${score >= 75 ? 'bg-emerald-500' : score >= 50 ? 'bg-indigo-600' : score > 0 ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
                         }`}
                       style={{ width: `${Math.max(score, 4)}%` }}
                     />
@@ -180,7 +180,7 @@ export const PerformanceView = () => {
               </div>
 
               {/* Big Percentage Badge */}
-              <div className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl min-w-[180px] text-center shrink-0">
+              <div className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 rounded-xl min-w-[180px] text-center shrink-0">
                 <span className="text-4xl font-extrabold text-slate-900 dark:text-slate-100">
                   {score}%
                 </span>
@@ -196,7 +196,7 @@ export const PerformanceView = () => {
             {/* Evaluator Remarks */}
             <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Evaluator Remarks & Feedback</h4>
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 rounded-md">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl">
                 <p className="text-xs text-slate-700 dark:text-slate-300 italic leading-relaxed">
                   "{performanceData?.remarks || 'No specific remarks recorded for this evaluation cycle yet. Keep up the consistent deliverables.'}"
                 </p>
@@ -206,18 +206,18 @@ export const PerformanceView = () => {
 
           {/* Performance Competency Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+            <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sprint Velocity</span>
-                <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{Math.max(score, 88)}%</span>
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{Math.max(score, 88)}%</span>
               </div>
               <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-blue-600 h-full rounded-full" style={{ width: `${Math.max(score, 88)}%` }} />
+                <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${Math.max(score, 88)}%` }} />
               </div>
               <p className="text-[11px] text-slate-500">Measures planned tasks completed within sprint timelines</p>
             </div>
 
-            <div className="p-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+            <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Attendance & Punctuality</span>
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">96.5%</span>
@@ -228,7 +228,7 @@ export const PerformanceView = () => {
               <p className="text-[11px] text-slate-500">Punctual session check-ins, active work hours, and minimal break overrun</p>
             </div>
 
-            <div className="p-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+            <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Quality & Bug-Free Output</span>
                 <span className="text-xs font-bold text-purple-600 dark:text-purple-400">{Math.max(score, 92)}%</span>
@@ -427,9 +427,9 @@ export const TeamMembersView = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
+          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
             <Users size={22} />
           </div>
           <div>
@@ -448,18 +448,18 @@ export const TeamMembersView = () => {
             placeholder="Search teammates by name, email..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
           />
         </div>
       </div>
 
       {/* Active Team Projects Tag */}
       {userProjects.length > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-lg text-xs">
-          <span className="font-semibold text-blue-700 dark:text-blue-300">My Assigned Projects:</span>
+        <div className="flex items-center gap-2 p-3 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl text-xs">
+          <span className="font-semibold text-indigo-700 dark:text-indigo-300">My Assigned Projects:</span>
           <div className="flex flex-wrap gap-1.5">
             {userProjects.map((p, i) => (
-              <span key={i} className="px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-800 text-blue-800 dark:text-blue-200 font-semibold border border-blue-200 dark:border-blue-800 shadow-xs">
+              <span key={i} className="px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-800 text-indigo-800 dark:text-indigo-200 font-semibold border border-indigo-200 dark:border-indigo-800 shadow-xs">
                 {p}
               </span>
             ))}
@@ -469,11 +469,11 @@ export const TeamMembersView = () => {
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 space-y-3">
-          <Loader2 size={32} className="animate-spin text-blue-500" />
+          <Loader2 size={32} className="animate-spin text-indigo-500" />
           <p className="text-sm text-slate-500">Loading your project teammates...</p>
         </div>
       ) : filteredMembers.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center shadow-xs">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-10 text-center shadow-xs">
           <Users size={36} className="mx-auto text-slate-400 mb-2 opacity-60" />
           <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">No Team Members Found</h4>
           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
@@ -496,14 +496,14 @@ export const TeamMembersView = () => {
             return (
               <div
                 key={m.id || idx}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-slate-700 rounded-xl p-4 shadow-xs flex flex-col justify-between space-y-3 transition-all"
+                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-slate-700 rounded-xl p-4 shadow-xs flex flex-col justify-between space-y-3 transition-all"
               >
                 <div className="flex items-start gap-3">
                   <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${m.isLead
                     ? 'bg-amber-500'
                     : m.role === 'Intern'
                       ? 'bg-purple-600'
-                      : 'bg-blue-600'
+                      : 'bg-indigo-600'
                     }`}>
                     {initials}
                   </div>
@@ -524,7 +524,7 @@ export const TeamMembersView = () => {
                         ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
                         : m.role === 'Intern'
                           ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                          : 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                          : 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                         }`}>
                         {m.role}
                       </span>
@@ -637,9 +637,9 @@ export const EmployeesView = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
+          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
             <Building2 size={22} />
           </div>
           <div>
@@ -651,12 +651,12 @@ export const EmployeesView = () => {
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-md text-xs self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs self-start sm:self-auto">
           {['ALL', 'TL', 'EMP', 'INT'].map(tag => (
             <button
               key={tag}
               onClick={() => setFilterRole(tag)}
-              className={`px-3 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${filterRole === tag ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${filterRole === tag ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
                 }`}
             >
               {tag === 'ALL' ? 'All Staff' : tag === 'TL' ? 'Team Leaders' : tag === 'INT' ? 'Interns' : 'Employees'}
@@ -666,7 +666,7 @@ export const EmployeesView = () => {
       </div>
 
       {/* Directory Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="relative w-full sm:max-w-sm">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -675,7 +675,7 @@ export const EmployeesView = () => {
               placeholder="Search by name, email, department, role..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
             />
           </div>
           <span className="text-xs text-slate-400 self-end sm:self-auto">
@@ -685,7 +685,7 @@ export const EmployeesView = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 size={32} className="animate-spin text-blue-500" />
+            <Loader2 size={32} className="animate-spin text-indigo-500" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
@@ -724,7 +724,7 @@ export const EmployeesView = () => {
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${emp.role === 'TL' ? 'bg-amber-500' :
                             emp.role === 'INT' ? 'bg-purple-600' :
                               emp.role === 'MGMT' ? 'bg-indigo-600' :
-                                'bg-blue-600'
+                                'bg-indigo-600'
                             }`}>
                             {initials}
                           </div>
@@ -738,7 +738,7 @@ export const EmployeesView = () => {
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${emp.role === 'TL' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800' :
                           emp.role === 'INT' ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800' :
                             emp.role === 'MGMT' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800' :
-                              'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                              'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                           }`}>
                           {emp.roleFull}
                         </span>
@@ -833,9 +833,9 @@ export const InternshipProgressView = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
+          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
             <GraduationCap size={22} />
           </div>
           <div>
@@ -846,8 +846,8 @@ export const InternshipProgressView = () => {
       </div>
 
       {checkpoints.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-10 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
             <GraduationCap size={24} />
           </div>
           <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Evaluation Checkpoints Yet</h4>
@@ -858,8 +858,8 @@ export const InternshipProgressView = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {checkpoints.map((item, idx) => (
-            <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-3">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.status === 'Completed' ? 'bg-green-100 text-green-700' : item.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+            <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-3">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.status === 'Completed' ? 'bg-green-100 text-green-700' : item.status === 'In Progress' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'
                 }`}>
                 {item.status}
               </span>
@@ -896,9 +896,9 @@ export const DocumentsView = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-md">
+          <div className="p-2.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl">
             <FileBadge size={22} />
           </div>
           <div>
@@ -909,7 +909,7 @@ export const DocumentsView = () => {
 
         <button
           onClick={() => setCurrentTab('profile')}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer self-start sm:self-auto shadow-xs"
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer self-start sm:self-auto shadow-xs"
         >
           <span>Manage Identity Proofs in Profile</span>
           <ChevronRight size={14} />
@@ -924,16 +924,16 @@ export const DocumentsView = () => {
           </h3>
           <button
             onClick={() => setCurrentTab('profile')}
-            className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
           >
             Upload or Update in Profile &rarr;
           </button>
         </div>
 
         {employeeDocs.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 text-center text-xs text-slate-500 dark:text-slate-400">
             No identity proofs saved yet. You can upload your Aadhar Card, PAN Card, and photo from the{' '}
-            <button onClick={() => setCurrentTab('profile')} className="text-blue-600 dark:text-blue-400 font-semibold underline cursor-pointer">
+            <button onClick={() => setCurrentTab('profile')} className="text-indigo-600 dark:text-indigo-400 font-semibold underline cursor-pointer">
               Profile section
             </button>.
           </div>
@@ -1291,14 +1291,14 @@ export const TeamTaskManagementView = () => {
     if (p === 'low') {
       return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Low</span>;
     }
-    return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">Medium</span>;
+    return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">Medium</span>;
   };
 
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
       {alertNotice && (
-        <div className={`p-3.5 rounded-lg text-xs font-semibold flex items-center justify-between shadow-md transition-all ${alertNotice.type === 'error'
+        <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-md transition-all ${alertNotice.type === 'error'
           ? 'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-200 dark:border-rose-800'
           : 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-800'
           }`}>
@@ -1313,9 +1313,9 @@ export const TeamTaskManagementView = () => {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
+          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
             <ListTodo size={24} />
           </div>
           <div>
@@ -1330,23 +1330,23 @@ export const TeamTaskManagementView = () => {
           <button
             onClick={fetchAllData}
             disabled={isLoading}
-            className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-md transition-colors cursor-pointer"
+            className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors cursor-pointer"
             title="Refresh Tasks"
           >
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
           </button>
 
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
             <button
               onClick={() => setViewMode('kanban')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${viewMode === 'kanban' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-600 dark:text-slate-400'
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${viewMode === 'kanban' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs' : 'text-slate-600 dark:text-slate-400'
                 }`}
             >
               <Layers size={14} /> Kanban
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs' : 'text-slate-600 dark:text-slate-400'
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs' : 'text-slate-600 dark:text-slate-400'
                 }`}
             >
               <CheckSquare size={14} /> List
@@ -1355,7 +1355,7 @@ export const TeamTaskManagementView = () => {
 
           <button
             onClick={handleOpenCreateModal}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Plus size={16} /> Create Task
           </button>
@@ -1365,12 +1365,12 @@ export const TeamTaskManagementView = () => {
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Tasks', value: tasks.length, color: 'text-slate-900 dark:text-slate-100', border: 'border-l-blue-500' },
+          { label: 'Total Tasks', value: tasks.length, color: 'text-slate-900 dark:text-slate-100', border: 'border-l-indigo-600' },
           { label: 'To Do', value: tasks.filter(t => normalizeStatus(t.status) === 'todo').length, color: 'text-slate-600 dark:text-slate-300', border: 'border-l-slate-400' },
           { label: 'In Progress', value: tasks.filter(t => normalizeStatus(t.status) === 'in_progress').length, color: 'text-amber-600 dark:text-amber-400', border: 'border-l-amber-500' },
           { label: 'Completed', value: tasks.filter(t => normalizeStatus(t.status) === 'completed').length, color: 'text-emerald-600 dark:text-emerald-400', border: 'border-l-emerald-500' },
         ].map((item, idx) => (
-          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.border} rounded-lg shadow-2xs`}>
+          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-2xs`}>
             <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">{item.label}</span>
             <span className={`text-2xl font-bold mt-1 block ${item.color}`}>{item.value}</span>
           </div>
@@ -1378,7 +1378,7 @@ export const TeamTaskManagementView = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col md:flex-row gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3.5 rounded-lg shadow-2xs">
+      <div className="flex flex-col md:flex-row gap-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3.5 rounded-xl shadow-2xs">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -1386,7 +1386,7 @@ export const TeamTaskManagementView = () => {
             placeholder="Search by title, description, project, assignee..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-200"
           />
         </div>
 
@@ -1394,7 +1394,7 @@ export const TeamTaskManagementView = () => {
           <select
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none"
           >
             <option value="all">All Projects</option>
             {projects.map(p => (
@@ -1405,7 +1405,7 @@ export const TeamTaskManagementView = () => {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none"
           >
             <option value="all">All Priorities</option>
             <option value="critical">Critical</option>
@@ -1417,7 +1417,7 @@ export const TeamTaskManagementView = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none"
           >
             <option value="all">All Stages</option>
             <option value="todo">To Do</option>
@@ -1430,12 +1430,12 @@ export const TeamTaskManagementView = () => {
 
       {/* Main Content Area */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
-          <Loader2 size={32} className="animate-spin text-blue-500" />
+        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+          <Loader2 size={32} className="animate-spin text-indigo-500" />
           <p className="text-xs text-slate-500 font-medium">Loading live team tasks...</p>
         </div>
       ) : filteredTasks.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-12 text-center space-y-3">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-12 text-center space-y-3">
           <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-full w-fit mx-auto">
             <ListTodo size={32} />
           </div>
@@ -1445,7 +1445,7 @@ export const TeamTaskManagementView = () => {
           </p>
           <button
             onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
           >
             <Plus size={14} /> Create Task
           </button>
@@ -1481,11 +1481,11 @@ export const TeamTaskManagementView = () => {
                       <div
                         key={task._id}
                         onClick={() => setSelectedTask && setSelectedTask(task)}
-                        className="group p-3.5 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-md shadow-2xs hover:shadow-xs hover:border-blue-400 dark:hover:border-blue-500 transition-all cursor-pointer space-y-2.5 relative"
+                        className="group p-3.5 bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 rounded-xl shadow-2xs hover:shadow-xs hover:border-indigo-400 dark:hover:border-indigo-500 transition-all cursor-pointer space-y-2.5 relative"
                       >
                         {/* Top row: Project badge & Priority */}
                         <div className="flex items-center justify-between gap-1.5">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 truncate max-w-[130px]">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 truncate max-w-[130px]">
                             {projectName}
                           </span>
                           {getPriorityBadge(task.priority)}
@@ -1534,7 +1534,7 @@ export const TeamTaskManagementView = () => {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={(e) => handleOpenEditModal(task, e)}
-                              className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition cursor-pointer"
                               title="Edit Task"
                             >
                               <Edit3 size={13} />
@@ -1619,7 +1619,7 @@ export const TeamTaskManagementView = () => {
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => handleOpenEditModal(task)}
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition cursor-pointer"
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition cursor-pointer"
                         title="Edit Task"
                       >
                         <Edit3 size={14} />
@@ -1673,7 +1673,7 @@ export const TeamTaskManagementView = () => {
                   placeholder="e.g. Design authentication modal"
                   value={taskForm.taskTitle}
                   onChange={(e) => setTaskForm({ ...taskForm, taskTitle: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
                 />
               </div>
 
@@ -1686,7 +1686,7 @@ export const TeamTaskManagementView = () => {
                   required
                   value={taskForm.projectId}
                   onChange={(e) => setTaskForm({ ...taskForm, projectId: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
                 >
                   <option value="">Select Project</option>
                   {projects.map(p => (
@@ -1703,7 +1703,7 @@ export const TeamTaskManagementView = () => {
                 <select
                   value={taskForm.assignedTo}
                   onChange={(e) => setTaskForm({ ...taskForm, assignedTo: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
                 >
                   <option value="">Unassigned</option>
                   {usersList.map(u => {
@@ -1726,7 +1726,7 @@ export const TeamTaskManagementView = () => {
                   <select
                     value={taskForm.priority}
                     onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -1743,7 +1743,7 @@ export const TeamTaskManagementView = () => {
                   <select
                     value={taskForm.status}
                     onChange={(e) => setTaskForm({ ...taskForm, status: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
                   >
                     <option value="pending">To Do / Pending</option>
                     <option value="in_progress">In Progress</option>
@@ -1764,7 +1764,7 @@ export const TeamTaskManagementView = () => {
                     type="date"
                     value={taskForm.dueDate}
                     onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
                   />
                 </div>
 
@@ -1778,7 +1778,7 @@ export const TeamTaskManagementView = () => {
                     placeholder="e.g. 16"
                     value={taskForm.estimatedHours}
                     onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
                   />
                 </div>
               </div>
@@ -1793,7 +1793,7 @@ export const TeamTaskManagementView = () => {
                   placeholder="Provide scope, requirements, or acceptance criteria..."
                   value={taskForm.taskDescription}
                   onChange={(e) => setTaskForm({ ...taskForm, taskDescription: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
                 />
               </div>
 
@@ -1802,14 +1802,14 @@ export const TeamTaskManagementView = () => {
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition cursor-pointer"
+                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting && <Loader2 size={13} className="animate-spin" />}
                   {editingTask ? 'Save Changes' : 'Create Task'}
@@ -2116,8 +2116,8 @@ export const TeamLeaveManagementView = () => {
   // Avatar initial background color generator
   const getAvatarColor = (name = '') => {
     const colors = [
-      'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
       'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+      'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
       'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
       'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
       'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
@@ -2149,9 +2149,9 @@ export const TeamLeaveManagementView = () => {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-md">
+          <div className="p-2.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl">
             <CalendarX size={24} />
           </div>
           <div>
@@ -2165,7 +2165,7 @@ export const TeamLeaveManagementView = () => {
         <button
           onClick={fetchLeaves}
           disabled={isLoading}
-          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
           Refresh
@@ -2178,9 +2178,9 @@ export const TeamLeaveManagementView = () => {
           { label: 'Pending Approvals', value: pendingCount, color: 'text-amber-600 dark:text-amber-400', border: 'border-l-amber-500' },
           { label: 'Approved', value: approvedCount, color: 'text-emerald-600 dark:text-emerald-400', border: 'border-l-emerald-500' },
           { label: 'Rejected', value: rejectedCount, color: 'text-rose-600 dark:text-rose-400', border: 'border-l-rose-500' },
-          { label: 'Total Requests', value: leaves.length, color: 'text-blue-600 dark:text-blue-400', border: 'border-l-blue-500' }
+          { label: 'Total Requests', value: leaves.length, color: 'text-indigo-600 dark:text-indigo-400', border: 'border-l-indigo-600' }
         ].map((item, idx) => (
-          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.border} rounded-lg shadow-2xs`}>
+          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-2xs`}>
             <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">{item.label}</span>
             <span className={`text-2xl font-bold mt-1 block ${item.color}`}>{item.value}</span>
           </div>
@@ -2188,8 +2188,8 @@ export const TeamLeaveManagementView = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-2xs">
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-md w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3 rounded-xl shadow-2xs">
+        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-full sm:w-auto">
           {[
             { key: 'pending', label: `Pending (${pendingCount})` },
             { key: 'all', label: `All (${leaves.length})` },
@@ -2199,8 +2199,8 @@ export const TeamLeaveManagementView = () => {
             <button
               key={tab.key}
               onClick={() => setFilterTab(tab.key)}
-              className={`flex-1 sm:flex-none px-3 py-1.5 rounded text-xs font-semibold transition cursor-pointer ${filterTab === tab.key
-                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+              className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${filterTab === tab.key
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
             >
@@ -2216,7 +2216,7 @@ export const TeamLeaveManagementView = () => {
             placeholder="Search by applicant, reason..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200"
+            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-200"
           />
         </div>
       </div>
@@ -2281,7 +2281,7 @@ export const TeamLeaveManagementView = () => {
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                       (l.leaveType === 'half_day' || l.isHalfDay) 
                         ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' 
-                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                        : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
                     }`}>
                       {(l.leaveType === 'half_day' || l.isHalfDay) ? 'Half Day Leave' : 'Full Day Leave'}
                     </span>
@@ -2416,7 +2416,7 @@ export const TeamLeaveManagementView = () => {
                 placeholder={actionModal.type === 'approve' ? 'e.g. Approved by Team Leader' : 'e.g. Rejected by Team Leader'}
                 value={remarksText}
                 onChange={(e) => setRemarksText(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
               />
             </div>
 
@@ -2448,42 +2448,6 @@ export const TeamLeaveManagementView = () => {
   );
 };
 
-// 12. ATTENDANCE REVIEW (Team Leader #6)
-// export const AttendanceReviewView = () => {
-//   return (
-//     <div className="space-y-6">
-//       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
-//         <div className="flex items-center gap-3">
-//           <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
-//             <ClipboardCheck size={22} />
-//           </div>
-//           <div>
-//             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Team Attendance Review</h2>
-//             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Monitor live punch-in times, late arrivals, and total active session duration</p>
-//           </div>
-//         </div>
-//         <button className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5">
-//           <Download size={14} /> Export Attendance Sheet
-//         </button>
-//       </div>
-
-//       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-//         <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-//           <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Present Today</span>
-//           <p className="text-2xl font-bold text-emerald-600 mt-1">7 / 8 Members</p>
-//         </div>
-//         <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-//           <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">On Leave</span>
-//           <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">1 Member</p>
-//         </div>
-//         <div className="p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-//           <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Avg Daily Work</span>
-//           <p className="text-2xl font-bold text-blue-600 mt-1">8 hrs 15 mins</p>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
 
 // 13. REPORT / PERFORMANCE VIEW (Team Leader #7) - Aliased to live PerformanceView using GET /api/performance/:id
 export const ReportView = PerformanceView;

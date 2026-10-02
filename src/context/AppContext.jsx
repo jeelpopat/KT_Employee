@@ -49,16 +49,15 @@ export const getRealAuthUserId = (u) => {
   return resolveMongoObjectId(u?.employeeId || u?.id || '');
 };
 
-// Validates if the given role is allowed to access the employee panel
-// Allowed: employee, team_leader (team lead), hr, intern
-// Unauthorized: account, ca, admin (and any other unpermitted role)
+// Validates if the given role is allowed to access the panel
+// Allowed: admin, employee, team_leader (team lead), hr, intern
+// Unauthorized: account, ca (and any other unpermitted role)
 export const isRoleAllowed = (role) => {
   if (!role) return false;
   const r = String(role).toLowerCase().trim();
 
-  // Explicit check for unauthorized roles like account, ca, admin
+  // Explicit check for unauthorized roles like account, ca
   if (
-    r.includes('admin') ||
     r.includes('account') ||
     /\bca\b/i.test(r) ||
     r.includes('chartered')
@@ -67,6 +66,10 @@ export const isRoleAllowed = (role) => {
   }
 
   return (
+    r === 'admin' ||
+    r === 'administrator' ||
+    r === 'superadmin' ||
+    r.includes('admin') ||
     r === 'employee' ||
     r === 'team_leader' ||
     r === 'team lead' ||
@@ -334,7 +337,9 @@ export const AppProvider = ({ children }) => {
   const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [currentTab, setCurrentTabState] = useState(() => {
     const role = localStorage.getItem('active_role') || localStorage.getItem('user_role');
-    return role === 'hr' ? 'admin-screenshots' : 'dashboard';
+    if (role === 'hr') return 'admin-screenshots';
+    if (role === 'admin') return 'admin-dashboard';
+    return 'dashboard';
   });
 
   const setCurrentTab = useCallback((tab) => {
@@ -1518,7 +1523,33 @@ export const AppProvider = ({ children }) => {
 
       // Default role permissions if not provided by backend
       if (!permissions || permissions.length === 0) {
-        if (determinedRole === 'admin' || determinedRole === 'hr') {
+        if (determinedRole === 'admin') {
+          permissions = [
+            'all',
+            'view_dashboard',
+            'manage_monitoring',
+            'view_screenshots',
+            'manage_employees',
+            'view_employees',
+            'manage_team_leaves',
+            'manage_checkin_requests',
+            'manage_attendance_logs',
+            'manage_adjustments',
+            'manage_holidays',
+            'manage_tasks',
+            'manage_applications',
+            'manage_positions',
+            'manage_leads',
+            'manage_contacts',
+            'view_attendance',
+            'view_salary',
+            'view_performance',
+            'view_holidays',
+            'view_profile',
+            'view_reports',
+            'manage_office_settings'
+          ];
+        } else if (determinedRole === 'hr') {
           permissions = [
             'view_dashboard',
             'manage_monitoring',
@@ -1576,16 +1607,18 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem('user_role', determinedRole);
       setRoleDetails(rawRoleData || {
         roleName: resolvedRoleName || (
+          determinedRole === 'admin' ? 'Administrator' :
           determinedRole === 'team_leader' ? 'Team Leader' :
             determinedRole === 'hr' ? 'HR Manager' :
               determinedRole === 'account' ? 'Accountant' :
-                determinedRole === 'ca' ? 'Chartered Accountant (CA)' :
-                  determinedRole === 'admin' ? 'Administrator' : 'Employee'
+                determinedRole === 'ca' ? 'Chartered Accountant (CA)' : 'Employee'
         )
       });
       setRolePermissions(permissions);
       if (determinedRole === 'hr') {
         setCurrentTabState('admin-screenshots');
+      } else if (determinedRole === 'admin') {
+        setCurrentTabState('admin-dashboard');
       }
       return determinedRole;
     } catch (err) {
@@ -1594,6 +1627,8 @@ export const AppProvider = ({ children }) => {
       setUserRole(fallback);
       if (fallback === 'hr') {
         setCurrentTabState('admin-screenshots');
+      } else if (fallback === 'admin') {
+        setCurrentTabState('admin-dashboard');
       }
       return fallback;
     } finally {
@@ -1621,6 +1656,8 @@ export const AppProvider = ({ children }) => {
     setRoleDetails({ roleName: roleLabels[newRole] || 'Employee' });
     if (newRole === 'hr') {
       setCurrentTabState('admin-screenshots');
+    } else if (newRole === 'admin') {
+      setCurrentTabState('admin-dashboard');
     }
   };
 
@@ -1678,18 +1715,24 @@ export const AppProvider = ({ children }) => {
     const preliminaryRole = deriveUserRole(userData);
     if (!isRoleAllowed(preliminaryRole)) {
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('auth_user');
+      localStorage.removeItem('user');
       localStorage.removeItem('active_role');
       localStorage.removeItem('user_role');
       setUser(null);
-      const roleDisplayName = preliminaryRole === 'admin' ? 'Admin' : preliminaryRole === 'account' ? 'Account' : preliminaryRole === 'ca' ? 'CA' : preliminaryRole;
-      const err = new Error(`Unauthorized login: Access denied for role "${roleDisplayName}". Only Employee, Team Lead, and HR are authorized to access this panel.`);
+      const roleDisplayName = preliminaryRole === 'account' ? 'Account' : preliminaryRole === 'ca' ? 'CA' : preliminaryRole;
+      const err = new Error(`Unauthorized login: Access denied for role "${roleDisplayName}". Access restricted to permitted company roles.`);
       err.isUnauthorized = true;
       throw err;
     }
 
-    // Temporarily save token so fetchLiveUserProfile can authenticate
-    if (token) localStorage.setItem('auth_token', token);
+    // Save tokens for both employee and admin components
+    if (token) {
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('token', token);
+      localStorage.setItem('isAuthenticated', 'true');
+    }
 
     let activeUser = userData;
     // Immediately fetch latest live profile with role info from backend
@@ -1719,26 +1762,32 @@ export const AppProvider = ({ children }) => {
       if (!isRoleAllowed(determined)) {
         console.warn(`Unauthorized login attempt by role: ${determined}`);
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('token');
         localStorage.removeItem('auth_user');
+        localStorage.removeItem('user');
         localStorage.removeItem('active_role');
         localStorage.removeItem('user_role');
         setUser(null);
-        const roleDisplayName = determined === 'admin' ? 'Admin' : determined === 'account' ? 'Account' : determined === 'ca' ? 'CA' : determined;
-        const err = new Error(`Unauthorized login: Access denied for role "${roleDisplayName}". Only Employee, Team Lead, and HR are authorized to access this panel.`);
+        const roleDisplayName = determined === 'account' ? 'Account' : determined === 'ca' ? 'CA' : determined;
+        const err = new Error(`Unauthorized login: Access denied for role "${roleDisplayName}". Access restricted to permitted company roles.`);
         err.isUnauthorized = true;
         throw err;
       }
 
       localStorage.setItem('auth_user', JSON.stringify(activeUser));
+      localStorage.setItem('user', JSON.stringify(activeUser));
       setUser(activeUser);
       if (determined) {
         localStorage.setItem('user_role', determined);
+        localStorage.setItem('active_role', determined);
       }
     }
 
-    // Always take the user directly to Screenshot Monitoring for HR, or role dashboard
+    // Direct user to appropriate landing view
     if (determined === 'hr') {
       setCurrentTabState('admin-screenshots');
+    } else if (determined === 'admin') {
+      setCurrentTabState('admin-dashboard');
     } else {
       setCurrentTabState('dashboard');
     }

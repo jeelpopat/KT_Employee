@@ -1522,19 +1522,16 @@ export const DashboardView = () => {
       {/* KPI Cards (5 items) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Today Hours', value: formatHoursAndMinutes(totalWorkTimeDisplay), accent: 'border-l-blue-500' },
+          { label: 'Today Hours', value: formatHoursAndMinutes(totalWorkTimeDisplay), accent: 'border-l-indigo-600' },
           { label: 'Tasks To Do', value: tasksStats.todo, accent: 'border-l-slate-400' },
           { label: 'In Progress', value: tasksStats.inProgress, accent: 'border-l-amber-500' },
-          { label: 'Completed', value: tasksStats.completed, accent: 'border-l-green-500' },
-          // { label: 'Paid Balance', value: leaveBalance, accent: 'border-l-indigo-500' }
+          { label: 'Completed', value: tasksStats.completed, accent: 'border-l-emerald-500' },
         ].map((item, idx) => {
-          const Icon = item.icon;
           return (
-            <div key={`kpi-${idx}`} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm flex flex-col justify-between`}>
+            <div key={`kpi-${idx}`} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs flex flex-col justify-between`}>
               <div className="flex justify-between items-start w-full">
-                <span className="text-2xs  font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</span>
-                {/* <Icon size={14} className="text-slate-400 dark:text-slate-500" /> */}
-                <div className="px-2 items-end text-xl font-bold text-slate-900 dark:text-slate-100">
+                <span className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</span>
+                <div className="px-2 items-end text-xl font-bold text-slate-900">
                   {isDataLoading && idx !== 0 ? <Loader2 size={20} className="animate-spin text-slate-400" /> : item.value}
                 </div>
               </div>
@@ -1548,7 +1545,7 @@ export const DashboardView = () => {
         {/* TIME & ATTENDANCE - QUICK ACTIONS & TIMELINE */}
         <div 
           ref={quickActionsRef}
-          className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-colors shadow-sm p-4 sm:p-6 flex flex-col justify-between"
+          className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl overflow-hidden transition-all shadow-xs p-4 sm:p-5 flex flex-col justify-between"
         >
 
           {geoError && (
@@ -1712,39 +1709,39 @@ export const DashboardView = () => {
 
         {/* VERTICAL ANNOUNCEMENTS LIST */}
         <div 
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col h-full overflow-hidden shadow-sm transition-all duration-200"
+          className="bg-white border border-slate-200/80 rounded-xl flex flex-col h-full overflow-hidden shadow-xs transition-all duration-200"
           style={quickActionsHeight && typeof window !== 'undefined' && window.innerWidth >= 1024 ? { height: `${quickActionsHeight}px`, maxHeight: `${quickActionsHeight}px` } : undefined}
         >
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 shrink-0">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Bell size={16} className="text-[#2563EB]" /> Announcements
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-4 shrink-0">
+            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Bell size={16} className="text-indigo-600" /> Announcements
             </h2>
             {announcements.length > 0 && (
-              <span className="bg-[#EFF6FF] dark:bg-blue-900/20 text-[#2563EB] dark:text-blue-400 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider">
+              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider">
                 {announcements.length} Updates
               </span>
             )}
           </div>
-          <div className="p-0 flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 custom-scrollbar flex flex-col">
+          <div className="p-0 flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 custom-scrollbar flex flex-col">
             {isDataLoading ? (
               <div className="flex justify-center p-8"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
             ) : announcements.length === 0 ? (
               <div className="text-center p-8">
-                <Bell size={24} className="text-slate-300 dark:text-slate-700 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">No announcements.</p>
+                <Bell size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-400">No announcements.</p>
               </div>
             ) : (
               displayedAnnouncements.map((ann, idx) => (
-                <div key={idx} className="p-4 sm:p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex-1 flex flex-col justify-between">
+                <div key={idx} className="p-3.5 sm:p-4 hover:bg-slate-50 transition-colors flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1 leading-tight break-words [overflow-wrap:anywhere]">
+                    <h3 className="text-xs font-semibold text-slate-900 mb-1 leading-tight break-words [overflow-wrap:anywhere]">
                       {ann.title}
                     </h3>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-2 break-words [overflow-wrap:anywhere]">
+                    <p className="text-xs text-slate-500 leading-relaxed mb-2 break-words [overflow-wrap:anywhere]">
                       {ann.message}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400 mt-auto pt-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 mt-auto pt-1">
                     <Calendar size={12} />
                     {ann.createdAtIST || (ann.createdAt ? new Date(ann.createdAt).toLocaleDateString() : 'Recent')}
                   </div>
@@ -1758,18 +1755,18 @@ export const DashboardView = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
 
         {/* HOLIDAYS - HORIZONTAL DESIGN */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Umbrella size={16} className="text-[#10B981]" /> Upcoming Holidays
-              <span className="bg-[#ECFDF5] dark:bg-green-900/20 text-[#10B981] px-1.5 py-0.5 rounded-full text-[10px]">{holidays.length}</span>
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Umbrella size={16} className="text-emerald-600" /> Upcoming Holidays
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/70 px-1.5 py-0.5 rounded-md text-[10px] font-semibold">{holidays.length}</span>
             </h3>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
             {isDataLoading ? (
               <Loader2 size={20} className="animate-spin text-slate-400 mx-auto" />
             ) : holidays.length === 0 ? (
-              <p className="text-sm text-slate-500 w-full text-center">No holidays this month.</p>
+              <p className="text-xs text-slate-400 w-full text-center">No holidays this month.</p>
             ) : (
               holidays.map((h, i) => {
                 const dateObj = new Date(h.holidayDate);
@@ -1777,12 +1774,12 @@ export const DashboardView = () => {
                 const month = dateObj.toLocaleString('en-US', { month: 'short' });
                 return (
                   <div key={i} className="flex flex-col items-center min-w-[80px] text-center group cursor-pointer">
-                    <div className="w-14 h-14 rounded-full bg-[#ECFDF5] dark:bg-green-900/10 flex flex-col items-center justify-center border border-[#D1EBE5] dark:border-green-800/30 mb-2 group-hover:scale-105 transition-transform">
-                      <span className="text-sm font-bold text-[#10B981] leading-none">{day}</span>
-                      <span className="text-[10px] font-bold text-[#10B981] uppercase mt-0.5">{month}</span>
+                    <div className="w-13 h-13 rounded-full bg-emerald-50 flex flex-col items-center justify-center border border-emerald-200/60 mb-2 group-hover:scale-105 transition-transform">
+                      <span className="text-sm font-bold text-emerald-600 leading-none">{day}</span>
+                      <span className="text-[10px] font-bold text-emerald-600 uppercase mt-0.5">{month}</span>
                     </div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 capitalize truncate w-full px-1">{h.holidayName}</p>
-                    <p className="text-[9px] font-bold text-[#10B981] uppercase mt-1 bg-[#ECFDF5] dark:bg-green-900/20 px-1.5 py-0.5 rounded-sm">Public</p>
+                    <p className="text-xs font-medium text-slate-800 capitalize truncate w-full px-1">{h.holidayName}</p>
+                    <p className="text-[9px] font-semibold text-emerald-700 uppercase mt-1 bg-emerald-50 px-1.5 py-0.5 rounded-sm">Public</p>
                   </div>
                 );
               })
@@ -1791,18 +1788,18 @@ export const DashboardView = () => {
         </div>
 
         {/* BIRTHDAYS - HORIZONTAL DESIGN */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Gift size={16} className="text-[#8B5CF6]" /> Upcoming Birthdays
-              <span className="bg-[#F5F3FF] dark:bg-purple-900/20 text-[#8B5CF6] px-1.5 py-0.5 rounded-full text-[10px]">{upcomingBirthdays.length}</span>
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Gift size={16} className="text-indigo-600" /> Upcoming Birthdays
+              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1.5 py-0.5 rounded-md text-[10px] font-semibold">{upcomingBirthdays.length}</span>
             </h3>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
             {isDataLoading ? (
               <Loader2 size={20} className="animate-spin text-slate-400 mx-auto" />
             ) : upcomingBirthdays.length === 0 ? (
-              <p className="text-sm text-slate-500 w-full text-center">No birthdays upcoming.</p>
+              <p className="text-xs text-slate-400 w-full text-center">No birthdays upcoming.</p>
             ) : (
               upcomingBirthdays.map((b, i) => {
                 const initials = b.name ? b.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'BD';
@@ -1811,11 +1808,11 @@ export const DashboardView = () => {
 
                 return (
                   <div key={i} className="flex flex-col items-center min-w-[80px] text-center group cursor-pointer">
-                    <div className="w-14 h-14 rounded-full bg-[#F5F3FF] dark:bg-purple-900/10 flex items-center justify-center text-[#8B5CF6] font-bold text-lg border border-[#E9E4FF] dark:border-purple-800/30 mb-2 group-hover:scale-105 transition-transform">
+                    <div className="w-13 h-13 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm border border-indigo-200/60 mb-2 group-hover:scale-105 transition-transform">
                       {initials}
                     </div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate w-full px-1">{b.name}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{dateStr}</p>
+                    <p className="text-xs font-medium text-slate-800 truncate w-full px-1">{b.name}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5 font-medium">{dateStr}</p>
                   </div>
                 );
               })
@@ -1824,7 +1821,7 @@ export const DashboardView = () => {
         </div>
 
         {/* TEAM ON LEAVE - HORIZONTAL DESIGN */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm xl:col-span-1 lg:col-span-2">
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs xl:col-span-1 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Users size={16} className="text-[#F59E0B]" /> Team On Leave

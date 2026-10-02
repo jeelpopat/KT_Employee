@@ -1055,8 +1055,8 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: 'Worked less than 7h 50m',
-        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
-        dotClass: 'bg-blue-500'
+        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        dotClass: 'bg-indigo-600'
       };
     }
 
@@ -1067,8 +1067,8 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: `Break exceeded 70 mins (${breakMins}m)`,
-        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
-        dotClass: 'bg-blue-500'
+        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        dotClass: 'bg-indigo-600'
       };
     }
 
@@ -1078,8 +1078,8 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: 'Check-in after 10:30 AM',
-        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
-        dotClass: 'bg-blue-500'
+        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        dotClass: 'bg-indigo-600'
       };
     }
 
@@ -1109,8 +1109,8 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: `Break exceeded 70 mins (${breakMins}m)`,
-        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
-        dotClass: 'bg-blue-500'
+        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        dotClass: 'bg-indigo-600'
       };
     }
 
@@ -1129,8 +1129,8 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: 'Checked in between 10:31 AM - 3:00 PM',
-        badgeClass: 'text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50',
-        dotClass: 'bg-blue-500'
+        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        dotClass: 'bg-indigo-600'
       };
     }
 

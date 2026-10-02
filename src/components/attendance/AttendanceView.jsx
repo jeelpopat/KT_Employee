@@ -241,31 +241,27 @@ export const AttendanceView = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Hours', value: `${summaryStats.totalWorkingHours.toFixed(1)}h`, accent: 'border-l-blue-500' },
-          { label: 'Present Days', value: summaryStats.presentDays, accent: 'border-l-green-500' },
-          { label: 'Absent Days', value: summaryStats.absentDays, accent: 'border-l-red-500' },
+          { label: 'Total Hours', value: `${summaryStats.totalWorkingHours.toFixed(1)}h`, accent: 'border-l-indigo-600' },
+          { label: 'Present Days', value: summaryStats.presentDays, accent: 'border-l-emerald-500' },
+          { label: 'Absent Days', value: summaryStats.absentDays, accent: 'border-l-rose-500' },
           { label: 'Half Days', value: summaryStats.halfDays, accent: 'border-l-purple-500' },
-          // { label: 'Avg per day', value: `${summaryStats.averageWorkingHours.toFixed(1)}h`, accent: 'border-l-indigo-500' }
         ].map((item, idx) => {
-          const Icon = item.icon;
           return (
-            <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
+            <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
               <div>
-                <div className="flex justify-between">
-                  <p className="text-2xs  font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-                  <p className="px-2 items-end text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider">{item.label}</p>
+                  <p className="px-2 text-xl font-bold text-slate-900">{item.value}</p>
                 </div>
-                {/* <Icon size={18} className="text-slate-400 dark:text-slate-500" /> */}
               </div>
-              {/* <p className="text-xs mt-2 text-slate-400 dark:text-slate-500">{item.note}</p> */}
             </div>
           );
         })}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3 flex flex-col md:flex-row items-center justify-between gap-4 transition-colors shadow-sm">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-3 flex flex-col md:flex-row items-center justify-between gap-4 transition-all shadow-xs">
 
-        <div className="flex items-center gap-1 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+        <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
           {[
             { id: 'today', label: 'Today' },
             { id: '7days', label: 'Last 7 Days' },
@@ -275,9 +271,9 @@ export const AttendanceView = () => {
             <button
               key={tab.id}
               onClick={() => setActiveFilterTab(tab.id)}
-              className={`px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${activeFilterTab === tab.id
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-transparent'
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${activeFilterTab === tab.id
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200/80 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent'
                 }`}
             >
               {tab.label}
@@ -311,7 +307,7 @@ export const AttendanceView = () => {
               placeholder="Search date..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
 
@@ -322,7 +318,7 @@ export const AttendanceView = () => {
               name="statusFilter"
               value={selectedStatusFilter}
               onChange={e => setSelectedStatusFilter(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
+              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="present">Present / On Time</option>
@@ -335,7 +331,7 @@ export const AttendanceView = () => {
 
           <button
             onClick={() => { setActiveFilterTab('10days'); setSearchQuery(''); setSelectedStatusFilter('all'); }}
-            className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md transition-colors cursor-pointer"
+            className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg transition-colors cursor-pointer shadow-xs"
             title="Reset Filters"
           >
             <RotateCcw size={14} />
@@ -346,11 +342,11 @@ export const AttendanceView = () => {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {isLoading ? (
           <div className="xl:col-span-2 flex flex-col items-center justify-center p-16 space-y-4">
-            <Loader2 size={32} className="animate-spin text-blue-500" />
+            <Loader2 size={32} className="animate-spin text-indigo-500" />
             <span className="text-sm font-medium text-slate-500">Loading attendance history...</span>
           </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="xl:col-span-2 flex flex-col items-center justify-center p-16 space-y-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-sm">
+          <div className="xl:col-span-2 flex flex-col items-center justify-center p-16 space-y-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-xs">
             <Calendar size={48} className="text-slate-300 dark:text-slate-700" />
             <span className="text-sm font-medium text-slate-500">No attendance records found for this criteria.</span>
           </div>
@@ -395,11 +391,11 @@ export const AttendanceView = () => {
             const displayRejectionReason = isRecordRejected ? (record.rejectionReason || '') : '';
 
             return (
-              <div key={record._id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-5 flex flex-col transition-colors shadow-sm hover:shadow-md">
+              <div key={record._id} className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 flex flex-col transition-all shadow-xs hover:shadow-card">
 
-                <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center shrink-0">
+                <div className="flex items-start justify-between border-b border-slate-100 pb-3 mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-lg bg-slate-50 border border-slate-200 flex flex-col items-center justify-center shrink-0">
                       <span className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-none">{dateObj.day}</span>
                       <span className="text-[9px] font-semibold text-slate-500 uppercase mt-1">{dateObj.month}</span>
                     </div>
@@ -508,8 +504,8 @@ export const AttendanceView = () => {
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{isRecordRejected ? '0m' : `${Math.round(parseFloat(String(record.totalBreakTime || 0).replace(/[^\d.-]/g, '')) || 0)}m`}</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
-                    <span className="text-[10px] font-semibold text-blue-500 uppercase mb-1">Work</span>
-                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{isRecordRejected ? '0h' : (record.totalWorkTimeDisplay || `${Math.round(parseFloat(String(record.totalWorkTime || 0)) || 0)}h`)}</span>
+                    <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase mb-1">Work</span>
+                    <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{isRecordRejected ? '0h' : (record.totalWorkTimeDisplay || `${Math.round(parseFloat(String(record.totalWorkTime || 0)) || 0)}h`)}</span>
                   </div>
                 </div>
 
@@ -519,7 +515,7 @@ export const AttendanceView = () => {
 
                     <div className="flex items-center gap-3 text-[10px]">
                       <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-[#3B82F6]"></span>
+                        <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
                         Work
                       </span>
                       <span className="flex items-center gap-1">

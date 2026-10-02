@@ -587,50 +587,50 @@ export const SalaryView = () => {
       )}
 
       {/* 1. Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-sm">
-            <Wallet size={22} />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shadow-xs">
+            <Wallet size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Salary & Compensation</h2>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${salaryMetrics.hasStructure
-                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+              <h2 className="text-base font-semibold text-slate-900 tracking-tight">Salary & Compensation</h2>
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${salaryMetrics.hasStructure
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/70'
+                : 'bg-amber-50 text-amber-700 border-amber-200/70'
                 }`}>
                 {salaryMetrics.hasStructure ? (salaryMetrics.isActive ? 'Active Structure' : 'Inactive Structure') : 'Official Payroll'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               Live earnings breakdown, monthly payslips, and deductions for <strong>{user?.employee?.name || user?.name || 'Employee'}</strong>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
           <button
             onClick={() => fetchPayrollData(true)}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium transition cursor-pointer shadow-xs"
             title="Sync with latest payroll database"
           >
-            <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-emerald-600' : ''} />
+            <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-indigo-600' : 'text-slate-400'} />
             <span>{isRefreshing ? 'Syncing...' : 'Sync Payroll'}</span>
           </button>
 
           <button
             onClick={handlePrimaryDownload}
             disabled={Boolean(downloadingId)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
             title="Direct download your official payslip"
           >
             {downloadingId ? (
-              <RefreshCw size={14} className="animate-spin" />
+              <RefreshCw size={13} className="animate-spin" />
             ) : (
-              <Download size={14} />
+              <Download size={13} />
             )}
-            <span>{downloadingId ? 'Downloading...' : 'Download Pay Slip'}</span>
+            <span>{downloadingId ? 'Downloading...' : 'Download Payslip'}</span>
           </button>
         </div>
       </div>
@@ -692,11 +692,11 @@ export const SalaryView = () => {
         <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
             <span className="text-[11px] font-bold uppercase tracking-wider">Net Monthly In-Hand</span>
-            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
               <CreditCard size={16} />
             </div>
           </div>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+          <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
             {salaryMetrics.netSalary > 0 ? formatINR(salaryMetrics.netSalary) : '—'}
           </p>
           <span className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -814,7 +814,7 @@ export const SalaryView = () => {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Building2 size={16} className="text-blue-500" />
+              <Building2 size={16} className="text-indigo-600" />
               <span>Direct Deposit Bank Account</span>
             </h3>
             {salaryMetrics.hasStructure && (
@@ -853,7 +853,7 @@ export const SalaryView = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <FileText size={18} className="text-blue-600 dark:text-blue-400" />
+              <FileText size={18} className="text-indigo-600 dark:text-indigo-400" />
               <span>My Payslip History</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -902,7 +902,7 @@ export const SalaryView = () => {
                       </p>
                       <button
                         onClick={handlePrimaryDownload}
-                        className="mt-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                        className="mt-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1.5 transition cursor-pointer"
                       >
                         <Download size={13} />
                         <span>Download Current Pay Slip</span>
@@ -939,7 +939,7 @@ export const SalaryView = () => {
                     >
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm flex items-center gap-2">
-                          <FileText size={15} className="text-blue-500 shrink-0" />
+                          <FileText size={15} className="text-indigo-600 shrink-0" />
                           <span>{monthName}</span>
                         </div>
                         {slip.payPeriod && (
@@ -981,7 +981,7 @@ export const SalaryView = () => {
                             title="Printable HTML UI (/api/payroll/payslip/print/:id)"
                           >
                             {isHtmlPrinting ? (
-                              <RefreshCw size={12} className="animate-spin text-blue-600" />
+                              <RefreshCw size={12} className="animate-spin text-indigo-600" />
                             ) : (
                               <Printer size={12} className="text-slate-500" />
                             )}
@@ -992,7 +992,7 @@ export const SalaryView = () => {
                           <button
                             onClick={() => handleDownloadPdf(slip)}
                             disabled={isPdfDownloading}
-                            className="px-2.5 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs transition cursor-pointer flex items-center gap-1.5"
+                            className="px-2.5 py-1 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-2xs transition cursor-pointer flex items-center gap-1.5"
                             title="Direct .pdf Binary File Download (/api/payroll/payslip/pdf/:id)"
                           >
                             {isPdfDownloading ? (
@@ -1030,7 +1030,7 @@ export const SalaryView = () => {
             {/* Modal Header & Actions */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-blue-600 text-white rounded-lg">
+                <div className="p-2 bg-indigo-600 text-white rounded-lg">
                   <FileText size={18} />
                 </div>
                 <div>
@@ -1046,7 +1046,7 @@ export const SalaryView = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={triggerPrintModal}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Printer size={13} /> Print / Save PDF
                 </button>
@@ -1205,7 +1205,7 @@ export const SalaryView = () => {
             {/* Modal Bottom Actions */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2">
               <span className="text-[11px] text-slate-400 order-2 sm:order-1">
-                Endpoints: <code className="text-blue-600 dark:text-blue-400">/api/payroll/payslip/print/:id</code> &bull; <code className="text-blue-600 dark:text-blue-400">/pdf/:id</code>
+                Endpoints: <code className="text-indigo-600 dark:text-indigo-400">/api/payroll/payslip/print/:id</code> &bull; <code className="text-indigo-600 dark:text-indigo-400">/pdf/:id</code>
               </span>
               <div className="flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-end">
                 <button
@@ -1221,7 +1221,7 @@ export const SalaryView = () => {
                   title="Open Printable HTML UI (/api/payroll/payslip/print/:id)"
                 >
                   {printingId === (selectedSlipForModal._id || selectedSlipForModal.id) ? (
-                    <RefreshCw size={13} className="animate-spin text-blue-600" />
+                    <RefreshCw size={13} className="animate-spin text-indigo-600" />
                   ) : (
                     <ExternalLink size={13} />
                   )}
@@ -1236,7 +1236,7 @@ export const SalaryView = () => {
                       triggerPrintModal();
                     }
                   }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                   title="Direct Download or Save as PDF"
                 >
                   <Download size={13} />

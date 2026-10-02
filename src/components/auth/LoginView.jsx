@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, LogIn, Loader2, ShieldAlert } from 'lucide-react';
-import logo from '../../assets/Logo.png';
+import { Mail, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import api from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
+import Button from '../common/Button.jsx';
+import Input from '../common/Input.jsx';
 
 export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
   const { loginUser } = useApp();
@@ -28,6 +29,11 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
 
       // Store session details from backend
       const token = data.token || data.accessToken || data.data?.token;
+      if (token) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('isAuthenticated', 'true');
+      }
       const user = data.user || data.data?.user || { email };
 
       // Combine all response properties so role or employee metadata is preserved
@@ -67,111 +73,80 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-xl overflow-hidden transition-colors">
-
-        {/* Header */}
-        <div className="px-6 py-8 flex flex-col items-center border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-center">
-          <div className="mb-5">
-            <img src={logo} alt="Kevalon Technology" className="h-10 w-auto object-contain scale-[4]" />
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8 antialiased font-sans">
+      <div className="w-full max-w-sm rounded-xl border border-slate-200/80 bg-white p-6 shadow-xs animate-fade-in">
+        
+        {/* Header Icon & Title matching KT-admin */}
+        <div className="mb-5 text-center flex flex-col items-center">
+          <div className="h-10 w-10 rounded-xl bg-indigo-50 border border-indigo-200/60 flex items-center justify-center text-indigo-600 mb-3 shadow-xs">
+            <ShieldCheck className="h-5 w-5" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-            Welcome back
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
-            Please enter your credentials to access your account.
+          <h1 className="text-lg font-semibold text-slate-900 tracking-tight">
+            Welcome Back
+          </h1>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Sign in to access your portal workspace
           </p>
         </div>
 
-        {/* Form */}
-        <div className="p-6 sm:p-8">
-          <form onSubmit={handleLogin} className="space-y-5">
+        {/* Form matching KT-admin */}
+        <form onSubmit={handleLogin} className="space-y-3.5">
+          <Input
+            label="Email Address"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="employee@kevalon.com"
+            leftIcon={Mail}
+            required
+          />
 
-            {error && (
-              <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 rounded-md text-red-700 dark:text-red-300 text-sm font-medium flex items-start gap-2.5 shadow-xs">
-                <ShieldAlert size={18} className="shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
-                <div className="leading-snug">{error}</div>
-              </div>
-            )}
-
-            {/* Email Input */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                Email Address
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Mail size={18} />
-                </div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@kevalon.com"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
-                  required
-                />
-              </div>
+          <div>
+            <Input
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              leftIcon={Lock}
+              rightIcon={showPassword ? EyeOff : Eye}
+              onRightIconClick={() => setShowPassword(!showPassword)}
+              required
+            />
+            <div className="flex justify-end mt-1.5">
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
+              >
+                Forgot Password?
+              </button>
             </div>
+          </div>
 
-            {/* Password Input */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                  Password
-                </label>
-                <button
-                  type="button"
-                  onClick={onForgotPassword}
-                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                >
-                  Forgot password?
-                </button>
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Lock size={18} />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+          {error && (
+            <div className="p-2 rounded-lg bg-rose-50 border border-rose-200/60 text-xs font-medium text-rose-600 text-center">
+              {error}
             </div>
+          )}
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed transition-all mt-6 cursor-pointer"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Authenticating...
-                </>
-              ) : (
-                <>
-                  <LogIn size={18} />
-                  Sign In
-                </>
-              )}
-            </button>
+          <Button
+            type="submit"
+            isLoading={isLoading}
+            className="w-full py-2 text-xs font-semibold"
+          >
+            {isLoading ? "Signing In..." : "Sign In"}
+          </Button>
+        </form>
 
-          </form>
+        <div className="mt-5 pt-4 border-t border-slate-100 text-center">
+          <p className="text-[11px] text-slate-400">
+            Kevalon Technology © {new Date().getFullYear()}
+          </p>
         </div>
       </div>
     </div>
   );
 };
+
+export default LoginView;

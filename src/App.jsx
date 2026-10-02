@@ -1,8 +1,10 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
+import { pathToTab } from './utils/navigation.js';
 
 // Lazy-load layout and views so unauthenticated users download ONLY the Login screen
 const Sidebar = lazy(() => import('./components/layout/Sidebar.jsx').then(m => ({ default: m.Sidebar })));
@@ -16,6 +18,25 @@ const ProfileView = lazy(() => import('./components/profile/ProfileView.jsx').th
 const AdminScreenshotPortal = lazy(() => import('./components/screenshots/AdminScreenshotPortal.jsx').then(m => ({ default: m.AdminScreenshotPortal })));
 const InactivityAlertModal = lazy(() => import('./components/alerts/InactivityAlertModal.jsx').then(m => ({ default: m.InactivityAlertModal })));
 const HolidayCalendarView = lazy(() => import('./components/holiday/HolidayCalendarView.jsx').then(m => ({ default: m.HolidayCalendarView })));
+
+// Lazy-load Admin Views
+const AdminDashboardView = lazy(() => import('./pages/Dashboard.jsx'));
+const AdminPerformanceView = lazy(() => import('./pages/Performance.jsx'));
+const AdminAttendanceLogsView = lazy(() => import('./pages/attendance/AttendanceLogs.jsx'));
+const AdminCheckInRequestsView = lazy(() => import('./pages/attendance/CheckInRequest.jsx'));
+const AdminLeaveRequestsView = lazy(() => import('./pages/attendance/LeaveRequest.jsx'));
+const AdminAdjustmentsView = lazy(() => import('./pages/attendance/Adjustments.jsx'));
+const AdminHolidaysView = lazy(() => import('./pages/attendance/Holidays.jsx'));
+const AdminEmployeesView = lazy(() => import('./pages/attendance/Employees.jsx'));
+const AdminEmployeeRequestsView = lazy(() => import('./pages/EmployeeRequests.jsx'));
+const AdminMembersView = lazy(() => import('./pages/attendance/Members.jsx'));
+const AdminTeamLeadView = lazy(() => import('./pages/TeamLead.jsx').then(m => ({ default: m.TeamLead || m.default })));
+const AdminTeamTasksView = lazy(() => import('./pages/attendance/Team.jsx'));
+const AdminOfficeSettingsView = lazy(() => import('./pages/attendance/OfficeSettings.jsx'));
+const AdminApplicationsView = lazy(() => import('./pages/Applications.jsx'));
+const AdminPositionsView = lazy(() => import('./pages/Positions.jsx'));
+const AdminPortfolioLeadsView = lazy(() => import('./pages/PortfolioLeads.jsx'));
+const AdminContactsView = lazy(() => import('./pages/Contacts.jsx'));
 
 // Lazy-load role & placeholder views
 const SalaryView = lazy(() => import('./components/salary/SalaryView.jsx').then(m => ({ default: m.SalaryView })));
@@ -32,7 +53,8 @@ const TeamLeaveManagementView = lazy(() => import('./components/placeholders/Pla
 const ReportView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.ReportView })));
 
 const MainLayout = ({ handleSignOut }) => {
-  const { currentTab, isSidebarCollapsed, userRole, setCurrentTab, isRoleAllowed: roleCheck } = useApp();
+  const { currentTab, userRole, setCurrentTab, isRoleAllowed: roleCheck } = useApp();
+  const location = useLocation();
 
   // If user is HR, enforce that active tab is strictly locked to screenshot monitoring
   useEffect(() => {
@@ -41,24 +63,39 @@ const MainLayout = ({ handleSignOut }) => {
     }
   }, [userRole, currentTab, setCurrentTab]);
 
-  // Reject unauthorized roles (account, ca, admin, etc.)
+  // Synchronize URL route with currentTab
+  useEffect(() => {
+    const path = location.pathname;
+    const mapped = pathToTab[path];
+    if (mapped && mapped !== currentTab) {
+      if (userRole === 'hr') {
+        setCurrentTab('admin-screenshots');
+      } else {
+        setCurrentTab(mapped);
+      }
+    }
+  }, [location.pathname, setCurrentTab, currentTab, userRole]);
+
+  // Reject unauthorized roles (account, ca, etc.)
   const checkAllowed = roleCheck || isRoleAllowed;
   if (!checkAllowed(userRole)) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded-xl shadow-xl p-6 sm:p-8 text-center space-y-4">
-          <div className="w-16 h-16 bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto">
-            <ShieldAlert size={36} />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-sm w-full bg-white border border-slate-200/80 rounded-xl shadow-xs p-6 text-center space-y-4 animate-fade-in">
+          <div className="w-12 h-12 bg-rose-50 border border-rose-200/60 text-rose-600 rounded-xl flex items-center justify-center mx-auto shadow-xs">
+            <ShieldAlert size={24} />
           </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            Unauthorized Login
-          </h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-            Access to this Employee Portal is restricted to <strong>Employee</strong>, <strong>Team Lead</strong>, and <strong>HR</strong> roles only. Access denied for role &quot;<strong>{userRole}</strong>&quot;.
-          </p>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">
+              Unauthorized Access
+            </h2>
+            <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+              Access is restricted to authorized company roles. Access denied for role &quot;<strong>{userRole}</strong>&quot;.
+            </p>
+          </div>
           <button
             onClick={handleSignOut}
-            className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow transition-colors cursor-pointer"
+            className="w-full py-2 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
           >
             Back to Login
           </button>
@@ -74,8 +111,27 @@ const MainLayout = ({ handleSignOut }) => {
     }
 
     switch (currentTab) {
+      // Admin Specific Modules
+      case 'admin-dashboard': return <AdminDashboardView />;
+      case 'admin-performance': return <AdminPerformanceView />;
+      case 'admin-attendance-logs': return <AdminAttendanceLogsView />;
+      case 'admin-checkin-requests': return <AdminCheckInRequestsView />;
+      case 'admin-leave-requests': return <AdminLeaveRequestsView />;
+      case 'admin-adjustments': return <AdminAdjustmentsView />;
+      case 'admin-holidays': return <AdminHolidaysView />;
+      case 'admin-employees': return <AdminEmployeesView />;
+      case 'admin-employee-requests': return <AdminEmployeeRequestsView />;
+      case 'admin-members': return <AdminMembersView />;
+      case 'admin-team-lead': return <AdminTeamLeadView />;
+      case 'admin-team-tasks': return <AdminTeamTasksView />;
+      case 'admin-office-settings': return <AdminOfficeSettingsView />;
+      case 'admin-applications': return <AdminApplicationsView />;
+      case 'admin-positions': return <AdminPositionsView />;
+      case 'admin-portfolio-leads': return <AdminPortfolioLeadsView />;
+      case 'admin-contacts': return <AdminContactsView />;
+
       // Existing Modules
-      case 'dashboard': return <DashboardView />;
+      case 'dashboard': return userRole === 'admin' ? <AdminDashboardView /> : <DashboardView />;
       case 'attendance': return <AttendanceView />;
       case 'daily-report': return <DailyReportView />;
       case 'tasks': return <TaskManagementView />;
@@ -83,46 +139,44 @@ const MainLayout = ({ handleSignOut }) => {
       case 'profile': return <ProfileView />;
       case 'admin-screenshots': return <AdminScreenshotPortal />;
 
-      // New Role-Specific Modules
+      // Role-Specific & Standard Modules
       case 'salary': return <SalaryView />;
-      case 'performance': return <PerformanceView />;
+      case 'performance': return userRole === 'admin' ? <AdminPerformanceView /> : <PerformanceView />;
       case 'projects': return <ProjectView />;
-      case 'holiday': return <HolidayCalendarView />;
-      case 'team-members': return <TeamMembersView />;
-      case 'employees': return <EmployeesView />;
+      case 'holiday': return userRole === 'admin' ? <AdminHolidaysView /> : <HolidayCalendarView />;
+      case 'team-members': return userRole === 'admin' ? <AdminMembersView /> : <TeamMembersView />;
+      case 'employees': return userRole === 'admin' ? <AdminEmployeesView /> : <EmployeesView />;
       case 'learning-hub': return <LearningHubView />;
       case 'internship-progress': return <InternshipProgressView />;
       case 'documents': return <DocumentsView />;
       case 'daily-follow-up': return <DailyFollowUpView />;
-      case 'team-tasks': return <TeamTaskManagementView />;
-      case 'team-leaves': return <TeamLeaveManagementView />;
-      // case 'attendance-review': return <AttendanceReviewView />;
+      case 'team-tasks': return userRole === 'admin' ? <AdminTeamTasksView /> : <TeamTaskManagementView />;
+      case 'team-leaves': return userRole === 'admin' ? <AdminLeaveRequestsView /> : <TeamLeaveManagementView />;
       case 'report': return <ReportView />;
 
-      default: return <DashboardView />;
+      default: return userRole === 'admin' ? <AdminDashboardView /> : <DashboardView />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 antialiased font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       <Suspense fallback={null}>
         <Sidebar onSignOut={handleSignOut} />
       </Suspense>
-      <div
-        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
-          }`}
-      >
-        <Suspense fallback={<div className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900" />}>
+      <div className="lg:pl-60 flex flex-col min-h-screen">
+        <Suspense fallback={<div className="h-16 border-b border-slate-200/80 bg-white" />}>
           <Header onSignOut={handleSignOut} />
         </Suspense>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full mx-auto space-y-6">
-          <Suspense fallback={
-            <div className="flex items-center justify-center min-h-[350px]">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          }>
-            {renderActiveTab()}
-          </Suspense>
+        <main className="flex-1 p-3 pt-32 sm:p-5 sm:pt-32 lg:p-6 lg:pt-20">
+          <div className="page-content w-full">
+            <Suspense fallback={
+              <div className="flex items-center justify-center min-h-[350px]">
+                <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            }>
+              {renderActiveTab()}
+            </Suspense>
+          </div>
         </main>
       </div>
       <Suspense fallback={null}>
@@ -134,23 +188,27 @@ const MainLayout = ({ handleSignOut }) => {
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     const storedRole = localStorage.getItem('user_role') || localStorage.getItem('active_role');
     if (storedRole && !isRoleAllowed(storedRole)) {
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('auth_user');
+      localStorage.removeItem('user');
       localStorage.removeItem('active_role');
       localStorage.removeItem('user_role');
       return false;
     }
-    const storedUser = localStorage.getItem('auth_user');
+    const storedUser = localStorage.getItem('auth_user') || localStorage.getItem('user');
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
         const derived = deriveUserRole(parsed);
         if (!isRoleAllowed(derived)) {
           localStorage.removeItem('auth_token');
+          localStorage.removeItem('token');
           localStorage.removeItem('auth_user');
+          localStorage.removeItem('user');
           localStorage.removeItem('active_role');
           localStorage.removeItem('user_role');
           return false;
@@ -180,7 +238,7 @@ export default function App() {
   };
 
   const handleSignOut = async () => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     try {
       if (token) {
         await fetch('https://kt-backend-1.onrender.com/api/users/logout', {
@@ -195,7 +253,10 @@ export default function App() {
       console.warn('Logout notification error:', e);
     } finally {
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
+      localStorage.removeItem('isAuthenticated');
       localStorage.removeItem('auth_user');
+      localStorage.removeItem('user');
       localStorage.removeItem('active_role');
       localStorage.removeItem('user_role');
       setIsAuthenticated(false);

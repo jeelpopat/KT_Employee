@@ -54,7 +54,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
     const p = String(priority || '').toLowerCase();
     if (p === 'critical' || p === 'urgent') return <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 font-medium border border-rose-200/60 text-xs">Critical</span>;
     if (p === 'high') return <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium border border-amber-200/60 text-xs">High</span>;
-    if (p === 'medium') return <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-200/60 text-xs">Medium</span>;
+    if (p === 'medium') return <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-medium border border-indigo-200/60 text-xs">Medium</span>;
     return <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium text-xs">Low</span>;
   };
 
@@ -138,9 +138,9 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
           {/* Header */}
           <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
             <div className="flex items-center space-x-3 min-w-0">
-              {isLoading ? <Loader2 size={20} className="animate-spin text-slate-400" /> : <CheckSquare size={20} className="text-blue-400" />}
+              {isLoading ? <Loader2 size={20} className="animate-spin text-slate-400" /> : <CheckSquare size={20} className="text-indigo-400" />}
               <div className="min-w-0">
-                <span className="text-[10px] text-blue-300 font-mono font-medium uppercase truncate block max-w-xs">
+                <span className="text-[10px] text-indigo-300 font-mono font-medium uppercase truncate block max-w-xs">
                   {projectObj?.projectName || displayTask.projectId?.name || (typeof displayTask.projectId === 'string' ? displayTask.projectId : 'Project Task')}
                 </span>
                 <h2 className="text-sm font-semibold truncate max-w-md">{displayTask.taskTitle || displayTask.title}</h2>
@@ -225,7 +225,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
             <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <div className="flex justify-between text-xs font-medium text-slate-800 dark:text-slate-200">
                 <span>Task Completion Progress</span>
-                <span className="text-blue-600 dark:text-blue-400 font-mono font-bold">{displayTask.progress || 0}%</span>
+                <span className="text-indigo-600 dark:text-indigo-400 font-mono font-bold">{displayTask.progress || 0}%</span>
               </div>
               <input 
                 type="range" 
@@ -233,7 +233,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                 max="100" 
                 value={displayTask.progress || 0}
                 onChange={handleUpdateProgress}
-                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
               />
             </div>
 
@@ -278,7 +278,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                   {[...subTasks, ...checklist].map((item, i) => (
                     <div key={i} className="flex items-center gap-2 p-2.5 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-lg text-xs">
                       <div className="w-4 h-4 rounded border border-slate-300 dark:border-slate-700 flex items-center justify-center bg-white dark:bg-slate-900">
-                        <Check size={11} className="text-blue-500" />
+                        <Check size={11} className="text-indigo-600" />
                       </div>
                       <span className="text-slate-700 dark:text-slate-300">{typeof item === 'string' ? item : item.title || item.name}</span>
                     </div>
@@ -308,7 +308,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                       href={att.fileUrl || att.url || (typeof att === 'string' ? att : '#')}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs hover:border-blue-400 transition"
+                      className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs hover:border-indigo-400 transition"
                     >
                       <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block max-w-[200px]">
                         {att.fileName || att.name || 'Attachment ' + (idx + 1)}
@@ -334,7 +334,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                 ) : (
                   comments.map((c, idx) => (
                     <div key={c._id || idx} className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl flex items-start space-x-3 text-xs">
-                      <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 ring-1 ring-slate-200 dark:ring-slate-700">
+                      <div className="w-7 h-7 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0 ring-1 ring-indigo-200 dark:ring-indigo-800">
                         {String(c.userId?.name || c.commentedBy?.name || 'TM').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -359,12 +359,12 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                   placeholder="Add a comment or work update..."
                   value={commentText}
                   onChange={e => setCommentText(e.target.value)}
-                  className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition"
+                  className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition"
                 />
                 <button 
-                  type="submit"
+                  type="submit" 
                   disabled={isUpdating}
-                  className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition cursor-pointer disabled:opacity-50"
+                  className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition cursor-pointer disabled:opacity-50"
                 >
                   {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 </button>

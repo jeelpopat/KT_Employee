@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Search, Bell, Menu, User, LogOut, ChevronDown, 
-  Camera, CheckCircle2, AlertCircle, Sun, Moon, CheckCheck
+  Bell, User, LogOut, ChevronDown, 
+  Camera, CheckCircle2, AlertCircle, CheckCheck, Plus
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js'; 
@@ -9,13 +9,11 @@ import companyLogo from '../../assets/Logo.png';
 
 export const Header = ({ onSignOut }) => {
   const { 
-    user, currentTab, setCurrentTab, setIsMobileSidebarOpen, 
-    globalSearchQuery, setGlobalSearchQuery, attendanceStatus, handleCheckOut,
+    user, currentTab, setCurrentTab, 
+    attendanceStatus, handleCheckOut,
     userRole, updateUserProfile
   } = useApp();
 
-  const [timeString, setTimeString] = useState('');
-  const [dateString, setDateString] = useState('');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [headerProfileData, setHeaderProfileData] = useState(null);
@@ -28,16 +26,6 @@ export const Header = ({ onSignOut }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const previousUnreadCountRef = useRef(0);
-
-  // Helper function to get initials from full name
-  const getInitials = (name) => {
-    if (!name || typeof name !== 'string') return 'EP';
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  };
 
   // --- Click Outside Event Listener ---
   useEffect(() => {
@@ -64,31 +52,6 @@ export const Header = ({ onSignOut }) => {
       document.removeEventListener('touchstart', handleClickOutside);
     };
   }, []);
-
-  // Safe dark mode initialization
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('theme');
-      if (stored === 'dark') return true;
-      if (stored === 'light') return false;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  });
-
-  // Force apply dark mode class to HTML tag
-  useEffect(() => {
-    const root = document.documentElement;
-    if (isDarkMode) {
-      root.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
-
-  const toggleTheme = () => setIsDarkMode(prev => !prev);
 
   // Request Browser Notification Permission on Mount
   useEffect(() => {
@@ -177,45 +140,44 @@ export const Header = ({ onSignOut }) => {
     return () => { isMounted = false; };
   }, []);
 
-  useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      setTimeString(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
-      setDateString(now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit' }));
-    };
-    updateClock();
-    const interval = setInterval(updateClock, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
   const pageTitles = {
-    'dashboard': 'Dashboard Overview',
-    'attendance': 'My Attendance Log',
+    'dashboard': userRole === 'admin' ? 'Admin Dashboard' : 'Dashboard',
+    'admin-dashboard': 'Admin Dashboard',
+    'admin-performance': 'Performance Analytics',
+    'admin-attendance-logs': 'Attendance Logs',
+    'admin-checkin-requests': 'Check-In Requests',
+    'admin-leave-requests': 'Leave Requests',
+    'admin-adjustments': 'Attendance Adjustments',
+    'admin-holidays': 'Holidays & Events',
+    'admin-employees': 'Employees Directory',
+    'admin-employee-requests': 'Employee Requests',
+    'admin-members': 'Team Members',
+    'admin-team-lead': 'Team Leads',
+    'admin-team-tasks': 'Task Management',
+    'admin-office-settings': 'Office Settings',
+    'admin-applications': 'Job Applications',
+    'admin-positions': 'Open Positions',
+    'admin-portfolio-leads': 'Portfolio Leads',
+    'admin-contacts': 'Contact Inquiries',
+    'attendance': 'Attendance Logs',
     'daily-report': 'Daily Work Report',
-    'tasks': 'My Task Management',
+    'tasks': 'Task Management',
     'leave': 'Leave Portal',
-    'profile': 'Profile Details',
-    'salary': 'Salary & Compensations',
-    'performance': 'My Performance Scorecard',
-    'projects': 'My Projects',
-    'holiday': 'Holiday & Festival Calendar',
-    'team-members': 'Team Members',
-    'employees': 'Kevalon Employee Directory',
-    'learning-hub': 'Internship Learning Hub',
-    'internship-progress': 'Internship Progress Tracker',
-    'documents': 'Documents & Certificates',
-    'daily-follow-up': 'Team Daily Follow Up',
-    'team-tasks': 'Team Task Management',
-    'team-leaves': 'Team Leave Management',
-    'attendance-review': 'Team Attendance Review',
-    'report': 'Performance Analytics',
+    'profile': 'User Profile',
+    'salary': 'Salary & Compensation',
     'performance': 'Performance Analytics',
+    'projects': 'Projects',
+    'holiday': 'Holidays & Events',
+    'team-members': 'Team Members',
+    'employees': 'Employees',
+    'learning-hub': 'Learning Hub',
+    'internship-progress': 'Internship Progress',
+    'documents': 'Documents & Records',
+    'daily-follow-up': 'Daily Follow-Up',
+    'team-tasks': 'Team Task Management',
+    'team-leaves': 'Team Leave Requests',
+    'report': 'Performance Analytics',
     'admin-screenshots': 'Screenshot Monitoring Portal'
-  };
-
-  const extractName = (source) => {
-    if (!source) return '';
-    return resolveEmployeeName(source) || '';
   };
 
   const extractPhoto = (source) => {
@@ -243,7 +205,7 @@ export const Header = ({ onSignOut }) => {
   };
 
   const displayName = resolveEmployeeName(headerProfileData) || resolveEmployeeName(user) || 'Employee';
-  const displayEmail = user?.email || user?.employee?.email || user?.profile?.email || headerProfileData?.email || headerProfileData?.employee?.email || 'emp@gmail.com';
+  const displayEmail = user?.email || user?.employee?.email || user?.profile?.email || headerProfileData?.email || headerProfileData?.employee?.email || 'employee@kevalon.com';
   const displayPhoto = extractPhoto(user) || extractPhoto(headerProfileData);
   const [headerImgError, setHeaderImgError] = useState(false);
 
@@ -252,171 +214,118 @@ export const Header = ({ onSignOut }) => {
   }, [displayPhoto]);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 sm:px-6 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 transition-colors">
-      
-      <div className="flex items-center space-x-3">
-        <button 
-          onClick={() => setIsMobileSidebarOpen(true)}
-          className="p-2 text-slate-500 dark:text-slate-400 rounded-md lg:hidden hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-        >
-          <Menu size={20} />
-        </button>
+    <header className="fixed top-14 left-0 right-0 z-30 h-16 border-b border-slate-200/80 bg-white/95 shadow-xs backdrop-blur lg:top-0 lg:left-60">
+      <div className="flex h-full items-center justify-between px-4 sm:px-6">
+        
+        {/* Left: Eyebrow and Page Title matching KT-admin PageHeader */}
         <div>
-          <h1 className="text-base font-semibold text-slate-800 dark:text-slate-100 tracking-wide">
-            {pageTitles[currentTab] || 'Employee Management'}
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kevalon Technology</p>
+          <h1 className="text-base font-semibold leading-6 text-slate-900 tracking-tight">
+            {pageTitles[currentTab] || 'Overview'}
           </h1>
         </div>
-      </div>
 
-      {/* <div className="hidden md:flex flex-1 max-w-md mx-6">
-        <div className="relative w-full">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Search..." 
-            value={globalSearchQuery}
-            onChange={(e) => setGlobalSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none transition-colors"
-          />
-        </div>
-      </div> */}
-
-      <div className="flex items-center space-x-3">
-        {userRole !== 'hr' && attendanceStatus === 'checked_in' && (
-          <button 
-            type="button"
-            onClick={() => setCurrentTab('admin-screenshots')}
-            title="Open Screenshot Monitoring Portal"
-            className="flex items-center space-x-2 px-2.5 py-1.5 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 border border-green-200 dark:border-green-800/50 rounded-md text-xs font-medium text-green-700 dark:text-green-400 transition-colors cursor-pointer"
-          >
-            <Camera size={14} className="text-green-600 dark:text-green-500" />
-            <span className="hidden sm:inline">Monitoring Active</span>
-          </button>
-        )}
-
-        <button 
-          onClick={toggleTheme}
-          className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
-        >
-          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-
-        {/* Notifications Dropdown */}
-        <div className="relative" ref={notificationRef}>
-          <button 
-            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className="relative p-2 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer border-none bg-transparent"
-          >
-            <Bell size={24} strokeWidth={1.5} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-[20px] bg-blue-600 dark:bg-blue-500 text-white text-[11px] font-bold rounded-[4px] shadow-sm animate-pulse">
-                {unreadCount}
-              </span>
-            )}
-          </button>
-          
-          {isNotificationsOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-xl z-50 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Notifications ({unreadCount} unread)</span>
-                {unreadCount > 0 && (
-                  <button 
-                    onClick={handleMarkAllAsRead}
-                    className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <CheckCheck size={14} /> Mark all read
-                  </button>
-                )}
-              </div>
-              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-slate-400">No notifications available</div>
-                ) : (
-                  notifications.map((notif) => (
-                    <div 
-                      key={notif._id}
-                      onClick={() => !notif.isRead && handleMarkAsRead(notif._id)}
-                      className={`p-4 flex items-start space-x-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors ${!notif.isRead ? 'bg-blue-50/40 dark:bg-slate-800/40' : ''}`}
-                    >
-                      <div className="mt-0.5 shrink-0 text-slate-500 dark:text-slate-400">
-                        {notif.type === 'SYSTEM' ? <CheckCircle2 size={16} className="text-blue-500" /> : 
-                         notif.type === 'ANNOUNCEMENT' ? <Bell size={16} className="text-amber-500" /> : <AlertCircle size={16} />}
-                      </div>
-                      <div className="flex-1 text-sm">
-                        <div className="font-semibold text-slate-800 dark:text-slate-200 flex justify-between items-center">
-                          <span className="truncate max-w-[200px]">{notif.title}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}
-                          </span>
-                        </div>
-                        <p className="text-slate-600 dark:text-slate-400 mt-1 text-xs leading-relaxed">{notif.message}</p>
-                      </div>
-                      {!notif.isRead && (
-                        <span className="w-2 h-2 rounded-full bg-blue-600 self-center shrink-0" />
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+        {/* Right: Actions, Notifications & Profile */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Active monitoring badge for employees */}
+          {userRole !== 'hr' && attendanceStatus === 'checked_in' && (
+            <button 
+              type="button"
+              onClick={() => setCurrentTab('admin-screenshots')}
+              title="Screenshot Monitoring is Active"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-xs font-medium hover:bg-emerald-100/70 transition-colors cursor-pointer"
+            >
+              <Camera size={14} className="text-emerald-600" />
+              <span>Monitoring Active</span>
+            </button>
           )}
-        </div>
 
-        {/* Profile Menu Dropdown with User Photo or Company Dark Blue Logo Fallback */}
-        <div className="relative" ref={profileMenuRef}>
-          <button 
-            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-            className="flex items-center space-x-2 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent"
-          >
-            <div className="relative shrink-0">
-              <div className="w-9 h-9 sm:w-8 sm:h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden shadow-xs">
-                {displayPhoto && !headerImgError ? (
-                  <img 
-                    src={displayPhoto} 
-                    alt={displayName} 
-                    onError={() => setHeaderImgError(true)}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <img 
-                    src={companyLogo} 
-                    alt="Kevalon Technology Logo" 
-                    className="w-full h-full object-contain p-0.5"
-                    title="Company Logo"
-                  />
-                )}
-              </div>
-              <span 
-                className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white dark:border-slate-900 shadow-xs" 
-                title="Online" 
-              />
-            </div>
+          {/* Admin Announcement Trigger Button */}
+          {userRole === 'admin' && (
+            <button
+              type="button"
+              title="Post Announcement"
+              onClick={() => window.dispatchEvent(new Event("open-announcement"))}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-xs font-semibold hover:bg-indigo-100 transition-colors cursor-pointer shadow-xs"
+            >
+              <Plus size={14} className="text-indigo-600" />
+              <span>Announcement</span>
+            </button>
+          )}
+
+          {/* Notifications Button */}
+          <div className="relative" ref={notificationRef}>
+            <button 
+              type="button"
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              title="View notifications"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors relative cursor-pointer"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full shadow-xs">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
             
-            <div className="hidden sm:flex items-center gap-1.5">
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[130px]">
-                {displayName}
-              </span>
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase ${
-                userRole === 'team_leader'
-                  ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
-                  : userRole === 'hr'
-                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                  : userRole === 'admin'
-                  ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300'
-                  : userRole === 'intern'
-                  ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
-                  : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-              }`}>
-                {userRole === 'team_leader' ? 'TL' : userRole === 'hr' ? 'HR' : userRole === 'admin' ? 'ADMIN' : userRole === 'intern' ? 'INTERN' : 'EMP'}
-              </span>
-            </div>
-            <ChevronDown size={16} className="text-slate-400 hidden sm:inline" />
-          </button>
-          
-          {isProfileMenuOpen && (
-            <div className="absolute right-0 mt-2 w-60 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md shadow-lg z-50 py-1 divide-y divide-slate-100 dark:divide-slate-800">
-              <div className="px-4 py-3 flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+            {/* Notification Dropdown */}
+            {isNotificationsOpen && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200/80 rounded-xl shadow-card z-50 overflow-hidden animate-fade-in">
+                <div className="flex items-center justify-between px-4 py-3 bg-slate-50/70 border-b border-slate-100">
+                  <span className="text-xs font-semibold text-slate-800">Notifications ({unreadCount} unread)</span>
+                  {unreadCount > 0 && (
+                    <button 
+                      onClick={handleMarkAllAsRead}
+                      className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <CheckCheck size={13} /> Mark all read
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                  {notifications.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400">No notifications available</div>
+                  ) : (
+                    notifications.map((notif) => (
+                      <div 
+                        key={notif._id}
+                        onClick={() => !notif.isRead && handleMarkAsRead(notif._id)}
+                        className={`p-3.5 flex items-start gap-2.5 cursor-pointer hover:bg-slate-50/80 transition-colors ${!notif.isRead ? 'bg-indigo-50/30' : ''}`}
+                      >
+                        <div className="mt-0.5 shrink-0 text-slate-500">
+                          {notif.type === 'SYSTEM' ? <CheckCircle2 size={15} className="text-indigo-600" /> : 
+                           notif.type === 'ANNOUNCEMENT' ? <Bell size={15} className="text-amber-500" /> : <AlertCircle size={15} className="text-slate-400" />}
+                        </div>
+                        <div className="flex-1 text-xs">
+                          <div className="font-semibold text-slate-800 flex justify-between items-center">
+                            <span className="truncate max-w-[180px]">{notif.title}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}
+                            </span>
+                          </div>
+                          <p className="text-slate-500 mt-1 text-[11px] leading-relaxed">{notif.message}</p>
+                        </div>
+                        {!notif.isRead && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 self-center shrink-0" />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Profile Menu Dropdown */}
+          <div className="relative" ref={profileMenuRef}>
+            <button 
+              type="button"
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              className="flex items-center gap-2 p-1 pl-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer border border-slate-200/80 bg-white shadow-xs"
+            >
+              <div className="relative shrink-0">
+                <div className="w-7 h-7 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
                   {displayPhoto && !headerImgError ? (
                     <img 
                       src={displayPhoto} 
@@ -427,48 +336,93 @@ export const Header = ({ onSignOut }) => {
                   ) : (
                     <img 
                       src={companyLogo} 
-                      alt="Kevalon Technology Logo" 
-                      className="w-full h-full object-contain p-1"
+                      alt="Logo" 
+                      className="w-full h-full object-contain p-0.5"
                     />
                   )}
                 </div>
-                <div className="overflow-hidden">
-                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono uppercase">
-                      {userRole === 'team_leader' ? 'Team Leader' : userRole === 'intern' ? 'Intern' : userRole === 'hr' ? 'HR Manager' : userRole === 'admin' ? 'Administrator' : 'Employee'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{displayEmail}</p>
-                </div>
+                <span 
+                  className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white" 
+                  title="Online" 
+                />
               </div>
               
-              <div className="py-1 border-t border-slate-100 dark:border-slate-800">
-                {userRole !== 'hr' && (
-                  <button 
-                    onClick={() => { setCurrentTab('profile'); setIsProfileMenuOpen(false); }}
-                    className="w-full px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center space-x-3 transition-colors cursor-pointer"
-                  >
-                    <User size={16} />
-                    <span>My Profile</span>
-                  </button>
-                )}
-                <button 
-                  onClick={() => { 
-                    handleCheckOut(); 
-                    setIsProfileMenuOpen(false); 
-                    if (onSignOut) onSignOut(); 
-                  }}
-                  className="w-full px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center space-x-3 transition-colors cursor-pointer"
-                >
-                  <LogOut size={16} />
-                  <span>Sign Out</span>
-                </button>
+              <div className="hidden sm:flex items-center gap-1.5 pr-1">
+                <span className="text-xs font-semibold text-slate-800 truncate max-w-[120px]">
+                  {displayName}
+                </span>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase ${
+                  userRole === 'admin'
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                    : userRole === 'team_leader'
+                    ? 'bg-purple-50 text-purple-700 border border-purple-200/70'
+                    : userRole === 'hr'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200/70'
+                }`}>
+                  {userRole === 'admin' ? 'ADMIN' : userRole === 'team_leader' ? 'TL' : userRole === 'hr' ? 'HR' : 'EMP'}
+                </span>
               </div>
-            </div>
-          )}
+              <ChevronDown size={14} className="text-slate-400 hidden sm:inline" />
+            </button>
+            
+            {/* Profile Dropdown */}
+            {isProfileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200/80 rounded-xl shadow-card z-50 py-1 divide-y divide-slate-100 animate-fade-in">
+                <div className="px-3.5 py-2.5 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+                    {displayPhoto && !headerImgError ? (
+                      <img 
+                        src={displayPhoto} 
+                        alt={displayName} 
+                        onError={() => setHeaderImgError(true)}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <img 
+                        src={companyLogo} 
+                        alt="Logo" 
+                        className="w-full h-full object-contain p-0.5"
+                      />
+                    )}
+                  </div>
+                  <div className="overflow-hidden min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">{displayName}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{displayEmail}</p>
+                  </div>
+                </div>
+                
+                <div className="py-1">
+                  {userRole !== 'hr' && (
+                    <button 
+                      type="button"
+                      onClick={() => { setCurrentTab('profile'); setIsProfileMenuOpen(false); }}
+                      className="w-full px-3.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 transition-colors cursor-pointer text-left"
+                    >
+                      <User size={14} className="text-slate-400" />
+                      <span>My Profile</span>
+                    </button>
+                  )}
+                  <button 
+                    type="button"
+                    onClick={() => { 
+                      handleCheckOut(); 
+                      setIsProfileMenuOpen(false); 
+                      if (onSignOut) onSignOut(); 
+                    }}
+                    className="w-full px-3.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50/80 flex items-center gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <LogOut size={14} className="text-rose-500" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>
   );
 };
+
+export default Header;

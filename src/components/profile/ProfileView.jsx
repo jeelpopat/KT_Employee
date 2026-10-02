@@ -1052,7 +1052,7 @@ export const ProfileView = () => {
   if (isLoadingData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <Loader2 size={32} className="animate-spin text-blue-500" />
+        <Loader2 size={32} className="animate-spin text-indigo-600" />
         <p className="text-sm text-slate-500 font-medium">Loading your profile & documents...</p>
       </div>
     );
@@ -1107,10 +1107,10 @@ export const ProfileView = () => {
       />
 
       {/* Profile Header Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-6 transition-colors shadow-sm relative overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs relative overflow-hidden">
         
         {/* Subtle background brand accent */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 w-full md:w-auto text-center md:text-left">
@@ -1161,7 +1161,7 @@ export const ProfileView = () => {
                 type="button"
                 onClick={() => photoInputRef.current?.click()}
                 disabled={isPhotoUploading}
-                className="md:hidden absolute -bottom-1 -left-1 p-1.5 rounded-full bg-blue-600 text-white shadow-md border-2 border-white dark:border-slate-900"
+                className="md:hidden absolute -bottom-1 -left-1 p-1.5 rounded-full bg-indigo-600 text-white shadow-md border-2 border-white dark:border-slate-900"
                 title="Update Photo"
               >
                 <Camera size={12} />
@@ -1172,7 +1172,7 @@ export const ProfileView = () => {
             <div className="flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex flex-col md:flex-row items-center gap-3">
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{fullName}</h2>
-                <span className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold uppercase tracking-wider">
+                <span className="px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-400 font-mono text-xs font-bold uppercase tracking-wider">
                   {employeeId}
                 </span>
               </div>
@@ -1180,12 +1180,12 @@ export const ProfileView = () => {
               <p className="text-sm text-slate-600 dark:text-slate-400 font-medium mt-1">{designation}</p>
               
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                <span className="flex items-center gap-1.5"><Briefcase size={14} className="text-blue-500" /> {department}</span>
+                <span className="flex items-center gap-1.5"><Briefcase size={14} className="text-indigo-500" /> {department}</span>
                 <span className="flex items-center gap-1.5"><Calendar size={14} className="text-slate-400" /> Joined {joiningDate}</span>
                 <div className="flex items-center gap-2">
                   <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                    <Shield size={14} className={userRole === 'team_leader' ? 'text-blue-500' : 'text-amber-500'} /> 
-                    Role: <strong className="text-blue-600 dark:text-blue-400 font-bold">{displayRole}</strong>
+                    <Shield size={14} className={userRole === 'team_leader' ? 'text-indigo-500' : 'text-amber-500'} /> 
+                    Role: <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{displayRole}</strong>
                   </span>
                 </div>
               </div>
@@ -1196,7 +1196,7 @@ export const ProfileView = () => {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={isPhotoUploading}
-                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
                 >
                   {isPhotoUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                   {isPhotoUploading ? 'Uploading...' : 'Update Photo'}
@@ -1206,7 +1206,7 @@ export const ProfileView = () => {
                   <button
                     type="button"
                     onClick={handleResetProfilePhoto}
-                    className="px-3 py-1.5 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 border border-transparent hover:border-red-200 dark:hover:border-red-800/50 rounded-md text-xs font-semibold transition-colors cursor-pointer"
+                    className="px-3 py-1.5 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 border border-transparent hover:border-red-200 dark:hover:border-red-800/50 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                     title="Reset back to company dark blue logo"
                   >
                     Reset to Logo
@@ -1234,19 +1234,19 @@ export const ProfileView = () => {
               onClick={() => fetchProfile(true)}
               disabled={isRefreshing}
               title="Fetch real-time profile details from server (GET /api/users/profile)"
-              className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer shadow-xs disabled:opacity-60"
+              className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer shadow-xs disabled:opacity-60"
             >
-              <RefreshCw size={14} className={isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"} />
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin text-indigo-600" : "text-slate-500"} />
               <span>{isRefreshing ? 'Fetching...' : 'Sync Live Details'}</span>
             </button>
 
             <button
               onClick={() => setActiveTab('documents')}
-              className="px-4 py-2 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-md text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+              className="px-4 py-2 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
             >
               <FileCheck size={16} />
               <span>My Documents</span>
-              <span className="px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+              <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
                 {documents.length}
               </span>
             </button>
@@ -1255,35 +1255,35 @@ export const ProfileView = () => {
       </div>
 
       {/* Main Tab Navigation Bar */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md px-3 pt-2 shadow-xs transition-colors">
+      <div className="flex border-b border-slate-200/80 bg-white rounded-xl px-3 pt-1 shadow-xs transition-colors">
         <button
           type="button"
           onClick={() => setActiveTab('details')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'details'
-              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <User size={16} />
+          <User size={15} />
           <span>Personal Details</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('documents')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'documents'
-              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <FileBadge size={16} />
+          <FileBadge size={15} />
           <span>Documents & Identity</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
             activeTab === 'documents'
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-slate-100 text-slate-600'
           }`}>
             {documents.length}
           </span>
@@ -1292,13 +1292,13 @@ export const ProfileView = () => {
         <button
           type="button"
           onClick={() => setActiveTab('security')}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'security'
-              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <KeyRound size={16} />
+          <KeyRound size={15} />
           <span>Security & Password</span>
         </button>
       </div>
@@ -1339,18 +1339,18 @@ export const ProfileView = () => {
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md transition-colors shadow-sm p-5">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
-                  <FileCheck size={16} className="text-blue-500" /> Identity Proofs
+                  <FileCheck size={16} className="text-indigo-500" /> Identity Proofs
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50">
                   {documents.filter(d => d.status === 'uploaded').length}/{documents.length} Done
                 </span>
               </div>
 
               <div className="space-y-3">
                 {/* Aadhar summary */}
-                <div className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="p-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shrink-0">
+                    <div className="p-1.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shrink-0">
                       <CreditCard size={14} />
                     </div>
                     <div className="truncate">
@@ -1361,7 +1361,7 @@ export const ProfileView = () => {
                   {aadharDoc?.fileUrl && (
                     <button
                       onClick={() => handleOpenDocViewer(aadharDoc)}
-                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors"
+                      className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors"
                       title="View Aadhar Card"
                     >
                       <Eye size={14} />
@@ -1370,7 +1370,7 @@ export const ProfileView = () => {
                 </div>
 
                 {/* PAN summary */}
-                <div className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="p-1.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shrink-0">
                       <FileText size={14} />
@@ -1383,7 +1383,7 @@ export const ProfileView = () => {
                   {panDoc?.fileUrl && (
                     <button
                       onClick={() => handleOpenDocViewer(panDoc)}
-                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors"
+                      className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors"
                       title="View PAN Card"
                     >
                       <Eye size={14} />
@@ -1392,7 +1392,7 @@ export const ProfileView = () => {
                 </div>
 
                 {/* Passport Photo summary */}
-                <div className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="p-1.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 shrink-0">
                       <ImageIcon size={14} />
@@ -1405,7 +1405,7 @@ export const ProfileView = () => {
                   {passportPhotoDoc?.fileUrl && (
                     <button
                       onClick={() => handleOpenDocViewer(passportPhotoDoc)}
-                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors"
+                      className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors"
                       title="View Passport Photo"
                     >
                       <Eye size={14} />
@@ -1415,7 +1415,7 @@ export const ProfileView = () => {
 
                 <button
                   onClick={() => setActiveTab('documents')}
-                  className="w-full mt-2 py-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md border border-dashed border-blue-200 dark:border-blue-800/60 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  className="w-full mt-2 py-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg border border-dashed border-indigo-200 dark:border-indigo-800/60 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   Manage All Documents <ArrowRight size={12} />
                 </button>
@@ -1433,8 +1433,8 @@ export const ProfileView = () => {
                     <span className="text-sm font-bold text-slate-900 dark:text-slate-100 block">{emergencyContact.name}</span>
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{emergencyContact.relation}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium bg-slate-50 dark:bg-slate-950 p-2.5 rounded-md border border-slate-100 dark:border-slate-800">
-                    <Phone size={14} className="text-blue-500" /> {emergencyContact.phone}
+                  <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                    <Phone size={14} className="text-indigo-600" /> {emergencyContact.phone}
                   </div>
                 </div>
               </div>
@@ -1442,7 +1442,7 @@ export const ProfileView = () => {
 
             {/* Technical Skills */}
             {skillsList.length > 0 && (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md transition-colors shadow-sm p-5">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl transition-colors shadow-xs p-5">
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex items-center gap-2">
                   <Code size={16} className="text-slate-400" /> Technical Skills
                 </h3>
@@ -1461,7 +1461,7 @@ export const ProfileView = () => {
           <div className="space-y-6 lg:col-span-2">
             
             {/* Contact & Personal Details Form */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md transition-colors shadow-sm">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl transition-colors shadow-xs">
               <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
                 <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Personal & Contact Details</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Update your display name, phone number, and physical address.</p>
@@ -1480,7 +1480,7 @@ export const ProfileView = () => {
                       value={name} 
                       onChange={e => setName(e.target.value)} 
                       placeholder="Enter your full name"
-                      className="w-full px-4 py-2.5 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                      className="w-full px-4 py-2.5 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-indigo-500 transition-colors"
                       required
                     />
                   </div>
@@ -1500,7 +1500,7 @@ export const ProfileView = () => {
                       value={email} 
                       readOnly
                       disabled
-                      className="w-full px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-md text-slate-500 dark:text-slate-400 font-medium cursor-not-allowed select-none transition-colors"
+                      className="w-full px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-500 dark:text-slate-400 font-medium cursor-not-allowed select-none transition-colors"
                       title="Email address is fixed and cannot be changed"
                     />
                     <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
@@ -1517,7 +1517,7 @@ export const ProfileView = () => {
                       type="text" 
                       value={phone} 
                       onChange={e => setPhone(e.target.value)} 
-                      className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                      className="w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-indigo-500 transition-colors"
                       required
                     />
                   </div>
@@ -1531,7 +1531,7 @@ export const ProfileView = () => {
                       value={address} 
                       onChange={e => setAddress(e.target.value)} 
                       rows={2}
-                      className="w-full px-4 py-3 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-blue-500 transition-colors resize-y"
+                      className="w-full px-4 py-3 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-indigo-500 transition-colors resize-y"
                       required
                     />
                   </div>
@@ -1546,7 +1546,7 @@ export const ProfileView = () => {
                   <button 
                     type="submit" 
                     disabled={isSaving}
-                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-70"
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-70"
                   >
                     {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                     {isSaving ? 'Saving...' : 'Save Changes'}
@@ -1557,14 +1557,14 @@ export const ProfileView = () => {
 
             {/* Education Records */}
             {educationList.length > 0 && (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md transition-colors shadow-sm">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl transition-colors shadow-xs">
                 <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-950/50">
                   <GraduationCap size={18} className="text-slate-500 dark:text-slate-400" />
                   <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Education History</h3>
                 </div>
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                   {educationList.map((edu, index) => (
-                    <div key={index} className="p-4 border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-950 flex flex-col justify-between">
+                    <div key={index} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-950 flex flex-col justify-between">
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">{edu.degree}</h4>
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{edu.institute}</p>
@@ -1590,9 +1590,9 @@ export const ProfileView = () => {
         <div className="space-y-6">
           
           {/* Header Banner for Documents */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm transition-colors">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs transition-colors">
             <div className="flex items-start gap-4">
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg shrink-0">
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0">
                 <FileBadge size={28} />
               </div>
               <div>
@@ -1610,7 +1610,7 @@ export const ProfileView = () => {
                 type="button"
                 onClick={syncDocumentsFromBackend}
                 disabled={isSyncingDocs}
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Sync documents from server"
               >
                 <RefreshCw size={14} className={isSyncingDocs ? 'animate-spin' : ''} />
@@ -1619,7 +1619,7 @@ export const ProfileView = () => {
               <button
                 type="button"
                 onClick={() => setIsAddDocModalOpen(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
               >
                 <Plus size={16} />
                 <span>Add Document</span>
@@ -1629,7 +1629,7 @@ export const ProfileView = () => {
 
           {/* Feedback banner */}
           {docFeedback.text && (
-            <div className={`p-4 rounded-md text-sm font-medium border flex items-center gap-3 transition-all ${
+            <div className={`p-4 rounded-xl text-sm font-medium border flex items-center gap-3 transition-all ${
               docFeedback.type === 'error'
                 ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50'
                 : 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/50'
@@ -1652,12 +1652,12 @@ export const ProfileView = () => {
               
               {/* ---------------- 1. AADHAR CARD ---------------- */}
               {aadharDoc && (
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-sm flex flex-col justify-between transition-all hover:border-blue-400 dark:hover:border-blue-600">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs flex flex-col justify-between transition-all hover:border-indigo-400 dark:hover:border-indigo-600">
                   <div>
                     {/* Header */}
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                        <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
                           <CreditCard size={22} />
                         </div>
                         <div>
@@ -1681,7 +1681,7 @@ export const ProfileView = () => {
                     </p>
 
                     {/* Document Number Display / Editable */}
-                    <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-md border border-slate-100 dark:border-slate-800 mb-4">
+                    <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-100 dark:border-slate-800 mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Aadhar Number</span>
                         {editingDocId === aadharDoc.id ? (
@@ -1696,7 +1696,7 @@ export const ProfileView = () => {
                           <button
                             type="button"
                             onClick={() => handleStartEditNumber(aadharDoc)}
-                            className="text-[11px] font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                            className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                           >
                             <Edit3 size={11} /> Edit
                           </button>
@@ -1709,7 +1709,7 @@ export const ProfileView = () => {
                           value={tempDocNumber}
                           onChange={e => setTempDocNumber(e.target.value)}
                           placeholder="e.g. 1234 5678 9012"
-                          className="w-full px-2 py-1 text-xs font-mono bg-white dark:bg-slate-900 border border-blue-400 rounded text-slate-900 dark:text-slate-100 focus:outline-none"
+                          className="w-full px-2 py-1 text-xs font-mono bg-white dark:bg-slate-900 border border-indigo-400 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none"
                           autoFocus
                         />
                       ) : (
@@ -1739,7 +1739,7 @@ export const ProfileView = () => {
                     <button
                       type="button"
                       onClick={() => handleOpenDocViewer(aadharDoc)}
-                      className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                     >
                       <Eye size={14} /> View
                     </button>
@@ -1748,7 +1748,7 @@ export const ProfileView = () => {
                       type="button"
                       onClick={() => handleTriggerDocUpload(aadharDoc.id)}
                       disabled={uploadingDocId === aadharDoc.id}
-                      className="w-full py-2 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                      className="w-full py-2 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 shadow-xs"
                     >
                       {uploadingDocId === aadharDoc.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -1807,7 +1807,7 @@ export const ProfileView = () => {
                           <button
                             type="button"
                             onClick={() => handleStartEditNumber(panDoc)}
-                            className="text-[11px] font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                            className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                           >
                             <Edit3 size={11} /> Edit
                           </button>
@@ -1820,7 +1820,7 @@ export const ProfileView = () => {
                           value={tempDocNumber}
                           onChange={e => setTempDocNumber(e.target.value)}
                           placeholder="e.g. ABCDE1234F"
-                          className="w-full px-2 py-1 text-xs font-mono uppercase bg-white dark:bg-slate-900 border border-blue-400 rounded text-slate-900 dark:text-slate-100 focus:outline-none"
+                          className="w-full px-2 py-1 text-xs font-mono uppercase bg-white dark:bg-slate-900 border border-indigo-400 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none"
                           autoFocus
                         />
                       ) : (
@@ -1994,14 +1994,14 @@ export const ProfileView = () => {
               <button
                 type="button"
                 onClick={() => setIsAddDocModalOpen(true)}
-                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-700 dark:text-slate-300 hover:text-blue-600 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-slate-700 dark:text-slate-300 hover:text-indigo-600 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
               >
                 <Plus size={14} /> Add Another
               </button>
             </div>
 
             {customDocs.length === 0 ? (
-              <div className="bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-300 dark:border-slate-800 rounded-lg p-8 text-center">
+              <div className="bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-300 dark:border-slate-800 rounded-xl p-8 text-center">
                 <FileText size={32} className="mx-auto text-slate-400 mb-2 opacity-60" />
                 <h5 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No additional documents uploaded yet</h5>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
@@ -2010,7 +2010,7 @@ export const ProfileView = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddDocModalOpen(true)}
-                  className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                 >
                   <Plus size={14} /> Upload Custom Document
                 </button>
@@ -2057,7 +2057,7 @@ export const ProfileView = () => {
                       <button
                         type="button"
                         onClick={() => handleOpenDocViewer(doc)}
-                        className="py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        className="py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-xs"
                       >
                         <Eye size={13} /> View
                       </button>
@@ -2066,7 +2066,7 @@ export const ProfileView = () => {
                         type="button"
                         onClick={() => handleTriggerDocUpload(doc.id)}
                         disabled={uploadingDocId === doc.id}
-                        className="py-1.5 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 text-blue-700 dark:text-blue-300 rounded text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-60"
+                        className="py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-60 shadow-xs"
                       >
                         {uploadingDocId === doc.id ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                         Update
@@ -2115,7 +2115,7 @@ export const ProfileView = () => {
                       onChange={e => setCurrentPassword(e.target.value)}
                       placeholder="Enter your current password"
                       required
-                      className="w-full pl-4 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                      className="w-full pl-4 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                     />
                     <button
                       type="button"
@@ -2141,7 +2141,7 @@ export const ProfileView = () => {
                         onChange={e => setNewPassword(e.target.value)}
                         placeholder="Min 6 characters"
                         required
-                        className="w-full pl-4 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                        className="w-full pl-4 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                       <button
                         type="button"
@@ -2164,7 +2164,7 @@ export const ProfileView = () => {
                         onChange={e => setConfirmPassword(e.target.value)}
                         placeholder="Repeat new password"
                         required
-                        className="w-full pl-4 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                        className="w-full pl-4 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                       <button
                         type="button"
@@ -2209,7 +2209,7 @@ export const ProfileView = () => {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-950/70 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
                   <FileText size={20} />
                 </div>
                 <div>
@@ -2313,14 +2313,14 @@ export const ProfileView = () => {
                     onClick={() => {
                       handleTriggerDocUpload(docViewerModal.doc.id);
                     }}
-                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold inline-flex items-center gap-1.5"
+                    className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5"
                   >
                     <Upload size={14} /> Upload Now
                   </button>
                 </div>
               ) : (docViewerModal.doc.fileType?.includes('pdf') || docViewerModal.doc.fileName?.endsWith('.pdf')) ? (
                 /* PDF Document Preview Card */
-                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center max-w-md bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 shadow-md">
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center max-w-md bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-md">
                   <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 mb-4">
                     <FileText size={48} />
                   </div>
@@ -2333,7 +2333,7 @@ export const ProfileView = () => {
                       href={docViewerModal.doc.fileUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold flex items-center gap-2 shadow-xs transition-colors"
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs transition-colors"
                     >
                       <ExternalLink size={14} /> Open Full PDF
                     </a>
@@ -2373,14 +2373,14 @@ export const ProfileView = () => {
                 <button
                   type="button"
                   onClick={() => handleTriggerDocUpload(docViewerModal.doc.id)}
-                  className="px-4 py-2 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                 >
                   <Upload size={14} /> Replace Document
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseDocViewer}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-md text-xs font-bold transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
                 >
                   Close
                 </button>
@@ -2404,7 +2404,7 @@ export const ProfileView = () => {
           >
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-950/70">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
                   <Plus size={18} />
                 </div>
                 <div>
@@ -2431,7 +2431,7 @@ export const ProfileView = () => {
                 <select
                   value={newDocForm.presetType}
                   onChange={e => setNewDocForm(p => ({ ...p, presetType: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-indigo-500"
                 >
                   <option value="Driving License">Driving License</option>
                   <option value="Voter ID Card">Voter ID Card</option>
@@ -2456,7 +2456,7 @@ export const ProfileView = () => {
                     onChange={e => setNewDocForm(p => ({ ...p, customTitle: e.target.value }))}
                     placeholder="e.g. Postgraduate Degree Certificate"
                     required
-                    className="w-full px-3.5 py-2.5 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               )}
@@ -2471,7 +2471,7 @@ export const ProfileView = () => {
                   value={newDocForm.docNumber}
                   onChange={e => setNewDocForm(p => ({ ...p, docNumber: e.target.value }))}
                   placeholder="e.g. DL-1420110012345"
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -2495,12 +2495,12 @@ export const ProfileView = () => {
 
                 <div
                   onClick={() => addDocFileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 rounded-lg p-6 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-950/50 transition-colors"
+                  className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-lg p-6 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-950/50 transition-colors"
                 >
                   <Upload size={24} className="mx-auto text-slate-400 mb-2" />
                   {newDocForm.fileName ? (
                     <div>
-                      <p className="text-xs font-bold text-blue-600 dark:text-blue-400">{newDocForm.fileName}</p>
+                      <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{newDocForm.fileName}</p>
                       <p className="text-[11px] text-slate-400 mt-1">Click to change selected file</p>
                     </div>
                   ) : (
@@ -2516,14 +2516,14 @@ export const ProfileView = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddDocModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md cursor-pointer transition-colors"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingNewDoc || !newDocForm.file}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-xs"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-xs"
                 >
                   {isSubmittingNewDoc ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   {isSubmittingNewDoc ? 'Uploading...' : 'Save & Upload'}

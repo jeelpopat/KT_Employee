@@ -58,13 +58,13 @@ export const ScreenshotMonitoringBar = () => {
   };
 
   return (
-    <div className="bg-slate-900 text-slate-200 border-b border-slate-800 px-4 py-2.5 shadow-sm">
+    <div className="bg-white text-slate-800 border-b border-slate-200/80 px-4 py-2 shadow-xs">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
         
         {/* Left: Status & Transparent Notice */}
-        <div className="flex items-center space-x-3">
-          <div className="p-1.5 bg-slate-800 rounded-lg text-blue-400">
-            <Shield size={16} />
+        <div className="flex items-center space-x-2.5">
+          <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-md border border-indigo-200/60 shadow-xs">
+            <Shield size={15} />
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             {getStatusBadge()}
@@ -75,14 +75,14 @@ export const ScreenshotMonitoringBar = () => {
         </div>
 
         {/* Right: Metrics & Actions */}
-        <div className="flex items-center space-x-4 sm:space-x-6 text-slate-300">
+        <div className="flex items-center space-x-4 sm:space-x-5 text-slate-600">
           
           {/* Next Shot Countdown (only active during active work session) */}
           {attendanceStatus === 'checked_in' && (
-            <div className="flex items-center space-x-1.5 font-mono text-slate-300 bg-slate-800 px-2.5 py-1 rounded-md">
-              <Camera size={13} className="text-emerald-400 animate-spin" />
+            <div className="flex items-center space-x-1.5 font-mono text-slate-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-md">
+              <Camera size={13} className="text-emerald-600 animate-spin" />
               <span>
-                Capture in: <strong className="text-white">
+                Capture in: <strong className="text-slate-900">
                   {Math.floor(nextScreenshotCountdown / 60)}m {String(nextScreenshotCountdown % 60).padStart(2, '0')}s
                 </strong>
               </span>
@@ -91,27 +91,27 @@ export const ScreenshotMonitoringBar = () => {
 
           {/* Last Shot Time */}
           <div className="hidden sm:flex flex-col">
-            <span className="text-[10px] text-slate-400 uppercase">Last Shot</span>
-            <span className="font-semibold text-slate-200">{latestScreenshot ? latestScreenshot.captureTime : 'N/A'}</span>
+            <span className="text-[10px] text-slate-400 uppercase font-medium">Last Shot</span>
+            <span className="font-semibold text-slate-800">{latestScreenshot ? latestScreenshot.captureTime : 'N/A'}</span>
           </div>
 
           {/* Total Captured Today */}
           <div className="flex flex-col">
-            <span className="text-[10px] text-slate-400 uppercase">Captured Today</span>
-            <span className="font-semibold text-blue-400">{screenshots.length} Shots</span>
+            <span className="text-[10px] text-slate-400 uppercase font-medium">Captured Today</span>
+            <span className="font-semibold text-indigo-600">{screenshots.length} Shots</span>
           </div>
 
           {/* Session Duration */}
           <div className="hidden md:flex flex-col">
-            <span className="text-[10px] text-slate-400 uppercase">Duration</span>
-            <span className="font-semibold text-slate-200">{hrs}h {mins}m</span>
+            <span className="text-[10px] text-slate-400 uppercase font-medium">Duration</span>
+            <span className="font-semibold text-slate-800">{hrs}h {mins}m</span>
           </div>
 
           {/* Action Triggers */}
           {attendanceStatus === 'checked_in' && (
             <button
               onClick={() => captureRealScreenNow().catch(e => console.warn(e))}
-              className="flex items-center space-x-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md font-medium text-xs shadow-xs transition cursor-pointer"
+              className="flex items-center space-x-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-xs shadow-xs transition cursor-pointer"
               title="Capture real employee workstation screen right now"
             >
               <Camera size={13} />
@@ -121,10 +121,10 @@ export const ScreenshotMonitoringBar = () => {
 
           <button
             onClick={() => setIsScreenshotModalOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-md font-medium text-xs shadow-xs transition"
+            className="flex items-center space-x-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-xs shadow-xs transition cursor-pointer"
           >
-            <Eye size={14} />
-            <span>Read-Only History</span>
+            <Eye size={13} />
+            <span>History</span>
           </button>
         </div>
 

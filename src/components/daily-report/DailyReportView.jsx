@@ -315,15 +315,16 @@ export const DailyReportView = () => {
     <div className="space-y-6">
 
       {/* Daily Report Builder */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-4 sm:p-5 transition-colors shadow-sm">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
         
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 mb-5 border-b border-slate-200 dark:border-slate-800 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-500 rounded-md shrink-0">
-              <FileText size={20} />
+            <div className="p-2 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shrink-0 shadow-xs">
+              <FileText size={18} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Submit New Update</h3>
+              <h3 className="text-base font-semibold text-slate-900 tracking-tight">Submit Daily Work Report</h3>
+              <p className="text-xs text-slate-400">Record tasks completed, hours logged, and plans for tomorrow</p>
             </div>
           </div>
         </div>
@@ -338,11 +339,11 @@ export const DailyReportView = () => {
           <div className="space-y-4">
             
             {isMetaLoading ? (
-               <div className="flex justify-center p-8"><Loader2 className="animate-spin text-blue-500" /></div>
+               <div className="flex justify-center p-8"><Loader2 className="animate-spin text-indigo-500" /></div>
             ) : taskRows.map((row, idx) => {
               const availableTasks = getTasksForProject(row.projectId);
               return (
-                <div key={row.id} className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md space-y-4 transition-colors overflow-hidden">
+                <div key={row.id} className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4 transition-colors overflow-hidden">
                   
                   <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 tracking-wide">
@@ -370,7 +371,7 @@ export const DailyReportView = () => {
                       <select 
                         value={row.projectId}
                         onChange={e => handleRowChange(row.id, 'projectId', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                         required
                       >
                         <option value="" disabled>Select Project</option>
@@ -388,7 +389,7 @@ export const DailyReportView = () => {
                       <select 
                         value={row.taskId}
                         onChange={e => handleRowChange(row.id, 'taskId', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                       >
                         <option value="">No task linked</option>
                         {availableTasks.map(t => (
@@ -407,7 +408,7 @@ export const DailyReportView = () => {
                         min="0.5" max="16" step="0.5"
                         value={row.hoursWorked}
                         onChange={e => handleRowChange(row.id, 'hoursWorked', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                         required
                       />
                     </div>
@@ -422,7 +423,7 @@ export const DailyReportView = () => {
                         placeholder="What did you accomplish today?"
                         value={row.todaysWork}
                         onChange={e => handleRowChange(row.id, 'todaysWork', e.target.value)}
-                        className="w-full px-3 py-3 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors resize-y"
+                        className="w-full px-3 py-3 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors resize-y"
                         required
                       />
                     </div>
@@ -437,7 +438,7 @@ export const DailyReportView = () => {
                         placeholder="What is left to do?"
                         value={row.pendingWork}
                         onChange={e => handleRowChange(row.id, 'pendingWork', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                     </div>
 
@@ -451,7 +452,7 @@ export const DailyReportView = () => {
                         placeholder="What will you work on tomorrow?"
                         value={row.tomorrowPlan}
                         onChange={e => handleRowChange(row.id, 'tomorrowPlan', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                     </div>
 
@@ -465,7 +466,7 @@ export const DailyReportView = () => {
                         placeholder="Any blockers or challenges?"
                         value={row.issuesFaced}
                         onChange={e => handleRowChange(row.id, 'issuesFaced', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                     </div>
                   </div>
@@ -475,21 +476,21 @@ export const DailyReportView = () => {
           </div>
 
           {/* Form Actions */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
             <button 
               type="button" 
               onClick={handleAddRow}
-              className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
             >
-              <Plus size={16} /> Add Another Project Update
+              <Plus size={15} /> Add Another Project Update
             </button>
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <button 
-                type="submit"
+                type="submit" 
                 disabled={isSubmitting || isMetaLoading || assignedProjects.length === 0}
-                className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} 
+                {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} 
                 {isSubmitting ? 'Submitting...' : 'Submit Report'}
               </button>
             </div>
@@ -498,17 +499,17 @@ export const DailyReportView = () => {
       </div>
 
       {/* Report History Panel */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden transition-colors shadow-sm">
+      <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden transition-all shadow-xs">
         
-        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-950/50">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-slate-50/50">
           <div>
             <div className="flex items-center gap-2.5">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Report History</h3>
-              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+              <h3 className="text-sm font-semibold text-slate-900 tracking-tight">Report History</h3>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
                 {historyReports.length} {historyReports.length === 1 ? 'Report' : 'Reports'}
               </span>
             </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/:id</p>
+            <p className="text-xs text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/:id</p>
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
@@ -519,13 +520,13 @@ export const DailyReportView = () => {
                 placeholder="Search description..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
             <select 
               value={selectedProjectFilter}
               onChange={e => setSelectedProjectFilter(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
             >
               <option value="all">All Projects</option>
               {assignedProjects.map(p => (
@@ -536,17 +537,17 @@ export const DailyReportView = () => {
               type="button"
               onClick={fetchHistory}
               disabled={isHistoryLoading}
-              className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-md hover:bg-slate-200/50 dark:hover:bg-slate-800 transition cursor-pointer shrink-0"
+              className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 transition cursor-pointer shrink-0"
               title="Refresh History"
             >
-              <RefreshCw size={16} className={isHistoryLoading ? 'animate-spin' : ''} />
+              <RefreshCw size={16} className={isHistoryLoading ? 'animate-spin text-indigo-500' : ''} />
             </button>
           </div>
         </div>
 
         <div className="overflow-x-auto w-full">
           {isHistoryLoading ? (
-            <div className="flex justify-center p-12"><Loader2 size={24} className="animate-spin text-blue-500" /></div>
+            <div className="flex justify-center p-12"><Loader2 size={24} className="animate-spin text-indigo-500" /></div>
           ) : (
             <table className="w-full text-left text-sm min-w-[800px]">
               <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400 uppercase text-xs font-semibold tracking-wider border-b border-slate-200 dark:border-slate-800">
@@ -584,7 +585,7 @@ export const DailyReportView = () => {
                             {projName}
                           </span>
                         </td>
-                        <td className="px-5 py-4 font-mono font-medium text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                        <td className="px-5 py-4 font-mono font-medium text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
                           {hours} hrs
                         </td>
                         <td className="px-5 py-4 text-slate-600 dark:text-slate-400 max-w-sm">

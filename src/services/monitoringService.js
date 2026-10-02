@@ -467,7 +467,14 @@ export const extractEmployeeDetails = (source = {}) => {
     return s.length > 0 && s !== 'emp-8492' && s !== 'emp' && s !== 'emp-cld' && s !== 'emp-kt';
   };
 
-  // Extract Employee ID
+  // Determine if source is a screenshot document rather than a user/employee document
+  const isScreenshotRecord = Boolean(
+    source.imageUrl || source.screenshotUrl || source.cloudinaryUrl || 
+    source.captureTime || source.sessionId || source.public_id || source.deviceInfo
+  );
+  const screenshotDocId = String(source._id || source.id || '');
+
+  // Extract Employee ID (Must NEVER be the screenshot's own MongoDB _id)
   let employeeId = '';
   const rawIdCandidates = [
     emp.employeeID,
@@ -477,15 +484,23 @@ export const extractEmployeeDetails = (source = {}) => {
     prof.employeeId,
     source.employeeID,
     source.uniqueID,
-    typeof source.employeeId === 'string' ? source.employeeId : '',
+    typeof source.employeeId === 'string' && source.employeeId !== screenshotDocId ? source.employeeId : '',
+    // If it's a screenshot document, prioritize the genuine userId / user reference
+    source.userId?._id,
+    source.userId?.id,
+    typeof source.userId === 'string' && source.userId !== screenshotDocId ? source.userId : '',
+    source.user?._id,
+    source.user?.id,
+    typeof source.user === 'string' && source.user !== screenshotDocId ? source.user : '',
     emp._id,
     emp.id,
-    source._id,
-    source.id
+    // Only accept source._id / source.id if source is NOT a screenshot document (e.g. user model)
+    !isScreenshotRecord ? source._id : '',
+    !isScreenshotRecord ? source.id : ''
   ];
 
   for (const cand of rawIdCandidates) {
-    if (isValidId(cand)) {
+    if (isValidId(cand) && cand !== screenshotDocId) {
       employeeId = String(cand).trim();
       break;
     }
@@ -528,6 +543,7 @@ export const extractEmployeeDetails = (source = {}) => {
   return {
     name: name || 'Jeel Patel',
     employeeId: employeeId || 'EMP1008',
+    userId: source.userId?._id || source.userId?.id || (typeof source.userId === 'string' && source.userId !== screenshotDocId ? source.userId : ''),
     designation: designation || 'Full Stack Developer'
   };
 };
@@ -542,7 +558,26 @@ export const normalizeScreenshotRecord = (raw) => {
     : (typeof raw.employeeId === 'object' && raw.employeeId !== null)
       ? raw.employeeId
       : {};
-  const empId = empDetails.employeeId || (typeof raw.employeeId === 'string' && raw.employeeId !== 'EMP-8492' && raw.employeeId !== 'EMP-CLD' ? raw.employeeId : (activeUser?.employeeId || 'EMP1008'));
+  
+  const screenshotDocId = String(raw._id || raw.id || '');
+
+  // Mongoose Session Schema fields:
+  // userId: ObjectId ref 'User' (authentic MongoDB user ID)
+  const rawUserId = raw.userId?._id || raw.userId?.id || (typeof raw.userId === 'string' ? raw.userId : '') ||
+                    raw.user?._id || raw.user?.id || (typeof raw.user === 'string' ? raw.user : '') ||
+                    empDetails.userId || '';
+  const userId = (isValidObjectId(rawUserId) && rawUserId !== screenshotDocId)
+    ? rawUserId 
+    : (activeUser?.userId || resolveMongoObjectId(rawUserId || raw.employeeId));
+
+  // Genuine employee ID (NEVER the screenshot's own mongo _id)
+  let empId = empDetails.employeeId;
+  if (!empId || empId === screenshotDocId) {
+    empId = (typeof raw.employeeId === 'string' && raw.employeeId !== screenshotDocId && raw.employeeId !== 'EMP-8492' && raw.employeeId !== 'EMP-CLD')
+      ? raw.employeeId
+      : (isValidObjectId(userId) && userId !== screenshotDocId ? userId : (activeUser?.employeeId || 'EMP1008'));
+  }
+
   const empName = empDetails.name || (activeUser?.name || 'Jeel Patel');
   const empRole = empDetails.designation || (activeUser?.designation || 'Full Stack Developer');
   const empPhoto = typeof emp === 'object' ? (emp.profilePhoto || emp.photoUrl || emp.avatar || '') : (raw.profilePhoto || '');
@@ -554,11 +589,6 @@ export const normalizeScreenshotRecord = (raw) => {
   const dateObj = raw.capturedAt ? new Date(raw.capturedAt) : (raw.createdAt ? new Date(raw.createdAt) : new Date());
   const dateStr = dateObj.toISOString().split('T')[0];
   const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-  // Mongoose Session Schema fields:
-  // userId: ObjectId ref 'User'
-  const rawUserId = raw.userId || (typeof raw.user === 'object' ? raw.user?._id : raw.user) || empId;
-  const userId = isValidObjectId(rawUserId) ? rawUserId : (activeUser?.userId || resolveMongoObjectId(rawUserId));
 
   // attendanceId: ObjectId ref 'Attendance' or null
   const rawAttId = raw.attendanceId || (typeof raw.attendance === 'object' ? raw.attendance?._id : raw.attendance);
@@ -754,9 +784,20 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
   let cldResult = null;
   let cldError = null;
 
+  const activeUser = getActiveUserContext();
+  const screenshotDocId = String(metadata.id || metadata._id || '');
+
   // Normalize Session Schema Attributes:
   // userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true }
-  const effectiveUserId = resolveMongoObjectId(metadata.userId || metadata.employeeId);
+  const rawCandidate = metadata.userId || activeUser?.userId || metadata.user?._id || metadata.user?.id || metadata.employeeId;
+  const effectiveUserId = (isValidObjectId(rawCandidate) && rawCandidate !== screenshotDocId)
+    ? rawCandidate
+    : resolveMongoObjectId(rawCandidate);
+
+  // Genuine Employee ID (never screenshot doc id)
+  const effectiveEmployeeId = (metadata.employeeId && metadata.employeeId !== screenshotDocId)
+    ? metadata.employeeId
+    : (activeUser?.employeeId || effectiveUserId);
 
   // attendanceId: { type: mongoose.Schema.Types.ObjectId, ref: "Attendance", default: null }
   const effectiveAttendanceId = isValidObjectId(metadata.attendanceId) ? metadata.attendanceId : null;
@@ -844,7 +885,7 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
   }));
 
   // Contextual Employee & Cloudinary info
-  formData.append('employeeId', metadata.employeeId || effectiveUserId);
+  formData.append('employeeId', effectiveEmployeeId);
   formData.append('employeeName', metadata.employeeName || '');
   formData.append('position', metadata.position || metadata.positionShort || 'EMP');
   formData.append('positionShort', metadata.positionShort || 'EMP');
@@ -881,7 +922,7 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
     deviceInfo: effectiveDeviceInfo,
 
     // Detailed employee and capture context at the exact capture time
-    employeeId: metadata.employeeId || effectiveUserId,
+    employeeId: effectiveEmployeeId,
     employeeName: metadata.employeeName || 'Jeel Patel',
     designation: metadata.designation || 'Full Stack Developer',
     position: metadata.position || metadata.positionShort || 'EMP',

@@ -149,18 +149,26 @@ export const AdminScreenshotPortal = () => {
       }
     }
 
-    // Resolve Clean ID
-    let id = rec.employeeId;
-    if (!isValidId(id)) {
-      const activeStored = (() => {
-        try {
-          const str = localStorage.getItem('auth_user');
-          return str ? JSON.parse(str) : null;
-        } catch (e) { return null; }
-      })();
-      const activeUser = user || activeStored;
-      const activeDetails = extractEmployeeDetails(activeUser);
-      id = activeDetails.employeeId || activeUser?.employee?.employeeID || activeUser?.employeeId || 'EMP1008';
+    // Resolve Clean ID (Must NEVER be the screenshot's own MongoDB _id)
+    const screenshotDocId = String(rec?._id || rec?.id || '');
+    let id = rec?.employeeId;
+
+    if (!isValidId(id) || id === screenshotDocId) {
+      const uId = rec?.userId?._id || rec?.userId?.id || (typeof rec?.userId === 'string' ? rec.userId : '') ||
+                  rec?.user?._id || rec?.user?.id || (typeof rec?.user === 'string' ? rec.user : '');
+      if (isValidId(uId) && uId !== screenshotDocId) {
+        id = uId;
+      } else {
+        const activeStored = (() => {
+          try {
+            const str = localStorage.getItem('auth_user');
+            return str ? JSON.parse(str) : null;
+          } catch (e) { return null; }
+        })();
+        const activeUser = user || activeStored;
+        const activeDetails = extractEmployeeDetails(activeUser);
+        id = activeDetails.employeeId || activeUser?.employee?.employeeID || activeUser?.employeeId || activeUser?.id || activeUser?._id || 'EMP1008';
+      }
     }
 
     // Resolve Clean Designation
@@ -177,9 +185,13 @@ export const AdminScreenshotPortal = () => {
       designation = activeDetails.designation || activeUser?.employee?.designation || 'Full Stack Developer';
     }
 
+    const resolvedUserId = rec?.userId?._id || rec?.userId?.id || (typeof rec?.userId === 'string' && rec.userId !== screenshotDocId ? rec.userId : '') ||
+                           rec?.user?._id || rec?.user?.id || (typeof rec?.user === 'string' && rec.user !== screenshotDocId ? rec.user : '');
+
     return {
       name: name || 'Jeel Patel',
       id: id || 'EMP1008',
+      userId: resolvedUserId,
       designation: designation || 'Full Stack Developer'
     };
   };
@@ -496,22 +508,49 @@ export const AdminScreenshotPortal = () => {
     const list = new Map();
     allScreenshots.forEach(s => {
       const empInfo = getRecordEmployeeInfo(s);
-      const empKey = empInfo.id || s.employeeId || s.userId;
+      const screenshotDocId = String(s._id || s.id || '');
+      
+      const rawUserId = s.userId?._id || s.userId?.id || (typeof s.userId === 'string' ? s.userId : '') ||
+                        s.user?._id || s.user?.id || (typeof s.user === 'string' ? s.user : '') ||
+                        empInfo.userId || '';
+      const validUserId = (rawUserId && rawUserId !== screenshotDocId) ? rawUserId : null;
+      
+      // Never use screenshotDocId as empKey
+      let empKey = (empInfo.id && empInfo.id !== screenshotDocId) 
+        ? empInfo.id 
+        : (validUserId || (s.employeeId && s.employeeId !== screenshotDocId ? s.employeeId : 'EMP1008'));
+      
       if (!empKey) return;
       const pos = getRecordPosition(s);
       const isNamed = empInfo.name && empInfo.name !== 'Active Employee' && empInfo.name !== 'Employee';
-      const existing = list.get(empKey);
-      if (!existing) {
+
+      // Group unified by employee name or key so multiple captures don't duplicate
+      let existingKey = list.has(empKey) ? empKey : null;
+      if (!existingKey && isNamed) {
+        for (const [k, v] of list.entries()) {
+          if (v.name && v.name.toLowerCase().trim() === empInfo.name.toLowerCase().trim()) {
+            existingKey = k;
+            break;
+          }
+        }
+      }
+
+      if (!existingKey) {
         list.set(empKey, {
           id: empKey,
+          userId: validUserId || empKey,
           name: isNamed ? empInfo.name : empKey,
           positionShort: pos.short,
           isNamed
         });
       } else {
+        const existing = list.get(existingKey);
         if (!existing.isNamed && isNamed) {
           existing.name = empInfo.name;
           existing.isNamed = true;
+        }
+        if (validUserId && !existing.userId) {
+          existing.userId = validUserId;
         }
         if (pos.short === 'TL' && existing.positionShort !== 'TL') {
           existing.positionShort = 'TL';
@@ -523,9 +562,29 @@ export const AdminScreenshotPortal = () => {
 
   // Filtered Screenshots
   const filteredScreenshots = useMemo(() => {
+    const selectedEmpObj = selectedEmployeeFilter !== 'all' 
+      ? uniqueEmployees.find(e => e.id === selectedEmployeeFilter || e.userId === selectedEmployeeFilter) 
+      : null;
+
     return allScreenshots.filter(s => {
       const empInfo = getRecordEmployeeInfo(s);
-      const matchesEmp = selectedEmployeeFilter === 'all' || s.employeeId === selectedEmployeeFilter || empInfo.id === selectedEmployeeFilter;
+      const screenshotDocId = String(s._id || s.id || '');
+      const sUserId = s.userId?._id || s.userId?.id || (typeof s.userId === 'string' && s.userId !== screenshotDocId ? s.userId : '');
+      
+      let matchesEmp = selectedEmployeeFilter === 'all';
+      if (!matchesEmp) {
+        matchesEmp = 
+          s.employeeId === selectedEmployeeFilter ||
+          empInfo.id === selectedEmployeeFilter ||
+          sUserId === selectedEmployeeFilter ||
+          (selectedEmpObj && (
+            (selectedEmpObj.userId && sUserId === selectedEmpObj.userId) ||
+            (selectedEmpObj.id && (s.employeeId === selectedEmpObj.id || empInfo.id === selectedEmpObj.id)) ||
+            (selectedEmpObj.name && empInfo.name && selectedEmpObj.name.toLowerCase().trim() === empInfo.name.toLowerCase().trim()) ||
+            (selectedEmpObj.name && s.employeeName && selectedEmpObj.name.toLowerCase().trim() === s.employeeName.toLowerCase().trim())
+          ));
+      }
+
       const matchesDate = !selectedDateFilter || (s.date && s.date.startsWith(selectedDateFilter));
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch = !q ||
@@ -533,10 +592,11 @@ export const AdminScreenshotPortal = () => {
         (s.employeeName && s.employeeName.toLowerCase().includes(q)) ||
         (empInfo.id && empInfo.id.toLowerCase().includes(q)) ||
         (s.employeeId && s.employeeId.toLowerCase().includes(q)) ||
+        (sUserId && sUserId.toLowerCase().includes(q)) ||
         (s.activeWindow && s.activeWindow.toLowerCase().includes(q));
       return matchesEmp && matchesDate && matchesSearch;
     });
-  }, [allScreenshots, selectedEmployeeFilter, selectedDateFilter, searchQuery]);
+  }, [allScreenshots, selectedEmployeeFilter, selectedDateFilter, searchQuery, uniqueEmployees]);
 
   // Auto-play slideshow ticker
   useEffect(() => {
@@ -608,65 +668,65 @@ export const AdminScreenshotPortal = () => {
     <div className="space-y-6">
       
       {/* Header Banner */}
-      <div className="bg-slate-900 dark:bg-black text-white rounded-2xl p-6 shadow-md border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-6 transition-colors">
-        <div className="space-y-2">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-colors">
+        <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs font-semibold border border-blue-500/30 flex items-center gap-1.5">
+            <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-semibold border border-indigo-200/70 flex items-center gap-1.5">
               <ShieldCheck size={13} />
-              HR & Admin Monitoring Portal
+              Screenshot Monitoring Portal
             </span>
             <a 
               href="https://console.cloudinary.com"
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-slate-400 hover:text-emerald-400 font-mono flex items-center gap-1 transition"
+              className="text-[11px] text-slate-400 hover:text-indigo-600 font-mono flex items-center gap-1 transition"
               title="Open console.cloudinary.com Media Library"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Cloudinary Vault Connected ({CLOUDINARY_CONFIG.cloudName})</span>
-              <ExternalLink size={11} className="ml-0.5 text-slate-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Cloudinary Connected ({CLOUDINARY_CONFIG.cloudName})</span>
+              <ExternalLink size={10} className="ml-0.5 text-slate-400" />
             </a>
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-white">Work Activity & Screenshot Monitoring</h2>
+          <h2 className="text-base font-semibold text-slate-900 tracking-tight">Work Activity & Screenshot Monitoring</h2>
           <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-            Silent background activity monitoring for employee workstations. Every frame is securely captured and archived in Cloudinary storage. Inspect frames, customize intervals, and review inactivity logs.
+            Silent background activity monitoring for employee workstations. Every frame is securely captured and archived in Cloudinary storage.
           </p>
         </div>
 
         {/* Action Controls: Screen Capture + Refresh + Settings Trigger */}
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {/* Toggle Screen Share Button */}
           <button
             onClick={handleToggleScreenShare}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer border ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition cursor-pointer border ${
               isScreenSharingActive
-                ? 'bg-emerald-950/80 border-emerald-500/50 hover:bg-emerald-900 text-emerald-300'
-                : 'bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30 text-amber-300'
+                ? 'bg-emerald-50 border-emerald-200/70 text-emerald-700'
+                : 'bg-amber-50 border-amber-200/70 text-amber-700'
             }`}
             title={isScreenSharingActive ? 'Device screen sharing is active' : 'Click to enable device screen sharing'}
           >
-            <span className={`w-2 h-2 rounded-full ${isScreenSharingActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            <span>{isScreenSharingActive ? 'Screen Connected' : 'Share Screen'}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${isScreenSharingActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+            <span>{isScreenSharingActive ? 'Connected' : 'Share Screen'}</span>
           </button>
 
           {/* Instant Real Screen Capture Trigger */}
           <button
             onClick={handleCaptureRealScreenNow}
             disabled={isCapturingNow}
-            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition cursor-pointer disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
             title="Capture real employee device screen right now and upload to Cloudinary"
           >
             <Camera size={14} className={isCapturingNow ? 'animate-pulse text-emerald-200' : ''} />
-            <span>{isCapturingNow ? 'Capturing Frame...' : 'Capture Real Screen Now'}</span>
+            <span>{isCapturingNow ? 'Capturing...' : 'Capture Now'}</span>
           </button>
 
           <button
             onClick={() => fetchScreenshots(true)}
             disabled={isRefreshing}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition cursor-pointer disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 border border-slate-200 transition cursor-pointer shadow-xs disabled:opacity-50"
             title="Refresh Screenshot Feed"
           >
-            <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-blue-400' : ''} />
+            <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-indigo-600' : 'text-slate-400'} />
             <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
           </button>
 
@@ -675,9 +735,9 @@ export const AdminScreenshotPortal = () => {
               fetchSettings();
               setIsSettingsModalOpen(true);
             }}
-            className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
           >
-            <Settings size={14} />
+            <Settings size={13} />
             <span>Settings</span>
           </button>
         </div>
@@ -722,52 +782,52 @@ export const AdminScreenshotPortal = () => {
 
       {/* Cloudinary Vault & Active Metrics Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Shots</span>
-          <span className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1 block">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Total Shots</span>
+          <span className="text-base font-bold text-slate-900 mt-0.5 block">
             {allScreenshots.length} Shots
           </span>
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Archived & Live</span>
+          <span className="text-[10px] text-emerald-600 font-medium">Archived & Live</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Interval</span>
-          <span className="text-lg font-bold text-blue-600 dark:text-blue-400 mt-1 block">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Interval</span>
+          <span className="text-base font-bold text-indigo-600 mt-0.5 block">
             {screenshotConfig.intervalMinutes || Math.round(screenshotConfig.intervalSeconds / 60) || 5} Min
           </span>
-          <span className="text-[10px] text-slate-500 font-mono">({screenshotConfig.intervalSeconds || 300}s auto-shot)</span>
+          <span className="text-[10px] text-slate-400 font-mono">({screenshotConfig.intervalSeconds || 300}s auto)</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Employees</span>
-          <span className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1 block">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Employees</span>
+          <span className="text-base font-bold text-slate-900 mt-0.5 block">
             {uniqueEmployees.length || 1} Monitored
           </span>
-          <span className="text-[10px] text-slate-500">Across sessions</span>
+          <span className="text-[10px] text-slate-400">Across sessions</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Latest Capture</span>
-          <span className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1 block truncate">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Latest Capture</span>
+          <span className="text-xs font-bold text-slate-900 mt-0.5 block truncate">
             {latestShotTime}
           </span>
-          <span className="text-[10px] text-slate-500 font-mono">Real-time sync</span>
+          <span className="text-[10px] text-slate-400 font-mono">Real-time sync</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Session Work</span>
-          <span className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1 block">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Session Work</span>
+          <span className="text-base font-bold text-slate-900 mt-0.5 block">
             {hrs}h {mins}m
           </span>
-          <span className="text-[10px] text-slate-500">Current shift</span>
+          <span className="text-[10px] text-slate-400">Current shift</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Cloud Storage</span>
-          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-1 block truncate">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Storage</span>
+          <span className="text-xs font-bold text-emerald-600 mt-0.5 block truncate">
             Cloudinary
           </span>
-          <span className="text-[10px] text-slate-500 font-mono truncate block" title={CLOUDINARY_CONFIG.cloudId}>
+          <span className="text-[10px] text-slate-400 font-mono truncate block" title={CLOUDINARY_CONFIG.cloudId}>
             ID: {CLOUDINARY_CONFIG.cloudId.slice(0, 10)}...
           </span>
         </div>
@@ -787,7 +847,7 @@ export const AdminScreenshotPortal = () => {
               <option value="all">All Employees ({allScreenshots.length})</option>
               {uniqueEmployees.map(emp => (
                 <option key={emp.id} value={emp.id}>
-                  [{emp.positionShort || 'EMP'}] {emp.name} ({emp.id})
+                  [{emp.positionShort || 'EMP'}] {emp.name} ({emp.userId || emp.id})
                 </option>
               ))}
             </select>
@@ -821,7 +881,7 @@ export const AdminScreenshotPortal = () => {
             placeholder="Search employee, ID, app window..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition"
           />
         </div>
       </div>
@@ -832,7 +892,7 @@ export const AdminScreenshotPortal = () => {
         <div className="p-4 bg-slate-50/70 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-              <Camera size={14} className="text-blue-500" />
+              <Camera size={14} className="text-indigo-600 dark:text-indigo-400" />
               All Monitored Screenshots Feed
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -861,7 +921,7 @@ export const AdminScreenshotPortal = () => {
 
         {isLoading ? (
           <div className="p-16 flex flex-col items-center justify-center space-y-3">
-            <RefreshCw size={24} className="animate-spin text-blue-500" />
+            <RefreshCw size={24} className="animate-spin text-indigo-600" />
             <span className="text-xs text-slate-500 font-medium">Loading screenshot archives...</span>
           </div>
         ) : filteredScreenshots.length === 0 ? (
@@ -876,7 +936,7 @@ export const AdminScreenshotPortal = () => {
               <div 
                 key={scr.id || idx}
                 onClick={() => setLightboxRecord(scr)}
-                className="bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group p-2.5 space-y-2"
+                className="bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-card transition-all cursor-pointer group p-2.5 space-y-2"
               >
                 <div className="relative rounded-lg overflow-hidden bg-slate-900 h-40">
                   <img 
@@ -895,7 +955,7 @@ export const AdminScreenshotPortal = () => {
                   <span className="absolute top-2 right-2 backdrop-blur-xs">
                     {renderStatusPill(scr.status)}
                   </span>
-                  <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-blue-600/90 text-white text-[10px] font-semibold backdrop-blur-xs">
+                  <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-indigo-600/90 text-white text-[10px] font-semibold backdrop-blur-xs">
                     {scr.activityLevel || 88}% Activity
                   </span>
                 </div>
@@ -916,7 +976,7 @@ export const AdminScreenshotPortal = () => {
                             ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                             : cardPos.short === 'INTERN'
                             ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                            : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                            : 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                         }`}>
                           {cardPos.short} ({cardPos.label})
                         </span>
@@ -1057,7 +1117,7 @@ export const AdminScreenshotPortal = () => {
                   <div className="p-3 bg-slate-800/90 rounded-xl border border-slate-700/80 space-y-2">
                     <div className="flex items-center justify-between border-b border-slate-700/60 pb-1.5">
                       <span className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1.5 tracking-wider">
-                        <Database size={12} className="text-blue-400" />
+                        <Database size={12} className="text-indigo-400" />
                         Session Telemetry
                       </span>
                       {renderStatusPill(lightboxRecord.status)}
@@ -1097,7 +1157,7 @@ export const AdminScreenshotPortal = () => {
                           <div>
                             <span className="text-slate-400 text-[10px] uppercase font-semibold block">Attendance ID (ObjectId ref Attendance)</span>
                             <div className="flex items-center justify-between mt-0.5 bg-slate-950/80 px-2 py-1 rounded border border-slate-800 font-mono">
-                              <span className={`text-[10px] truncate ${resolvedAttId ? 'text-blue-400' : 'text-slate-500 italic'}`} title={resolvedAttId || 'null'}>
+                              <span className={`text-[10px] truncate ${resolvedAttId ? 'text-indigo-400' : 'text-slate-500 italic'}`} title={resolvedAttId || 'null'}>
                                 {resolvedAttId || 'No Active Shift'}
                               </span>
                               {resolvedAttId && (
@@ -1178,13 +1238,13 @@ export const AdminScreenshotPortal = () => {
                               ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
                               : pos.short === 'INTERN'
                               ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
-                              : 'bg-blue-500/25 text-blue-300 border border-blue-500/40'
+                              : 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/40'
                           }`}>
                             {pos.short} ({pos.label})
                           </span>
                         </div>
                         <span className="text-sm font-bold text-white block">{empInfo.name}</span>
-                        <span className="text-[10px] text-blue-400 font-mono mt-0.5 block">{empInfo.id} • {empInfo.designation}</span>
+                        <span className="text-[10px] text-indigo-400 font-mono mt-0.5 block">{empInfo.id} • {empInfo.designation}</span>
                       </div>
                     );
                   })()}
@@ -1232,7 +1292,7 @@ export const AdminScreenshotPortal = () => {
                   href={lightboxRecord.fullUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <ExternalLink size={14} />
                   <span>Open Full High-Res Asset</span>
@@ -1269,7 +1329,7 @@ export const AdminScreenshotPortal = () => {
             
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
               <div className="flex items-center gap-2">
-                <Settings size={18} className="text-blue-600" />
+                <Settings size={18} className="text-indigo-600" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Screenshot Monitoring Settings</h3>
               </div>
               <button
@@ -1309,7 +1369,7 @@ export const AdminScreenshotPortal = () => {
                       onClick={() => setSettingsForm(prev => ({ ...prev, intervalMinutes: mins, intervalSeconds: mins * 60 }))}
                       className={`py-2 px-3 rounded-xl border font-semibold transition cursor-pointer text-center ${
                         settingsForm.intervalMinutes === mins
-                          ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/20'
+                          ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500/20'
                           : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300'
                       }`}
                     >
@@ -1333,7 +1393,7 @@ export const AdminScreenshotPortal = () => {
                     type="checkbox"
                     checked={settingsForm.isEnabled}
                     onChange={e => setSettingsForm(prev => ({ ...prev, isEnabled: e.target.checked }))}
-                    className="accent-blue-600 w-4 h-4 cursor-pointer"
+                    className="accent-indigo-600 w-4 h-4 cursor-pointer"
                   />
                 </label>
 
@@ -1346,7 +1406,7 @@ export const AdminScreenshotPortal = () => {
                     type="checkbox"
                     checked={settingsForm.pauseOnBreak}
                     onChange={e => setSettingsForm(prev => ({ ...prev, pauseOnBreak: e.target.checked }))}
-                    className="accent-blue-600 w-4 h-4 cursor-pointer"
+                    className="accent-indigo-600 w-4 h-4 cursor-pointer"
                   />
                 </label>
               </div>
@@ -1379,7 +1439,7 @@ export const AdminScreenshotPortal = () => {
                 <button
                   type="submit"
                   disabled={isSavingSettings}
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition disabled:opacity-50"
                 >
                   {isSavingSettings && <RefreshCw size={14} className="animate-spin" />}
                   <span>{isSavingSettings ? 'Saving...' : 'Save Settings'}</span>

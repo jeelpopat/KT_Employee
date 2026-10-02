@@ -202,17 +202,17 @@ export const HolidayCalendarView = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto animate-in fade-in duration-200">
-      {/* Main Single Calendar Card Matching Design Screenshot */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
+    <div className="w-full max-w-7xl mx-auto animate-fade-in">
+      {/* Main Single Calendar Card Matching KT-admin Design */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden transition-colors">
         
         {/* Card Header */}
-        <div className="flex items-center justify-between px-6 py-3.5">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
           <div>
-            <span className="text-[10px] font-bold tracking-wider text-slate-500 dark:text-slate-400 uppercase">
-              HOLIDAY CALENDAR
+            <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
+              HOLIDAYS & EVENTS
             </span>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-base font-semibold text-slate-900 tracking-tight">
               {monthNames[currentMonth]} {currentYear}
             </h2>
           </div>
@@ -221,17 +221,17 @@ export const HolidayCalendarView = () => {
           <div className="flex items-center gap-1.5">
             <button
               onClick={prevMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer shadow-2xs"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition cursor-pointer shadow-xs"
               title="Previous Month"
             >
-              <ChevronLeft size={16} strokeWidth={2.2} />
+              <ChevronLeft size={15} strokeWidth={2} />
             </button>
             <button
               onClick={nextMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer shadow-2xs"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition cursor-pointer shadow-xs"
               title="Next Month"
             >
-              <ChevronRight size={16} strokeWidth={2.2} />
+              <ChevronRight size={15} strokeWidth={2} />
             </button>
           </div>
         </div>
@@ -327,19 +327,19 @@ export const HolidayCalendarView = () => {
               );
             }
 
-            // Case 4: Festival on working day (Blue border as requested)
+            // Case 4: Festival on working day (Indigo border as requested)
             if (cell.festival) {
               return (
                 <div
                   key={cell.key}
                   onClick={() => setSelectedDayInfo(cell)}
-                  className={`${cellHeight} p-1 sm:p-1.5 flex flex-col justify-between cursor-pointer select-none ${borderClasses} bg-[#f0f4f9] dark:bg-blue-950/20 hover:bg-[#e8eef6] dark:hover:bg-blue-900/30 transition-colors relative`}
+                  className={`${cellHeight} p-1 sm:p-1.5 flex flex-col justify-between cursor-pointer select-none ${borderClasses} bg-indigo-50/40 dark:bg-indigo-950/20 hover:bg-indigo-50/70 dark:hover:bg-indigo-900/30 transition-colors relative`}
                 >
-                  <div className="w-full h-full border-2 border-blue-500 rounded-md p-1 sm:p-1.5 flex flex-col justify-between">
-                    <div className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                  <div className="w-full h-full border-2 border-indigo-500 rounded-md p-1 sm:p-1.5 flex flex-col justify-between">
+                    <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
                       {cell.day}
                     </div>
-                    <div className="text-[10px] sm:text-[11px] font-semibold text-blue-700 dark:text-blue-300 truncate leading-tight">
+                    <div className="text-[10px] sm:text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 truncate leading-tight">
                       {cell.festival.name}
                     </div>
                   </div>
@@ -358,7 +358,7 @@ export const HolidayCalendarView = () => {
                   <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                     {cell.day}
                   </div>
-                  <div className="text-[10px] sm:text-[11px] text-blue-600 dark:text-blue-400 font-medium truncate leading-tight">
+                  <div className="text-[10px] sm:text-[11px] text-indigo-600 dark:text-indigo-400 font-medium truncate leading-tight">
                     {cell.publicHol.name}
                   </div>
                 </div>
@@ -429,10 +429,10 @@ export const HolidayCalendarView = () => {
       {/* Selected Day Details Modal */}
       {selectedDayInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 dark:border-slate-800 space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-sm w-full p-6 shadow-xs border border-slate-200/80 dark:border-slate-800 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <CalendarIcon size={18} className="text-blue-600 dark:text-blue-400" />
+                <CalendarIcon size={18} className="text-indigo-600 dark:text-indigo-400" />
                 <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
                   {selectedDayInfo.day} {monthNames[currentMonth]} {currentYear}
                 </h3>
@@ -470,9 +470,9 @@ export const HolidayCalendarView = () => {
               )}
 
               {selectedDayInfo.holidays?.map((h, i) => (
-                <div key={i} className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 text-xs space-y-1 border border-blue-100 dark:border-blue-900">
-                  <p className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-blue-500" />
+                <div key={i} className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 text-xs space-y-1 border border-indigo-100 dark:border-indigo-900">
+                  <p className="font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-indigo-500" />
                     <span>{h.name}</span>
                   </p>
                   <p className="text-slate-600 dark:text-slate-400 text-[11px]">

@@ -512,7 +512,7 @@ export const LeaveManagementView = () => {
           <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm border ${
             isHalfDayActive 
               ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800' 
-              : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800'
+              : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800'
           }`}>
             {isHalfDayActive ? 'Half Day' : 'Full Day'}
           </span>
@@ -580,18 +580,18 @@ export const LeaveManagementView = () => {
               <button
                 type="button"
                 onClick={() => setIsPolicyModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-xs sm:text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"
               >
-                <FileText size={15} />
+                <FileText size={14} />
                 Leave Policy
               </button>
 
               <button
                 type="button"
                 onClick={handleOpenModal}
-                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer"
               >
-                <Plus size={15} />
+                <Plus size={14} />
                 Apply Leave
               </button>
             </div>
@@ -602,22 +602,22 @@ export const LeaveManagementView = () => {
       {/* Leave Balance Quota Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Quota', value: `${leaveBalance.totalLeaves || 12} Days`, icon: Calendar, accent: 'border-l-blue-500' },
+          { label: 'Total Quota', value: `${leaveBalance.totalLeaves || 12} Days`, icon: Calendar, accent: 'border-l-indigo-600' },
           { label: 'Leaves Taken', value: `${leaveBalance.usedLeaves || 0} Days`, icon: Clock, accent: 'border-l-amber-500' },
-          { label: 'Remaining Balance', value: `${leaveBalance.remainingLeaves || 12} Days`, icon: CheckCircle2, accent: 'border-l-green-500' },
+          { label: 'Remaining Balance', value: `${leaveBalance.remainingLeaves || 12} Days`, icon: CheckCircle2, accent: 'border-l-emerald-500' },
           { label: 'Pending Requests', value: `${leaveBalance.pendingRequests || 0} Req.`, icon: Clock, accent: 'border-l-slate-400' }
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 ${item.accent} rounded-md p-4 transition-colors shadow-sm`}>
+          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
             <div className="flex justify-between items-start">
-              <p className="text-2xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="px-2 text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="px-2 text-xl font-bold text-slate-900">{item.value}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* Leave History Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden transition-colors shadow-sm">
+      <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden transition-all shadow-xs">
         
         <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-950/50">
           <div>
@@ -633,13 +633,13 @@ export const LeaveManagementView = () => {
                 placeholder="Search reason or type..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
             <select 
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="approved">Approved</option>
@@ -654,9 +654,9 @@ export const LeaveManagementView = () => {
               onClick={() => fetchData(false)}
               disabled={isRefreshing}
               title="Refresh Leave History"
-              className="p-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-md text-slate-600 dark:text-slate-300 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50"
+              className="p-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg text-slate-600 dark:text-slate-300 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50"
             >
-              <RefreshCw size={16} className={isRefreshing ? 'animate-spin text-blue-500' : ''} />
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin text-indigo-500' : ''} />
             </button>
           </div>
         </div>
@@ -664,7 +664,7 @@ export const LeaveManagementView = () => {
         <div className="overflow-x-auto">
           {isLoading ? (
              <div className="flex flex-col items-center justify-center p-12 space-y-3">
-               <Loader2 size={24} className="animate-spin text-blue-500" />
+               <Loader2 size={24} className="animate-spin text-indigo-500" />
                <span className="text-sm text-slate-500 font-medium">Loading history...</span>
              </div>
           ) : (
@@ -694,7 +694,7 @@ export const LeaveManagementView = () => {
                           <span className="font-semibold text-slate-900 dark:text-slate-100 block">
                             {formatDate(l.startDate)} {l.startDate !== l.endDate ? `to ${formatDate(l.endDate)}` : ''}
                           </span>
-                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1 block">
+                          <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-1 block">
                             {l.totalDays} {l.totalDays === 1 || l.totalDays === 0.5 ? 'Day' : 'Days'} {l.isHalfDay ? `(${l.halfDayType === 'first-half' ? '1st Half' : l.halfDayType === 'second-half' ? '2nd Half' : 'Half Day'})` : ''}
                           </span>
                         </td>
@@ -712,7 +712,7 @@ export const LeaveManagementView = () => {
                               href={l.attachment} 
                               target="_blank" 
                               rel="noreferrer" 
-                              className="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                              className="mt-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
                             >
                               <Paperclip size={12} /> View Attachment
                             </a>
@@ -734,7 +734,7 @@ export const LeaveManagementView = () => {
       {/* Policy Modal */}
       {isPolicyModalOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 dark:bg-black/60 transition-opacity flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-md shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden max-h-[90vh]">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden max-h-[90vh]">
             <div className="px-4 sm:px-6 py-4 sm:py-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -744,16 +744,16 @@ export const LeaveManagementView = () => {
               </div>
               <button 
                 onClick={() => setIsPolicyModalOpen(false)}
-                className="p-2 rounded-md text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
               >
                 <XCircle size={20} />
               </button>
             </div>
             
             <div className="p-6 overflow-y-auto space-y-6">
-              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950/50 shadow-sm">
+              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950/50 shadow-xs">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-500 rounded-md">
+                  <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-500 rounded-lg">
                     <Calendar size={20} />
                   </div>
                   <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Full Day Leave</h4>
@@ -762,16 +762,16 @@ export const LeaveManagementView = () => {
                   Full day leaves cover entire working days for planned vacations, personal commitments, or health rest.
                 </p>
                 <h5 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-3">Policy Rules:</h5>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-400 marker:text-blue-500">
+                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-400 marker:text-indigo-500">
                   <li>Total leave days are computed excluding company holidays and weekly off (Sundays).</li>
                   <li>Applications can be submitted for dates starting from today onwards.</li>
                   <li>Approval follows the standard hierarchy (Team Lead &rarr; HR &rarr; Admin).</li>
                 </ul>
               </div>
 
-              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950/50 shadow-sm">
+              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950/50 shadow-xs">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 rounded-md">
+                  <div className="p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 rounded-lg">
                     <Clock size={20} />
                   </div>
                   <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Half Day Leave</h4>
@@ -791,7 +791,7 @@ export const LeaveManagementView = () => {
             <div className="px-4 sm:px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-end">
               <button 
                 onClick={() => setIsPolicyModalOpen(false)}
-                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 text-white dark:text-slate-900 font-medium rounded-md transition-colors cursor-pointer"
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 text-white dark:text-slate-900 font-medium rounded-lg shadow-xs transition-colors cursor-pointer"
               >
                 Close Policies
               </button>
@@ -803,18 +803,18 @@ export const LeaveManagementView = () => {
       {/* Apply Leave Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 dark:bg-black/60 transition-opacity flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-md shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
             
             <div className="px-4 sm:px-6 py-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Apply For Leave</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Applying as <span className="font-semibold uppercase text-blue-600 dark:text-blue-400">{resolveApplicantRole()}</span>
+                  Applying as <span className="font-semibold uppercase text-indigo-600 dark:text-indigo-400">{resolveApplicantRole()}</span>
                 </p>
               </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-md text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
               >
                 <XCircle size={20} />
               </button>
@@ -823,13 +823,13 @@ export const LeaveManagementView = () => {
             <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 text-sm">
               
               {formError && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-md text-red-700 dark:text-red-400 font-medium text-sm flex items-start gap-2">
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg text-red-700 dark:text-red-400 font-medium text-sm flex items-start gap-2">
                   <AlertCircle size={18} className="shrink-0 mt-0.5" />
                   <span>{formError}</span>
                 </div>
               )}
               {successMsg && (
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-md text-green-700 dark:text-green-400 font-medium text-sm flex items-center justify-center gap-2">
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg text-green-700 dark:text-green-400 font-medium text-sm flex items-center justify-center gap-2">
                   <CheckCircle2 size={18} /> {successMsg}
                 </div>
               )}
@@ -849,7 +849,7 @@ export const LeaveManagementView = () => {
                     }}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
                       leaveType === 'full_day' && !isHalfDay
-                        ? 'border-blue-600 bg-blue-50/70 dark:bg-blue-900/30 text-blue-950 dark:text-blue-200 ring-2 ring-blue-500/20 shadow-sm'
+                        ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-900/30 text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20 shadow-xs'
                         : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
@@ -858,7 +858,7 @@ export const LeaveManagementView = () => {
                       <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">Whole working day(s)</div>
                     </div>
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                      leaveType === 'full_day' && !isHalfDay ? 'border-blue-600 bg-blue-600' : 'border-slate-300 dark:border-slate-600'
+                      leaveType === 'full_day' && !isHalfDay ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300 dark:border-slate-600'
                     }`}>
                       {leaveType === 'full_day' && !isHalfDay && (
                         <div className="w-1.5 h-1.5 rounded-full bg-white" />
@@ -876,7 +876,7 @@ export const LeaveManagementView = () => {
                     }}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
                       leaveType === 'half_day' || isHalfDay
-                        ? 'border-blue-600 bg-blue-50/70 dark:bg-blue-900/30 text-blue-950 dark:text-blue-200 ring-2 ring-blue-500/20 shadow-sm'
+                        ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-900/30 text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20 shadow-xs'
                         : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
@@ -885,7 +885,7 @@ export const LeaveManagementView = () => {
                       <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">0.5 day shift</div>
                     </div>
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                      leaveType === 'half_day' || isHalfDay ? 'border-blue-600 bg-blue-600' : 'border-slate-300 dark:border-slate-600'
+                      leaveType === 'half_day' || isHalfDay ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300 dark:border-slate-600'
                     }`}>
                       {(leaveType === 'half_day' || isHalfDay) && (
                         <div className="w-1.5 h-1.5 rounded-full bg-white" />
@@ -897,14 +897,14 @@ export const LeaveManagementView = () => {
 
               {/* Half Day Shift Selector (shown when half_day is selected) */}
               {(isHalfDay || leaveType === 'half_day') && (
-                <div className="p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/40">
+                <div className="p-3 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/40">
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 text-xs mb-2">
                     Shift Selection
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <label className={`flex items-center gap-2.5 p-2 rounded-md border cursor-pointer text-xs font-medium transition-colors ${
                       halfDayType === 'first-half'
-                        ? 'bg-white dark:bg-slate-900 border-blue-500 text-blue-700 dark:text-blue-300 shadow-2xs'
+                        ? 'bg-white dark:bg-slate-900 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-2xs'
                         : 'bg-white/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
                     }`}>
                       <input 
@@ -913,14 +913,14 @@ export const LeaveManagementView = () => {
                         value="first-half"
                         checked={halfDayType === 'first-half'}
                         onChange={() => setHalfDayType('first-half')}
-                        className="accent-blue-600 w-3.5 h-3.5"
+                        className="accent-indigo-600 w-3.5 h-3.5"
                       />
                       <span>First Half (Morning)</span>
                     </label>
 
                     <label className={`flex items-center gap-2.5 p-2 rounded-md border cursor-pointer text-xs font-medium transition-colors ${
                       halfDayType === 'second-half'
-                        ? 'bg-white dark:bg-slate-900 border-blue-500 text-blue-700 dark:text-blue-300 shadow-2xs'
+                        ? 'bg-white dark:bg-slate-900 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-2xs'
                         : 'bg-white/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
                     }`}>
                       <input 
@@ -929,7 +929,7 @@ export const LeaveManagementView = () => {
                         value="second-half"
                         checked={halfDayType === 'second-half'}
                         onChange={() => setHalfDayType('second-half')}
-                        className="accent-blue-600 w-3.5 h-3.5"
+                        className="accent-indigo-600 w-3.5 h-3.5"
                       />
                       <span>Second Half (Afternoon)</span>
                     </label>
@@ -951,7 +951,7 @@ export const LeaveManagementView = () => {
                         setEndDate(e.target.value);
                       }
                     }}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                     required
                   />
                 </div>
@@ -963,7 +963,7 @@ export const LeaveManagementView = () => {
                     value={(isHalfDay || leaveType === 'half_day') ? startDate : endDate}
                     onChange={e => setEndDate(e.target.value)}
                     disabled={isHalfDay || leaveType === 'half_day'}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     required
                   />
                 </div>
@@ -971,10 +971,10 @@ export const LeaveManagementView = () => {
               
               {/* Dynamic Working Days Banner */}
               {startDate && endDate && (
-                <div className={`p-2.5 rounded-md border text-sm font-semibold flex items-center justify-between ${
+                <div className={`p-2.5 rounded-lg border text-sm font-semibold flex items-center justify-between ${
                   calculatedDays === 0 
                     ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50' 
-                    : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800/50'
                 }`}>
                   <span>Working Days Requested:</span>
                   <span className="font-mono text-base">
@@ -990,7 +990,7 @@ export const LeaveManagementView = () => {
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   placeholder="Provide brief explanation for leave..."
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors resize-y"
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors resize-y"
                   required
                 />
               </div>
@@ -1003,7 +1003,7 @@ export const LeaveManagementView = () => {
                     placeholder="Provide a link to medical doc / certificate..."
                     value={attachmentName}
                     onChange={(e) => setAttachmentName(e.target.value)}
-                    className="flex-1 px-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+                    className="flex-1 px-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                 </div>
               </div>
@@ -1012,14 +1012,14 @@ export const LeaveManagementView = () => {
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-md font-medium transition-colors cursor-pointer"
+                  className="px-5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg font-medium shadow-xs transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
                   disabled={isSubmitting || calculatedDays === 0}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                   Submit Application
