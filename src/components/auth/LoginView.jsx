@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-import api from '../../api/axios.js';
+import api, { clearApiCache } from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
 import Button from '../common/Button.jsx';
 import Input from '../common/Input.jsx';
@@ -17,6 +17,19 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+
+    // Clear previous session role, tokens and cache to prevent stale role leak
+    if (typeof clearApiCache === 'function') {
+      clearApiCache();
+    }
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('active_role');
+    localStorage.removeItem('token');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('kt_employee_full_name');
 
     try {
       const response = await api.post('/api/users/login', {

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import api from '../api/axios.js';
+import api, { clearApiCache } from '../api/axios.js';
 
 import {
   getMonitoringSettings,
@@ -84,64 +84,121 @@ export const isRoleAllowed = (role) => {
 // Helper to determine exact user role from authenticated profile data
 export const deriveUserRole = (u) => {
   if (!u) return 'employee';
+
   const roleStr = (
     u.role?.roleName ||
     u.role?.name ||
-    u.role ||
+    (typeof u.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(u.role) ? u.role : '') ||
+    u.roleName ||
     u.userRole ||
     u.applicantRole ||
-    u.employee?.role ||
+    u.employee?.role?.roleName ||
+    u.employee?.role?.name ||
+    (typeof u.employee?.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(u.employee.role) ? u.employee.role : '') ||
+    u.employee?.roleName ||
     u.employee?.userRole ||
-    u.profile?.role ||
-    u.designation ||
-    u.employee?.designation ||
-    u.department ||
-    u.employee?.department ||
+    u.profile?.role?.roleName ||
+    u.profile?.role?.name ||
+    (typeof u.profile?.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(u.profile.role) ? u.profile.role : '') ||
+    u.profile?.roleName ||
+    u.profile?.userRole ||
     ''
   ).toString().toLowerCase().trim();
 
-  // 1. Explicit check for unauthorized roles
-  if (roleStr.includes('admin') || u.isAdmin === true || u.employee?.isAdmin === true) {
-    return 'admin';
-  }
+  const designationStr = (
+    u.designation ||
+    u.employee?.designation ||
+    u.profile?.designation ||
+    ''
+  ).toString().toLowerCase().trim();
 
-  if (roleStr.includes('account')) {
-    return 'account';
-  }
+  const departmentStr = (
+    u.department ||
+    u.employee?.department ||
+    u.profile?.department ||
+    ''
+  ).toString().toLowerCase().trim();
 
-  if (/\bca\b/i.test(roleStr) || roleStr.includes('chartered') || roleStr === 'ca') {
-    return 'ca';
-  }
+  const emailStr = (u.email || u.user?.email || u.employee?.email || '').toLowerCase().trim();
+  const nameStr = (u.name || u.fullName || u.employee?.name || u.employee?.fullName || '').toLowerCase().trim();
 
-  // 2. Check for HR
-  if (roleStr.includes('hr') || roleStr.includes('human resource')) {
-    return 'hr';
-  }
-
-  // 3. Check for Team Leader / Team Lead
+  // 1. Check for Team Leader first (so TL is never misclassified)
   if (
-    roleStr.includes('lead') ||
-    roleStr.includes('leader') ||
-    roleStr.includes('tl') ||
+    roleStr === 'team_leader' ||
+    roleStr === 'team lead' ||
+    roleStr === 'team leader' ||
+    roleStr === 'teamlead' ||
+    roleStr === 'tl' ||
     roleStr.includes('team lead') ||
+    roleStr.includes('team leader') ||
     roleStr.includes('team_leader') ||
+    roleStr.includes('teamlead') ||
+    designationStr.includes('team lead') ||
+    designationStr.includes('team leader') ||
+    designationStr.includes('teamlead') ||
     u.isTeamLeader === true ||
     u.isTeamLead === true ||
     u.employee?.isTeamLeader === true ||
     u.employee?.isTeamLead === true ||
-    u.email === 'hetvi.kevalon@gmail.com' ||
-    u.email === 'kureshpoonawala384@gmail.com' ||
-    String(u.name || '').toLowerCase().includes('hetvi') ||
-    String(u.fullName || '').toLowerCase().includes('hetvi')
+    emailStr === 'hetvi.kevalon@gmail.com' ||
+    emailStr === 'kureshpoonawala384@gmail.com' ||
+    nameStr.includes('hetvi') ||
+    nameStr.includes('kuresh')
   ) {
     return 'team_leader';
   }
 
-  // 4. Check for Intern
-  if (roleStr.includes('intern')) {
+  // 2. Check for HR (before admin so HR department/user is never misclassified as admin)
+  if (
+    roleStr === 'hr' ||
+    roleStr === 'hr manager' ||
+    roleStr === 'human resource' ||
+    roleStr === 'human resources' ||
+    roleStr === 'hr executive' ||
+    roleStr === 'hr admin' ||
+    roleStr.startsWith('hr') ||
+    /\bhr\b/i.test(roleStr) ||
+    /\bhr\b/i.test(designationStr) ||
+    departmentStr === 'hr' ||
+    departmentStr === 'human resource' ||
+    departmentStr === 'human resources'
+  ) {
+    return 'hr';
+  }
+
+  // 3. Check for Intern
+  if (
+    roleStr === 'intern' ||
+    roleStr.includes('intern') ||
+    roleStr.includes('trainee') ||
+    designationStr.includes('intern') ||
+    designationStr.includes('trainee')
+  ) {
     return 'intern';
   }
 
+  // 4. Check for Admin (strictly verified by Admin email OR explicit Admin role string - NEVER loose isAdmin flag)
+  if (
+    emailStr === 'harsh@kevalontechnology.in' ||
+    roleStr === 'admin' ||
+    roleStr === 'administrator' ||
+    roleStr === 'superadmin' ||
+    roleStr === 'system admin' ||
+    (roleStr.includes('admin') && !roleStr.includes('hr') && !roleStr.includes('leader') && !roleStr.includes('lead'))
+  ) {
+    return 'admin';
+  }
+
+  // 5. Excluded finance roles
+  if (roleStr === 'account' || roleStr === 'accountant' || roleStr.includes('account')) {
+    return 'account';
+  }
+
+  if (/\bca\b/i.test(roleStr) || roleStr === 'ca' || roleStr.includes('chartered')) {
+    return 'ca';
+  }
+
+  // 6. Default to standard Employee
   return 'employee';
 };
 
@@ -1328,7 +1385,33 @@ export const AppProvider = ({ children }) => {
         }
       }
 
-      let resolvedRoleName = '';
+      // 3b. Check if role name is directly present on user / employee / profile / token
+      let directRoleName = (
+        candidate?.role?.roleName ||
+        candidate?.role?.name ||
+        (typeof candidate?.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(candidate.role) ? candidate.role : '') ||
+        candidate?.roleName ||
+        (typeof candidate?.userRole === 'string' && !/^[0-9a-fA-F]{24}$/.test(candidate.userRole) ? candidate.userRole : '') ||
+        emp?.role?.roleName ||
+        emp?.role?.name ||
+        (typeof emp?.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(emp.role) ? emp.role : '') ||
+        emp?.roleName ||
+        (typeof emp?.userRole === 'string' && !/^[0-9a-fA-F]{24}$/.test(emp.userRole) ? emp.userRole : '') ||
+        prof?.role?.roleName ||
+        prof?.role?.name ||
+        (typeof prof?.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(prof.role) ? prof.role : '') ||
+        prof?.roleName ||
+        (typeof prof?.userRole === 'string' && !/^[0-9a-fA-F]{24}$/.test(prof.userRole) ? prof.userRole : '') ||
+        usr?.role?.roleName ||
+        usr?.role?.name ||
+        (typeof usr?.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(usr.role) ? usr.role : '') ||
+        usr?.roleName ||
+        tokenPayload?.roleName ||
+        (typeof tokenPayload?.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(tokenPayload.role) ? tokenPayload.role : '') ||
+        ''
+      );
+
+      let resolvedRoleName = directRoleName;
       let permissions = [];
       let rawRoleData = null;
 
@@ -1338,13 +1421,13 @@ export const AppProvider = ({ children }) => {
         if (currentRole._id && !currentRole.roleName && !currentRole.name) {
           currentRole = currentRole._id;
         } else {
-          resolvedRoleName = currentRole.roleName || currentRole.name || currentRole.title || '';
+          resolvedRoleName = currentRole.roleName || currentRole.name || currentRole.title || resolvedRoleName;
           permissions = currentRole.permissions || [];
         }
       }
 
-      // 5. Check if currentRole is a MongoDB ID (24-character hex string)
-      if (typeof currentRole === 'string' && /^[a-fA-F0-9]{24}$/.test(currentRole.trim())) {
+      // 5. Check if currentRole is a MongoDB ID (24-character hex string) - look up only if resolvedRoleName is not already known
+      if (!resolvedRoleName && typeof currentRole === 'string' && /^[a-fA-F0-9]{24}$/.test(currentRole.trim())) {
         const roleId = currentRole.trim();
         let roleFound = false;
 
@@ -1396,7 +1479,7 @@ export const AppProvider = ({ children }) => {
             console.warn('Could not fetch role by /api/role/:id:', apiErr);
           }
         }
-      } else if (typeof currentRole === 'string' && currentRole.trim() !== '') {
+      } else if (!resolvedRoleName && typeof currentRole === 'string' && currentRole.trim() !== '') {
         resolvedRoleName = currentRole.trim();
       }
 
@@ -1456,49 +1539,20 @@ export const AppProvider = ({ children }) => {
 
       let determinedRole = 'employee';
 
-      // Check all possible signals:
+      // 1. Team Leader Detection (check first so TL is never misclassified)
       if (
-        normalizedRoleName.includes('admin') ||
-        designationStr.includes('admin') ||
-        candidate?.isAdmin === true ||
-        candidate?.employee?.isAdmin === true ||
-        tokenPayload?.isAdmin === true
-      ) {
-        determinedRole = 'admin';
-        if (!resolvedRoleName) resolvedRoleName = 'Administrator';
-      } else if (
-        normalizedRoleName.includes('account') ||
-        designationStr.includes('account') ||
-        departmentStr.includes('account')
-      ) {
-        determinedRole = 'account';
-        if (!resolvedRoleName) resolvedRoleName = 'Accountant';
-      } else if (
-        /\bca\b/i.test(normalizedRoleName) ||
-        /\bca\b/i.test(designationStr) ||
-        normalizedRoleName.includes('chartered') ||
-        designationStr.includes('chartered')
-      ) {
-        determinedRole = 'ca';
-        if (!resolvedRoleName) resolvedRoleName = 'Chartered Accountant (CA)';
-      } else if (
-        normalizedRoleName.includes('hr') ||
-        designationStr.includes('hr') ||
-        departmentStr.includes('hr') ||
-        departmentStr.includes('human resources')
-      ) {
-        determinedRole = 'hr';
-        if (!resolvedRoleName) resolvedRoleName = 'HR Manager';
-      } else if (
-        normalizedRoleName.includes('lead') ||
-        normalizedRoleName.includes('leader') ||
-        normalizedRoleName.includes('tl') ||
+        normalizedRoleName === 'team_leader' ||
+        normalizedRoleName === 'team lead' ||
+        normalizedRoleName === 'team leader' ||
+        normalizedRoleName === 'teamlead' ||
+        normalizedRoleName === 'tl' ||
         normalizedRoleName.includes('team lead') ||
+        normalizedRoleName.includes('team leader') ||
         normalizedRoleName.includes('team_leader') ||
-        designationStr.includes('lead') ||
-        designationStr.includes('leader') ||
-        designationStr.includes('tl') ||
+        normalizedRoleName.includes('teamlead') ||
         designationStr.includes('team lead') ||
+        designationStr.includes('team leader') ||
+        designationStr.includes('teamlead') ||
         isTLFlag ||
         empIdStr === 'EMP1002' ||
         candidateEmail === 'kureshpoonawala384@gmail.com' ||
@@ -1510,13 +1564,65 @@ export const AppProvider = ({ children }) => {
         if (!resolvedRoleName || resolvedRoleName.toLowerCase() === 'employee') {
           resolvedRoleName = 'Team Leader';
         }
-      } else if (
+      }
+      // 2. HR Detection (check before admin so HR is never misclassified as admin)
+      else if (
+        normalizedRoleName === 'hr' ||
+        normalizedRoleName === 'hr manager' ||
+        normalizedRoleName === 'human resource' ||
+        normalizedRoleName === 'human resources' ||
+        normalizedRoleName === 'hr executive' ||
+        normalizedRoleName === 'hr admin' ||
+        normalizedRoleName.startsWith('hr') ||
+        /\bhr\b/i.test(normalizedRoleName) ||
+        /\bhr\b/i.test(designationStr) ||
+        departmentStr === 'hr' ||
+        departmentStr === 'human resource' ||
+        departmentStr === 'human resources'
+      ) {
+        determinedRole = 'hr';
+        if (!resolvedRoleName) resolvedRoleName = 'HR Manager';
+      }
+      // 3. Intern Detection
+      else if (
+        normalizedRoleName === 'intern' ||
         normalizedRoleName.includes('intern') ||
-        designationStr.includes('intern')
+        normalizedRoleName.includes('trainee') ||
+        designationStr.includes('intern') ||
+        designationStr.includes('trainee')
       ) {
         determinedRole = 'intern';
         if (!resolvedRoleName) resolvedRoleName = 'Intern';
-      } else {
+      }
+      // 4. Admin Detection (strictly verified by email or explicit admin role string - NEVER loose isAdmin flag)
+      else if (
+        candidateEmail === 'harsh@kevalontechnology.in' ||
+        normalizedRoleName === 'admin' ||
+        normalizedRoleName === 'administrator' ||
+        normalizedRoleName === 'superadmin' ||
+        normalizedRoleName === 'system admin' ||
+        (normalizedRoleName.includes('admin') && !normalizedRoleName.includes('hr') && !normalizedRoleName.includes('lead') && !normalizedRoleName.includes('leader'))
+      ) {
+        determinedRole = 'admin';
+        if (!resolvedRoleName) resolvedRoleName = 'Administrator';
+      }
+      // 5. Excluded Account / CA roles
+      else if (
+        normalizedRoleName === 'account' ||
+        normalizedRoleName === 'accountant' ||
+        normalizedRoleName.includes('account')
+      ) {
+        determinedRole = 'account';
+        if (!resolvedRoleName) resolvedRoleName = 'Accountant';
+      } else if (
+        /\bca\b/i.test(normalizedRoleName) ||
+        normalizedRoleName.includes('chartered')
+      ) {
+        determinedRole = 'ca';
+        if (!resolvedRoleName) resolvedRoleName = 'Chartered Accountant (CA)';
+      }
+      // 6. Default to standard Employee
+      else {
         determinedRole = 'employee';
         if (!resolvedRoleName) resolvedRoleName = 'Employee';
       }
@@ -1619,16 +1725,22 @@ export const AppProvider = ({ children }) => {
         setCurrentTabState('admin-screenshots');
       } else if (determinedRole === 'admin') {
         setCurrentTabState('admin-dashboard');
+      } else {
+        setCurrentTabState('dashboard');
       }
       return determinedRole;
     } catch (err) {
       console.error('Error resolving role:', err);
       const fallback = deriveUserRole(userData);
       setUserRole(fallback);
+      localStorage.setItem('user_role', fallback);
+      localStorage.setItem('active_role', fallback);
       if (fallback === 'hr') {
         setCurrentTabState('admin-screenshots');
       } else if (fallback === 'admin') {
         setCurrentTabState('admin-dashboard');
+      } else {
+        setCurrentTabState('dashboard');
       }
       return fallback;
     } finally {
@@ -1658,6 +1770,8 @@ export const AppProvider = ({ children }) => {
       setCurrentTabState('admin-screenshots');
     } else if (newRole === 'admin') {
       setCurrentTabState('admin-dashboard');
+    } else {
+      setCurrentTabState('dashboard');
     }
   };
 
@@ -1711,6 +1825,10 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const loginUser = async (userData, token) => {
+    // Clear any previous role so stale roles from other accounts don't linger
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('active_role');
+
     // 1. Immediate preliminary check on login response payload
     const preliminaryRole = deriveUserRole(userData);
     if (!isRoleAllowed(preliminaryRole)) {
@@ -1726,6 +1844,11 @@ export const AppProvider = ({ children }) => {
       err.isUnauthorized = true;
       throw err;
     }
+
+    // Set preliminary role immediately
+    setUserRole(preliminaryRole);
+    localStorage.setItem('user_role', preliminaryRole);
+    localStorage.setItem('active_role', preliminaryRole);
 
     // Save tokens for both employee and admin components
     if (token) {
@@ -1749,7 +1872,7 @@ export const AppProvider = ({ children }) => {
       console.warn('Profile fetch on login fallback:', e);
     }
 
-    let determined = null;
+    let determined = preliminaryRole;
     if (activeUser) {
       const resolved = resolveEmployeeName(activeUser);
       if (resolved) {
@@ -1778,12 +1901,19 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(activeUser));
       setUser(activeUser);
       if (determined) {
+        setUserRole(determined);
         localStorage.setItem('user_role', determined);
         localStorage.setItem('active_role', determined);
+        setRoleDetails({
+          roleName: determined === 'admin' ? 'Administrator' :
+            determined === 'team_leader' ? 'Team Leader' :
+              determined === 'hr' ? 'HR Manager' :
+                determined === 'intern' ? 'Intern' : 'Employee'
+        });
       }
     }
 
-    // Direct user to appropriate landing view
+    // Direct user to appropriate landing view strictly as per role
     if (determined === 'hr') {
       setCurrentTabState('admin-screenshots');
     } else if (determined === 'admin') {
@@ -1833,6 +1963,25 @@ export const AppProvider = ({ children }) => {
       console.warn('Failed to refresh user profile:', err);
     }
     return null;
+  };
+
+  const logoutUser = () => {
+    setUser(null);
+    setUserRole('employee');
+    setCurrentTabState('dashboard');
+    setRoleDetails({ roleName: 'Employee' });
+    setRolePermissions([]);
+    if (typeof clearApiCache === 'function') {
+      clearApiCache();
+    }
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('user');
+    localStorage.removeItem('active_role');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('kt_employee_full_name');
   };
 
   return (
@@ -1909,7 +2058,8 @@ export const AppProvider = ({ children }) => {
       updateMonitoringSettings,
       getAdminScreenshots,
       getMonitoringSettings,
-      CLOUDINARY_CONFIG
+      CLOUDINARY_CONFIG,
+      logoutUser
     }}>
       {children}
     </AppContext.Provider>

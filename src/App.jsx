@@ -70,6 +70,10 @@ const MainLayout = ({ handleSignOut }) => {
     if (mapped && mapped !== currentTab) {
       if (userRole === 'hr') {
         setCurrentTab('admin-screenshots');
+      } else if (userRole === 'admin' && (mapped === 'dashboard' || path === '/')) {
+        setCurrentTab('admin-dashboard');
+      } else if (userRole !== 'admin' && (mapped === 'admin-dashboard' || path === '/admin' || path === '/admin/dashboard')) {
+        setCurrentTab('dashboard');
       } else {
         setCurrentTab(mapped);
       }
@@ -259,7 +263,9 @@ export default function App() {
       localStorage.removeItem('user');
       localStorage.removeItem('active_role');
       localStorage.removeItem('user_role');
+      localStorage.removeItem('kt_employee_full_name');
       setIsAuthenticated(false);
+      window.location.href = '/';
     }
   };
 
