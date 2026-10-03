@@ -643,8 +643,8 @@ export const AppProvider = ({ children }) => {
           const idleSec = Math.floor(idleMs / 1000);
           setInactivitySeconds(idleSec);
 
-          // FOR TESTING: 1 MINUTE (60 seconds) TIMER
-          // ONLY trigger alarm if employee has NOT moved mouse/cursor or pressed any key for 60 continuous seconds
+          // 5 MINUTES (300 seconds) INACTIVITY THRESHOLD
+          // ONLY trigger alarm if employee has NOT moved mouse/cursor or pressed any key for 300 continuous seconds
           if (idleSec >= INACTIVITY_THRESHOLD_SECONDS) {
             triggerInactivityAlert();
           }

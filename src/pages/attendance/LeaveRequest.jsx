@@ -31,7 +31,7 @@ const HR_APPROVE_URL = `${BASE_URL}/hr/approve`;
 const HR_REJECT_URL = `${BASE_URL}/hr/reject`;
 
 const ADMIN_APPROVE_URL = `${BASE_URL}/admin/approve`;
-const ADMIN_REJECT_URL = `${BASE_URL}/admin/approve`;
+const ADMIN_REJECT_URL = `${BASE_URL}/admin/reject`;
 
 // ============================================================
 // HELPERS

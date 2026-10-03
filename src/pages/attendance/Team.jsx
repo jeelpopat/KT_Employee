@@ -18,6 +18,9 @@ import {
   X,
   FolderOpen,
   ListTodo,
+  FileText,
+  RefreshCw,
+  Eye,
   MessageSquare,
   Check,
   Search,
@@ -48,6 +51,9 @@ const TASK_PROJECT_MANAGE_URL =
 
 const TEAM_LEAD_URL =
   "https://kt-backend-1.onrender.com/api/teamLead/team";
+
+const DAILY_UPDATE_URL =
+  "https://kt-backend-1.onrender.com/api/dailyUpdate/list";
 
 function MultiSelectDropdown({
   label,
@@ -335,6 +341,44 @@ export default function Team() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [selectedTaskDetails, setSelectedTaskDetails] = useState(null);
+
+  // Top-level Navigation: 'projects' | 'daily-reports'
+  const [activeMainTab, setActiveMainTab] = useState('projects');
+
+  // Daily Work Reports State from API https://kt-backend-1.onrender.com/api/dailyUpdate/list
+  const [dailyReports, setDailyReports] = useState([]);
+  const [isDailyReportsLoading, setIsDailyReportsLoading] = useState(false);
+  const [dailySearchQuery, setDailySearchQuery] = useState("");
+  const [dailyProjectFilter, setDailyProjectFilter] = useState("all");
+  const [dailyEmployeeFilter, setDailyEmployeeFilter] = useState("all");
+  const [selectedDailyReportModal, setSelectedDailyReportModal] = useState(null);
+
+  const fetchAllDailyReports = async () => {
+    setIsDailyReportsLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await axios.get("https://kt-backend-1.onrender.com/api/dailyUpdate/list", { headers });
+      const list = res.data?.data || res.data?.reports || (Array.isArray(res.data) ? res.data : []);
+      if (Array.isArray(list)) {
+        const valid = list.filter(r => r && (r.todaysWork || r.workUpdate || r.description));
+        valid.sort((a, b) => {
+          const dateA = new Date(a.createdAt || a.date || a.reportDate || 0).getTime();
+          const dateB = new Date(b.createdAt || b.date || b.reportDate || 0).getTime();
+          return dateB - dateA;
+        });
+        setDailyReports(valid);
+      }
+    } catch (err) {
+      console.error("Failed to fetch daily reports from /api/dailyUpdate/list:", err);
+    } finally {
+      setIsDailyReportsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllDailyReports();
+  }, []);
   
 const [projectTeamMembers, setProjectTeamMembers] = useState({
   tl: null,
@@ -395,35 +439,222 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     fetchTasks();
   }, []);
 
-  // Function to fetch daily updates for a task
+  // Function to fetch daily updates for a task using https://kt-backend-1.onrender.com/api/dailyUpdate/list
   const fetchTaskUpdates = async (taskId) => {
     if (!taskId) return;
 
     setLoadingTaskUpdates((prev) => ({ ...prev, [taskId]: true }));
 
     try {
-      const response = await axios.get(`${API_CORE}/daily-update/${taskId}`);
-      const payload = response.data;
-      const updates = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : Array.isArray(payload?.dailyUpdates)
-            ? payload.dailyUpdates
-            : Array.isArray(payload?.updates)
-              ? payload.updates
-              : [];
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const sortedUpdates = [...updates].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      // Primary Live API: GET https://kt-backend-1.onrender.com/api/dailyUpdate/list
+      let rawList = [];
+      try {
+        const response = await axios.get(DAILY_UPDATE_URL, {
+          headers,
+          params: { taskId },
+        });
+        const payload = response.data;
+        rawList = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.reports)
+              ? payload.reports
+              : Array.isArray(payload?.dailyUpdates)
+                ? payload.dailyUpdates
+                : Array.isArray(payload?.updates)
+                  ? payload.updates
+                  : [];
+      } catch (paramErr) {
+        // Fallback without params if param caused issue
+        const response = await axios.get(DAILY_UPDATE_URL, { headers });
+        const payload = response.data;
+        rawList = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.reports)
+              ? payload.reports
+              : Array.isArray(payload?.dailyUpdates)
+                ? payload.dailyUpdates
+                : Array.isArray(payload?.updates)
+                  ? payload.updates
+                  : [];
+      }
+
+      // If empty, check if dailyReports state has loaded reports
+      if ((!rawList || rawList.length === 0) && Array.isArray(dailyReports) && dailyReports.length > 0) {
+        rawList = dailyReports;
+      }
+
+      const targetTask = tasks.find((t) => String(t._id || t.id) === String(taskId));
+      const targetTitle = (targetTask?.taskTitle || targetTask?.title || "").trim().toLowerCase();
+
+      // Filter reports associated with this specific task
+      const matchedReports = rawList.filter((item) => {
+        if (!item) return false;
+
+        // 1. Check in taskReferences array (e.g. [{ _id, projectId, taskTitle, progress, status }])
+        if (Array.isArray(item.taskReferences) && item.taskReferences.length > 0) {
+          const hasTaskRef = item.taskReferences.some((ref) => {
+            if (!ref) return false;
+            const refId = String(
+              typeof ref === "object" ? ref._id || ref.id || ref.taskId || "" : ref
+            );
+            if (refId && refId === String(taskId)) return true;
+            if (
+              targetTitle &&
+              typeof ref === "object" &&
+              ref.taskTitle &&
+              ref.taskTitle.trim().toLowerCase() === targetTitle
+            ) {
+              return true;
+            }
+            return false;
+          });
+          if (hasTaskRef) return true;
+        }
+
+        // 2. Direct taskId or task references on the report object
+        const directTaskId = String(
+          item.taskId?._id || item.taskId?.id || item.taskId || item.task?._id || item.task || ""
+        );
+        if (directTaskId && directTaskId === String(taskId)) return true;
+
+        // 3. Array of tasks (item.tasks)
+        if (Array.isArray(item.tasks) && item.tasks.length > 0) {
+          const hasTaskInArray = item.tasks.some((t) => {
+            if (!t) return false;
+            const tId = String(typeof t === "object" ? t._id || t.id || t.taskId || "" : t);
+            return tId && tId === String(taskId);
+          });
+          if (hasTaskInArray) return true;
+        }
+
+        return false;
+      });
+
+      // Normalize report records for UI display
+      const normalizedUpdates = matchedReports.map((item) => {
+        const matchingRef = Array.isArray(item.taskReferences)
+          ? item.taskReferences.find((ref) => {
+              if (!ref) return false;
+              const refId = String(
+                typeof ref === "object" ? ref._id || ref.id || ref.taskId || "" : ref
+              );
+              if (refId && refId === String(taskId)) return true;
+              if (
+                targetTitle &&
+                typeof ref === "object" &&
+                ref.taskTitle &&
+                ref.taskTitle.trim().toLowerCase() === targetTitle
+              ) {
+                return true;
+              }
+              return false;
+            })
+          : null;
+
+        const progressVal =
+          typeof matchingRef === "object" && matchingRef?.progress !== undefined
+            ? matchingRef.progress
+            : typeof item.progress === "number"
+              ? item.progress
+              : null;
+
+        const primaryText =
+          item.todaysWork ||
+          item.workUpdate ||
+          item.updateText ||
+          item.description ||
+          item.message ||
+          "";
+
+        return {
+          ...item,
+          progress: typeof progressVal === "number" ? progressVal : null,
+          updateText: primaryText || "No report details provided.",
+          todaysWork: item.todaysWork,
+          pendingWork: item.pendingWork,
+          tomorrowPlan: item.tomorrowPlan,
+          issuesFaced: item.issuesFaced,
+          hoursWorked: item.hoursWorked,
+          createdAt: item.createdAt || item.reportDate || item.date || new Date().toISOString(),
+        };
+      });
+
+      const sortedUpdates = [...normalizedUpdates].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      );
+
       setTaskUpdatesById((prev) => ({ ...prev, [taskId]: sortedUpdates }));
     } catch (error) {
-      console.error("Error fetching task updates:", error);
+      console.error("Error fetching task updates from /api/dailyUpdate/list:", error);
       setTaskUpdatesById((prev) => ({ ...prev, [taskId]: [] }));
-      alert("Failed to load task updates.");
     } finally {
       setLoadingTaskUpdates((prev) => ({ ...prev, [taskId]: false }));
     }
   };
+
+  // Automatically correlate loaded dailyReports with tasks so updates show immediately
+  useEffect(() => {
+    if (!dailyReports || dailyReports.length === 0 || !tasks || tasks.length === 0) return;
+
+    const updatesMap = {};
+    tasks.forEach((task) => {
+      const taskId = String(task._id || task.id);
+      const targetTitle = (task.taskTitle || task.title || "").trim().toLowerCase();
+
+      const matched = dailyReports.filter((item) => {
+        if (!item) return false;
+        if (Array.isArray(item.taskReferences) && item.taskReferences.length > 0) {
+          return item.taskReferences.some((ref) => {
+            if (!ref) return false;
+            const refId = String(typeof ref === "object" ? ref._id || ref.id || ref.taskId || "" : ref);
+            if (refId && refId === taskId) return true;
+            if (targetTitle && typeof ref === "object" && ref.taskTitle && ref.taskTitle.trim().toLowerCase() === targetTitle) return true;
+            return false;
+          });
+        }
+        const directTaskId = String(item.taskId?._id || item.taskId?.id || item.taskId || item.task?._id || item.task || "");
+        if (directTaskId && directTaskId === taskId) return true;
+        return false;
+      });
+
+      if (matched.length > 0) {
+        updatesMap[taskId] = matched.map((item) => {
+          const matchingRef = Array.isArray(item.taskReferences)
+            ? item.taskReferences.find((ref) => {
+                const refId = String(typeof ref === "object" ? ref._id || ref.id || ref.taskId || "" : ref);
+                return refId === taskId || (targetTitle && typeof ref === "object" && ref.taskTitle && ref.taskTitle.trim().toLowerCase() === targetTitle);
+              })
+            : null;
+          const progressVal = typeof matchingRef === "object" && matchingRef?.progress !== undefined
+            ? matchingRef.progress
+            : typeof item.progress === "number" ? item.progress : null;
+          const primaryText = item.todaysWork || item.workUpdate || item.updateText || item.description || item.message || "";
+          return {
+            ...item,
+            progress: typeof progressVal === "number" ? progressVal : null,
+            updateText: primaryText || "No report details provided.",
+            todaysWork: item.todaysWork,
+            pendingWork: item.pendingWork,
+            tomorrowPlan: item.tomorrowPlan,
+            issuesFaced: item.issuesFaced,
+            hoursWorked: item.hoursWorked,
+            createdAt: item.createdAt || item.reportDate || item.date || new Date().toISOString(),
+          };
+        }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      }
+    });
+
+    if (Object.keys(updatesMap).length > 0) {
+      setTaskUpdatesById((prev) => ({ ...updatesMap, ...prev }));
+    }
+  }, [dailyReports, tasks]);
 
   const fetchTasks = async (projectId = null) => {
     try {
@@ -1401,23 +1632,72 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       {confirmationDialog}
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Top Action Bar */}
-        <div className="flex items-center justify-end -mt-1 sm:-mt-2 mb-1">
-          <button
-            onClick={() => {
-              setSelectedProject(null);
-              setProjectForm(defaultProjectForm);
-              setShowProjectModal(true);
-            }}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 transition-all duration-200 flex items-center justify-center gap-2 font-semibold text-sm cursor-pointer active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            New Project
-          </button>
+        {/* Top Action & Navigation Tabs Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mt-1 sm:-mt-2 mb-1">
+          {/* Main Tab Switcher */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-xl w-fit">
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('projects')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeMainTab === 'projects'
+                  ? 'bg-white text-blue-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>Projects & Tasks</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
+                {totalProjectsCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('daily-reports')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeMainTab === 'daily-reports'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Daily Work Reports</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-bold">
+                {dailyReports.length}
+              </span>
+            </button>
+          </div>
+
+          {activeMainTab === 'projects' ? (
+            <button
+              onClick={() => {
+                setSelectedProject(null);
+                setProjectForm(defaultProjectForm);
+                setShowProjectModal(true);
+              }}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 sm:px-5 sm:py-2 rounded-xl shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 transition-all duration-200 flex items-center justify-center gap-2 font-semibold text-xs cursor-pointer active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              New Project
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={fetchAllDailyReports}
+              disabled={isDailyReportsLoading}
+              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all text-xs font-semibold flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isDailyReportsLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh Reports</span>
+            </button>
+          )}
         </div>
 
-        {/* KPI Metrics Dashboard Cards (Compact) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {activeMainTab === 'projects' && (
+          <>
+            {/* KPI Metrics Dashboard Cards (Compact) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Card 1: Total Projects */}
           <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
@@ -1903,14 +2183,29 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                                 <span className="text-xs font-semibold text-slate-800">
                                                   {getUpdateMemberName(update)}
                                                 </span>
+                                                {update.hoursWorked ? (
+                                                  <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium border border-blue-200/60">
+                                                    {update.hoursWorked}h
+                                                  </span>
+                                                ) : null}
                                               </div>
                                               <span className="text-[10px] text-slate-400 font-medium">
                                                 {update.createdAt ? new Date(update.createdAt).toLocaleString() : "No date"}
                                               </span>
                                             </div>
-                                            <p className="text-xs text-slate-600">
-                                              {update.updateText || update.message || update.description || "No report details provided."}
+                                            <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                                              {update.todaysWork || update.workUpdate || update.updateText || update.message || update.description || "No report details provided."}
                                             </p>
+                                            {update.pendingWork && (
+                                              <p className="text-[11px] text-amber-700 mt-1">
+                                                <span className="font-semibold">Pending:</span> {update.pendingWork}
+                                              </p>
+                                            )}
+                                            {update.tomorrowPlan && (
+                                              <p className="text-[11px] text-indigo-700 mt-0.5">
+                                                <span className="font-semibold">Next:</span> {update.tomorrowPlan}
+                                              </p>
+                                            )}
                                             {typeof update.progress === "number" && (
                                               <div className="mt-2 flex items-center gap-2">
                                                 <div className="h-1.5 flex-1 rounded-full bg-slate-200 overflow-hidden">
@@ -1929,7 +2224,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                       <p className="text-xs text-slate-400 py-1">
                                         {selectedReportMemberId
                                           ? "No daily reports for this assigned member yet."
-                                          : "Click the assigned member name to view daily reports."}
+                                          : "No daily reports submitted yet for this task."}
                                       </p>
                                     )}
                                   </div>
@@ -2000,6 +2295,313 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 )}
               </div>
             )}
+          </div>
+        )}
+          </>
+        )}
+
+        {/* DAILY WORK REPORTS SECTION (API: https://kt-backend-1.onrender.com/api/dailyUpdate/list) */}
+        {activeMainTab === 'daily-reports' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* KPI Metrics Dashboard Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Total Reports
+                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <FileText className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1.5 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {dailyReports.length}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">Logged</span>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Total Hours Logged
+                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Clock className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1.5 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {dailyReports.reduce((acc, r) => acc + (Number(r.hoursWorked) || 0), 0)}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">Hours</span>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Staff Reporting
+                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <Users className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1.5 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {new Set(dailyReports.map(r => r.employeeId?._id || r.employeeId?.email || r.employeeId).filter(Boolean)).size}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">Employees & TLs</span>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Live Endpoint
+                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1.5 flex items-baseline gap-1.5">
+                  <span className="text-xs font-mono font-semibold text-emerald-700 truncate">
+                    /api/dailyUpdate/list
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by employee name, project, work description, plan..."
+                  value={dailySearchQuery}
+                  onChange={(e) => setDailySearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-9 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800 placeholder-slate-400"
+                />
+                {dailySearchQuery && (
+                  <button
+                    onClick={() => setDailySearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {/* Project Filter */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+                  <FolderOpen className="w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={dailyProjectFilter}
+                    onChange={(e) => setDailyProjectFilter(e.target.value)}
+                    className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">All Projects</option>
+                    {Array.from(new Set(dailyReports.map(r => r.projectId?.projectName || r.projectId?.name || r.projectName).filter(Boolean))).map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Employee Filter */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={dailyEmployeeFilter}
+                    onChange={(e) => setDailyEmployeeFilter(e.target.value)}
+                    className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">All Employees</option>
+                    {Array.from(new Set(dailyReports.map(r => r.employeeId?.name || r.employeeName || (typeof r.employeeId === 'string' ? r.employeeId : '')).filter(Boolean))).map((emp) => (
+                      <option key={emp} value={emp}>{emp}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(dailySearchQuery || dailyProjectFilter !== "all" || dailyEmployeeFilter !== "all") && (
+                  <button
+                    onClick={() => {
+                      setDailySearchQuery("");
+                      setDailyProjectFilter("all");
+                      setDailyEmployeeFilter("all");
+                    }}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline px-2 py-1 cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Daily Reports Table */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+              {isDailyReportsLoading ? (
+                <div className="flex flex-col justify-center items-center py-20">
+                  <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
+                  <p className="text-sm font-medium text-slate-500">Loading daily reports from API...</p>
+                </div>
+              ) : (() => {
+                const q = dailySearchQuery.toLowerCase().trim();
+                const filtered = dailyReports.filter((report) => {
+                  const empName = (report.employeeId?.name || report.employeeName || report.name || '').toLowerCase();
+                  const empEmail = (report.employeeId?.email || report.email || '').toLowerCase();
+                  const projName = (report.projectId?.projectName || report.projectId?.name || report.projectName || '').toLowerCase();
+                  const work = (report.todaysWork || report.workUpdate || report.description || '').toLowerCase();
+                  const tomorrow = (report.tomorrowPlan || report.tomorrow_plan || '').toLowerCase();
+
+                  const matchesQuery = !q || empName.includes(q) || empEmail.includes(q) || projName.includes(q) || work.includes(q) || tomorrow.includes(q);
+
+                  const rawProj = report.projectId?.projectName || report.projectId?.name || report.projectName || '';
+                  const matchesProject = dailyProjectFilter === 'all' || rawProj === dailyProjectFilter;
+
+                  const rawEmp = report.employeeId?.name || report.employeeName || (typeof report.employeeId === 'string' ? report.employeeId : '');
+                  const matchesEmp = dailyEmployeeFilter === 'all' || rawEmp === dailyEmployeeFilter;
+
+                  return matchesQuery && matchesProject && matchesEmp;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-16 text-center">
+                      <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <h3 className="text-base font-semibold text-slate-800 mb-1">
+                        {dailySearchQuery || dailyProjectFilter !== 'all' || dailyEmployeeFilter !== 'all'
+                          ? "No Matching Daily Reports Found"
+                          : "No Daily Reports Submitted Yet"}
+                      </h3>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        {dailySearchQuery || dailyProjectFilter !== 'all' || dailyEmployeeFilter !== 'all'
+                          ? "Try adjusting your search criteria or clearing filters."
+                          : "Reports submitted via employee & TL daily report portals will automatically appear here."}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm min-w-[950px]">
+                      <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-semibold tracking-wider">
+                        <tr>
+                          <th className="px-5 py-3.5">Employee</th>
+                          <th className="px-4 py-3.5">Project</th>
+                          <th className="px-4 py-3.5">Date & Time</th>
+                          <th className="px-3 py-3.5 text-center">Hours</th>
+                          <th className="px-5 py-3.5 w-1/3">Today's Work</th>
+                          <th className="px-4 py-3.5">Tomorrow's Plan</th>
+                          <th className="px-4 py-3.5 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filtered.map((report) => {
+                          const empName = report.employeeId?.name || report.employeeName || report.name || "Employee";
+                          const empEmail = report.employeeId?.email || report.email || "";
+                          const empRole = report.employeeId?.role || report.role || "EMP";
+                          const projName = report.projectId?.projectName || report.projectId?.name || report.projectName || "General Project";
+                          
+                          let rDate = 'N/A';
+                          let rTime = '';
+                          try {
+                            const dVal = report.createdAt || report.date || report.reportDate;
+                            if (dVal) {
+                              const d = new Date(dVal);
+                              if (!isNaN(d.getTime())) {
+                                rDate = d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+                                rTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              }
+                            }
+                          } catch (e) {}
+
+                          const hours = report.hoursWorked ?? report.hours ?? 8;
+                          const work = report.todaysWork || report.workUpdate || report.description || "—";
+                          const plan = report.tomorrowPlan || report.tomorrow_plan || "—";
+                          const issues = report.issuesFaced || report.blockers || "";
+
+                          return (
+                            <tr key={report._id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="px-5 py-3.5">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                                    {empName.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-slate-900 truncate max-w-[140px]">
+                                        {empName}
+                                      </span>
+                                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded uppercase font-mono bg-slate-100 text-slate-600 border border-slate-200">
+                                        {empRole}
+                                      </span>
+                                    </div>
+                                    {empEmail && (
+                                      <p className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                                        {empEmail}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="px-4 py-3.5 whitespace-nowrap">
+                                <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200/80 font-medium text-xs inline-block">
+                                  {projName}
+                                </span>
+                              </td>
+
+                              <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">
+                                <div className="font-medium text-slate-800">{rDate}</div>
+                                {rTime && <div className="text-[11px] text-slate-400 font-mono">{rTime}</div>}
+                              </td>
+
+                              <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono font-semibold text-xs border border-indigo-100">
+                                  {hours} hrs
+                                </span>
+                              </td>
+
+                              <td className="px-5 py-3.5 max-w-xs text-slate-700">
+                                <p className="line-clamp-2 text-xs leading-relaxed" title={work}>
+                                  {work}
+                                </p>
+                                {issues && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-200/70 px-1.5 py-0.5 rounded mt-1 font-medium">
+                                    <AlertCircle size={10} /> Issue: {issues}
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3.5 max-w-xs text-slate-600">
+                                <p className="line-clamp-2 text-xs leading-relaxed" title={plan}>
+                                  {plan}
+                                </p>
+                              </td>
+
+                              <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedDailyReportModal(report)}
+                                  className="px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Eye size={13} />
+                                  <span>Details</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
       </div>
@@ -2840,14 +3442,37 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                   <span className="text-xs font-bold text-slate-800">
                                     {getUpdateMemberName(update)}
                                   </span>
+                                  {update.hoursWorked ? (
+                                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-semibold">
+                                      {update.hoursWorked} hrs logged
+                                    </span>
+                                  ) : null}
                                 </div>
                                 <span className="text-[11px] text-slate-400">
                                   {update.createdAt ? new Date(update.createdAt).toLocaleString() : "No date"}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                {update.updateText || update.message || update.description || "No report details provided."}
-                              </p>
+                              <div className="space-y-1.5 mt-1 text-xs">
+                                <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                  <span className="font-bold text-slate-800">Today's Work: </span>
+                                  {update.todaysWork || update.workUpdate || update.updateText || update.message || update.description || "No report details provided."}
+                                </p>
+                                {update.pendingWork && (
+                                  <p className="text-amber-800 bg-amber-50/70 border border-amber-200/70 p-2 rounded-lg">
+                                    <span className="font-bold">Pending: </span>{update.pendingWork}
+                                  </p>
+                                )}
+                                {update.tomorrowPlan && (
+                                  <p className="text-indigo-800 bg-indigo-50/70 border border-indigo-200/70 p-2 rounded-lg">
+                                    <span className="font-bold">Tomorrow's Plan: </span>{update.tomorrowPlan}
+                                  </p>
+                                )}
+                                {update.issuesFaced && (
+                                  <p className="text-rose-800 bg-rose-50/70 border border-rose-200/70 p-2 rounded-lg">
+                                    <span className="font-bold">Issues: </span>{update.issuesFaced}
+                                  </p>
+                                )}
+                              </div>
                               {typeof update.progress === "number" && (
                                 <div className="flex items-center gap-2 pt-1">
                                   <div className="h-1.5 flex-1 rounded-full bg-slate-200 overflow-hidden">
@@ -2879,6 +3504,142 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 type="button"
                 onClick={() => setSelectedTaskDetails(null)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl text-xs transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Work Report Details Modal */}
+      {selectedDailyReportModal && (
+        <div
+          className="fixed inset-0 z-[10000] bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setSelectedDailyReportModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-indigo-300" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-white">Daily Work Report Details</h3>
+                  <p className="text-[11px] text-slate-300">
+                    {selectedDailyReportModal.createdAt
+                      ? new Date(selectedDailyReportModal.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : 'Report Information'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDailyReportModal(null)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* Employee & Project row */}
+              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                      {(selectedDailyReportModal.employeeId?.name || selectedDailyReportModal.employeeName || selectedDailyReportModal.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">
+                        {selectedDailyReportModal.employeeId?.name || selectedDailyReportModal.employeeName || selectedDailyReportModal.name || 'Employee'}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {selectedDailyReportModal.employeeId?.email || selectedDailyReportModal.email || ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Project</span>
+                  <p className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg mt-1 w-fit truncate max-w-full">
+                    {selectedDailyReportModal.projectId?.projectName || selectedDailyReportModal.projectId?.name || selectedDailyReportModal.projectName || 'General Project'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Hours & Time */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-slate-400" /> Hours Logged
+                  </span>
+                  <p className="text-base font-bold text-slate-800 mt-0.5">
+                    {selectedDailyReportModal.hoursWorked ?? selectedDailyReportModal.hours ?? 8} hrs
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-slate-400" /> Submission Date
+                  </span>
+                  <p className="text-xs font-semibold text-slate-700 mt-1">
+                    {selectedDailyReportModal.createdAt
+                      ? new Date(selectedDailyReportModal.createdAt).toLocaleString()
+                      : 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Work Accomplished */}
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Today's Work Summary</span>
+                <div className="mt-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {selectedDailyReportModal.todaysWork || selectedDailyReportModal.workUpdate || selectedDailyReportModal.description || 'No work summary provided.'}
+                </div>
+              </div>
+
+              {/* Pending Work */}
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Pending Work</span>
+                <div className="mt-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {selectedDailyReportModal.pendingWork || 'None logged.'}
+                </div>
+              </div>
+
+              {/* Tomorrow's Plan */}
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tomorrow's Plan</span>
+                <div className="mt-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {selectedDailyReportModal.tomorrowPlan || selectedDailyReportModal.tomorrow_plan || 'None logged.'}
+                </div>
+              </div>
+
+              {/* Issues Faced */}
+              {selectedDailyReportModal.issuesFaced && (
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> Issues / Blockers Faced
+                  </span>
+                  <div className="mt-1.5 p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 leading-relaxed whitespace-pre-wrap">
+                    {selectedDailyReportModal.issuesFaced}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedDailyReportModal(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 Close
               </button>

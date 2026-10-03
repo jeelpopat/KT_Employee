@@ -893,27 +893,39 @@ const fetchAllMembers = async () => {
         })
       );
 
-      const dailyUpdates = [];
-      if (tasks.length) {
-        const updateResults = await Promise.all(tasks.map(async (task) => {
-          const taskId = task?._id || task?.id || task?.taskId;
-          if (!taskId) return [];
+      let dailyUpdates = [];
+      try {
+        const res = await fetch('https://kt-backend-1.onrender.com/api/dailyUpdate/list', { headers });
+        if (res.ok) {
+          const payload = await res.json();
+          const allReports = normalizeArrayPayload(payload);
+          const memberIdStr = String(member?._id || member?.id || member?.userId || member?.employeeId || '').toLowerCase();
+          const memberEmailStr = String(member?.email || '').toLowerCase();
+          const taskIds = new Set(tasks.map(t => String(t?._id || t?.id || t?.taskId || '')));
 
-          try {
-            const response = await fetch(`${PROJECT_API_BASE}/daily-update/${taskId}`, { headers });
-            if (!response.ok) return [];
-            const payload = await response.json();
-            return normalizeArrayPayload(payload).map((update) => ({
-              ...update,
-              taskTitle: task?.taskTitle || task?.title || 'Task'
-            }));
-          } catch (err) {
-            console.error('❌ Error fetching project updates:', err);
-            return [];
-          }
-        }));
-
-        updateResults.forEach((updates) => dailyUpdates.push(...updates));
+          dailyUpdates = allReports.filter(report => {
+            if (!report) return false;
+            if (Array.isArray(report.taskReferences) && report.taskReferences.length > 0) {
+              const matchesTask = report.taskReferences.some(ref => {
+                const refId = String(typeof ref === 'object' ? (ref._id || ref.id || ref.taskId || '') : ref);
+                return refId && taskIds.has(refId);
+              });
+              if (matchesTask) return true;
+            }
+            const empObj = report.employeeId || report.userId || report.user;
+            const empId = String(typeof empObj === 'object' ? (empObj?._id || empObj?.id || '') : (empObj || '')).toLowerCase();
+            const empEmail = String(typeof empObj === 'object' ? (empObj?.email || '') : (report.employeeEmail || report.email || '')).toLowerCase();
+            if (memberIdStr && empId && empId === memberIdStr) return true;
+            if (memberEmailStr && empEmail && empEmail === memberEmailStr) return true;
+            return false;
+          }).map(report => ({
+            ...report,
+            updateText: report.todaysWork || report.workUpdate || report.updateText || report.description || 'Daily Update',
+            taskTitle: (Array.isArray(report.taskReferences) && report.taskReferences[0]?.taskTitle) || 'Project Task'
+          }));
+        }
+      } catch (err) {
+        console.error('❌ Error fetching daily updates list:', err);
       }
 
       setMemberInsights({

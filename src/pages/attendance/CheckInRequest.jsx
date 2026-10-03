@@ -9,7 +9,26 @@ import {
 import Modal from "../../components/common/Modal";
 import { isFinanceOrExcludedUser } from "../../utils/roleFilters";
 
-const ADMIN_ID = "6a23b5c49cd1507bfd5e3bcb";
+const getLoggedInAdminId = () => {
+  try {
+    const stored = localStorage.getItem("auth_user") || localStorage.getItem("user");
+    if (stored) {
+      const u = JSON.parse(stored);
+      if (u._id || u.id || u.userId) return u._id || u.id || u.userId;
+    }
+    const tok = localStorage.getItem("auth_token") || localStorage.getItem("token");
+    if (tok) {
+      const parts = tok.split(".");
+      if (parts.length >= 2) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+        if (payload._id || payload.userId || payload.id || payload.sub) {
+          return payload._id || payload.userId || payload.id || payload.sub;
+        }
+      }
+    }
+  } catch (e) {}
+  return "6a23b5c49cd1507bfd5e3bcb";
+};
 
 const PENDING_URL =
   "https://kt-backend-1.onrender.com/api/attendance/pending";
@@ -234,7 +253,7 @@ export default function CheckInRequest() {
 
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
   // ============================================================
   // FETCH PENDING REQUESTS
@@ -378,7 +397,7 @@ export default function CheckInRequest() {
             },
 
             body: JSON.stringify({
-              approvedBy: ADMIN_ID,
+              approvedBy: getLoggedInAdminId(),
               attendanceId: id,
             }),
           }

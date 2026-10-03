@@ -4,10 +4,12 @@ import { Lock, CheckCircle2, AlertCircle, KeyRound, Eye, EyeOff } from "lucide-r
 import Button from "../components/common/Button";
 import Input from "../components/common/Input";
 
-function ResetPassword() {
+import api from "../api/axios";
+
+function ResetPassword({ onBackToLogin }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const token = searchParams.get("token") || new URLSearchParams(window.location.search).get("token");
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -46,34 +48,20 @@ function ResetPassword() {
     try {
       setLoading(true);
 
-      const API_BASE =
-        process.env.REACT_APP_API_BASE_URL ||
-        (window.location.hostname === "localhost"
-          ? "http://localhost:5000"
-          : "https://kt-backend-1.onrender.com");
-
-      const response = await fetch(`${API_BASE}/api/users/reset-password`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token,
-          newPassword,
-        }),
+      const response = await api.put("/api/users/reset-password", {
+        token,
+        newPassword,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Failed to reset password.");
-        return;
+      if (response.data?.success !== false) {
+        setSuccess(true);
+      } else {
+        setError(response.data?.message || "Failed to reset password.");
       }
-
-      setSuccess(true);
     } catch (err) {
-      console.error(err);
-      setError("Network error. Please try again.");
+      console.error("Reset password error:", err);
+      const msg = err.response?.data?.message || err.response?.data?.error || "Network error. Please try again.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -110,8 +98,8 @@ function ResetPassword() {
 
             <Button
               type="button"
-              onClick={() => navigate("/login", { replace: true })}
-              className="w-full py-2 text-xs font-semibold"
+              onClick={() => onBackToLogin ? onBackToLogin() : (window.location.href = "/")}
+              className="w-full py-2 text-xs font-semibold cursor-pointer"
             >
               Go to Login
             </Button>
@@ -133,7 +121,7 @@ function ResetPassword() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-7 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-7 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 {showPassword ? <Eye className="w-3.5 h-3.5 text-indigo-600" /> : <EyeOff className="w-3.5 h-3.5" />}
               </button>
@@ -154,7 +142,7 @@ function ResetPassword() {
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-2.5 top-7 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-7 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 {showConfirmPassword ? <Eye className="w-3.5 h-3.5 text-indigo-600" /> : <EyeOff className="w-3.5 h-3.5" />}
               </button>
@@ -171,18 +159,19 @@ function ResetPassword() {
               type="submit"
               isLoading={loading}
               isDisabled={!token}
-              className="w-full py-2 text-xs font-semibold"
+              className="w-full py-2 text-xs font-semibold cursor-pointer"
             >
               {loading ? "Updating Password..." : "Submit New Password"}
             </Button>
 
             <div className="text-center pt-2">
-              <Link
-                to="/login"
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+              <button
+                type="button"
+                onClick={() => onBackToLogin ? onBackToLogin() : (window.location.href = "/")}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
               >
                 Back to Login
-              </Link>
+              </button>
             </div>
           </form>
         )}

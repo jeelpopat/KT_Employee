@@ -18,6 +18,7 @@ const ProfileView = lazy(() => import('./components/profile/ProfileView.jsx').th
 const AdminScreenshotPortal = lazy(() => import('./components/screenshots/AdminScreenshotPortal.jsx').then(m => ({ default: m.AdminScreenshotPortal })));
 const InactivityAlertModal = lazy(() => import('./components/alerts/InactivityAlertModal.jsx').then(m => ({ default: m.InactivityAlertModal })));
 const HolidayCalendarView = lazy(() => import('./components/holiday/HolidayCalendarView.jsx').then(m => ({ default: m.HolidayCalendarView })));
+const ResetPasswordView = lazy(() => import('./pages/ResetPassword.jsx'));
 
 // Lazy-load Admin Views
 const AdminDashboardView = lazy(() => import('./pages/Dashboard.jsx'));
@@ -37,6 +38,7 @@ const AdminApplicationsView = lazy(() => import('./pages/Applications.jsx'));
 const AdminPositionsView = lazy(() => import('./pages/Positions.jsx'));
 const AdminPortfolioLeadsView = lazy(() => import('./pages/PortfolioLeads.jsx'));
 const AdminContactsView = lazy(() => import('./pages/Contacts.jsx'));
+const AdminSettingsView = lazy(() => import('./pages/Setting.jsx'));
 
 // Lazy-load role & placeholder views
 const SalaryView = lazy(() => import('./components/salary/SalaryView.jsx').then(m => ({ default: m.SalaryView })));
@@ -129,6 +131,8 @@ const MainLayout = ({ handleSignOut }) => {
       case 'admin-team-lead': return <AdminTeamLeadView />;
       case 'admin-team-tasks': return <AdminTeamTasksView />;
       case 'admin-office-settings': return <AdminOfficeSettingsView />;
+      case 'admin-settings':
+      case 'settings': return <AdminSettingsView />;
       case 'admin-applications': return <AdminApplicationsView />;
       case 'admin-positions': return <AdminPositionsView />;
       case 'admin-portfolio-leads': return <AdminPortfolioLeadsView />;
@@ -221,7 +225,16 @@ export default function App() {
     }
     return !!token;
   });
-  const [authView, setAuthView] = useState('login');
+  const [authView, setAuthView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      const hasToken = new URLSearchParams(window.location.search).has('token');
+      if (path.includes('reset-password') || hasToken) {
+        return 'reset_password';
+      }
+    }
+    return 'login';
+  });
 
   useEffect(() => {
     const root = document.documentElement;
@@ -273,6 +286,14 @@ export default function App() {
     <AppProvider>
       {isAuthenticated ? (
         <MainLayout handleSignOut={handleSignOut} />
+      ) : authView === 'reset_password' ? (
+        <Suspense fallback={
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        }>
+          <ResetPasswordView onBackToLogin={() => setAuthView('login')} />
+        </Suspense>
       ) : authView === 'forgot_password' ? (
         <ForgotPasswordView onBackToLogin={() => setAuthView('login')} />
       ) : (

@@ -76,11 +76,9 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "Workspace & Account",
+      title: "Account",
       items: [
-        { tab: 'attendance', label: 'My Attendance', icon: Clock, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
         { tab: 'profile', label: 'Profile', icon: User },
-        { tab: 'admin-office-settings', label: 'Office Settings', icon: Settings },
       ]
     }
   ];
@@ -224,7 +222,7 @@ export const Sidebar = ({ onSignOut }) => {
               src={logo}
               alt="Kevalon Technology"
               className="h-8 w-auto object-contain scale-[5] origin-center transition-all"
-              style={{ transform: 'scale(1.35)' }}
+              style={{ transform: 'scale(1.4)' }}
             />
           </div>
           <button

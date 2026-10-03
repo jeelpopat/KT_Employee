@@ -45,21 +45,41 @@ export const DailyReportView = () => {
     try {
       let projs = [];
       let tsks = [];
+
+      // 1. Primary Live API call for projects: GET /api/projectManage/project/all
       try {
-        const response = await api.get('/api/employee-panel/daily-report/assigned-meta');
-        const data = response.data?.data || response.data || {};
-        projs = data.projects || [];
-        tsks = data.tasks || [];
+        const pResponse = await api.get('/api/projectManage/project/all');
+        const pData = pResponse.data?.data || pResponse.data?.projects || pResponse.data || [];
+        if (Array.isArray(pData) && pData.length > 0) {
+          projs = pData.map(p => ({
+            ...p,
+            _id: p._id || p.id,
+            name: p.projectName || p.name || 'Project',
+            projectName: p.projectName || p.name || 'Project'
+          }));
+        }
       } catch (err) {
-        // Fallback
+        console.warn("Notice loading projects from /api/projectManage/project/all:", err.message);
       }
 
-      if (projs.length === 0 || tsks.length === 0) {
+      // 2. Live API call for tasks: GET /api/projectManage/task/all
+      try {
+        const tResponse = await api.get('/api/projectManage/task/all');
+        const tData = tResponse.data?.data || tResponse.data?.tasks || tResponse.data || [];
+        if (Array.isArray(tData) && tData.length > 0) {
+          tsks = tData;
+        }
+      } catch (tErr) {
+        console.warn("Notice loading tasks from /api/projectManage/task/all:", tErr.message);
+      }
+
+      // Fallback: If projects still empty, try legacy task fallback or assigned-meta
+      if (projs.length === 0) {
         try {
           const taskRes = await api.get('/api/task/all');
           const liveTasks = taskRes.data?.data || taskRes.data?.tasks || [];
           if (Array.isArray(liveTasks) && liveTasks.length > 0) {
-            tsks = liveTasks;
+            if (tsks.length === 0) tsks = liveTasks;
             const projectMap = new Map();
             liveTasks.forEach(t => {
               if (t.projectId) {
@@ -74,16 +94,34 @@ export const DailyReportView = () => {
             projs = Array.from(projectMap.values());
           }
         } catch (taskErr) {
-          console.warn("Fallback live task fetch for daily report:", taskErr);
+          // fallback completed
         }
+      }
+
+      if (projs.length === 0) {
+        try {
+          const metaRes = await api.get('/api/employee-panel/daily-report/assigned-meta');
+          const mData = metaRes.data?.data || metaRes.data || {};
+          if (Array.isArray(mData.projects) && mData.projects.length > 0) {
+            projs = mData.projects.map(p => ({
+              ...p,
+              _id: p._id || p.id,
+              name: p.projectName || p.name || 'Project',
+              projectName: p.projectName || p.name || 'Project'
+            }));
+          }
+          if (Array.isArray(mData.tasks) && mData.tasks.length > 0 && tsks.length === 0) {
+            tsks = mData.tasks;
+          }
+        } catch (metaErr) {}
       }
       
       setAssignedProjects(projs);
       setAssignedTasks(tsks);
 
-      // Auto-select first project if available
+      // Initialize row with first project if available
       if (projs.length > 0) {
-        setTaskRows([{ ...getEmptyRow(), projectId: projs[0]._id }]);
+        setTaskRows(prev => prev.map(r => r.projectId ? r : { ...r, projectId: projs[0]._id }));
       }
     } catch (error) {
       console.error("Failed to load assigned projects/tasks:", error);
@@ -96,55 +134,65 @@ export const DailyReportView = () => {
     setIsHistoryLoading(true);
     try {
       const userId = user?._id || user?.id || user?.employeeId || user?.employee?._id;
-      let reports = [];
-
-      // 1. Primary Live API call as requested: GET /api/dailyUpdate/:id
+      
+      // Clean up any legacy dummy cache from localStorage to prevent "General Project" automatic rows
       if (userId) {
         try {
-          const res = await api.get(`/api/dailyUpdate/${userId}`);
-          const payload = res.data?.data || res.data?.reports || res.data?.dailyUpdates || res.data?.updates || res.data;
-          if (Array.isArray(payload)) {
-            reports = payload;
-          } else if (payload && Array.isArray(payload.reports)) {
-            reports = payload.reports;
-          } else if (payload && Array.isArray(payload.updates)) {
-            reports = payload.updates;
-          } else if (payload && typeof payload === 'object' && (payload.todaysWork || payload._id)) {
-            reports = [payload];
-          }
-        } catch (apiErr) {
-          console.warn('GET /api/dailyUpdate/:id notice:', apiErr.response?.data?.message || apiErr.message);
-        }
+          localStorage.removeItem(`daily_reports_${userId}`);
+        } catch (e) {}
       }
 
-      // 2. Secondary fallback to /api/employee-panel/daily-report/history if empty
-      if (reports.length === 0) {
+      let reports = [];
+
+      // Primary Live API: GET /api/dailyUpdate/list
+      try {
+        const listRes = await api.get('/api/dailyUpdate/list');
+        const rawList = listRes.data?.data || listRes.data?.reports || (Array.isArray(listRes.data) ? listRes.data : []);
+        
+        if (Array.isArray(rawList) && rawList.length > 0) {
+          const currentUserId = String(userId || '').toLowerCase().trim();
+          const currentUserEmail = String(user?.email || '').toLowerCase().trim();
+          const currentUserName = String(user?.name || user?.fullName || '').toLowerCase().trim();
+
+          reports = rawList.filter(item => {
+            if (!item) return false;
+            // Exclude empty/dummy reports without any work summary
+            const workText = (item.todaysWork || item.workUpdate || item.description || '').trim();
+            if (!workText) return false;
+
+            const empObj = item.employeeId;
+            const empId = String(typeof empObj === 'object' ? (empObj?._id || empObj?.id) : (empObj || '')).toLowerCase().trim();
+            const empEmail = String(typeof empObj === 'object' ? empObj?.email : (item.employeeEmail || item.email || '')).toLowerCase().trim();
+            const empName = String(typeof empObj === 'object' ? empObj?.name : (item.employeeName || '')).toLowerCase().trim();
+
+            const matchId = currentUserId && empId && (empId === currentUserId);
+            const matchEmail = currentUserEmail && empEmail && (empEmail === currentUserEmail);
+            const matchName = currentUserName && empName && (empName === currentUserName);
+
+            return matchId || matchEmail || matchName;
+          });
+        }
+      } catch (listErr) {
+        console.warn("GET /api/dailyUpdate/list notice:", listErr.response?.data?.message || listErr.message);
+      }
+
+      // Secondary fallback if list was empty
+      if (reports.length === 0 && userId) {
         try {
           const fbRes = await api.get('/api/employee-panel/daily-report/history?page=1&limit=50');
           const fbReports = fbRes.data?.data?.reports || fbRes.data?.reports || fbRes.data?.data || [];
           if (Array.isArray(fbReports) && fbReports.length > 0) {
-            reports = fbReports;
+            reports = fbReports.filter(r => (r.todaysWork || r.workUpdate || r.description || '').trim());
           }
-        } catch (fbErr) {
-          // fallback completed
-        }
+        } catch (fbErr) {}
       }
 
-      // 3. Merge with locally saved submissions for this user to guarantee persistence
-      if (userId) {
-        try {
-          const localSaved = JSON.parse(localStorage.getItem(`daily_reports_${userId}`) || '[]');
-          if (Array.isArray(localSaved) && localSaved.length > 0) {
-            const existingKeys = new Set(reports.map(r => r._id || `${r.todaysWork}-${r.reportDate || r.createdAt}`));
-            localSaved.forEach(lr => {
-              const key = lr._id || `${lr.todaysWork}-${lr.reportDate || lr.createdAt}`;
-              if (!existingKeys.has(key)) {
-                reports.push(lr);
-              }
-            });
-          }
-        } catch (e) {}
-      }
+      // Sort by date descending
+      reports.sort((a, b) => {
+        const dateA = new Date(a.reportDate || a.createdAt || a.date || 0).getTime();
+        const dateB = new Date(b.reportDate || b.createdAt || b.date || 0).getTime();
+        return dateB - dateA;
+      });
 
       setHistoryReports(reports);
     } catch (error) {
@@ -268,12 +316,10 @@ export const DailyReportView = () => {
         }
       }
 
-      // Persist in local cache for instant feedback and history reliability
-      if (userId && createdReports.length > 0) {
+      // Clean any stale local cache to prevent automatic or unverified records
+      if (userId) {
         try {
-          const localSaved = JSON.parse(localStorage.getItem(`daily_reports_${userId}`) || '[]');
-          const updated = [...createdReports, ...localSaved];
-          localStorage.setItem(`daily_reports_${userId}`, JSON.stringify(updated));
+          localStorage.removeItem(`daily_reports_${userId}`);
         } catch (e) {}
       }
 
@@ -283,7 +329,7 @@ export const DailyReportView = () => {
       const defaultProj = assignedProjects.length > 0 ? assignedProjects[0]._id : '';
       setTaskRows([{ ...getEmptyRow(), projectId: defaultProj }]);
 
-      // Refresh History with live API GET api/dailyUpdate/:id
+      // Refresh History with live API GET /api/dailyUpdate/list
       await fetchHistory();
       
       // Clear success message after 4s
@@ -374,9 +420,9 @@ export const DailyReportView = () => {
                         className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                         required
                       >
-                        <option value="" disabled>Select Project</option>
+                        <option value="">Select Project</option>
                         {assignedProjects.map(p => (
-                          <option key={p._id} value={p._id}>{p.name}</option>
+                          <option key={p._id} value={p._id}>{p.projectName || p.name || 'Project'}</option>
                         ))}
                       </select>
                     </div>
@@ -509,7 +555,7 @@ export const DailyReportView = () => {
                 {historyReports.length} {historyReports.length === 1 ? 'Report' : 'Reports'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/:id</p>
+            <p className="text-xs text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/list</p>
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
@@ -530,7 +576,7 @@ export const DailyReportView = () => {
             >
               <option value="all">All Projects</option>
               {assignedProjects.map(p => (
-                <option key={p._id} value={p._id}>{p.name}</option>
+                <option key={p._id} value={p._id}>{p.projectName || p.name || 'Project'}</option>
               ))}
             </select>
             <button

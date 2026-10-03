@@ -255,7 +255,7 @@
 
     async function fetchTeamLeads() {
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
         const response = await fetch("https://kt-backend-1.onrender.com/api/teamLead/team", {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -274,7 +274,7 @@
 
     async function fetchLeaves() {
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
         const response = await fetch("https://kt-backend-1.onrender.com/api/leave/all", {
           headers: { Authorization: `Bearer ${token}` },
         });

@@ -18,11 +18,10 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
+import Toast from "../../components/common/Toast";
 import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../../utils/roleFilters";
 
-const API_BASE =
-  process.env.REACT_APP_API_URL ||
-  "https://kt-backend-1.onrender.com/api";
+const API_BASE = "https://kt-backend-1.onrender.com/api";
 
 const initialFormData = {
   fullName: "",
@@ -45,6 +44,14 @@ export default function Employees() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [toast, setToast] = useState({ message: "", type: "success" });
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast((prev) => (prev.message === message ? { message: "", type: "success" } : prev));
+    }, 4000);
+  };
 
   // =========================
   // EDIT MODE
@@ -88,7 +95,7 @@ export default function Employees() {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
         "https://kt-backend-1.onrender.com/api/employee/list",
@@ -131,7 +138,7 @@ export default function Employees() {
         ? `https://kt-backend-1.onrender.com/api/employee/remove-tl/${employeeId}`
         : `https://kt-backend-1.onrender.com/api/employee/assign-tl/${employeeId}`;
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const headers = {
         "Content-Type": "application/json",
@@ -145,9 +152,8 @@ export default function Employees() {
 
       const data = await res.json();
 
-      alert(data.message);
-
       if (data.success) {
+        showToast(data.message || "Team lead status updated successfully", "success");
         setEmployees((prev) =>
           prev.map((emp) =>
             emp._id === employeeId
@@ -158,10 +164,12 @@ export default function Employees() {
               : emp
           )
         );
+      } else {
+        showToast(data.message || "Failed to update TL", "error");
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to update TL");
+      showToast("Failed to update TL", "error");
     }
   };
 
@@ -208,7 +216,7 @@ export default function Employees() {
   const getFormPayload = () => {
     const fullName = (formData.fullName || "").trim();
     if (!fullName) {
-      alert("Full Name is required");
+      showToast("Full Name is required", "error");
       return null;
     }
 
@@ -222,17 +230,17 @@ export default function Employees() {
     };
 
     if (!payload.address) {
-      alert("Address is required");
+      showToast("Address is required", "error");
       return null;
     }
 
     if (!payload.gender) {
-      alert("Gender is required");
+      showToast("Gender is required", "error");
       return null;
     }
 
     if (!payload.designation) {
-      alert("Designation is required");
+      showToast("Designation is required", "error");
       return null;
     }
 
@@ -252,7 +260,7 @@ export default function Employees() {
     }
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
         `${API_BASE}/employee/add`,
@@ -269,18 +277,18 @@ export default function Employees() {
       const data = await res.json();
 
       if (data.success) {
-        alert("Employee Added Successfully");
+        showToast("Employee Added Successfully", "success");
 
         setShowModal(false);
         resetForm();
 
         fetchEmployees();
       } else {
-        alert(data.message || "Failed to add employee");
+        showToast(data.message || "Failed to add employee", "error");
       }
     } catch (err) {
       console.error(err);
-      alert("Something went wrong");
+      showToast("Something went wrong", "error");
     }
   };
 
@@ -351,7 +359,7 @@ export default function Employees() {
     e.preventDefault();
 
     if (!selectedEmployeeId) {
-      alert("Employee ID is missing");
+      showToast("Employee ID is missing", "error");
       return;
     }
 
@@ -362,7 +370,7 @@ export default function Employees() {
     }
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
         `https://kt-backend-1.onrender.com/api/employee/edit/${selectedEmployeeId}`,
@@ -379,18 +387,18 @@ export default function Employees() {
       const data = await res.json();
  
       if (data.success) {
-        alert("Employee Updated Successfully");
+        showToast("Employee Updated Successfully", "success");
 
         setShowModal(false);
         resetForm();
 
         fetchEmployees();
       } else {
-        alert(data.message || "Failed to update employee");
+        showToast(data.message || "Failed to update employee", "error");
       }
     } catch (error) {
       console.error("Update employee error:", error);
-      alert("Failed to update employee");
+      showToast("Failed to update employee", "error");
     }
   };
 
@@ -410,7 +418,7 @@ export default function Employees() {
     }
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
         `https://kt-backend-1.onrender.com/api/employee/delete/${employeeId}`,
@@ -443,22 +451,22 @@ export default function Employees() {
             ? "Delete employee API endpoint was not found. Please check the backend route."
             : `Failed to delete employee (HTTP ${res.status})`);
 
-        alert(message);
+        showToast(message, "error");
         return;
       }
 
       if (data.success) {
-        alert(data.message || "Employee Deleted Successfully");
+        showToast(data.message || "Employee Deleted Successfully", "success");
 
         setEmployees((prev) =>
           prev.filter((employee) => employee._id !== employeeId)
         );
       } else {
-        alert(data.message || "Failed to delete employee");
+        showToast(data.message || "Failed to delete employee", "error");
       }
     } catch (error) {
       console.error("Delete employee error:", error);
-      alert("Failed to delete employee");
+      showToast("Failed to delete employee", "error");
     }
   };
 
@@ -487,6 +495,13 @@ export default function Employees() {
   return (
     <div className="min-h-screen bg-gray-50 px-3 sm:px-4 py-4 sm:py-6 lg:px-8">
       {confirmationDialog}
+      {toast.message && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ message: "", type: "success" })}
+        />
+      )}
       <div className="mx-auto max-w-7xl">
 
         {/* ================= HEADER ================= */}

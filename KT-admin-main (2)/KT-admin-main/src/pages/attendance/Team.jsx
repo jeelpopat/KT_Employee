@@ -49,6 +49,9 @@ const TASK_PROJECT_MANAGE_URL =
 const TEAM_LEAD_URL =
   "https://kt-backend-1.onrender.com/api/teamLead/team";
 
+const DAILY_UPDATE_URL =
+  "https://kt-backend-1.onrender.com/api/dailyUpdate/list";
+
 function MultiSelectDropdown({
   label,
   options = [],
@@ -395,31 +398,148 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     fetchTasks();
   }, []);
 
-  // Function to fetch daily updates for a task
+  // Function to fetch daily updates for a task using https://kt-backend-1.onrender.com/api/dailyUpdate/list
   const fetchTaskUpdates = async (taskId) => {
     if (!taskId) return;
 
     setLoadingTaskUpdates((prev) => ({ ...prev, [taskId]: true }));
 
     try {
-      const response = await axios.get(`${API_CORE}/daily-update/${taskId}`);
-      const payload = response.data;
-      const updates = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : Array.isArray(payload?.dailyUpdates)
-            ? payload.dailyUpdates
-            : Array.isArray(payload?.updates)
-              ? payload.updates
-              : [];
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const sortedUpdates = [...updates].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      let rawList = [];
+      try {
+        const response = await axios.get(DAILY_UPDATE_URL, {
+          headers,
+          params: { taskId },
+        });
+        const payload = response.data;
+        rawList = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.reports)
+              ? payload.reports
+              : Array.isArray(payload?.dailyUpdates)
+                ? payload.dailyUpdates
+                : Array.isArray(payload?.updates)
+                  ? payload.updates
+                  : [];
+      } catch (paramErr) {
+        const response = await axios.get(DAILY_UPDATE_URL, { headers });
+        const payload = response.data;
+        rawList = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.reports)
+              ? payload.reports
+              : Array.isArray(payload?.dailyUpdates)
+                ? payload.dailyUpdates
+                : Array.isArray(payload?.updates)
+                  ? payload.updates
+                  : [];
+      }
+
+      const targetTask = tasks.find((t) => String(t._id || t.id) === String(taskId));
+      const targetTitle = (targetTask?.taskTitle || targetTask?.title || "").trim().toLowerCase();
+
+      const matchedReports = rawList.filter((item) => {
+        if (!item) return false;
+        if (Array.isArray(item.taskReferences) && item.taskReferences.length > 0) {
+          const hasTaskRef = item.taskReferences.some((ref) => {
+            if (!ref) return false;
+            const refId = String(
+              typeof ref === "object" ? ref._id || ref.id || ref.taskId || "" : ref
+            );
+            if (refId && refId === String(taskId)) return true;
+            if (
+              targetTitle &&
+              typeof ref === "object" &&
+              ref.taskTitle &&
+              ref.taskTitle.trim().toLowerCase() === targetTitle
+            ) {
+              return true;
+            }
+            return false;
+          });
+          if (hasTaskRef) return true;
+        }
+
+        const directTaskId = String(
+          item.taskId?._id || item.taskId?.id || item.taskId || item.task?._id || item.task || ""
+        );
+        if (directTaskId && directTaskId === String(taskId)) return true;
+
+        if (Array.isArray(item.tasks) && item.tasks.length > 0) {
+          const hasTaskInArray = item.tasks.some((t) => {
+            if (!t) return false;
+            const tId = String(typeof t === "object" ? t._id || t.id || t.taskId || "" : t);
+            return tId && tId === String(taskId);
+          });
+          if (hasTaskInArray) return true;
+        }
+
+        return false;
+      });
+
+      const normalizedUpdates = matchedReports.map((item) => {
+        const matchingRef = Array.isArray(item.taskReferences)
+          ? item.taskReferences.find((ref) => {
+              if (!ref) return false;
+              const refId = String(
+                typeof ref === "object" ? ref._id || ref.id || ref.taskId || "" : ref
+              );
+              if (refId && refId === String(taskId)) return true;
+              if (
+                targetTitle &&
+                typeof ref === "object" &&
+                ref.taskTitle &&
+                ref.taskTitle.trim().toLowerCase() === targetTitle
+              ) {
+                return true;
+              }
+              return false;
+            })
+          : null;
+
+        const progressVal =
+          typeof matchingRef === "object" && matchingRef?.progress !== undefined
+            ? matchingRef.progress
+            : typeof item.progress === "number"
+              ? item.progress
+              : null;
+
+        const primaryText =
+          item.todaysWork ||
+          item.workUpdate ||
+          item.updateText ||
+          item.description ||
+          item.message ||
+          "";
+
+        return {
+          ...item,
+          progress: typeof progressVal === "number" ? progressVal : null,
+          updateText: primaryText || "No report details provided.",
+          todaysWork: item.todaysWork,
+          pendingWork: item.pendingWork,
+          tomorrowPlan: item.tomorrowPlan,
+          issuesFaced: item.issuesFaced,
+          hoursWorked: item.hoursWorked,
+          createdAt: item.createdAt || item.reportDate || item.date || new Date().toISOString(),
+        };
+      });
+
+      const sortedUpdates = [...normalizedUpdates].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      );
+
       setTaskUpdatesById((prev) => ({ ...prev, [taskId]: sortedUpdates }));
     } catch (error) {
-      console.error("Error fetching task updates:", error);
+      console.error("Error fetching task updates from /api/dailyUpdate/list:", error);
       setTaskUpdatesById((prev) => ({ ...prev, [taskId]: [] }));
-      alert("Failed to load task updates.");
     } finally {
       setLoadingTaskUpdates((prev) => ({ ...prev, [taskId]: false }));
     }

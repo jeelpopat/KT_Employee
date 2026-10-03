@@ -8,6 +8,14 @@ import {
 } from "lucide-react";
 import { useConfirm } from "../components/common/ConfirmDialog";
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 export default function Positions() {
   const { confirm, confirmationDialog } = useConfirm();
   const [positions, setPositions] = useState([]);
@@ -46,7 +54,9 @@ export default function Positions() {
   const fetchPositions = async () => {
     try {
       setLoading(true);
-      const res = await fetch("https://kt-backend-1.onrender.com/api/position");
+      const res = await fetch("https://kt-backend-1.onrender.com/api/position", {
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       setPositions(data.data || []);
     } catch (error) {
@@ -86,9 +96,7 @@ export default function Positions() {
 
       const response = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -99,7 +107,6 @@ export default function Positions() {
         setEditId(null);
         setFormData(initialFormState);
         fetchPositions();
-        alert(editId ? "Position updated successfully!" : "Position created successfully!");
       } else {
         alert(result.message || "Something went wrong!");
       }
@@ -139,11 +146,11 @@ export default function Positions() {
       try {
         const response = await fetch(`https://kt-backend-1.onrender.com/api/position/${id}`, {
           method: "DELETE",
+          headers: getAuthHeaders(),
         });
         const result = await response.json();
         if (result.success) {
           fetchPositions();
-          alert("Position deleted successfully!");
         } else {
           alert(result.message || "Failed to delete position!");
         }

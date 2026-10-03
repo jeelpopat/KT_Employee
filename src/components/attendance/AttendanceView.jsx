@@ -56,7 +56,8 @@ export const AttendanceView = () => {
       if (activeFilterTab === 'month' && selectedMonthStr) {
         const [year, month] = selectedMonthStr.split('-');
         const startDate = `${year}-${month}-01`;
-        const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+        const endD = new Date(Number(year), Number(month), 0);
+        const endDate = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}`;
         endpoint += `?startDate=${startDate}&endDate=${endDate}`;
       } else if (activeFilterTab === 'month') {
         endpoint += `?filter=thisMonth`;
@@ -90,8 +91,8 @@ export const AttendanceView = () => {
       }
 
       const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
       const todayLocalStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const todayStr = todayLocalStr;
 
       // Purge any stale rejection flags from localStorage
       localStorage.removeItem('kt_attendance_rejected_' + todayStr);

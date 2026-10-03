@@ -76,17 +76,7 @@ export const getAdminScreenshots = async (params = {}) => {
       backendScreenshots = rawList.map(s => normalizeScreenshotRecord(s)).filter(Boolean);
     }
   } catch (error) {
-    if (error.response?.status === 404) {
-      try {
-        const res2 = await api.get('/api/employee-panel//monitoring/admin/screenshots', { params });
-        const rawList2 = res2.data?.screenshots || res2.data?.sessions || res2.data?.data?.screenshots || res2.data?.data?.sessions || res2.data?.data || res2.data || [];
-        if (Array.isArray(rawList2) && rawList2.length > 0) {
-          backendScreenshots = rawList2.map(s => normalizeScreenshotRecord(s)).filter(Boolean);
-        }
-      } catch (e) {}
-    } else {
-      console.warn('Backend GET /api/employee-panel/monitoring/admin/screenshots notice:', error.response?.data || error.message);
-    }
+    console.warn('Backend GET /api/employee-panel/monitoring/admin/screenshots notice:', error.response?.data || error.message);
   }
 
   // 2. Also query GET /api/screenshot
@@ -968,21 +958,12 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
     });
     if (!backendResult) backendResult = epRes.data;
   } catch (epErr) {
-    if (epErr.response?.status === 404) {
-      try {
-        const epRes2 = await api.post('/api/employee-panel//monitoring/screenshot', formData, {
-          headers: { 'Content-Type': undefined }
-        });
-        if (!backendResult) backendResult = epRes2.data;
-      } catch (e) {}
-    } else {
-      // Also try with JSON payload
-      try {
-        const epJsonRes = await api.post('/api/employee-panel/monitoring/screenshot', sessionPayload);
-        if (!backendResult) backendResult = epJsonRes.data;
-      } catch (jsonErr) {
-        console.warn('Backend POST /api/employee-panel/monitoring/screenshot notice:', epErr.response?.data || epErr.message);
-      }
+    // Also try with JSON payload
+    try {
+      const epJsonRes = await api.post('/api/employee-panel/monitoring/screenshot', sessionPayload);
+      if (!backendResult) backendResult = epJsonRes.data;
+    } catch (jsonErr) {
+      console.warn('Backend POST /api/employee-panel/monitoring/screenshot notice:', epErr.response?.data || epErr.message);
     }
   }
 

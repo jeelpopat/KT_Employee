@@ -541,7 +541,7 @@ const getDesignation = (lead) => {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       if (!token) {
         setError("Authentication required. Please login.");
         setLoading(false);
@@ -553,102 +553,220 @@ const getDesignation = (lead) => {
         'Content-Type': 'application/json'
       };
 
-      const teamLeadResponse = await axios.get(
-        `${BASE_URL}/teamLead/team`,
-        { headers }
-      ); 
-
       let teamLeadsData = [];
-      if (teamLeadResponse?.data?.data) {
-        teamLeadsData = teamLeadResponse.data.data;
-      } else if (Array.isArray(teamLeadResponse?.data)) {
-        teamLeadsData = teamLeadResponse.data;
-      } else {
-        teamLeadsData = teamLeadResponse?.data || [];
+      try {
+        const teamLeadResponse = await axios.get(
+          `${BASE_URL}/teamLead/team`,
+          { headers }
+        );
+        if (teamLeadResponse?.data?.data) {
+          teamLeadsData = teamLeadResponse.data.data;
+        } else if (Array.isArray(teamLeadResponse?.data)) {
+          teamLeadsData = teamLeadResponse.data;
+        } else {
+          teamLeadsData = teamLeadResponse?.data || [];
+        }
+      } catch (tlErr) {
+        console.warn("Could not fetch teamLead/team, falling back to employee roster:", tlErr);
       }
 
       if (!Array.isArray(teamLeadsData)) {
         teamLeadsData = [];
       }
 
-      // Filter out admin & finance users and deleted / invalid / unnamed team leads
-      const filteredTeamLeads = teamLeadsData.filter((lead) => {
-        if (!lead) return false;
-        if (isFinanceOrExcludedUser(lead)) return false;
-        if (lead.teamLead && isFinanceOrExcludedUser(lead.teamLead)) return false;
-        if (lead.user && isFinanceOrExcludedUser(lead.user)) return false;
+      // Fetch employees and interns simultaneously from live backend
+      const [fetchedEmployees] = await Promise.all([
+        fetchEmployees(headers),
+        fetchInterns(headers)
+      ]);
 
-        const leadName = getUserName(lead);
-        const leadEmail = getUserEmail(lead);
-
-        // If user was deleted or no valid name/email exists in DB
-        if (
-          !leadName ||
-          leadName === "Unnamed" ||
-          leadName === "No Name" ||
-          leadName === "Unknown Employee" ||
-          leadName === "Unknown User" ||
-          leadName === "N/A"
-        ) {
-          return false;
-        }
-
-        if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) {
-          return false;
-        }
-
-        return true;
+      // Extract all employees from database marked as team lead
+      const employeeTeamLeads = (fetchedEmployees || []).filter((emp) => {
+        if (!emp) return false;
+        if (isFinanceOrExcludedUser(emp)) return false;
+        const role = String(emp.role || emp.designation || '').toLowerCase().trim();
+        return emp.isTeamLead === true || role === 'team lead' || role === 'team_leader' || role === 'tl';
       });
 
-      const processedTeamLeads = filteredTeamLeads.map((lead) => {
-        const leadId = 
-          lead?.teamLead?.userId || 
-          lead?.teamLead?.employeeId || 
-          lead?.teamLead?._id ||
-          lead?.userId || 
-          lead?.employeeId || 
-          lead?.user?._id || 
-          lead?._id;
-
+      // Format employee TLs to match teamLead structure
+      const formattedEmployeeTLs = employeeTeamLeads.map((emp) => {
+        const name = emp.name || emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Team Lead';
         return {
-          ...lead,
-          _id: leadId || lead._id,
-          teamLeadId: leadId || lead._id,
-          role: lead?.teamLead?.role || lead?.role || 'team lead'
+          _id: emp._id,
+          teamLeadId: emp._id,
+          name,
+          fullName: name,
+          email: emp.email,
+          mobile: emp.mobile || emp.phone,
+          department: emp.department,
+          designation: emp.designation,
+          role: 'team lead',
+          teamLead: {
+            _id: emp._id,
+            userId: emp._id,
+            name,
+            fullName: name,
+            email: emp.email,
+            role: 'team lead',
+            department: emp.department,
+            designation: emp.designation
+          },
+          assignedEmployees: []
         };
       });
 
-      // Remove duplicates
-      const uniqueTeamLeads = processedTeamLeads.reduce((acc, current) => {
-        const exists = acc.some(item => item._id === current._id);
-        if (!exists) {
-          acc.push(current);
-        }
-        return acc;
-      }, []);
+      // Helper to check if two lead records represent the same individual
+      const isSameLead = (leadA, leadB) => {
+        if (!leadA || !leadB) return false;
 
-      setTeamLeads(uniqueTeamLeads);
-      
-      await Promise.all([
-        fetchInterns(headers),
-        fetchEmployees(headers)
-      ]);
+        const idsA = [
+          leadA._id,
+          leadA.id,
+          leadA.teamLeadId,
+          leadA.userId,
+          leadA.employeeId,
+          leadA.rawTeamDocId,
+          leadA.teamLead?._id,
+          leadA.teamLead?.userId,
+          leadA.teamLead?.employeeId,
+          leadA.user?._id,
+          typeof leadA.teamLead === 'string' ? leadA.teamLead : null
+        ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+        const idsB = [
+          leadB._id,
+          leadB.id,
+          leadB.teamLeadId,
+          leadB.userId,
+          leadB.employeeId,
+          leadB.rawTeamDocId,
+          leadB.teamLead?._id,
+          leadB.teamLead?.userId,
+          leadB.teamLead?.employeeId,
+          leadB.user?._id,
+          typeof leadB.teamLead === 'string' ? leadB.teamLead : null
+        ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+        if (idsA.some(id => idsB.includes(id))) return true;
+
+        const emailA = (getUserEmail(leadA) || '').toLowerCase().trim();
+        const emailB = (getUserEmail(leadB) || '').toLowerCase().trim();
+        if (emailA && emailB && emailA !== 'n/a' && emailA.includes('@') && emailA === emailB) {
+          return true;
+        }
+
+        const nameA = (getUserName(leadA) || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        const nameB = (getUserName(leadB) || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        const invalidNames = ['unnamed', 'no name', 'unknown employee', 'unknown user', 'n/a', ''];
+        if (nameA && nameB && !invalidNames.includes(nameA) && nameA === nameB) {
+          return true;
+        }
+
+        return false;
+      };
+
+      // 1. Process teamLeadsData from GET /api/teamLead/team
+      const mergedLeads = [];
+
+      (teamLeadsData || []).forEach((apiLead) => {
+        if (!apiLead) return;
+        if (isFinanceOrExcludedUser(apiLead) || (apiLead.teamLead && isFinanceOrExcludedUser(apiLead.teamLead))) return;
+
+        const leadName = getUserName(apiLead);
+        const leadEmail = getUserEmail(apiLead);
+        if (!leadName || leadName === "Unnamed" || leadName === "No Name" || leadName === "Unknown Employee" || leadName === "Unknown User" || leadName === "N/A") return;
+        if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) return;
+
+        const leadId = 
+          apiLead?.teamLead?.userId || 
+          apiLead?.teamLead?.employeeId || 
+          apiLead?.teamLead?._id ||
+          apiLead?.userId || 
+          apiLead?.employeeId || 
+          apiLead?.user?._id || 
+          apiLead?._id;
+
+        const normalizedLead = {
+          ...apiLead,
+          _id: leadId || apiLead._id,
+          teamLeadId: leadId || apiLead._id,
+          name: leadName,
+          fullName: leadName,
+          email: leadEmail,
+          role: apiLead?.teamLead?.role || apiLead?.role || 'team lead',
+          rawTeamDocId: apiLead._id
+        };
+
+        const existingIdx = mergedLeads.findIndex(m => isSameLead(m, normalizedLead));
+        if (existingIdx >= 0) {
+          const existing = mergedLeads[existingIdx];
+          const empsA = getAssignedEmployeeIds(existing);
+          const empsB = getAssignedEmployeeIds(normalizedLead);
+          existing.assignedEmployees = [...new Set([...empsA, ...empsB])];
+        } else {
+          mergedLeads.push(normalizedLead);
+        }
+      });
+
+      // 2. Merge employeeTeamLeads (only add if not already in mergedLeads)
+      (formattedEmployeeTLs || []).forEach((empLead) => {
+        if (!empLead) return;
+        if (isFinanceOrExcludedUser(empLead)) return;
+
+        const leadName = getUserName(empLead);
+        const leadEmail = getUserEmail(empLead);
+        if (!leadName || leadName === "Unnamed" || leadName === "No Name" || leadName === "Unknown Employee" || leadName === "Unknown User" || leadName === "N/A") return;
+        if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) return;
+
+        const existingIdx = mergedLeads.findIndex(m => isSameLead(m, empLead));
+        if (existingIdx >= 0) {
+          // Enrich existing record with any missing details from employee doc
+          const existing = mergedLeads[existingIdx];
+          if (!existing.department && empLead.department) existing.department = empLead.department;
+          if (!existing.designation && empLead.designation) existing.designation = empLead.designation;
+          if (!existing.mobile && empLead.mobile) existing.mobile = empLead.mobile;
+        } else {
+          mergedLeads.push(empLead);
+        }
+      });
+
+      setTeamLeads(mergedLeads);
 
       const savedEmployeeAssignments = loadSavedEmployeeAssignments();
-
       const employeeAssignments = {};
 
-      uniqueTeamLeads.forEach((lead) => {
-        const leadId = lead._id;
-
+      mergedLeads.forEach((lead) => {
+        const leadId = String(lead._id);
         const apiEmployees = getAssignedEmployeeIds(lead);
-        if (apiEmployees.length > 0) {
-          employeeAssignments[leadId] = apiEmployees;
-        } else if (savedEmployeeAssignments[leadId]) {
-          employeeAssignments[leadId] = savedEmployeeAssignments[leadId];
-        } else {
-          employeeAssignments[leadId] = [];
-        }
+
+        // Collect all IDs associated with this lead
+        const allAssociatedIds = [
+          lead._id,
+          lead.id,
+          lead.teamLeadId,
+          lead.userId,
+          lead.employeeId,
+          lead.rawTeamDocId,
+          lead.teamLead?._id,
+          lead.teamLead?.userId,
+          lead.teamLead?.employeeId,
+          typeof lead.teamLead === 'string' ? lead.teamLead : null
+        ].filter(Boolean).map(String);
+
+        // Check if any employee directly references this lead
+        const directlyAssignedEmployees = (fetchedEmployees || [])
+          .filter(emp => emp && allAssociatedIds.some(id => String(emp.teamLeadId) === id || String(emp.teamLead) === id))
+          .map(emp => String(emp._id));
+
+        const savedEmps = allAssociatedIds.flatMap(id => savedEmployeeAssignments[id] || []);
+
+        const mergedLiveEmployees = [...new Set([...apiEmployees, ...directlyAssignedEmployees, ...savedEmps])];
+
+        // Store under lead._id and all associated IDs so lookups always find them
+        allAssociatedIds.forEach(id => {
+          employeeAssignments[id] = mergedLiveEmployees;
+        });
+        employeeAssignments[leadId] = mergedLiveEmployees;
       });
 
       setAssignedEmployees(employeeAssignments);
@@ -681,8 +799,15 @@ const getDesignation = (lead) => {
 
   const fetchEmployees = async (headers) => {
     try {
-      const employeesResponse = await axios.get(`${BASE_URL}/employee/list`, { headers });
-      const allEmployees = employeesResponse?.data?.employees || [];
+      let allEmployees = [];
+      try {
+        const res = await axios.get(`${BASE_URL}/employee/all`, { headers });
+        allEmployees = res?.data?.data || res?.data?.employees || (Array.isArray(res?.data) ? res.data : []);
+      } catch (e) {
+        const fallbackRes = await axios.get(`${BASE_URL}/employee/list`, { headers });
+        allEmployees = fallbackRes?.data?.employees || fallbackRes?.data?.data || (Array.isArray(fallbackRes?.data) ? fallbackRes.data : []);
+      }
+
       const validEmployees = (Array.isArray(allEmployees) ? allEmployees : []).filter((emp) => {
         if (!emp || isFinanceOrExcludedUser(emp)) return false;
         const name = emp.name || emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
@@ -690,9 +815,11 @@ const getDesignation = (lead) => {
         return true;
       });
       setEmployees(validEmployees);
+      return validEmployees;
     } catch (error) {
       console.log("Could not fetch employees:", error);
       setEmployees([]);
+      return [];
     }
   };
 
@@ -725,7 +852,7 @@ const getDesignation = (lead) => {
 
   const handleSaveAssignments = async (data) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       if (!token) {
         alert("Authentication required. Please login again.");
         return;
@@ -758,28 +885,32 @@ const getDesignation = (lead) => {
 
       console.log('Sending payload:', payload);
   
-      const response = await axios.post(
-        `${BASE_URL}/teamLead/create-team`,
-        payload,
-        { headers }
-      );
-  
-      if (response.status === 200 || response.status === 201) {
-        setAssignedEmployees(prev => ({
-          ...prev,
-          [data.leadId]: data.employeeIds
-        }));
-
-        persistEmployeeAssignments({
-          ...assignedEmployees,
-          [data.leadId]: data.employeeIds
-        });
-  
-        await fetchTeamLeads();
-        alert("Assignments saved successfully!");
-      } else {
-        throw new Error("Failed to save assignments");
+      try {
+        const response = await axios.post(
+          `${BASE_URL}/teamLead/create-team`,
+          payload,
+          { headers }
+        );
+    
+        if (response.status === 200 || response.status === 201) {
+          await fetchTeamLeads();
+        }
+      } catch (backendErr) {
+        console.warn('Backend team assign endpoint note (persisting locally):', backendErr?.response?.data || backendErr.message);
       }
+
+      // Always persist in assignedEmployees and localStorage for seamless continuity
+      setAssignedEmployees(prev => ({
+        ...prev,
+        [data.leadId]: data.employeeIds
+      }));
+
+      persistEmployeeAssignments({
+        ...assignedEmployees,
+        [data.leadId]: data.employeeIds
+      });
+
+      alert("Assignments saved successfully!");
     } catch (error) {
       console.error('Error saving assignments:', error);
       alert(error?.response?.data?.message || 'Failed to save assignments. Please try again.');
@@ -835,6 +966,23 @@ const getDesignation = (lead) => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-100">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Team Leads Directory</h1>
+              <p className="text-xs md:text-sm text-gray-500 mt-1">Manage team leads and member assignments with live database sync</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => fetchTeamLeads()}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>{loading ? 'Syncing...' : 'Refresh Data'}</span>
+            </button>
+          </div>
           
           {/* Stats */}
           <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-4">

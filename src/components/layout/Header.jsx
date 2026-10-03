@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Bell, User, LogOut, ChevronDown, 
   Camera, CheckCircle2, AlertCircle, CheckCheck, Plus
@@ -6,6 +7,7 @@ import {
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js'; 
 import companyLogo from '../../assets/Logo.png';
+import { tabToPath } from '../../utils/navigation.js';
 
 export const Header = ({ onSignOut }) => {
   const { 
@@ -13,6 +15,15 @@ export const Header = ({ onSignOut }) => {
     attendanceStatus, handleCheckOut,
     userRole, updateUserProfile
   } = useApp();
+  const navigate = useNavigate();
+
+  const handleOpenProfile = () => {
+    setCurrentTab('profile');
+    if (tabToPath && tabToPath['profile']) {
+      navigate(tabToPath['profile']);
+    }
+    setIsProfileMenuOpen(false);
+  };
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -155,6 +166,8 @@ export const Header = ({ onSignOut }) => {
     'admin-team-lead': 'Team Leads',
     'admin-team-tasks': 'Task Management',
     'admin-office-settings': 'Office Settings',
+    'admin-settings': 'System Settings',
+    'settings': 'System Settings',
     'admin-applications': 'Job Applications',
     'admin-positions': 'Open Positions',
     'admin-portfolio-leads': 'Portfolio Leads',
@@ -245,7 +258,16 @@ export const Header = ({ onSignOut }) => {
             <button
               type="button"
               title="Post Announcement"
-              onClick={() => window.dispatchEvent(new Event("open-announcement"))}
+              onClick={() => {
+                if (currentTab !== 'admin-dashboard') {
+                  setCurrentTab('admin-dashboard');
+                  setTimeout(() => {
+                    window.dispatchEvent(new Event("open-announcement"));
+                  }, 150);
+                } else {
+                  window.dispatchEvent(new Event("open-announcement"));
+                }
+              }}
               className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-xs font-semibold hover:bg-indigo-100 transition-colors cursor-pointer shadow-xs"
             >
               <Plus size={14} className="text-indigo-600" />
@@ -369,7 +391,11 @@ export const Header = ({ onSignOut }) => {
             {/* Profile Dropdown */}
             {isProfileMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200/80 rounded-xl shadow-card z-50 py-1 divide-y divide-slate-100 animate-fade-in">
-                <div className="px-3.5 py-2.5 flex items-center gap-2.5">
+                <div 
+                  onClick={handleOpenProfile}
+                  className="px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 transition-colors"
+                  title="View full profile"
+                >
                   <div className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
                     {displayPhoto && !headerImgError ? (
                       <img 
@@ -386,23 +412,21 @@ export const Header = ({ onSignOut }) => {
                       />
                     )}
                   </div>
-                  <div className="overflow-hidden min-w-0">
+                  <div className="overflow-hidden min-w-0 flex-1">
                     <p className="text-xs font-bold text-slate-900 truncate">{displayName}</p>
                     <p className="text-[10px] text-slate-400 truncate">{displayEmail}</p>
                   </div>
                 </div>
                 
                 <div className="py-1">
-                  {userRole !== 'hr' && (
-                    <button 
-                      type="button"
-                      onClick={() => { setCurrentTab('profile'); setIsProfileMenuOpen(false); }}
-                      className="w-full px-3.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 transition-colors cursor-pointer text-left"
-                    >
-                      <User size={14} className="text-slate-400" />
-                      <span>My Profile</span>
-                    </button>
-                  )}
+                  <button 
+                    type="button"
+                    onClick={handleOpenProfile}
+                    className="w-full px-3.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <User size={14} className="text-slate-400" />
+                    <span>My Profile</span>
+                  </button>
                   <button 
                     type="button"
                     onClick={() => { 

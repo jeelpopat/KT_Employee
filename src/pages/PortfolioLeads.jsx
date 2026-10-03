@@ -36,13 +36,13 @@ export default function PortfolioLeads() {
           clientName: item.fullName || "N/A",
           keyContact: item.email || "N/A",
           projectScope: item.projectTitle || "N/A",
-          stage: "Proposal Sent",
-          priority: "High",
+          stage: item.stage || item.status || "New Lead",
+          priority: item.priority || "Normal",
           createdAt: item.createdAt,
           phone: item.phone || "N/A",
           company: item.company || "N/A",
           message: item.message || "No message provided",
-          estimatedValue: "₹5,00,000",
+          estimatedValue: item.estimatedValue || item.budget || "Pending Estimation",
         }));
 
         setLeads(formattedData);

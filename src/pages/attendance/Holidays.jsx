@@ -15,6 +15,14 @@ const normalizeHoliday = (holiday) => {
   };
 };
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 export default function Holidays() {
   const { confirm, confirmationDialog } = useConfirm();
   const [holidays, setHolidays] = useState([]);
@@ -34,7 +42,9 @@ export default function Holidays() {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE}/all`);
+      const response = await fetch(`${API_BASE}/all`, {
+        headers: getAuthHeaders()
+      });
       const data = await response.json();
 
       let holidaysData = [];
@@ -73,7 +83,10 @@ export default function Holidays() {
   const handleSubmit = async (e) => { 
     e.preventDefault();
     const trimmedTitle = title.trim();
-    if (!date || !trimmedTitle) return alert('Please fill in both date and title!');
+    if (!date || !trimmedTitle) {
+      setError('Please fill in both date and title!');
+      return;
+    }
 
     setIsSubmitting(true);
     setError('');
@@ -89,9 +102,7 @@ export default function Holidays() {
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -147,6 +158,7 @@ export default function Holidays() {
     try {
       const response = await fetch(`${API_BASE}/delete/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
