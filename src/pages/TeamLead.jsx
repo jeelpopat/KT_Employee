@@ -553,6 +553,81 @@ const getDesignation = (lead) => {
         'Content-Type': 'application/json'
       };
 
+      // 1. Fetch team leads using api/user/all (with api/users/all as fallback)
+      let allUsers = [];
+      try {
+        const userRes = await axios.get(`${BASE_URL}/user/all`, { headers });
+        allUsers = userRes?.data?.users || userRes?.data?.data || (Array.isArray(userRes?.data) ? userRes.data : []);
+      } catch (err1) {
+        try {
+          const usersRes = await axios.get(`${BASE_URL}/users/all`, { headers });
+          allUsers = usersRes?.data?.users || usersRes?.data?.data || (Array.isArray(usersRes?.data) ? usersRes.data : []);
+        } catch (err2) {
+          try {
+            const publicUsersRes = await axios.get(`${BASE_URL}/users/all`);
+            allUsers = publicUsersRes?.data?.users || publicUsersRes?.data?.data || (Array.isArray(publicUsersRes?.data) ? publicUsersRes.data : []);
+          } catch (err3) {
+            console.warn("Could not fetch user/all or users/all:", err3);
+          }
+        }
+      }
+
+      const isTeamLeadUser = (u) => {
+        if (!u) return false;
+        if (isFinanceOrExcludedUser(u)) return false;
+        const role = String(u.role || '').toLowerCase().trim();
+        const desig = String(u.designation?.designationName || u.designation?.name || u.designation || '').toLowerCase().trim();
+        return (
+          u.isTeamLead === true ||
+          u.isTeamLeader === true ||
+          role === 'team lead' ||
+          role === 'team_leader' ||
+          role === 'team leader' ||
+          role === 'tl' ||
+          role.includes('team lead') ||
+          role.includes('lead') ||
+          desig.includes('team lead') ||
+          desig.includes('team leader')
+        );
+      };
+
+      const userTeamLeads = (Array.isArray(allUsers) ? allUsers : []).filter(isTeamLeadUser);
+
+      // Format team leads from api/user/all
+      const formattedUserTLs = userTeamLeads.map((u) => {
+        const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Team Lead';
+        const designation = typeof u.designation === 'object'
+          ? (u.designation?.designationName || u.designation?.name || u.designation?.title || '')
+          : (u.designation || '');
+        return {
+          _id: u._id,
+          teamLeadId: u._id,
+          name,
+          fullName: name,
+          email: u.email,
+          mobile: u.mobile || u.phone || u.phoneNumber,
+          phone: u.phone || u.phoneNumber || u.mobile,
+          department: u.department,
+          designation,
+          role: u.role || 'team lead',
+          isActive: u.isActive !== false,
+          profileImage: u.profileImage,
+          teamLead: {
+            _id: u._id,
+            userId: u._id,
+            name,
+            fullName: name,
+            email: u.email,
+            role: u.role || 'team lead',
+            department: u.department,
+            designation,
+            profileImage: u.profileImage
+          },
+          assignedEmployees: []
+        };
+      });
+
+      // Optional: fetch teamLead/team to attach any existing assignments or raw team docs
       let teamLeadsData = [];
       try {
         const teamLeadResponse = await axios.get(
@@ -567,7 +642,7 @@ const getDesignation = (lead) => {
           teamLeadsData = teamLeadResponse?.data || [];
         }
       } catch (tlErr) {
-        console.warn("Could not fetch teamLead/team, falling back to employee roster:", tlErr);
+        console.warn("teamLead/team fetch note (using api/user/all roster):", tlErr?.message);
       }
 
       if (!Array.isArray(teamLeadsData)) {
@@ -580,12 +655,12 @@ const getDesignation = (lead) => {
         fetchInterns(headers)
       ]);
 
-      // Extract all employees from database marked as team lead
+      // Extract all employees from database marked as team lead (e.g. Yash Vaghasiya)
       const employeeTeamLeads = (fetchedEmployees || []).filter((emp) => {
         if (!emp) return false;
         if (isFinanceOrExcludedUser(emp)) return false;
         const role = String(emp.role || emp.designation || '').toLowerCase().trim();
-        return emp.isTeamLead === true || role === 'team lead' || role === 'team_leader' || role === 'tl';
+        return emp.isTeamLead === true || role === 'team lead' || role === 'team_leader' || role === 'tl' || role.includes('lead');
       });
 
       // Format employee TLs to match teamLead structure
@@ -598,6 +673,7 @@ const getDesignation = (lead) => {
           fullName: name,
           email: emp.email,
           mobile: emp.mobile || emp.phone,
+          phone: emp.phone || emp.mobile,
           department: emp.department,
           designation: emp.designation,
           role: 'team lead',
@@ -665,9 +741,32 @@ const getDesignation = (lead) => {
         return false;
       };
 
-      // 1. Process teamLeadsData from GET /api/teamLead/team
-      const mergedLeads = [];
+      // 1. Start merged leads with the formatted team leads from api/user/all
+      const mergedLeads = [...formattedUserTLs];
 
+      // 2. Merge in any employeeTeamLeads (e.g. Yash Vaghasiya)
+      (formattedEmployeeTLs || []).forEach((empLead) => {
+        if (!empLead) return;
+        if (isFinanceOrExcludedUser(empLead)) return;
+
+        const leadName = getUserName(empLead);
+        const leadEmail = getUserEmail(empLead);
+        if (!leadName || leadName === "Unnamed" || leadName === "No Name" || leadName === "Unknown Employee" || leadName === "Unknown User" || leadName === "N/A") return;
+        if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) return;
+
+        const existingIdx = mergedLeads.findIndex(m => isSameLead(m, empLead));
+        if (existingIdx >= 0) {
+          const existing = mergedLeads[existingIdx];
+          if (!existing.department && empLead.department) existing.department = empLead.department;
+          if (!existing.designation && empLead.designation) existing.designation = empLead.designation;
+          if (!existing.mobile && empLead.mobile) existing.mobile = empLead.mobile;
+          if (!existing.phone && empLead.phone) existing.phone = empLead.phone;
+        } else {
+          mergedLeads.push(empLead);
+        }
+      });
+
+      // 3. Process teamLeadsData from teamLead/team to attach any existing assignments / rawTeamDocId
       (teamLeadsData || []).forEach((apiLead) => {
         if (!apiLead) return;
         if (isFinanceOrExcludedUser(apiLead) || (apiLead.teamLead && isFinanceOrExcludedUser(apiLead.teamLead))) return;
@@ -703,30 +802,9 @@ const getDesignation = (lead) => {
           const empsA = getAssignedEmployeeIds(existing);
           const empsB = getAssignedEmployeeIds(normalizedLead);
           existing.assignedEmployees = [...new Set([...empsA, ...empsB])];
+          if (!existing.rawTeamDocId) existing.rawTeamDocId = apiLead._id;
         } else {
           mergedLeads.push(normalizedLead);
-        }
-      });
-
-      // 2. Merge employeeTeamLeads (only add if not already in mergedLeads)
-      (formattedEmployeeTLs || []).forEach((empLead) => {
-        if (!empLead) return;
-        if (isFinanceOrExcludedUser(empLead)) return;
-
-        const leadName = getUserName(empLead);
-        const leadEmail = getUserEmail(empLead);
-        if (!leadName || leadName === "Unnamed" || leadName === "No Name" || leadName === "Unknown Employee" || leadName === "Unknown User" || leadName === "N/A") return;
-        if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) return;
-
-        const existingIdx = mergedLeads.findIndex(m => isSameLead(m, empLead));
-        if (existingIdx >= 0) {
-          // Enrich existing record with any missing details from employee doc
-          const existing = mergedLeads[existingIdx];
-          if (!existing.department && empLead.department) existing.department = empLead.department;
-          if (!existing.designation && empLead.designation) existing.designation = empLead.designation;
-          if (!existing.mobile && empLead.mobile) existing.mobile = empLead.mobile;
-        } else {
-          mergedLeads.push(empLead);
         }
       });
 
@@ -782,8 +860,19 @@ const getDesignation = (lead) => {
 
   const fetchInterns = async (headers) => {
     try {
-      const usersResponse = await axios.get(`${BASE_URL}/users/all`, { headers });
-      const allUsers = usersResponse?.data?.users || [];
+      let allUsers = [];
+      try {
+        const usersResponse = await axios.get(`${BASE_URL}/user/all`, { headers });
+        allUsers = usersResponse?.data?.users || usersResponse?.data?.data || (Array.isArray(usersResponse?.data) ? usersResponse.data : []);
+      } catch (e1) {
+        try {
+          const usersResponse = await axios.get(`${BASE_URL}/users/all`, { headers });
+          allUsers = usersResponse?.data?.users || usersResponse?.data?.data || (Array.isArray(usersResponse?.data) ? usersResponse.data : []);
+        } catch (e2) {
+          const usersResponse = await axios.get(`${BASE_URL}/users/all`);
+          allUsers = usersResponse?.data?.users || usersResponse?.data?.data || (Array.isArray(usersResponse?.data) ? usersResponse.data : []);
+        }
+      }
       const internUsers = allUsers.filter((user) => {
         if (!user || isFinanceOrExcludedUser(user)) return false;
         const name = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim();

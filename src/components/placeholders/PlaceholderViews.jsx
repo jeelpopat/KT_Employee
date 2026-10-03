@@ -204,41 +204,7 @@ export const PerformanceView = () => {
             </div>
           </div>
 
-          {/* Performance Competency Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sprint Velocity</span>
-                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{Math.max(score, 88)}%</span>
-              </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${Math.max(score, 88)}%` }} />
-              </div>
-              <p className="text-[11px] text-slate-500">Measures planned tasks completed within sprint timelines</p>
-            </div>
 
-            <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Attendance & Punctuality</span>
-                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">96.5%</span>
-              </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-emerald-500 h-full rounded-full" style={{ width: '96.5%' }} />
-              </div>
-              <p className="text-[11px] text-slate-500">Punctual session check-ins, active work hours, and minimal break overrun</p>
-            </div>
-
-            <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Quality & Bug-Free Output</span>
-                <span className="text-xs font-bold text-purple-600 dark:text-purple-400">{Math.max(score, 92)}%</span>
-              </div>
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-purple-600 h-full rounded-full" style={{ width: `${Math.max(score, 92)}%` }} />
-              </div>
-              <p className="text-[11px] text-slate-500">Deliverables meeting quality standards with clean code review passes</p>
-            </div>
-          </div>
         </>
       )}
     </div>
@@ -560,7 +526,7 @@ export const TeamMembersView = () => {
   );
 };
 
-// 5. EMPLOYEES DIRECTORY (Company-wide directory including Team Leaders, Employees, and Interns)
+// 5. EMPLOYEES DIRECTORY (Company-wide directory for Employees & Team Leads - Showing Employee, TL, HR, Admin; Excluding Account & CA)
 export const EmployeesView = () => {
   const [filterRole, setFilterRole] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -571,43 +537,145 @@ export const EmployeesView = () => {
     const fetchCompanyEmployees = async () => {
       setIsLoading(true);
       try {
-        // Fetch all company users from live backend
-        const res = await api.get('/api/users/all');
-        const rawUsers = res.data?.users || res.data?.data || [];
+        // Fetch users and employee records
+        const [usersRes, empsRes] = await Promise.allSettled([
+          api.get('/api/users/all'),
+          api.get('/api/employee/list')
+        ]);
 
-        const normalized = (Array.isArray(rawUsers) ? rawUsers : []).map(u => {
-          const roleStr = String(u.role || '').toLowerCase();
+        const rawUsers = usersRes.status === 'fulfilled'
+          ? (usersRes.value.data?.users || usersRes.value.data?.data || (Array.isArray(usersRes.value.data) ? usersRes.value.data : []))
+          : [];
+
+        const rawEmps = empsRes.status === 'fulfilled'
+          ? (empsRes.value.data?.employees || empsRes.value.data?.data || (Array.isArray(empsRes.value.data) ? empsRes.value.data : []))
+          : [];
+
+        // Helper to identify Account, CA, and Finance users who must NOT be shown
+        const isAccountOrCA = (u) => {
+          if (!u) return false;
+          const role = String(u.role || '').toLowerCase().trim();
+          const dept = String(u.department || u.dept || '').toLowerCase().trim();
+          const desig = String(u.designation || '').toLowerCase().trim();
+          const name = String(u.fullName || u.name || '').toLowerCase().trim();
+
+          // 1. Account / Accountant
+          if (role.includes('account') || dept.includes('account') || desig.includes('account')) return true;
+
+          // 2. CA / Chartered Accountant
+          if (
+            role === 'ca' ||
+            role.startsWith('ca ') ||
+            role.endsWith(' ca') ||
+            role.includes('chartered accountant') ||
+            desig === 'ca' ||
+            desig.startsWith('ca ') ||
+            desig.endsWith(' ca') ||
+            desig.includes('chartered accountant')
+          ) {
+            return true;
+          }
+
+          // 3. Finance & Audit
+          if (role.includes('finance') || dept.includes('finance') || desig.includes('finance')) return true;
+          if (role.includes('audit') || dept.includes('audit') || desig.includes('audit')) return true;
+          if (role.includes('cfo') || desig.includes('cfo')) return true;
+
+          // 4. Finance Admin specific check
+          if (name.includes('finance') && role.includes('admin')) return true;
+
+          return false;
+        };
+
+        // Helper to ensure ONLY employee, TL, HR, admin are shown
+        const isAllowedDirectoryRole = (u) => {
+          if (!u) return false;
+          if (isAccountOrCA(u)) return false;
+
+          const role = String(u.role || '').toLowerCase().trim();
+          const desig = String(u.designation || '').toLowerCase().trim();
+
+          const isEmployee =
+            role.includes('employee') ||
+            role === 'staff' ||
+            role.includes('intern') ||
+            desig.includes('developer') ||
+            desig.includes('designer') ||
+            desig.includes('engineer');
+
+          const isTL =
+            role.includes('lead') ||
+            role.includes('tl') ||
+            role === 'team_leader' ||
+            desig.includes('team lead') ||
+            desig.includes('team leader');
+
+          const isHR =
+            role.includes('hr') ||
+            desig.includes('hr');
+
+          const isAdmin =
+            role.includes('admin') ||
+            role.includes('ceo') ||
+            desig.includes('ceo') ||
+            desig.includes('admin');
+
+          return isEmployee || isTL || isHR || isAdmin;
+        };
+
+        const seenKeys = new Set();
+        const combined = [];
+
+        [...rawUsers, ...rawEmps].forEach((u) => {
+          if (!isAllowedDirectoryRole(u)) return;
+
+          const emailKey = String(u.email || '').toLowerCase().trim();
+          const nameKey = String(u.name || u.fullName || '').toLowerCase().trim();
+          const uniqueKey = emailKey || nameKey;
+
+          if (uniqueKey && seenKeys.has(uniqueKey)) return;
+          if (uniqueKey) seenKeys.add(uniqueKey);
+
+          const roleStr = String(u.role || '').toLowerCase().trim();
+          const desigStr = String(u.designation || '').toLowerCase().trim();
+
           let category = 'EMP';
           let roleFull = 'Employee';
 
-          if (roleStr.includes('lead') || roleStr === 'tl') {
+          if (roleStr.includes('lead') || roleStr.includes('tl') || roleStr === 'team_leader' || desigStr.includes('team lead') || desigStr.includes('team leader')) {
             category = 'TL';
             roleFull = 'Team Leader';
+          } else if (roleStr.includes('hr') || desigStr.includes('hr')) {
+            category = 'HR';
+            roleFull = 'HR Manager';
+          } else if (roleStr.includes('admin') || roleStr.includes('ceo') || desigStr.includes('ceo') || desigStr.includes('admin')) {
+            category = 'ADMIN';
+            roleFull = u.designation || 'Administrator';
           } else if (roleStr.includes('intern') || roleStr === 'int') {
             category = 'INT';
             roleFull = 'Intern';
-          } else if (roleStr.includes('hr') || roleStr.includes('admin') || roleStr.includes('accountant') || roleStr.includes('ceo')) {
-            category = 'MGMT';
-            roleFull = u.role ? (u.role.charAt(0).toUpperCase() + u.role.slice(1)) : 'Management';
+          } else {
+            category = 'EMP';
+            roleFull = u.designation || 'Employee';
           }
 
-          return {
+          combined.push({
             id: u.employeeID || (u._id ? `EMP-${String(u._id).slice(-4).toUpperCase()}` : 'EMP'),
-            name: u.name || 'Company Member',
+            name: u.fullName || u.name || 'Company Member',
             email: u.email || '',
-            phone: u.phone || u.phoneNumber || '',
+            phone: u.phone || u.phoneNumber || u.mobile || '',
             role: category,
             roleFull,
             rawRole: u.role,
-            dept: u.department || 'Operations',
+            dept: u.department || (category === 'ADMIN' ? 'Management' : category === 'HR' ? 'Human Resources' : 'Technology'),
             designation: u.designation || roleFull,
             status: u.isActive !== false ? 'Active' : 'Inactive',
             bloodGroup: u.bloodGroup,
             address: u.address
-          };
+          });
         });
 
-        setEmployees(normalized);
+        setEmployees(combined);
       } catch (err) {
         console.error("Failed to load company employees:", err);
       } finally {
@@ -622,7 +690,7 @@ export const EmployeesView = () => {
     const matchesRole =
       filterRole === 'ALL' ||
       item.role === filterRole ||
-      (filterRole === 'EMP' && (item.role === 'EMP' || item.role === 'MGMT'));
+      (filterRole === 'EMP' && (item.role === 'EMP' || item.role === 'INT'));
 
     const q = search.toLowerCase();
     const matchesSearch =
@@ -645,21 +713,30 @@ export const EmployeesView = () => {
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Company Employee Directory</h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              All registered employees across Kevalon Technology, including Team Leaders, Developers, and Staff
+              Company staff directory including Employees, Team Leaders, HR, and Administrators
             </p>
           </div>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs self-start sm:self-auto">
-          {['ALL', 'TL', 'EMP', 'INT'].map(tag => (
+        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs self-start sm:self-auto flex-wrap">
+          {[
+            { tag: 'ALL', label: 'All Staff' },
+            { tag: 'EMP', label: 'Employees' },
+            { tag: 'TL', label: 'Team Leaders' },
+            { tag: 'HR', label: 'HR' },
+            { tag: 'ADMIN', label: 'Admin' },
+          ].map(({ tag, label }) => (
             <button
               key={tag}
               onClick={() => setFilterRole(tag)}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${filterRole === tag ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                }`}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                filterRole === tag
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+              }`}
             >
-              {tag === 'ALL' ? 'All Staff' : tag === 'TL' ? 'Team Leaders' : tag === 'INT' ? 'Interns' : 'Employees'}
+              {label}
             </button>
           ))}
         </div>
@@ -721,11 +798,13 @@ export const EmployeesView = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${emp.role === 'TL' ? 'bg-amber-500' :
-                            emp.role === 'INT' ? 'bg-purple-600' :
-                              emp.role === 'MGMT' ? 'bg-indigo-600' :
-                                'bg-indigo-600'
-                            }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${
+                            emp.role === 'TL' ? 'bg-amber-500' :
+                            emp.role === 'HR' ? 'bg-rose-500' :
+                            emp.role === 'ADMIN' ? 'bg-purple-600' :
+                            emp.role === 'INT' ? 'bg-emerald-600' :
+                            'bg-indigo-600'
+                          }`}>
                             {initials}
                           </div>
                           <div>
@@ -735,11 +814,13 @@ export const EmployeesView = () => {
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${emp.role === 'TL' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800' :
-                          emp.role === 'INT' ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800' :
-                            emp.role === 'MGMT' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800' :
-                              'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-                          }`}>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                          emp.role === 'TL' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800' :
+                          emp.role === 'HR' ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800' :
+                          emp.role === 'ADMIN' ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800' :
+                          emp.role === 'INT' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800' :
+                          'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                        }`}>
                           {emp.roleFull}
                         </span>
                       </td>

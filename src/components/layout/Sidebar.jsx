@@ -107,6 +107,8 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'team-tasks', label: 'Task Management', icon: ListTodo },
         { tab: 'team-leaves', label: 'Team Leave Requests', icon: CalendarX },
         { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: Clock },
+        { tab: 'team-members', label: 'Team Members', icon: Users },
+        { tab: 'employees', label: 'Employees', icon: Users },
       ]
     },
     {

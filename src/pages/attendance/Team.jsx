@@ -739,7 +739,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
   const fetchTeamLeadOptions = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
       const headers = token
         ? {
             Authorization: `Bearer ${token}`,
@@ -747,62 +747,114 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           }
         : {};
 
-      const res = await axios.get(TEAM_LEAD_URL, { headers });
-      const payload = res?.data?.data || res?.data?.teamLeads || res?.data?.teamLead || res?.data || [];
-      const teamLeadsData = Array.isArray(payload) ? payload : [];
+      // 1. Fetch from api/user/all (fallback to api/users/all)
+      let allUsers = [];
+      try {
+        const userRes = await axios.get("https://kt-backend-1.onrender.com/api/user/all", { headers });
+        allUsers = userRes?.data?.users || userRes?.data?.data || (Array.isArray(userRes?.data) ? userRes.data : []);
+      } catch (e1) {
+        try {
+          const userRes = await axios.get(USER_URL, { headers });
+          allUsers = userRes?.data?.users || userRes?.data?.data || (Array.isArray(userRes?.data) ? userRes.data : []);
+        } catch (e2) {
+          try {
+            const userRes = await axios.get(USER_URL);
+            allUsers = userRes?.data?.users || userRes?.data?.data || (Array.isArray(userRes?.data) ? userRes.data : []);
+          } catch (e3) {
+            console.warn("Could not fetch user/all or users/all:", e3);
+          }
+        }
+      }
 
-      const normalizedOptions = teamLeadsData
+      const isTeamLeadUser = (u) => {
+        if (!u || isFinanceOrExcludedUser(u)) return false;
+        const role = String(u.role || '').toLowerCase().trim();
+        const desig = String(u.designation?.designationName || u.designation?.name || u.designation || '').toLowerCase().trim();
+        return (
+          u.isTeamLead === true ||
+          u.isTeamLeader === true ||
+          role === 'team lead' ||
+          role === 'team_leader' ||
+          role === 'team leader' ||
+          role === 'tl' ||
+          role.includes('team lead') ||
+          role.includes('lead') ||
+          desig.includes('team lead') ||
+          desig.includes('team leader')
+        );
+      };
+
+      const userTeamLeads = (Array.isArray(allUsers) ? allUsers : []).filter(isTeamLeadUser);
+
+      // Optional: check teamLead/team for assigned interns/employees if available
+      let teamLeadsData = [];
+      try {
+        const res = await axios.get(TEAM_LEAD_URL, { headers });
+        const payload = res?.data?.data || res?.data?.teamLeads || res?.data?.teamLead || res?.data || [];
+        teamLeadsData = Array.isArray(payload) ? payload : [];
+      } catch (err) {
+        // Safe to ignore if endpoint is not used
+      }
+
+      const userOptions = userTeamLeads.map((u) => {
+        const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Team Lead';
+        const matchingDoc = teamLeadsData.find((doc) => {
+          const docId = doc?.teamLead?.userId || doc?.teamLead?._id || doc?.teamLead?.employeeId || doc?.userId || doc?._id;
+          const docEmail = doc?.teamLead?.email || doc?.email;
+          return (docId && String(docId) === String(u._id)) || (docEmail && docEmail.toLowerCase() === (u.email || '').toLowerCase());
+        });
+
+        const interns = (matchingDoc?.teamLead?.interns || matchingDoc?.interns || []).filter((i) => !isFinanceOrExcludedUser(i));
+        const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || []).filter((e) => !isFinanceOrExcludedUser(e));
+
+        return {
+          _id: String(u._id),
+          value: String(u._id),
+          name: name,
+          email: u.email || "",
+          department: u.department || "",
+          designation: typeof u.designation === 'object' ? (u.designation?.designationName || u.designation?.name || "") : (u.designation || ""),
+          interns: Array.isArray(interns) ? interns : [],
+          employees: Array.isArray(employees) ? employees : [],
+        };
+      });
+
+      // Include any extra TLs from teamLeadsData not yet present
+      const extraOptions = teamLeadsData
         .map((lead) => {
           const teamLeadRecord = lead?.teamLead || lead?.lead || lead?.user || lead?.employee || null;
           if (lead && isFinanceOrExcludedUser(lead)) return null;
           if (teamLeadRecord && isFinanceOrExcludedUser(teamLeadRecord)) return null;
 
-          const interns = (teamLeadRecord?.interns || lead?.interns || []).filter((i) => !isFinanceOrExcludedUser(i));
-          const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || []).filter((e) => !isFinanceOrExcludedUser(e));
-
           const leadId =
             teamLeadRecord?.userId ||
             teamLeadRecord?.employeeId ||
             teamLeadRecord?._id ||
-            teamLeadRecord?.id ||
             lead?.teamLeadId ||
-            lead?.teamLead?._id ||
-            lead?.teamLead?.id ||
-            lead?.teamLead?.userId ||
-            lead?.teamLead?.employeeId ||
-            lead?.user?._id ||
-            lead?.user?.id ||
             lead?._id ||
-            lead?.id ||
             null;
 
           const name =
             teamLeadRecord?.name ||
             teamLeadRecord?.fullName ||
-            teamLeadRecord?.displayName ||
             lead?.name ||
             lead?.fullName ||
-            lead?.displayName ||
-            lead?.user?.name ||
-            lead?.user?.fullName ||
-            lead?.user?.displayName ||
-            [teamLeadRecord?.firstName, teamLeadRecord?.lastName].filter(Boolean).join(" ") ||
-            [lead?.firstName, lead?.lastName].filter(Boolean).join(" ") ||
-            [lead?.user?.firstName, lead?.user?.lastName].filter(Boolean).join(" ") ||
             "";
 
           if (
             !leadId ||
             !name ||
-            name === "Unnamed" ||
-            name === "No Name" ||
-            name === "Unknown Employee" ||
-            name === "Unknown User" ||
-            name === "N/A" ||
-            name === "Team Lead"
+            userOptions.some(
+              (uo) =>
+                String(uo._id) === String(leadId) ||
+                uo.name.toLowerCase() === name.toLowerCase()
+            )
           ) {
             return null;
           }
+
+          const interns = (teamLeadRecord?.interns || lead?.interns || []).filter((i) => !isFinanceOrExcludedUser(i));
+          const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || []).filter((e) => !isFinanceOrExcludedUser(e));
 
           return {
             _id: String(leadId),
@@ -814,7 +866,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         })
         .filter(Boolean);
 
-      setTeamLeadOptions(normalizedOptions);
+      setTeamLeadOptions([...userOptions, ...extraOptions]);
     } catch (error) {
       console.error("Team lead options fetch error:", error);
       setTeamLeadOptions([]);

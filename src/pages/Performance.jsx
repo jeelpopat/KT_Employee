@@ -375,7 +375,45 @@ const Performance = () => {
               };
             })
             .filter((teamLead) => teamLead._id)
-        : [];
+      // Extract team leads directly from users/all
+      const usersTLs = users
+        .filter((user) => {
+          if (!user || isFinanceOrExcludedUser(user)) return false;
+          const role = String(user.role || "").toLowerCase().trim();
+          const desig = String(user.designation?.designationName || user.designation?.name || user.designation || "").toLowerCase().trim();
+          return (
+            user.isTeamLead === true ||
+            user.isTeamLeader === true ||
+            role === "team lead" ||
+            role === "team_leader" ||
+            role === "team leader" ||
+            role === "tl" ||
+            role.includes("team lead") ||
+            role.includes("lead") ||
+            desig.includes("team lead") ||
+            desig.includes("team leader")
+          );
+        })
+        .map((u) => ({
+          _id: u._id || u.id || u.userId,
+          name:
+            u.name ||
+            u.fullName ||
+            u.displayName ||
+            `${u.firstName || ""} ${u.lastName || ""}`.trim() ||
+            "Unknown Team Lead",
+          email: u.email || "",
+          type: "teamlead",
+          role: "teamlead",
+        }))
+        .filter((tl) => tl._id);
+
+      const allTeamLeads = [...usersTLs];
+      teamLeads.forEach((tl) => {
+        if (!allTeamLeads.some((c) => String(c._id) === String(tl._id) || (tl.email && c.email && c.email.toLowerCase() === tl.email.toLowerCase()))) {
+          allTeamLeads.push(tl);
+        }
+      });
 
       // ========================================================
       // MERGE ALL
@@ -384,7 +422,7 @@ const Performance = () => {
       const combinedEmployees = [
         ...interns,
         ...employees,
-        ...teamLeads,
+        ...allTeamLeads,
       ];
 
       // Remove duplicate IDs

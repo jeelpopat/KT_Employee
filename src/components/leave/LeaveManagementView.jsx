@@ -49,7 +49,8 @@ export const LeaveManagementView = () => {
   };
 
   const todayStr = getLocalDateString(0);
-  const minAllowedDate = todayStr;
+  // Leave policy: leaves must be applied at least 2 days in advance (e.g., if today is 3/10, selectable from 5/10 onwards)
+  const minAllowedDate = getLocalDateString(2);
 
   // Resolve applicant role strictly matching schema enum: ["employee", "intern", "team lead", "hr", "admin"]
   const resolveApplicantRole = () => {
@@ -396,8 +397,8 @@ export const LeaveManagementView = () => {
     setLeaveType('full_day');
     setIsHalfDay(false);
     setHalfDayType('first-half');
-    setStartDate(todayStr);
-    setEndDate(todayStr);
+    setStartDate(minAllowedDate);
+    setEndDate(minAllowedDate);
     setFormError('');
     setSuccessMsg('');
     setIsModalOpen(true);
@@ -408,8 +409,8 @@ export const LeaveManagementView = () => {
     setFormError('');
     setSuccessMsg('');
 
-    if (startDate < todayStr) {
-      setFormError('Policy Notice: Leave cannot be applied for past dates.');
+    if (startDate < minAllowedDate) {
+      setFormError('Policy Notice: Leave must be applied at least 2 days in advance.');
       return;
     }
 
@@ -764,7 +765,7 @@ export const LeaveManagementView = () => {
                 <h5 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-3">Policy Rules:</h5>
                 <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-400 marker:text-indigo-500">
                   <li>Total leave days are computed excluding company holidays and weekly off (Sundays).</li>
-                  <li>Applications can be submitted for dates starting from today onwards.</li>
+                  <li>Applications must be submitted at least 2 days in advance (dates starting 2 days after today).</li>
                   <li>Approval follows the standard hierarchy (Team Lead &rarr; HR &rarr; Admin).</li>
                 </ul>
               </div>
@@ -872,7 +873,7 @@ export const LeaveManagementView = () => {
                       setLeaveType('half_day');
                       setIsHalfDay(true);
                       if (!halfDayType) setHalfDayType('first-half');
-                      setEndDate(startDate || todayStr);
+                      setEndDate(startDate || minAllowedDate);
                     }}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
                       leaveType === 'half_day' || isHalfDay
@@ -938,35 +939,54 @@ export const LeaveManagementView = () => {
               )}
 
               {/* Start Date & End Date */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Start Date</label>
-                  <input 
-                    type="date" 
-                    min={minAllowedDate}
-                    value={startDate}
-                    onChange={e => {
-                      setStartDate(e.target.value);
-                      if (isHalfDay || leaveType === 'half_day' || endDate < e.target.value) {
-                        setEndDate(e.target.value);
-                      }
-                    }}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-                    required
-                  />
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Start Date</label>
+                    <input 
+                      type="date" 
+                      min={minAllowedDate}
+                      value={startDate}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val && val < minAllowedDate) {
+                          setFormError('Policy Notice: Leave must be applied at least 2 days in advance.');
+                        } else {
+                          setFormError('');
+                        }
+                        setStartDate(val);
+                        if (isHalfDay || leaveType === 'half_day' || endDate < val) {
+                          setEndDate(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">End Date</label>
+                    <input 
+                      type="date" 
+                      min={startDate || minAllowedDate}
+                      value={(isHalfDay || leaveType === 'half_day') ? startDate : endDate}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val && val < minAllowedDate) {
+                          setFormError('Policy Notice: Leave must be applied at least 2 days in advance.');
+                        } else {
+                          setFormError('');
+                        }
+                        setEndDate(val);
+                      }}
+                      disabled={isHalfDay || leaveType === 'half_day'}
+                      className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      required
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">End Date</label>
-                  <input 
-                    type="date" 
-                    min={startDate || minAllowedDate}
-                    value={(isHalfDay || leaveType === 'half_day') ? startDate : endDate}
-                    onChange={e => setEndDate(e.target.value)}
-                    disabled={isHalfDay || leaveType === 'half_day'}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    required
-                  />
-                </div>
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                  Notice: Leaves must be applied at least 2 days in advance (selectable from {minAllowedDate}).
+                </p>
               </div>
               
               {/* Dynamic Working Days Banner */}

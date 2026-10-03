@@ -256,16 +256,66 @@
     async function fetchTeamLeads() {
       try {
         const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
-        const response = await fetch("https://kt-backend-1.onrender.com/api/teamLead/team", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await response.json();
-        const teamLeads = data.teamLeads || data.data || data.teamlead || data.teams || [];
-        const filteredTeamLeads = filterOutFinanceUsers(Array.isArray(teamLeads) ? teamLeads : []);
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        let userList = [];
+        try {
+          const res = await fetch("https://kt-backend-1.onrender.com/api/user/all", { headers });
+          const d = await res.json();
+          userList = d.users || d.data || (Array.isArray(d) ? d : []);
+        } catch (e1) {
+          try {
+            const res = await fetch("https://kt-backend-1.onrender.com/api/users/all", { headers });
+            const d = await res.json();
+            userList = d.users || d.data || (Array.isArray(d) ? d : []);
+          } catch (e2) {
+            try {
+              const res = await fetch("https://kt-backend-1.onrender.com/api/users/all");
+              const d = await res.json();
+              userList = d.users || d.data || (Array.isArray(d) ? d : []);
+            } catch (e3) {
+              console.warn("Could not fetch user/all or users/all for team leads:", e3);
+            }
+          }
+        }
+
+        const isTeamLeadUser = (u) => {
+          if (!u || isFinanceOrExcludedUser(u)) return false;
+          const role = String(u.role || '').toLowerCase().trim();
+          const desig = String(u.designation?.designationName || u.designation?.name || u.designation || '').toLowerCase().trim();
+          return (
+            u.isTeamLead === true ||
+            u.isTeamLeader === true ||
+            role === 'team lead' ||
+            role === 'team_leader' ||
+            role === 'team leader' ||
+            role === 'tl' ||
+            role.includes('team lead') ||
+            role.includes('lead') ||
+            desig.includes('team lead') ||
+            desig.includes('team leader')
+          );
+        };
+
+        const teamLeadsFromUsers = (Array.isArray(userList) ? userList : []).filter(isTeamLeadUser);
+        let finalCount = teamLeadsFromUsers.length;
+
+        // If users API had 0 team leads, fallback to teamLead/team
+        if (finalCount === 0) {
+          try {
+            const response = await fetch("https://kt-backend-1.onrender.com/api/teamLead/team", {
+              headers,
+            });
+            const data = await response.json();
+            const teamLeads = data.teamLeads || data.data || data.teamlead || data.teams || [];
+            const filteredTeamLeads = filterOutFinanceUsers(Array.isArray(teamLeads) ? teamLeads : []);
+            finalCount = filteredTeamLeads.length;
+          } catch (err) {}
+        }
 
         setDashboardCounts((prev) => ({
           ...prev,
-          teamLeadCount: filteredTeamLeads.length,
+          teamLeadCount: finalCount,
         }));
       } catch (error) {
         console.error(error);
