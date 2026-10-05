@@ -527,27 +527,31 @@ export const LeaveManagementView = () => {
     );
   };
 
-  // Status badge matching Mongoose enum: ["pending", "pending_hr", "pending_admin", "approved", "rejected"]
-  const renderStatusBadge = (status) => {
-    const statusStr = String(status || 'pending').toLowerCase();
-    if (statusStr === 'approved') {
+  // Status badge matching Mongoose pipeline: Waiting for TL -> Pending HR (TL Approved) -> Approved / Rejected
+  const renderStatusBadge = (status, leave = {}) => {
+    const statusStr = String(status || leave?.status || leave?.approvalStatus || 'pending').toLowerCase();
+    const tlStatus = String(leave?.teamLeadStatus || '').toLowerCase();
+    const hrStatus = String(leave?.hrStatus || '').toLowerCase();
+
+    if (statusStr === 'approved' || hrStatus === 'approved') {
       return (
         <span className="px-2.5 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit">
           <CheckCircle2 size={14} /> Approved
         </span>
       );
     }
-    if (statusStr === 'rejected') {
+    if (statusStr === 'rejected' || tlStatus === 'rejected' || hrStatus === 'rejected') {
+      const rejectNote = tlStatus === 'rejected' ? 'Rejected by TL' : hrStatus === 'rejected' ? 'Rejected by HR' : 'Rejected';
       return (
-        <span className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit">
-          <XCircle size={14} /> Rejected
+        <span className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit" title={rejectNote}>
+          <XCircle size={14} /> {rejectNote}
         </span>
       );
     }
-    if (statusStr === 'pending_hr') {
+    if (statusStr === 'pending_hr' || tlStatus === 'approved') {
       return (
-        <span className="px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit">
-          <Clock size={14} /> Pending HR
+        <span className="px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit" title="Approved by your Team Lead, awaiting final HR approval">
+          <Clock size={14} /> Pending HR (TL Approved)
         </span>
       );
     }
@@ -559,8 +563,8 @@ export const LeaveManagementView = () => {
       );
     }
     return (
-      <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit">
-        <Clock size={14} /> Pending
+      <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit" title="Submitted to your Team Lead for initial approval">
+        <Clock size={14} /> Waiting for TL Approval
       </span>
     );
   };
@@ -598,23 +602,6 @@ export const LeaveManagementView = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Leave Balance Quota Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Quota', value: `${leaveBalance.totalLeaves || 12} Days`, icon: Calendar, accent: 'border-l-indigo-600' },
-          { label: 'Leaves Taken', value: `${leaveBalance.usedLeaves || 0} Days`, icon: Clock, accent: 'border-l-amber-500' },
-          { label: 'Remaining Balance', value: `${leaveBalance.remainingLeaves || 12} Days`, icon: CheckCircle2, accent: 'border-l-emerald-500' },
-          { label: 'Pending Requests', value: `${leaveBalance.pendingRequests || 0} Req.`, icon: Clock, accent: 'border-l-slate-400' }
-        ].map((item, idx) => (
-          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
-            <div className="flex justify-between items-start">
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="px-2 text-xl font-bold text-slate-900">{item.value}</p>
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* Leave History Table */}
@@ -720,7 +707,7 @@ export const LeaveManagementView = () => {
                           )}
                         </td>
                         <td className="px-5 py-4">
-                          {renderStatusBadge(l.status)}
+                          {renderStatusBadge(l.status, l)}
                         </td>
                       </tr>
                     );

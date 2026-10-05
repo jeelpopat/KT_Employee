@@ -19,8 +19,8 @@ export const Sidebar = ({ onSignOut }) => {
   const navigate = useNavigate();
 
   const handleNavClick = (tab) => {
-    if (userRole === 'hr') {
-      setCurrentTab('admin-screenshots');
+    if (userRole === 'hr' && tab !== 'admin-screenshots' && tab !== 'admin-leave-requests') {
+      setCurrentTab('admin-leave-requests');
       setIsMobileSidebarOpen(false);
       return;
     }
@@ -84,6 +84,12 @@ export const Sidebar = ({ onSignOut }) => {
   ];
 
   const HR_SECTIONS = [
+    {
+      title: "Leave Approvals",
+      items: [
+        { tab: 'admin-leave-requests', label: 'Leave Requests', icon: CalendarDays }
+      ]
+    },
     {
       title: "Monitoring",
       items: [

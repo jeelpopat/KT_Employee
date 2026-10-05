@@ -18,6 +18,13 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { isFinanceOrExcludedUser } from "../../utils/roleFilters";
+import {
+  getLoggedInUserIdentifiers,
+  fetchTeamsList,
+  isTeamOwnedByLead,
+  extractAssignedTeamEmployees,
+  isLeaveOfAssignedTeam,
+} from "../../utils/teamLeadUtils";
 
 const BASE_URL = "https://kt-backend-1.onrender.com/api/leave";
 
@@ -31,7 +38,7 @@ const HR_APPROVE_URL = `${BASE_URL}/hr/approve`;
 const HR_REJECT_URL = `${BASE_URL}/hr/reject`;
 
 const ADMIN_APPROVE_URL = `${BASE_URL}/admin/approve`;
-const ADMIN_REJECT_URL = `${BASE_URL}/admin/approve`;
+const ADMIN_REJECT_URL = `${BASE_URL}/admin/reject`;
 
 // ============================================================
 // HELPERS
@@ -218,6 +225,10 @@ export default function LeaveRequest() {
   const [success, setSuccess] = useState("");
   const [localOverrides, setLocalOverrides] = useState({});
 
+  const [assignedTeams, setAssignedTeams] = useState([]);
+  const [teamEmployeesScope, setTeamEmployeesScope] = useState(null);
+  const [usersMap, setUsersMap] = useState({});
+
   const [actionModal, setActionModal] = useState({
     isOpen: false,
     leave: null,
@@ -253,7 +264,8 @@ export default function LeaveRequest() {
       const storedUser =
         localStorage.getItem("user") ||
         localStorage.getItem("currentUser") ||
-        localStorage.getItem("loggedInUser");
+        localStorage.getItem("loggedInUser") ||
+        localStorage.getItem("auth_user");
 
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
@@ -273,7 +285,8 @@ export default function LeaveRequest() {
 
       const storedRole =
         localStorage.getItem("role") ||
-        localStorage.getItem("userRole");
+        localStorage.getItem("userRole") ||
+        localStorage.getItem("active_role");
 
       if (storedRole) {
         setCurrentRole(normalizeRole(storedRole));
@@ -295,30 +308,53 @@ export default function LeaveRequest() {
       setLoading(true);
       setError("");
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
 
       if (!token) {
         throw new Error("Please login first.");
       }
 
-      const response = await fetch(LEAVE_URL, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      // Simultaneously fetch leaves, teams list, and users directory
+      const [leaveRes, teamsData, uRes] = await Promise.allSettled([
+        fetch(LEAVE_URL, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }).then(r => r.json().catch(() => ({}))),
+        fetchTeamsList(),
+        fetch("https://kt-backend-1.onrender.com/api/users/all", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }).then(r => r.json().catch(() => ({})))
+      ]);
 
-      const responseData = await response
-        .json()
-        .catch(() => ({}));
+      const responseData = leaveRes.status === "fulfilled" ? leaveRes.value : {};
 
-      if (!response.ok) {
-        throw new Error(
-          responseData?.message ||
-            `Failed to fetch leaves (${response.status})`
-        );
+      let uMap = {};
+      if (uRes.status === "fulfilled" && uRes.value) {
+        const rawUsers = uRes.value?.users || uRes.value?.data || (Array.isArray(uRes.value) ? uRes.value : []);
+        if (Array.isArray(rawUsers)) {
+          rawUsers.forEach(u => {
+            if (u._id) uMap[String(u._id)] = u;
+            if (u.id) uMap[String(u.id)] = u;
+            if (u.employeeId) uMap[String(u.employeeId)] = u;
+            if (u.email) uMap[u.email.toLowerCase().trim()] = u;
+          });
+          setUsersMap(uMap);
+        }
       }
+
+      const allTeams = teamsData.status === "fulfilled" && Array.isArray(teamsData.value) ? teamsData.value : [];
+      const userIdent = getLoggedInUserIdentifiers(currentUser);
+      const myTeams = allTeams.filter(t => isTeamOwnedByLead(t, userIdent));
+      setAssignedTeams(myTeams);
+
+      const teamScope = extractAssignedTeamEmployees(myTeams, uMap);
+      setTeamEmployeesScope(teamScope);
 
       let leaveArray = [];
 
@@ -541,14 +577,23 @@ export default function LeaveRequest() {
         };
       });
 
-      setRequests(normalized);
+      const loggedRole = normalizeRole(currentRole || currentUser?.role);
+      let finalLeaves = normalized;
+
+      // CRITICAL RULE: Leave requests go ONLY to that employee's TL, not to all TLs
+      // If logged in as Team Lead, strictly filter leaves so they only see their assigned team employees!
+      if (loggedRole === "teamlead") {
+        finalLeaves = normalized.filter(leave => isLeaveOfAssignedTeam(leave, teamScope, uMap));
+      }
+
+      setRequests(finalLeaves);
 
       // Keep selected modal synchronized
       setSelectedLeave((previous) => {
         if (!previous) return null;
 
         return (
-          normalized.find(
+          finalLeaves.find(
             (item) => item.id === previous.id
           ) || null
         );
@@ -808,14 +853,17 @@ export default function LeaveRequest() {
 
     // ========================================================
     // TEAM LEAD
+    // Only that employee's assigned TL can approve!
     // ========================================================
 
     if (loggedRole === "teamlead") {
+      const isMyTeamEmployee = isLeaveOfAssignedTeam(leave, teamEmployeesScope, usersMap);
       return (
         (
           applicantRole === "employee" ||
           applicantRole === "intern"
         ) &&
+        isMyTeamEmployee &&
         isPending(leave.teamLeadStatus)
       );
     }
@@ -1077,7 +1125,11 @@ export default function LeaveRequest() {
         }
       }
 
-      setSuccess(`Leave status updated to ${newStatusTitle} successfully.`);
+      setSuccess(
+        userRole === "teamlead" && status === "approved"
+          ? "Leave approved by Team Lead and forwarded to HR for final approval."
+          : `Leave status updated to ${newStatusTitle} successfully.`
+      );
       closeActionModal();
       setTimeout(() => setSuccess(""), 3000);
     } catch (error) {
@@ -1286,6 +1338,65 @@ export default function LeaveRequest() {
 
   const ApprovalActions = ({ leave }) => {
     if (!canTakeAction(leave)) {
+      const loggedRole = normalizeRole(currentRole);
+      const applicantRole = normalizeRole(leave?.role);
+
+      // If logged in as HR and employee leave hasn't been approved by TL yet
+      if (loggedRole === "hr" && (applicantRole === "employee" || applicantRole === "intern")) {
+        if (isPending(leave?.teamLeadStatus)) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              Waiting for TL Approval
+            </span>
+          );
+        }
+        if (isRejected(leave?.teamLeadStatus)) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+              Rejected by TL
+            </span>
+          );
+        }
+        if (isApproved(leave?.hrStatus)) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+              Approved by HR
+            </span>
+          );
+        }
+        if (isRejected(leave?.hrStatus)) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+              Rejected by HR
+            </span>
+          );
+        }
+      }
+
+      // If logged in as Team Lead
+      if (loggedRole === "teamlead") {
+        if (isApproved(leave?.teamLeadStatus)) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+              Approved by You (Sent to HR)
+            </span>
+          );
+        }
+        if (isRejected(leave?.teamLeadStatus)) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+              Rejected by You
+            </span>
+          );
+        }
+      }
+
       return <StatusBadge status={leave?.adminStatus || "Pending"} />;
     }
 
@@ -1484,6 +1595,35 @@ export default function LeaveRequest() {
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        )}
+
+        {/* ====================================================
+            TEAM LEAD ASSIGNED BANNER
+        ==================================================== */}
+
+        {normalizeRole(currentRole) === "teamlead" && (
+          <div className="mb-4">
+            {assignedTeams.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs">
+                <div className="flex items-center gap-2 text-indigo-900 font-medium">
+                  <User className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    Viewing leaves for your assigned team: <strong>{assignedTeams.map(t => t.name || 'My Team').join(', ')}</strong> ({teamEmployeesScope?.memberIds?.size || 0} Members)
+                  </span>
+                </div>
+                <span className="text-[11px] text-indigo-700 font-semibold bg-white px-2.5 py-1 rounded-md border border-indigo-200 shadow-2xs">
+                  Requests forward to HR upon your approval
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  No specific team assigned to your Team Lead account in <code>/api/teamLead/team</code>. Only leaves for your assigned team members will appear here.
+                </span>
+              </div>
+            )}
           </div>
         )}
 

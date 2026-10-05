@@ -58,10 +58,10 @@ const MainLayout = ({ handleSignOut }) => {
   const { currentTab, userRole, setCurrentTab, isRoleAllowed: roleCheck } = useApp();
   const location = useLocation();
 
-  // If user is HR, enforce that active tab is strictly locked to screenshot monitoring
+  // If user is HR, ensure active tab is one of their allowed tabs
   useEffect(() => {
-    if (userRole === 'hr' && currentTab !== 'admin-screenshots') {
-      setCurrentTab('admin-screenshots');
+    if (userRole === 'hr' && currentTab !== 'admin-screenshots' && currentTab !== 'admin-leave-requests') {
+      setCurrentTab('admin-leave-requests');
     }
   }, [userRole, currentTab, setCurrentTab]);
 
@@ -71,7 +71,11 @@ const MainLayout = ({ handleSignOut }) => {
     const mapped = pathToTab[path];
     if (mapped && mapped !== currentTab) {
       if (userRole === 'hr') {
-        setCurrentTab('admin-screenshots');
+        if (mapped === 'admin-leave-requests' || mapped === 'admin-screenshots') {
+          setCurrentTab(mapped);
+        } else {
+          setCurrentTab('admin-leave-requests');
+        }
       } else if (userRole === 'admin' && (mapped === 'dashboard' || path === '/')) {
         setCurrentTab('admin-dashboard');
       } else if (userRole !== 'admin' && (mapped === 'admin-dashboard' || path === '/admin' || path === '/admin/dashboard')) {
@@ -111,9 +115,12 @@ const MainLayout = ({ handleSignOut }) => {
   }
 
   const renderActiveTab = () => {
-    // HR is strictly locked to Screenshot Monitoring portal only - no dashboard, profile, etc.
+    // HR portal includes Leave Requests and Screenshot Monitoring
     if (userRole === 'hr') {
-      return <AdminScreenshotPortal />;
+      if (currentTab === 'admin-screenshots') {
+        return <AdminScreenshotPortal />;
+      }
+      return <AdminLeaveRequestsView />;
     }
 
     switch (currentTab) {

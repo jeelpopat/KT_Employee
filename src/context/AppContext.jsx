@@ -394,22 +394,22 @@ export const AppProvider = ({ children }) => {
   const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [currentTab, setCurrentTabState] = useState(() => {
     const role = localStorage.getItem('active_role') || localStorage.getItem('user_role');
-    if (role === 'hr') return 'admin-screenshots';
+    if (role === 'hr') return 'admin-leave-requests';
     if (role === 'admin') return 'admin-dashboard';
     return 'dashboard';
   });
 
   const setCurrentTab = useCallback((tab) => {
-    if (userRole === 'hr') {
-      setCurrentTabState('admin-screenshots');
+    if (userRole === 'hr' && tab !== 'admin-screenshots' && tab !== 'admin-leave-requests') {
+      setCurrentTabState('admin-leave-requests');
       return;
     }
     setCurrentTabState(tab);
   }, [userRole]);
 
   useEffect(() => {
-    if (userRole === 'hr') {
-      setCurrentTabState('admin-screenshots');
+    if (userRole === 'hr' && currentTab !== 'admin-screenshots' && currentTab !== 'admin-leave-requests') {
+      setCurrentTabState('admin-leave-requests');
     }
   }, [userRole]);
 

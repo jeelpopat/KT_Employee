@@ -11,6 +11,13 @@ import {
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
 import { ProjectView } from '../projects/ProjectView.jsx';
+import {
+  getLoggedInUserIdentifiers,
+  fetchTeamsList,
+  isTeamOwnedByLead,
+  extractAssignedTeamEmployees,
+  isLeaveOfAssignedTeam,
+} from '../../utils/teamLeadUtils.js';
 
 export { ProjectView };
 
@@ -1942,10 +1949,13 @@ export const TeamTaskManagementView = () => {
   );
 };
 
-// 11. TEAM LEAVE MANAGEMENT (Team Leader #4) - Live API integration
+// 11. TEAM LEAVE MANAGEMENT (Team Leader #4) - Live API integration with strict assigned-team scoping
 export const TeamLeaveManagementView = () => {
+  const { user } = useApp();
   const [leaves, setLeaves] = useState([]);
   const [usersMap, setUsersMap] = useState({});
+  const [assignedTeams, setAssignedTeams] = useState([]);
+  const [assignedEmployeesCount, setAssignedEmployeesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filterTab, setFilterTab] = useState('pending'); // 'pending' | 'all' | 'approved' | 'rejected'
@@ -2035,43 +2045,59 @@ export const TeamLeaveManagementView = () => {
     return 'pending';
   };
 
-  // Fetch Live Leaves and User Directory
+  // Fetch Live Leaves and User Directory with Team Scope filter
   const fetchLeaves = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch Users directory for seamless employee name resolution
+      // 1. Fetch Users directory and Teams collection simultaneously
       let uMap = {};
-      try {
-        const uRes = await api.get('/api/users/all');
-        const rawUsers = uRes.data?.users || uRes.data?.data || (Array.isArray(uRes.data) ? uRes.data : []);
+      const [uRes, teamsData] = await Promise.allSettled([
+        api.get('/api/users/all'),
+        fetchTeamsList()
+      ]);
+
+      if (uRes.status === 'fulfilled') {
+        const rawUsers = uRes.value.data?.users || uRes.value.data?.data || (Array.isArray(uRes.value.data) ? uRes.value.data : []);
         if (Array.isArray(rawUsers)) {
           rawUsers.forEach(u => {
             if (u._id) uMap[String(u._id)] = u;
             if (u.id) uMap[String(u.id)] = u;
+            if (u.employeeId) uMap[String(u.employeeId)] = u;
             if (u.email) uMap[u.email.toLowerCase().trim()] = u;
           });
           setUsersMap(uMap);
         }
-      } catch (uErr) {
-        console.warn('Could not preload user directory for leave names:', uErr);
       }
 
-      // 2. Fetch Leaves
-      let list = [];
+      // 2. Identify the logged-in user's assigned team(s) from GET /api/teamLead/team
+      const allTeams = teamsData.status === 'fulfilled' && Array.isArray(teamsData.value) ? teamsData.value : [];
+      const userIdent = getLoggedInUserIdentifiers(user);
+      const myTeams = allTeams.filter(team => isTeamOwnedByLead(team, userIdent));
+      setAssignedTeams(myTeams);
+
+      const teamScope = extractAssignedTeamEmployees(myTeams, uMap);
+      setAssignedEmployeesCount(teamScope.memberIds.size);
+
+      // 3. Fetch leaves
+      let allLeavesList = [];
       try {
         const res = await api.get('/api/leave/all');
         const raw = res.data?.data || res.data?.leaves || res.data?.history || (Array.isArray(res.data) ? res.data : []);
-        if (Array.isArray(raw) && raw.length > 0) list = raw;
+        if (Array.isArray(raw) && raw.length > 0) allLeavesList = raw;
       } catch (err1) {
         try {
           const res2 = await api.get('/api/employee-panel/leaves/history');
           const raw2 = res2.data?.data || res2.data?.leaves || res2.data?.history || (Array.isArray(res2.data) ? res2.data : []);
-          if (Array.isArray(raw2) && raw2.length > 0) list = raw2;
+          if (Array.isArray(raw2) && raw2.length > 0) allLeavesList = raw2;
         } catch (err2) {
           console.warn('Could not load leaves:', err2);
         }
       }
-      setLeaves(list);
+
+      // 4. CRITICAL RULE: Leave requests go ONLY to that employee's TL, not to all TLs
+      // Only keep leaves from employees assigned to this Team Lead's team!
+      const myTeamLeaves = allLeavesList.filter(l => isLeaveOfAssignedTeam(l, teamScope, uMap));
+      setLeaves(myTeamLeaves);
     } finally {
       setIsLoading(false);
     }
@@ -2079,9 +2105,10 @@ export const TeamLeaveManagementView = () => {
 
   useEffect(() => {
     fetchLeaves();
-  }, []);
+  }, [user]);
 
-  // APPROVE LEAVE: PUT /api/leave/teamlead-approval with status: 'approved'
+  // APPROVE LEAVE: PUT /api/leave/teamlead/approve or /api/leave/teamlead-approval with status: 'approved'
+  // When TL approves, it goes to HR for approval!
   const handleApprove = async () => {
     if (!actionModal?.leave?._id) return;
     setIsSubmitting(true);
@@ -2098,21 +2125,21 @@ export const TeamLeaveManagementView = () => {
       };
 
       try {
-        await api.put('/api/leave/teamlead-approval', payload);
+        await api.put('/api/leave/teamlead/approve', payload);
       } catch (err1) {
-        if (err1.response?.status === 404 || err1.response?.status === 400) {
-          try {
+        try {
+          await api.put('/api/leave/teamlead-approval', payload);
+        } catch (err2) {
+          if (err2.response?.status === 404 || err2.response?.status === 400) {
             await api.put(`/api/leave/teamlead-approval/${leaveId}`, payload);
-          } catch (err2) {
-            throw err1;
+          } else {
+            throw err2;
           }
-        } else {
-          throw err1;
         }
       }
 
       const applicantName = resolveApplicantDetails(actionModal.leave).name;
-      showAlert(`Leave for ${applicantName} approved successfully!`);
+      showAlert(`Leave for ${applicantName} approved by you! Request has been forwarded to HR for final approval.`);
       setActionModal(null);
       setRemarksText('');
       await fetchLeaves();
@@ -2125,7 +2152,7 @@ export const TeamLeaveManagementView = () => {
     }
   };
 
-  // REJECT LEAVE: PUT /api/leave/teamlead-approval with status: 'rejected'
+  // REJECT LEAVE: PUT /api/leave/teamlead/reject or /api/leave/teamlead-approval with status: 'rejected'
   const handleReject = async () => {
     if (!actionModal?.leave?._id) return;
     setIsSubmitting(true);
@@ -2143,10 +2170,10 @@ export const TeamLeaveManagementView = () => {
       };
 
       try {
-        await api.put('/api/leave/teamlead-approval', payload);
+        await api.put('/api/leave/teamlead/reject', payload);
       } catch (err1) {
         try {
-          await api.put('/api/leave/teamlead/reject', payload);
+          await api.put('/api/leave/teamlead-approval', payload);
         } catch (err2) {
           throw err1;
         }
@@ -2238,7 +2265,7 @@ export const TeamLeaveManagementView = () => {
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Team Leave Approvals</h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              Review, approve, or reject leave applications submitted by department team members
+              Review and approve leave applications for your assigned team members before they proceed to HR
             </p>
           </div>
         </div>
@@ -2253,13 +2280,35 @@ export const TeamLeaveManagementView = () => {
         </button>
       </div>
 
+      {/* Team Assignment Banner */}
+      {assignedTeams.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-xl text-xs">
+          <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
+            <Users size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span>
+              Your Assigned Team: <strong>{assignedTeams.map(t => t.name || 'My Team').join(', ')}</strong> ({assignedEmployeesCount} Assigned Members)
+            </span>
+          </div>
+          <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold bg-white dark:bg-slate-900 px-2.5 py-1 rounded-md border border-indigo-200 dark:border-indigo-800">
+            Requests forward to HR upon your approval
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+          <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+          <span>
+            No specific team currently assigned to your Team Lead account in <code>/api/teamLead/team</code>. Only leave requests from your assigned team members will appear here.
+          </span>
+        </div>
+      )}
+
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Pending Approvals', value: pendingCount, color: 'text-amber-600 dark:text-amber-400', border: 'border-l-amber-500' },
-          { label: 'Approved', value: approvedCount, color: 'text-emerald-600 dark:text-emerald-400', border: 'border-l-emerald-500' },
-          { label: 'Rejected', value: rejectedCount, color: 'text-rose-600 dark:text-rose-400', border: 'border-l-rose-500' },
-          { label: 'Total Requests', value: leaves.length, color: 'text-indigo-600 dark:text-indigo-400', border: 'border-l-indigo-600' }
+          { label: 'Pending Your Approval', value: pendingCount, color: 'text-amber-600 dark:text-amber-400', border: 'border-l-amber-500' },
+          { label: 'Approved by You', value: approvedCount, color: 'text-emerald-600 dark:text-emerald-400', border: 'border-l-emerald-500' },
+          { label: 'Rejected by You', value: rejectedCount, color: 'text-rose-600 dark:text-rose-400', border: 'border-l-rose-500' },
+          { label: 'Team Total Requests', value: leaves.length, color: 'text-indigo-600 dark:text-indigo-400', border: 'border-l-indigo-600' }
         ].map((item, idx) => (
           <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-2xs`}>
             <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">{item.label}</span>
@@ -2294,7 +2343,7 @@ export const TeamLeaveManagementView = () => {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by applicant, reason..."
+            placeholder="Search team applicant, reason..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-200"
@@ -2306,14 +2355,16 @@ export const TeamLeaveManagementView = () => {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
           <Loader2 size={32} className="animate-spin text-rose-500" />
-          <p className="text-xs text-slate-500 font-medium">Loading leave requests...</p>
+          <p className="text-xs text-slate-500 font-medium">Loading team leave requests...</p>
         </div>
       ) : filteredLeaves.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-12 text-center space-y-2">
           <CheckCircle2 size={36} className="text-emerald-500 mx-auto" />
           <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No leave requests found</h3>
           <p className="text-xs text-slate-500">
-            {filterTab === 'pending' ? 'All caught up! No pending leave applications require your review.' : 'No leaves match the selected filter.'}
+            {filterTab === 'pending'
+              ? 'All caught up! No pending leave applications from your team members require your review.'
+              : 'No leaves match the selected filter.'}
           </p>
         </div>
       ) : (
@@ -2373,10 +2424,10 @@ export const TeamLeaveManagementView = () => {
                         'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                       }`}>
                       {tlStatus === 'approved'
-                        ? (l.status === 'pending_hr' ? 'TL Approved (Awaiting HR)' : 'Approved')
+                        ? 'Approved by You • Awaiting HR Approval'
                         : tlStatus === 'rejected'
-                          ? 'Rejected'
-                          : 'Pending Review'}
+                          ? 'Rejected by You'
+                          : 'Action Required (Your Team Member)'}
                     </span>
                   </div>
 
@@ -2417,7 +2468,7 @@ export const TeamLeaveManagementView = () => {
                         }}
                         className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                       >
-                        <Check size={14} /> Approve
+                        <Check size={14} /> Approve & Forward to HR
                       </button>
                       <button
                         onClick={() => {
@@ -2433,7 +2484,7 @@ export const TeamLeaveManagementView = () => {
                     <div className="flex items-center gap-1.5">
                       {tlStatus === 'approved' ? (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-md text-xs font-semibold">
-                          <Check size={13} /> Approved by You
+                          <Check size={13} /> Approved by You (Sent to HR)
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-md text-xs font-semibold">
@@ -2462,7 +2513,7 @@ export const TeamLeaveManagementView = () => {
                   {actionModal.type === 'approve' ? <Check size={18} /> : <X size={18} />}
                 </div>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  {actionModal.type === 'approve' ? 'Approve Leave Request' : 'Reject Leave Request'}
+                  {actionModal.type === 'approve' ? 'Approve & Forward to HR' : 'Reject Leave Request'}
                 </h4>
               </div>
               <button
@@ -2490,7 +2541,7 @@ export const TeamLeaveManagementView = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {actionModal.type === 'approve' ? 'Approval Remarks' : 'Rejection Reason / Remarks'}
+                {actionModal.type === 'approve' ? 'Approval Remarks (Forwarded to HR)' : 'Rejection Reason / Remarks'}
               </label>
               <textarea
                 rows={3}
@@ -2519,7 +2570,7 @@ export const TeamLeaveManagementView = () => {
                   }`}
               >
                 {isSubmitting && <Loader2 size={13} className="animate-spin" />}
-                {actionModal.type === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
+                {actionModal.type === 'approve' ? 'Approve & Forward to HR' : 'Confirm Rejection'}
               </button>
             </div>
           </div>

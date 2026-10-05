@@ -7,7 +7,7 @@ import {
   Plus, Edit3, Trash2, Save, Check
 } from 'lucide-react';
 import api from '../../api/axios.js';
-import { useApp } from '../../context/AppContext.jsx';
+import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
 
 // Helper to normalize and build assigned member list from project and /members endpoint data
 const buildAssignedMemberList = (proj, membersData) => {
@@ -87,7 +87,12 @@ const buildAssignedMemberList = (proj, membersData) => {
 };
 
 export const ProjectView = () => {
-  const { user, setSelectedTask } = useApp();
+  const { user, userRole, setSelectedTask } = useApp();
+
+  // Role detection: employees / interns cannot create, edit, or delete projects, nor view client details or budgets
+  const rawRole = userRole || deriveUserRole(user);
+  const normalizedRole = String(rawRole || '').toLowerCase().trim();
+  const isEmployee = normalizedRole === 'employee' || normalizedRole === 'intern';
 
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -136,6 +141,7 @@ export const ProjectView = () => {
   }, []);
 
   const openCreateModal = () => {
+    if (isEmployee) return;
     setEditingProject(null);
     setFormData(initialFormState);
     setFormError('');
@@ -143,6 +149,7 @@ export const ProjectView = () => {
   };
 
   const openEditModal = (prj) => {
+    if (isEmployee) return;
     setEditingProject(prj);
     setFormError('');
     setFormData({
@@ -164,6 +171,7 @@ export const ProjectView = () => {
 
   const handleSaveProject = async (e) => {
     e.preventDefault();
+    if (isEmployee) return;
     if (!formData.projectName.trim() || !formData.clientName.trim()) {
       setFormError('Project Name and Client Name are required.');
       return;
@@ -207,6 +215,7 @@ export const ProjectView = () => {
   };
 
   const handleDeleteProject = async () => {
+    if (isEmployee) return;
     if (!deletingProject?._id) return;
     setIsSubmitting(true);
     try {
@@ -349,11 +358,11 @@ export const ProjectView = () => {
     return projects.filter(p => {
       const q = searchQuery.toLowerCase().trim();
 
-      // Search matches project name, client, description, or any assigned member's name/email
+      // Search matches project name, client (only for non-employees), description, or any assigned member's name/email
       const matchesSearch = !q || (
         (p.projectName || '').toLowerCase().includes(q) ||
         (p.projectDescription || '').toLowerCase().includes(q) ||
-        (p.clientName || '').toLowerCase().includes(q) ||
+        (!isEmployee && (p.clientName || '').toLowerCase().includes(q)) ||
         (p.allAssigned || []).some(m => 
           (m.name || '').toLowerCase().includes(q) || 
           (m.email || '').toLowerCase().includes(q)
@@ -484,13 +493,15 @@ export const ProjectView = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus size={14} />
-            <span>Create Project</span>
-          </button>
+          {!isEmployee && (
+            <button
+              onClick={openCreateModal}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>Create Project</span>
+            </button>
+          )}
 
           <button
             onClick={fetchLiveProjectsAndTasks}
@@ -529,7 +540,7 @@ export const ProjectView = () => {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by project, client, or assigned member name/email..."
+            placeholder={isEmployee ? "Search by project or assigned member name/email..." : "Search by project, client, or assigned member name/email..."}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
@@ -634,26 +645,30 @@ export const ProjectView = () => {
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       {getStatusBadge(prj.status)}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditModal(prj);
-                        }}
-                        className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                        title="Edit Project"
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeletingProject(prj);
-                        }}
-                        className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                        title="Delete Project"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {!isEmployee && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(prj);
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                            title="Edit Project"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingProject(prj);
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                            title="Delete Project"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -753,18 +768,37 @@ export const ProjectView = () => {
                 {/* Metadata & Actions */}
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="block text-[10px] uppercase font-semibold text-slate-400">Client</span>
-                      <span className="font-medium text-slate-700 dark:text-slate-300 truncate block">
-                        {prj.clientName || 'In-House'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase font-semibold text-slate-400">Target Date</span>
-                      <span className="font-medium text-slate-700 dark:text-slate-300 font-mono">
-                        {targetDateStr}
-                      </span>
-                    </div>
+                    {!isEmployee ? (
+                      <>
+                        <div>
+                          <span className="block text-[10px] uppercase font-semibold text-slate-400">Client</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate block">
+                            {prj.clientName || 'In-House'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] uppercase font-semibold text-slate-400">Target Date</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 font-mono">
+                            {targetDateStr}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <span className="block text-[10px] uppercase font-semibold text-slate-400">Target Date</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 font-mono">
+                            {targetDateStr}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] uppercase font-semibold text-slate-400">Tasks</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 font-mono">
+                            {completedTasks} / {prj.tasks.length} Done
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <button
@@ -820,15 +854,19 @@ export const ProjectView = () => {
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto space-y-6">
               {/* Project Overview Details */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs">
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Client Name</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedProjectModal.clientName || 'In-House'}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Client Email</span>
-                  <span className="font-mono text-slate-600 dark:text-slate-400 truncate block">{selectedProjectModal.clientEmail || 'N/A'}</span>
-                </div>
+              <div className={`grid grid-cols-2 ${isEmployee ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-4 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs`}>
+                {!isEmployee && (
+                  <>
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Client Name</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedProjectModal.clientName || 'In-House'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Client Email</span>
+                      <span className="font-mono text-slate-600 dark:text-slate-400 truncate block">{selectedProjectModal.clientEmail || 'N/A'}</span>
+                    </div>
+                  </>
+                )}
                 <div>
                   <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Start Date</span>
                   <span className="font-mono text-slate-700 dark:text-slate-300">
@@ -841,7 +879,7 @@ export const ProjectView = () => {
                     {selectedProjectModal.endDate ? selectedProjectModal.endDate.split('T')[0] : 'N/A'}
                   </span>
                 </div>
-                {selectedProjectModal.projectBudget && (
+                {!isEmployee && selectedProjectModal.projectBudget && (
                   <div>
                     <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Project Budget</span>
                     <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">${Number(selectedProjectModal.projectBudget).toLocaleString()}</span>
@@ -1015,30 +1053,34 @@ export const ProjectView = () => {
 
             {/* Modal Footer */}
             <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const p = selectedProjectModal;
-                    setSelectedProjectModal(null);
-                    openEditModal(p);
-                  }}
-                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  <Edit3 size={13} />
-                  <span>Edit Project</span>
-                </button>
-                <button
-                  onClick={() => {
-                    const p = selectedProjectModal;
-                    setSelectedProjectModal(null);
-                    setDeletingProject(p);
-                  }}
-                  className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border border-rose-200 dark:border-rose-800/50"
-                >
-                  <Trash2 size={13} />
-                  <span>Delete</span>
-                </button>
-              </div>
+              {!isEmployee ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const p = selectedProjectModal;
+                      setSelectedProjectModal(null);
+                      openEditModal(p);
+                    }}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Edit3 size={13} />
+                    <span>Edit Project</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const p = selectedProjectModal;
+                      setSelectedProjectModal(null);
+                      setDeletingProject(p);
+                    }}
+                    className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border border-rose-200 dark:border-rose-800/50"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              ) : (
+                <div />
+              )}
 
               <button 
                 onClick={() => setSelectedProjectModal(null)}
@@ -1052,7 +1094,7 @@ export const ProjectView = () => {
       )}
 
       {/* Create / Edit Project Modal */}
-      {isFormModalOpen && (
+      {!isEmployee && isFormModalOpen && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
           onClick={() => !isSubmitting && setIsFormModalOpen(false)}
@@ -1282,7 +1324,7 @@ export const ProjectView = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {deletingProject && (
+      {!isEmployee && deletingProject && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
           onClick={() => !isSubmitting && setDeletingProject(null)}
