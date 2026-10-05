@@ -375,6 +375,8 @@ const Performance = () => {
               };
             })
             .filter((teamLead) => teamLead._id)
+        : [];
+
       // Extract team leads directly from users/all
       const usersTLs = users
         .filter((user) => {
