@@ -155,6 +155,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'admin-screenshots': return <AdminScreenshotPortal />;
 
       // Role-Specific & Standard Modules
+      case 'admin-salary':
       case 'salary': return <SalaryView />;
       case 'performance': return userRole === 'admin' ? <AdminPerformanceView /> : <PerformanceView />;
       case 'projects': return <ProjectView />;

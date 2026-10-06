@@ -57,6 +57,7 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-employee-requests', label: 'Employee Requests', icon: UserCheck },
         { tab: 'admin-members', label: 'Team Members', icon: Users },
         { tab: 'admin-team-lead', label: 'Team Leads', icon: Award },
+        { tab: 'salary', label: 'Salary & Payroll', icon: Wallet },
         { tab: 'admin-team-tasks', label: 'Task Management', icon: ListTodo },
       ]
     },

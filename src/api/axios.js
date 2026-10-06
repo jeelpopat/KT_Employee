@@ -14,7 +14,7 @@ const TTL_CONFIG = [
   { pattern: /\/api\/role/, ttl: 10 * 60 * 1000 },                      // 10 minutes
   { pattern: /\/api\/projectManage\/project\/all/, ttl: 2 * 60 * 1000 },// 2 minutes
   { pattern: /\/api\/projectManage\/project\/members\//, ttl: 5 * 60 * 1000 }, // 5 minutes
-  { pattern: /\/api\/payroll\/salary/, ttl: 2 * 60 * 1000 },            // 2 minutes
+  { pattern: /\/api\/payroll/, ttl: 60 * 1000 },                        // 1 minute
   { pattern: /\/api\/task\/all/, ttl: 60 * 1000 },                      // 1 minute
   { pattern: /\/api\/employee-panel\/dashboard/, ttl: 30 * 1000 },      // 30 seconds
   { pattern: /\/api\/employee-panel\/leaves\/overview/, ttl: 60 * 1000 }, // 1 minute
@@ -88,8 +88,8 @@ const cachingAdapter = async (config) => {
   const method = (config.method || 'get').toLowerCase();
   const url = config.url || '';
 
-  // For non-GET requests or explicit skipCache, purge matching cache & pass directly to network adapter
-  if (method !== 'get' || config.skipCache) {
+  // For non-GET requests, explicit skipCache, or binary downloads (blob/arraybuffer), pass directly to network adapter
+  if (method !== 'get' || config.skipCache || config.responseType === 'blob' || config.responseType === 'arraybuffer') {
     if (method !== 'get') {
       invalidateOnMutation(url);
     }
