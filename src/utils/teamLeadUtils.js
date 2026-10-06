@@ -416,3 +416,134 @@ export const isLeaveOfAssignedTeam = (leave, teamScope, usersMap = {}) => {
 
   return false;
 };
+
+/**
+ * Checks whether a given project is assigned to the currently logged-in Team Lead
+ */
+export const isProjectAssignedToLead = (project, userIdent) => {
+  if (!project || !userIdent) return false;
+  const { ids, emails, names } = userIdent;
+
+  const matchId = (val) => {
+    if (!val) return false;
+    const s = String(val).toLowerCase().trim();
+    return s ? ids.has(s) : false;
+  };
+  const matchEmail = (val) => {
+    if (!val) return false;
+    const s = String(val).toLowerCase().trim();
+    return s && s.includes('@') ? emails.has(s) : false;
+  };
+  const matchName = (val) => {
+    if (!val) return false;
+    const s = String(val).toLowerCase().trim();
+    return s && !['not assigned', 'unknown', 'team lead', 'admin', 'user', 'employee'].includes(s)
+      ? names.has(s)
+      : false;
+  };
+
+  const matchEntity = (entity) => {
+    if (!entity) return false;
+    if (typeof entity === 'string' || typeof entity === 'number') {
+      return matchId(entity);
+    }
+    if (typeof entity === 'object') {
+      if (
+        matchId(entity._id) ||
+        matchId(entity.id) ||
+        matchId(entity.userId) ||
+        matchId(entity.employeeId) ||
+        matchId(entity.empId)
+      ) {
+        return true;
+      }
+      if (matchEmail(entity.email)) return true;
+      if (
+        matchName(entity.name) ||
+        matchName(entity.fullName) ||
+        matchName(entity.employeeName) ||
+        matchName(entity.userName)
+      ) {
+        return true;
+      }
+      if (entity.user && matchEntity(entity.user)) return true;
+      if (entity.employee && matchEntity(entity.employee)) return true;
+      if (entity.teamLead && matchEntity(entity.teamLead)) return true;
+    }
+    return false;
+  };
+
+  // 1. Check teamLeadUser or assignedTL
+  if (matchEntity(project.teamLeadUser) || matchEntity(project.assignedTL)) return true;
+
+  // 2. Check teamLeadEmployee
+  if (matchEntity(project.teamLeadEmployee)) return true;
+
+  // 3. Check direct teamLead or teamLeadId
+  if (matchEntity(project.teamLead) || matchEntity(project.teamLeadId)) return true;
+
+  // 4. Check project.teamLeadName
+  if (project.teamLeadName && matchName(project.teamLeadName)) return true;
+
+  // 5. Check project.members (if present)
+  if (project.members && typeof project.members === 'object') {
+    if (
+      matchEntity(project.members.teamLeadUser) ||
+      matchEntity(project.members.teamLeadEmployee) ||
+      matchEntity(project.members.teamLead)
+    ) {
+      return true;
+    }
+  }
+
+  // 6. Check allAssigned if present (e.g. from ProjectView)
+  if (Array.isArray(project.allAssigned)) {
+    const leadMatch = project.allAssigned.some((m) => {
+      if (!m || !m.isLead) return false;
+      return matchId(m.id) || matchEmail(m.email) || matchName(m.name);
+    });
+    if (leadMatch) return true;
+  }
+
+  // 7. Check if TL is listed in employees or interns array
+  if (Array.isArray(project.employees)) {
+    if (project.employees.some((e) => matchEntity(e))) return true;
+  }
+  if (Array.isArray(project.interns)) {
+    if (project.interns.some((i) => matchEntity(i))) return true;
+  }
+
+  return false;
+};
+
+/**
+ * Checks whether role or user corresponds to a Team Leader
+ */
+export const isTeamLeadRole = (role, user = null) => {
+  const normalized = String(role || '').toLowerCase().trim();
+  if (normalized === 'admin') return false;
+  if (
+    normalized === 'team_leader' ||
+    normalized === 'team lead' ||
+    normalized === 'team leader' ||
+    normalized === 'tl' ||
+    normalized === 'teamlead' ||
+    normalized.includes('team lead') ||
+    normalized.includes('team_leader')
+  ) {
+    return true;
+  }
+  if (user && (user.isTeamLead === true || user.isTeamLeader === true)) {
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Checks whether role corresponds to Admin
+ */
+export const isAdminRole = (role, user = null) => {
+  const normalized = String(role || '').toLowerCase().trim();
+  return normalized === 'admin';
+};
+

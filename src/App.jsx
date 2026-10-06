@@ -166,7 +166,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'internship-progress': return <InternshipProgressView />;
       case 'documents': return <DocumentsView />;
       case 'daily-follow-up': return <DailyFollowUpView />;
-      case 'team-tasks': return userRole === 'admin' ? <AdminTeamTasksView /> : <TeamTaskManagementView />;
+      case 'team-tasks': return <AdminTeamTasksView />;
       case 'team-leaves': return userRole === 'admin' ? <AdminLeaveRequestsView /> : <TeamLeaveManagementView />;
       case 'report': return <ReportView />;
 

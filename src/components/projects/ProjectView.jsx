@@ -8,6 +8,12 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios.js';
 import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
+import { 
+  getLoggedInUserIdentifiers, 
+  isProjectAssignedToLead, 
+  isTeamLeadRole, 
+  isAdminRole 
+} from '../../utils/teamLeadUtils.js';
 
 // Helper to normalize and build assigned member list from project and /members endpoint data
 const buildAssignedMemberList = (proj, membersData) => {
@@ -92,7 +98,10 @@ export const ProjectView = () => {
   // Role detection: employees / interns cannot create, edit, or delete projects, nor view client details or budgets
   const rawRole = userRole || deriveUserRole(user);
   const normalizedRole = String(rawRole || '').toLowerCase().trim();
-  const isEmployee = normalizedRole === 'employee' || normalizedRole === 'intern';
+  const isAdmin = isAdminRole(normalizedRole, user);
+  const isTL = !isAdmin && isTeamLeadRole(normalizedRole, user);
+  const isEmployee = !isAdmin && !isTL && (normalizedRole === 'employee' || normalizedRole === 'intern');
+  const userIdentifiers = useMemo(() => getLoggedInUserIdentifiers(user), [user]);
 
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -350,12 +359,18 @@ export const ProjectView = () => {
     fetchLiveProjectsAndTasks();
   }, []);
 
+  // For TL: strictly only show projects assigned to that Team Lead
+  const accessibleProjects = useMemo(() => {
+    if (!isTL) return projects;
+    return projects.filter((p) => isProjectAssignedToLead(p, userIdentifiers));
+  }, [projects, isTL, userIdentifiers]);
+
   // Filter projects by search, status, and assignment
   const filteredProjects = useMemo(() => {
     const userEmail = (user?.email || user?.user?.email || '').toLowerCase().trim();
     const userId = String(user?._id || user?.id || user?.employee?._id || user?.employeeId || '');
 
-    return projects.filter(p => {
+    return accessibleProjects.filter(p => {
       const q = searchQuery.toLowerCase().trim();
 
       // Search matches project name, client (only for non-employees), description, or any assigned member's name/email
@@ -375,9 +390,9 @@ export const ProjectView = () => {
         selectedStatusFilter === 'all' || 
         statusLower === selectedStatusFilter.toLowerCase();
 
-      // Assignment filter ("Assigned to Me" vs "All")
+      // Assignment filter ("Assigned to Me" vs "All") - only relevant for non-TL users
       let matchesAssignment = true;
-      if (assignedFilter === 'assigned_to_me') {
+      if (!isTL && assignedFilter === 'assigned_to_me') {
         const hasMemberMatch = (p.allAssigned || []).some(m => {
           const mEmail = (m.email || '').toLowerCase();
           const mId = String(m.id || '');
@@ -413,27 +428,27 @@ export const ProjectView = () => {
 
       return matchesSearch && matchesStatus && matchesAssignment;
     });
-  }, [projects, searchQuery, selectedStatusFilter, assignedFilter, user]);
+  }, [accessibleProjects, searchQuery, selectedStatusFilter, assignedFilter, user, isEmployee, isTL]);
 
   // Overall KPI metrics
-  const totalProjects = projects.length;
-  const activeProjects = projects.filter(p => {
+  const totalProjects = accessibleProjects.length;
+  const activeProjects = accessibleProjects.filter(p => {
     const s = String(p.status || '').toLowerCase();
     return s === 'active' || s === 'in_progress' || s === 'pending';
   }).length;
-  const completedProjects = projects.filter(p => String(p.status || '').toLowerCase() === 'completed').length;
+  const completedProjects = accessibleProjects.filter(p => String(p.status || '').toLowerCase() === 'completed').length;
   
   // Total unique assigned members across all projects
   const totalUniqueAssignedMembers = useMemo(() => {
     const set = new Set();
-    projects.forEach(p => {
+    accessibleProjects.forEach(p => {
       (p.allAssigned || []).forEach(m => {
         if (m.email) set.add(m.email.toLowerCase());
         else if (m.id) set.add(m.id);
       });
     });
     return set.size;
-  }, [projects]);
+  }, [accessibleProjects]);
 
   const getStatusBadge = (status = 'active') => {
     const s = String(status).toLowerCase();
@@ -550,29 +565,36 @@ export const ProjectView = () => {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
           {/* Assignment Filter Pills */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs">
-            <button
-              onClick={() => setAssignedFilter('all')}
-              className={`px-3 py-1.5 rounded-md font-medium transition cursor-pointer ${
-                assignedFilter === 'all'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              All Projects
-            </button>
-            <button
-              onClick={() => setAssignedFilter('assigned_to_me')}
-              className={`px-3 py-1.5 rounded-md font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                assignedFilter === 'assigned_to_me'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <UserCheck size={13} />
-              <span>Assigned to Me</span>
-            </button>
-          </div>
+          {!isTL ? (
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs">
+              <button
+                onClick={() => setAssignedFilter('all')}
+                className={`px-3 py-1.5 rounded-md font-medium transition cursor-pointer ${
+                  assignedFilter === 'all'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                All Projects
+              </button>
+              <button
+                onClick={() => setAssignedFilter('assigned_to_me')}
+                className={`px-3 py-1.5 rounded-md font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                  assignedFilter === 'assigned_to_me'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <UserCheck size={13} />
+                <span>Assigned to Me</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 rounded-lg text-xs font-semibold">
+              <UserCheck size={14} />
+              <span>Assigned Projects ({accessibleProjects.length})</span>
+            </div>
+          )}
 
           {/* Status Dropdown */}
           <div className="flex items-center gap-2">
@@ -604,11 +626,13 @@ export const ProjectView = () => {
           <FolderKanban size={40} className="mx-auto text-slate-400 mb-3 opacity-60" />
           <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No Projects Found</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-            {assignedFilter === 'assigned_to_me'
-              ? 'You do not have any projects assigned to you directly or via tasks.'
-              : searchQuery 
-                ? 'No projects or assigned members match your search query.' 
-                : 'There are currently no active projects linked to the system.'}
+            {isTL
+              ? 'You do not have any projects assigned to you as Team Lead.'
+              : assignedFilter === 'assigned_to_me'
+                ? 'You do not have any projects assigned to you directly or via tasks.'
+                : searchQuery 
+                  ? 'No projects or assigned members match your search query.' 
+                  : 'There are currently no active projects linked to the system.'}
           </p>
         </div>
       ) : (

@@ -17,6 +17,7 @@ import {
   isTeamOwnedByLead,
   extractAssignedTeamEmployees,
   isLeaveOfAssignedTeam,
+  isProjectAssignedToLead,
 } from '../../utils/teamLeadUtils.js';
 
 export { ProjectView };
@@ -1155,7 +1156,11 @@ export const TeamTaskManagementView = () => {
       try {
         const pRes = await api.get('/api/projectManage/project/all');
         const pList = pRes.data?.data || pRes.data?.projects || pRes.data;
-        if (Array.isArray(pList)) setProjects(pList);
+        if (Array.isArray(pList)) {
+          const userIdent = getLoggedInUserIdentifiers(user);
+          const tlProjects = pList.filter(p => isProjectAssignedToLead(p, userIdent));
+          setProjects(tlProjects.length > 0 ? tlProjects : pList);
+        }
       } catch (pErr) {
         console.warn('Could not load projects for task dropdown:', pErr);
       }

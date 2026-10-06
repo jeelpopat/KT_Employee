@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   FileText, Plus, Trash2, Save, Send, Search, Clock, CheckCircle2, PauseCircle, Loader2, RefreshCw
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext.jsx';
+import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
+import { 
+  getLoggedInUserIdentifiers, 
+  isProjectAssignedToLead, 
+  isTeamLeadRole 
+} from '../../utils/teamLeadUtils.js';
 
 export const DailyReportView = () => {
   const { user } = useApp();
@@ -51,7 +56,14 @@ export const DailyReportView = () => {
         const pResponse = await api.get('/api/projectManage/project/all');
         const pData = pResponse.data?.data || pResponse.data?.projects || pResponse.data || [];
         if (Array.isArray(pData) && pData.length > 0) {
-          projs = pData.map(p => ({
+          let list = pData;
+          const role = deriveUserRole(user);
+          if (isTeamLeadRole(role, user)) {
+            const userIdent = getLoggedInUserIdentifiers(user);
+            const tlProjs = list.filter(p => isProjectAssignedToLead(p, userIdent));
+            if (tlProjs.length > 0) list = tlProjs;
+          }
+          projs = list.map(p => ({
             ...p,
             _id: p._id || p.id,
             name: p.projectName || p.name || 'Project',

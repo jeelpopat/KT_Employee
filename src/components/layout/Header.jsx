@@ -187,7 +187,7 @@ export const Header = ({ onSignOut }) => {
     'internship-progress': 'Internship Progress',
     'documents': 'Documents & Records',
     'daily-follow-up': 'Daily Follow-Up',
-    'team-tasks': 'Team Task Management',
+    'team-tasks': 'Task Management',
     'team-leaves': 'Team Leave Requests',
     'report': 'Performance Analytics',
     'admin-screenshots': 'Screenshot Monitoring Portal'

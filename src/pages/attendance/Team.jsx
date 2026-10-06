@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import { 
@@ -31,6 +31,13 @@ import {
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
 import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../../utils/roleFilters";
+import { useApp, deriveUserRole } from "../../context/AppContext";
+import { 
+  getLoggedInUserIdentifiers, 
+  isProjectAssignedToLead, 
+  isTeamLeadRole, 
+  isAdminRole 
+} from "../../utils/teamLeadUtils";
 
 const BASE_URL =
   "https://kt-backend-1.onrender.com/api/projectManage/project";
@@ -320,6 +327,11 @@ function MultiSelectDropdown({
 
 export default function Team() {
   const { confirm, confirmationDialog } = useConfirm();
+  const { user, userRole } = useApp();
+  const currentRole = userRole || deriveUserRole(user);
+  const isAdmin = isAdminRole(currentRole, user);
+  const isTL = !isAdmin && isTeamLeadRole(currentRole, user);
+  const userIdentifiers = useMemo(() => getLoggedInUserIdentifiers(user), [user]);
   const [projects, setProjects] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -1582,7 +1594,16 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   const getHrAndAdminUsers = () => {
     return users.filter(user => {
       const role = String(user.role || user.userRole || "").trim().toLowerCase();
-      return role === 'hr' || role === 'admin' || role === 'human resources';
+      return (
+        role === 'hr' || 
+        role === 'admin' || 
+        role === 'human resources' || 
+        role === 'team lead' || 
+        role === 'tl' || 
+        role === 'team_leader' || 
+        role === 'teamlead' || 
+        role.includes('lead')
+      );
     });
   };
  
@@ -1642,14 +1663,58 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     return 'bg-rose-500';
   };
 
+  // Projects accessible to current user (strictly assigned projects for TL, all for Admin)
+  const accessibleProjects = useMemo(() => {
+    if (!isTL) return projects;
+    return projects.filter((p) => isProjectAssignedToLead(p, userIdentifiers));
+  }, [projects, isTL, userIdentifiers]);
+
+  // Tasks accessible to current user (scoped to accessible projects or assigned to TL)
+  const accessibleTasks = useMemo(() => {
+    if (!isTL) return tasks;
+    const accessibleProjectIds = new Set(accessibleProjects.map((p) => String(p._id || p.id)));
+    return tasks.filter((t) => {
+      const pId = String(typeof t.projectId === 'object' ? (t.projectId?._id || t.projectId?.id) : (t.projectId || ''));
+      if (pId && accessibleProjectIds.has(pId)) return true;
+      const aTL = String(typeof t.assignedTeamLead === 'object' ? (t.assignedTeamLead?._id || t.assignedTeamLead?.id) : (t.assignedTeamLead || ''));
+      if (aTL && userIdentifiers.ids.has(aTL.toLowerCase())) return true;
+      return false;
+    });
+  }, [tasks, accessibleProjects, isTL, userIdentifiers]);
+
+  // Daily work reports accessible to current user (scoped to assigned projects for TL)
+  const accessibleDailyReports = useMemo(() => {
+    if (!isTL) return dailyReports;
+    const accessibleProjectNames = new Set(
+      accessibleProjects.map((p) => (p.projectName || '').toLowerCase().trim()).filter(Boolean)
+    );
+    const accessibleProjectIds = new Set(
+      accessibleProjects.map((p) => String(p._id || p.id).toLowerCase().trim()).filter(Boolean)
+    );
+
+    return dailyReports.filter((r) => {
+      const pId = String(r.projectId?._id || r.projectId?.id || (typeof r.projectId === 'string' ? r.projectId : '')).toLowerCase().trim();
+      if (pId && accessibleProjectIds.has(pId)) return true;
+      const pName = String(r.projectId?.projectName || r.projectId?.name || r.projectName || '').toLowerCase().trim();
+      if (pName && accessibleProjectNames.has(pName)) return true;
+      if (Array.isArray(r.taskReferences)) {
+        return r.taskReferences.some((ref) => {
+          const refPId = String(ref?.projectId || '').toLowerCase().trim();
+          return refPId && accessibleProjectIds.has(refPId);
+        });
+      }
+      return false;
+    });
+  }, [dailyReports, accessibleProjects, isTL]);
+
   // Filter projects by search query, status, and priority
-  const filteredProjects = projects.filter((project) => {
+  const filteredProjects = accessibleProjects.filter((project) => {
     const matchesSearch =
       !searchQuery.trim() ||
       (project.projectName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (project.clientName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (getProjectTeamLeadName(project) || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tasks.some(
+      accessibleTasks.some(
         (t) =>
           isSameId(t.projectId, project._id) &&
           (t.taskTitle || t.title || "").toLowerCase().includes(searchQuery.toLowerCase())
@@ -1667,10 +1732,10 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   });
 
   // KPI calculations
-  const totalProjectsCount = projects.length;
-  const totalTasksCount = tasks.length;
-  const completedTasksCount = tasks.filter((t) => (t.status || "").toLowerCase() === "completed").length;
-  const inProgressTasksCount = tasks.filter(
+  const totalProjectsCount = accessibleProjects.length;
+  const totalTasksCount = accessibleTasks.length;
+  const completedTasksCount = accessibleTasks.filter((t) => (t.status || "").toLowerCase() === "completed").length;
+  const inProgressTasksCount = accessibleTasks.filter(
     (t) =>
       (t.status || "").toLowerCase() === "in_progress" ||
       (t.status || "").toLowerCase() === "in-progress" ||
@@ -1716,7 +1781,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
               <FileText className="w-3.5 h-3.5" />
               <span>Daily Work Reports</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-bold">
-                {dailyReports.length}
+                {accessibleDailyReports.length}
               </span>
             </button>
           </div>
@@ -1725,7 +1790,10 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
             <button
               onClick={() => {
                 setSelectedProject(null);
-                setProjectForm(defaultProjectForm);
+                setProjectForm({
+                  ...defaultProjectForm,
+                  assignedTL: isTL ? normalizeId(user) : "",
+                });
                 setShowProjectModal(true);
               }}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 sm:px-5 sm:py-2 rounded-xl shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 transition-all duration-200 flex items-center justify-center gap-2 font-semibold text-xs cursor-pointer active:scale-95"
@@ -2312,12 +2380,16 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 <h3 className="text-lg font-bold text-slate-800 mb-1">
                   {searchQuery || statusFilter !== "all" || priorityFilter !== "all"
                     ? "No Matching Projects Found"
-                    : "No Projects Yet"}
+                    : isTL
+                      ? "No Assigned Projects"
+                      : "No Projects Yet"}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 mb-4 max-w-md mx-auto">
                   {searchQuery || statusFilter !== "all" || priorityFilter !== "all"
                     ? "Try adjusting your search query or reset your status/priority filters."
-                    : "Get started by creating your first project workspace and adding tasks."}
+                    : isTL
+                      ? "You do not have any projects assigned to you as Team Lead yet. Projects assigned to you will automatically appear here."
+                      : "Get started by creating your first project workspace and adding tasks."}
                 </p>
                 {searchQuery || statusFilter !== "all" || priorityFilter !== "all" ? (
                   <button
@@ -2368,7 +2440,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 </div>
                 <div className="mt-1.5 flex items-baseline gap-1.5">
                   <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {dailyReports.length}
+                    {accessibleDailyReports.length}
                   </span>
                   <span className="text-[11px] text-slate-500 font-medium">Logged</span>
                 </div>
@@ -2385,7 +2457,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 </div>
                 <div className="mt-1.5 flex items-baseline gap-1.5">
                   <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {dailyReports.reduce((acc, r) => acc + (Number(r.hoursWorked) || 0), 0)}
+                    {accessibleDailyReports.reduce((acc, r) => acc + (Number(r.hoursWorked) || 0), 0)}
                   </span>
                   <span className="text-[11px] text-slate-500 font-medium">Hours</span>
                 </div>
@@ -2402,7 +2474,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 </div>
                 <div className="mt-1.5 flex items-baseline gap-1.5">
                   <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {new Set(dailyReports.map(r => r.employeeId?._id || r.employeeId?.email || r.employeeId).filter(Boolean)).size}
+                    {new Set(accessibleDailyReports.map(r => r.employeeId?._id || r.employeeId?.email || r.employeeId).filter(Boolean)).size}
                   </span>
                   <span className="text-[11px] text-slate-500 font-medium">Employees & TLs</span>
                 </div>
@@ -2456,7 +2528,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option value="all">All Projects</option>
-                    {Array.from(new Set(dailyReports.map(r => r.projectId?.projectName || r.projectId?.name || r.projectName).filter(Boolean))).map((p) => (
+                    {Array.from(new Set(accessibleDailyReports.map(r => r.projectId?.projectName || r.projectId?.name || r.projectName).filter(Boolean))).map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
@@ -2471,7 +2543,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option value="all">All Employees</option>
-                    {Array.from(new Set(dailyReports.map(r => r.employeeId?.name || r.employeeName || (typeof r.employeeId === 'string' ? r.employeeId : '')).filter(Boolean))).map((emp) => (
+                    {Array.from(new Set(accessibleDailyReports.map(r => r.employeeId?.name || r.employeeName || (typeof r.employeeId === 'string' ? r.employeeId : '')).filter(Boolean))).map((emp) => (
                       <option key={emp} value={emp}>{emp}</option>
                     ))}
                   </select>
@@ -2501,7 +2573,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 </div>
               ) : (() => {
                 const q = dailySearchQuery.toLowerCase().trim();
-                const filtered = dailyReports.filter((report) => {
+                const filtered = accessibleDailyReports.filter((report) => {
                   const empName = (report.employeeId?.name || report.employeeName || report.name || '').toLowerCase();
                   const empEmail = (report.employeeId?.email || report.email || '').toLowerCase();
                   const projName = (report.projectId?.projectName || report.projectId?.name || report.projectName || '').toLowerCase();
@@ -3102,7 +3174,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     value={taskForm.projectId || ""}
                     onChange={(e) => { 
                       const projectId = e.target.value;
-                      const project = projects.find(
+                      const project = accessibleProjects.find(
                         (p) => isSameId(p._id || p.id, projectId)
                       );
                       setSelectedProject(project || null);
@@ -3121,7 +3193,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     required
                   >
                     <option value="">Select Project</option>
-                    {projects.map((project) => (
+                    {accessibleProjects.map((project) => (
                       <option key={project._id} value={project._id}>
                         {project.projectName}
                       </option>
@@ -3200,7 +3272,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By (HR/Admin)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By (Admin / HR / TL)</label>
                   <select
                     name="assignedBy"
                     value={taskForm.assignedBy}
@@ -3210,11 +3282,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     <option value="">Select Assigner</option>
                     {getHrAndAdminUsers().map((user) => (
                       <option key={user._id} value={user._id}>
-                        {getUserName(user)} ({user.role || "HR/Admin"})
+                        {getUserName(user)} ({user.role || "Admin/HR/TL"})
                       </option>
                     ))}
                     {getHrAndAdminUsers().length === 0 && (
-                      <option value="">No HR/Admin users available</option>
+                      <option value="">No Admin/HR/TL users available</option>
                     )}
                   </select>
                 </div>
