@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../utils/roleFilters";
 
-const BASE_URL = "https://kt-backend-1.onrender.com/api";
+const BASE_URL = "https://kt-backend-yzr4.onrender.com/api";
 
 // Modal Component for Assignments
 const AssignmentModal = ({ isOpen, onClose, lead, interns = [], employees = [], onSave, departmentName }) => {

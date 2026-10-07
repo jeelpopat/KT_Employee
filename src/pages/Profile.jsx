@@ -137,7 +137,7 @@ export default function Profile() {
         process.env.REACT_APP_API_BASE_URL ||
         (window.location.hostname === "localhost"
           ? "http://localhost:5000"
-          : "https://kt-backend-1.onrender.com");
+          : "https://kt-backend-yzr4.onrender.com");
 
       // Change Password API for logged-in user
       const response = await fetch(`${API_BASE}/api/users/change-password`, {

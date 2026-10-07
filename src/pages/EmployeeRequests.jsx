@@ -37,7 +37,7 @@ const EmployeeRequests = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('https://kt-backend-1.onrender.com/api/users/all');
+        const response = await fetch('https://kt-backend-yzr4.onrender.com/api/users/all');
 
         if (!response.ok) {
           throw new Error('Failed to fetch users');
@@ -63,8 +63,8 @@ const EmployeeRequests = () => {
   const handleAction = async (user, action) => {
     const userId = getUserIdentifier(user, 0);
     const endpoint = action === 'approve'
-      ? 'https://kt-backend-1.onrender.com/api/users/approve'
-      : 'https://kt-backend-1.onrender.com/api/users/reject';
+      ? 'https://kt-backend-yzr4.onrender.com/api/users/approve'
+      : 'https://kt-backend-yzr4.onrender.com/api/users/reject';
 
     setProcessingState({ userId, action });
     setError('');

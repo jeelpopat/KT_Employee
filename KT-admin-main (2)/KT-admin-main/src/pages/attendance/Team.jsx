@@ -30,27 +30,27 @@ import { useConfirm } from "../../components/common/ConfirmDialog";
 import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../../utils/roleFilters";
 
 const BASE_URL =
-  "https://kt-backend-1.onrender.com/api/projectManage/project";
+  "https://kt-backend-yzr4.onrender.com/api/projectManage/project";
 
 const API_CORE = BASE_URL.replace(/\/project$/, "");
 
 const EMPLOYEE_URL = 
-  "https://kt-backend-1.onrender.com/api/employee/list"; 
+  "https://kt-backend-yzr4.onrender.com/api/employee/list"; 
 
 const USER_URL =
-  "https://kt-backend-1.onrender.com/api/users/all";
+  "https://kt-backend-yzr4.onrender.com/api/users/all";
 
 const TASK_URL =
-  "https://kt-backend-1.onrender.com/api/task";
+  "https://kt-backend-yzr4.onrender.com/api/task";
 
 const TASK_PROJECT_MANAGE_URL =
-  "https://kt-backend-1.onrender.com/api/projectManage/task";
+  "https://kt-backend-yzr4.onrender.com/api/projectManage/task";
 
 const TEAM_LEAD_URL =
-  "https://kt-backend-1.onrender.com/api/teamLead/team";
+  "https://kt-backend-yzr4.onrender.com/api/teamLead/team";
 
 const DAILY_UPDATE_URL =
-  "https://kt-backend-1.onrender.com/api/dailyUpdate/list";
+  "https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list";
 
 function MultiSelectDropdown({
   label,
@@ -398,7 +398,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     fetchTasks();
   }, []);
 
-  // Function to fetch daily updates for a task using https://kt-backend-1.onrender.com/api/dailyUpdate/list
+  // Function to fetch daily updates for a task using https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list
   const fetchTaskUpdates = async (taskId) => {
     if (!taskId) return;
 

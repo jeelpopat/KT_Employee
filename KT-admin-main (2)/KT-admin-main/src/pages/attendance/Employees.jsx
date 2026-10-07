@@ -22,7 +22,7 @@ import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../../utils/role
 
 const API_BASE =
   process.env.REACT_APP_API_URL ||
-  "https://kt-backend-1.onrender.com/api";
+  "https://kt-backend-yzr4.onrender.com/api";
 
 const initialFormData = {
   fullName: "",
@@ -91,7 +91,7 @@ export default function Employees() {
       const token = localStorage.getItem("token");
 
       const res = await fetch(
-        "https://kt-backend-1.onrender.com/api/employee/list",
+        "https://kt-backend-yzr4.onrender.com/api/employee/list",
         {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -128,8 +128,8 @@ export default function Employees() {
   const toggleTL = async (employeeId, isTeamLead) => {
     try {
       const url = isTeamLead
-        ? `https://kt-backend-1.onrender.com/api/employee/remove-tl/${employeeId}`
-        : `https://kt-backend-1.onrender.com/api/employee/assign-tl/${employeeId}`;
+        ? `https://kt-backend-yzr4.onrender.com/api/employee/remove-tl/${employeeId}`
+        : `https://kt-backend-yzr4.onrender.com/api/employee/assign-tl/${employeeId}`;
 
       const token = localStorage.getItem("token");
 
@@ -365,7 +365,7 @@ export default function Employees() {
       const token = localStorage.getItem("token");
 
       const res = await fetch(
-        `https://kt-backend-1.onrender.com/api/employee/edit/${selectedEmployeeId}`,
+        `https://kt-backend-yzr4.onrender.com/api/employee/edit/${selectedEmployeeId}`,
         {
           method: "PUT",
           headers: {
@@ -413,7 +413,7 @@ export default function Employees() {
       const token = localStorage.getItem("token");
 
       const res = await fetch(
-        `https://kt-backend-1.onrender.com/api/employee/delete/${employeeId}`,
+        `https://kt-backend-yzr4.onrender.com/api/employee/delete/${employeeId}`,
         {
           method: "DELETE",
           headers: {

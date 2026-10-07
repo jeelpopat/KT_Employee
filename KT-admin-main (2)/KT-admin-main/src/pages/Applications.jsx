@@ -27,7 +27,7 @@
 //     try {
 //       setLoading(true);
 //       const response = await fetch(
-//         "https://kt-backend-1.onrender.com/api/application/all"
+//         "https://kt-backend-yzr4.onrender.com/api/application/all"
 //       );
 //       const result = await response.json();
 //       if (result.success) {
@@ -72,7 +72,7 @@
 //       };
 
 //       const interviewRes = await fetch(
-//         "https://kt-backend-1.onrender.com/api/interviewRound/addInterview",
+//         "https://kt-backend-yzr4.onrender.com/api/interviewRound/addInterview",
 //         {
 //           method: "POST",
 //           headers: { "Content-Type": "application/json" },
@@ -98,7 +98,7 @@
 //       };
 
 //       const roundRes = await fetch(
-//         "https://kt-backend-1.onrender.com/api/interviewRound/add",
+//         "https://kt-backend-yzr4.onrender.com/api/interviewRound/add",
 //         {
 //           method: "POST",
 //           headers: { "Content-Type": "application/json" },
@@ -149,7 +149,7 @@
 //       };
 
 //       const res = await fetch(
-//         "https://kt-backend-1.onrender.com/api/interviewRound/add",
+//         "https://kt-backend-yzr4.onrender.com/api/interviewRound/add",
 //         {
 //           method: "POST",
 //           headers: { "Content-Type": "application/json" },
@@ -758,7 +758,7 @@ export default function Applications() {
     try {
       setLoading(true);
       const response = await fetch(
-        "https://kt-backend-1.onrender.com/api/application/all"
+        "https://kt-backend-yzr4.onrender.com/api/application/all"
       );
       const result = await response.json();
       if (result.success) {
@@ -803,7 +803,7 @@ export default function Applications() {
       };
 
       const interviewRes = await fetch(
-        "https://kt-backend-1.onrender.com/api/interviewRound/addInterview",
+        "https://kt-backend-yzr4.onrender.com/api/interviewRound/addInterview",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -829,7 +829,7 @@ export default function Applications() {
       };
 
       const roundRes = await fetch(
-        "https://kt-backend-1.onrender.com/api/interviewRound/add",
+        "https://kt-backend-yzr4.onrender.com/api/interviewRound/add",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -880,7 +880,7 @@ export default function Applications() {
       };
 
       const res = await fetch(
-        "https://kt-backend-1.onrender.com/api/interviewRound/add",
+        "https://kt-backend-yzr4.onrender.com/api/interviewRound/add",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -151,7 +151,7 @@ const cachingAdapter = async (config) => {
 };
 
 const api = axios.create({
-  baseURL: 'https://kt-backend-1.onrender.com',
+  baseURL: 'https://kt-backend-yzr4.onrender.com',
   headers: {
     'Content-Type': 'application/json',
   },

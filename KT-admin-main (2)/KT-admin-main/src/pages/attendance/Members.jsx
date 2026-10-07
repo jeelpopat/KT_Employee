@@ -149,7 +149,7 @@ const isAttendanceMatch = (member, record) => {
   return memberName === recordName || recordName.includes(memberName) || memberName.includes(recordName);
 };
 
-const PROJECT_API_BASE = 'https://kt-backend-1.onrender.com/api/projectManage';
+const PROJECT_API_BASE = 'https://kt-backend-yzr4.onrender.com/api/projectManage';
 
 const normalizeArrayPayload = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -284,7 +284,7 @@ const fetchAllMembers = async () => {
     // FETCH USERS
     // ==========================================
     const usersRes = await fetch(
-      'https://kt-backend-1.onrender.com/api/users/all',
+      'https://kt-backend-yzr4.onrender.com/api/users/all',
       { headers }
     );
 
@@ -304,7 +304,7 @@ const fetchAllMembers = async () => {
     // FETCH EMPLOYEES
     // ==========================================
     const employeesRes = await fetch(
-      'https://kt-backend-1.onrender.com/api/employee/list',
+      'https://kt-backend-yzr4.onrender.com/api/employee/list',
       { headers }
     );
 
@@ -748,7 +748,7 @@ const fetchAllMembers = async () => {
       if (!token) return;
 
       try {
-        const response = await fetch('https://kt-backend-1.onrender.com/api/attendance/admin/all', {
+        const response = await fetch('https://kt-backend-yzr4.onrender.com/api/attendance/admin/all', {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -895,7 +895,7 @@ const fetchAllMembers = async () => {
 
       let dailyUpdates = [];
       try {
-        const res = await fetch('https://kt-backend-1.onrender.com/api/dailyUpdate/list', { headers });
+        const res = await fetch('https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list', { headers });
         if (res.ok) {
           const payload = await res.json();
           const allReports = normalizeArrayPayload(payload);

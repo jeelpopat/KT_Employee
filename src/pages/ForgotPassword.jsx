@@ -21,7 +21,7 @@ function ForgotPassword() {
         process.env.REACT_APP_API_BASE_URL ||
         (window.location.hostname === "localhost"
           ? "http://localhost:5000"
-          : "https://kt-backend-1.onrender.com");
+          : "https://kt-backend-yzr4.onrender.com");
 
       const response = await fetch(`${API_BASE}/api/users/forgot-password`, {
         method: "POST",

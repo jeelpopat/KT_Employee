@@ -26,7 +26,7 @@ export default function PortfolioLeads() {
   const fetchPortfolio = async () => {
     try {
       const res = await fetch(
-        "https://kt-backend-1.onrender.com/api/portfolio/get"
+        "https://kt-backend-yzr4.onrender.com/api/portfolio/get"
       );
       const data = await res.json();
 

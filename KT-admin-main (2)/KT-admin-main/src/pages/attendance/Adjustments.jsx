@@ -73,7 +73,7 @@
 //   ]);
 
 //   const API_BASE_URL =
-//     "https://kt-backend-1.onrender.com/api";
+//     "https://kt-backend-yzr4.onrender.com/api";
 
 //   // ==========================================
 //   // Fetch Employees + History
@@ -1970,7 +1970,7 @@ export default function Adjustments() {
     useState(false);
 
   const API_BASE_URL =
-    "https://kt-backend-1.onrender.com/api";
+    "https://kt-backend-yzr4.onrender.com/api";
 
   // ============================================================
   // LOAD ATTENDANCE SETTINGS

@@ -20,7 +20,7 @@ import * as XLSX from 'xlsx';
 import { isFinanceOrExcludedUser } from '../../utils/roleFilters';
 
 const ATTENDANCE_URL =
-  'https://kt-backend-1.onrender.com/api/attendance/admin/all';
+  'https://kt-backend-yzr4.onrender.com/api/attendance/admin/all';
 
 const AVATAR_COLORS = [
   'bg-blue-600',
@@ -987,7 +987,7 @@ export default function AttendanceLogs() {
 
       // 2. Fetch all users from /users/all to guarantee HR, TL, Employee are all in table (Excluding Admin & Finance)
       try {
-        const usersUrl = 'https://kt-backend-1.onrender.com/api/users/all';
+        const usersUrl = 'https://kt-backend-yzr4.onrender.com/api/users/all';
         const usersRes = await fetch(usersUrl, { method: 'GET', headers });
         if (usersRes.ok) {
           const usersData = await usersRes.json();
@@ -1034,7 +1034,7 @@ export default function AttendanceLogs() {
 
       // 3. Fetch adjustment history to merge any adjustments made for the selected date
       try {
-        const historyUrl = 'https://kt-backend-1.onrender.com/api/adjustment/history';
+        const historyUrl = 'https://kt-backend-yzr4.onrender.com/api/adjustment/history';
         const historyRes = await fetch(historyUrl, { method: 'GET', headers });
         if (historyRes.ok) {
           const historyData = await historyRes.json();

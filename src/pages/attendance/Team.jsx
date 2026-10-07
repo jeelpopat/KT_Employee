@@ -40,27 +40,27 @@ import {
 } from "../../utils/teamLeadUtils";
 
 const BASE_URL =
-  "https://kt-backend-1.onrender.com/api/projectManage/project";
+  "https://kt-backend-yzr4.onrender.com/api/projectManage/project";
 
 const API_CORE = BASE_URL.replace(/\/project$/, "");
 
 const EMPLOYEE_URL = 
-  "https://kt-backend-1.onrender.com/api/employee/list"; 
+  "https://kt-backend-yzr4.onrender.com/api/employee/list"; 
 
 const USER_URL =
-  "https://kt-backend-1.onrender.com/api/users/all";
+  "https://kt-backend-yzr4.onrender.com/api/users/all";
 
 const TASK_URL =
-  "https://kt-backend-1.onrender.com/api/task";
+  "https://kt-backend-yzr4.onrender.com/api/task";
 
 const TASK_PROJECT_MANAGE_URL =
-  "https://kt-backend-1.onrender.com/api/projectManage/task";
+  "https://kt-backend-yzr4.onrender.com/api/projectManage/task";
 
 const TEAM_LEAD_URL =
-  "https://kt-backend-1.onrender.com/api/teamLead/team";
+  "https://kt-backend-yzr4.onrender.com/api/teamLead/team";
 
 const DAILY_UPDATE_URL =
-  "https://kt-backend-1.onrender.com/api/dailyUpdate/list";
+  "https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list";
 
 function MultiSelectDropdown({
   label,
@@ -357,7 +357,7 @@ export default function Team() {
   // Top-level Navigation: 'projects' | 'daily-reports'
   const [activeMainTab, setActiveMainTab] = useState('projects');
 
-  // Daily Work Reports State from API https://kt-backend-1.onrender.com/api/dailyUpdate/list
+  // Daily Work Reports State from API https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list
   const [dailyReports, setDailyReports] = useState([]);
   const [isDailyReportsLoading, setIsDailyReportsLoading] = useState(false);
   const [dailySearchQuery, setDailySearchQuery] = useState("");
@@ -370,7 +370,7 @@ export default function Team() {
     try {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await axios.get("https://kt-backend-1.onrender.com/api/dailyUpdate/list", { headers });
+      const res = await axios.get("https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list", { headers });
       const list = res.data?.data || res.data?.reports || (Array.isArray(res.data) ? res.data : []);
       if (Array.isArray(list)) {
         const valid = list.filter(r => r && (r.todaysWork || r.workUpdate || r.description));
@@ -451,7 +451,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     fetchTasks();
   }, []);
 
-  // Function to fetch daily updates for a task using https://kt-backend-1.onrender.com/api/dailyUpdate/list
+  // Function to fetch daily updates for a task using https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list
   const fetchTaskUpdates = async (taskId) => {
     if (!taskId) return;
 
@@ -461,7 +461,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Primary Live API: GET https://kt-backend-1.onrender.com/api/dailyUpdate/list
+      // Primary Live API: GET https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list
       let rawList = [];
       try {
         const response = await axios.get(DAILY_UPDATE_URL, {
@@ -762,7 +762,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       // 1. Fetch from api/user/all (fallback to api/users/all)
       let allUsers = [];
       try {
-        const userRes = await axios.get("https://kt-backend-1.onrender.com/api/user/all", { headers });
+        const userRes = await axios.get("https://kt-backend-yzr4.onrender.com/api/user/all", { headers });
         allUsers = userRes?.data?.users || userRes?.data?.data || (Array.isArray(userRes?.data) ? userRes.data : []);
       } catch (e1) {
         try {
@@ -2424,7 +2424,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           </>
         )}
 
-        {/* DAILY WORK REPORTS SECTION (API: https://kt-backend-1.onrender.com/api/dailyUpdate/list) */}
+        {/* DAILY WORK REPORTS SECTION (API: https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list) */}
         {activeMainTab === 'daily-reports' && (
           <div className="space-y-6 animate-fade-in">
             {/* KPI Metrics Dashboard Cards */}

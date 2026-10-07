@@ -44,7 +44,7 @@ export default function Applications() {
     try {
       setLoading(true);
       const response = await fetch(
-        "https://kt-backend-1.onrender.com/api/application/all",
+        "https://kt-backend-yzr4.onrender.com/api/application/all",
         {
           headers: getAuthHeaders(false),
         }
@@ -92,7 +92,7 @@ export default function Applications() {
       };
 
       const interviewRes = await fetch(
-        "https://kt-backend-1.onrender.com/api/interviewRound/addInterview",
+        "https://kt-backend-yzr4.onrender.com/api/interviewRound/addInterview",
         {
           method: "POST",
           headers: getAuthHeaders(true),
@@ -118,7 +118,7 @@ export default function Applications() {
       };
 
       const roundRes = await fetch(
-        "https://kt-backend-1.onrender.com/api/interviewRound/add",
+        "https://kt-backend-yzr4.onrender.com/api/interviewRound/add",
         {
           method: "POST",
           headers: getAuthHeaders(true),
@@ -169,7 +169,7 @@ export default function Applications() {
       };
 
       const res = await fetch(
-        "https://kt-backend-1.onrender.com/api/interviewRound/add",
+        "https://kt-backend-yzr4.onrender.com/api/interviewRound/add",
         {
           method: "POST",
           headers: getAuthHeaders(true),

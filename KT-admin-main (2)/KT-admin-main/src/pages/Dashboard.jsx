@@ -202,7 +202,7 @@
     async function fetchUsers() {
       try {
         // Fetch employees from employee/list API
-        const employeeResponse = await fetch("https://kt-backend-1.onrender.com/api/employee/list");
+        const employeeResponse = await fetch("https://kt-backend-yzr4.onrender.com/api/employee/list");
         const employeeData = await employeeResponse.json();
         
         let employees = [];
@@ -220,7 +220,7 @@
         const employeeCount = filteredEmployees.length;
 
         // Fetch interns from users/all API
-        const usersResponse = await fetch("https://kt-backend-1.onrender.com/api/users/all");
+        const usersResponse = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all");
         const usersData = await usersResponse.json();
         const users = usersData.users || usersData.data || [];
         const filteredUsers = filterOutFinanceUsers(users);
@@ -256,7 +256,7 @@
     async function fetchTeamLeads() {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch("https://kt-backend-1.onrender.com/api/teamLead/team", {
+        const response = await fetch("https://kt-backend-yzr4.onrender.com/api/teamLead/team", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();
@@ -275,7 +275,7 @@
     async function fetchLeaves() {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch("https://kt-backend-1.onrender.com/api/leave/all", {
+        const response = await fetch("https://kt-backend-yzr4.onrender.com/api/leave/all", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();
@@ -295,7 +295,7 @@
 async function fetchHolidays() {
   try {
     const response = await fetch(
-      "https://kt-backend-1.onrender.com/api/holiday/current-month"
+      "https://kt-backend-yzr4.onrender.com/api/holiday/current-month"
     );
 
     if (!response.ok) {
@@ -440,7 +440,7 @@ async function fetchHolidays() {
         
         // Fetch absent records from the dedicated API
         const absentResponse = await fetch(
-          "https://kt-backend-1.onrender.com/api/attendance/absent/all",
+          "https://kt-backend-yzr4.onrender.com/api/attendance/absent/all",
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -472,7 +472,7 @@ async function fetchHolidays() {
         setAbsentRecords(normalizedAbsent);
 
         // Fetch present records
-        const attendanceResponse = await fetch("https://kt-backend-1.onrender.com/api/attendance/admin/all", {
+        const attendanceResponse = await fetch("https://kt-backend-yzr4.onrender.com/api/attendance/admin/all", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const attendanceData = await attendanceResponse.json();
@@ -497,7 +497,7 @@ async function fetchHolidays() {
 
         try {
           const token = localStorage.getItem("token");
-          const response = await fetch("https://kt-backend-1.onrender.com/api/attendance/admin/all", {
+          const response = await fetch("https://kt-backend-yzr4.onrender.com/api/attendance/admin/all", {
             headers: { Authorization: `Bearer ${token}` },
           });
           const data = await response.json();
@@ -541,7 +541,7 @@ async function fetchHolidays() {
         // 1. Try unified backend endpoint first
         let backendSucceeded = false;
         try {
-          const response = await fetch("https://kt-backend-1.onrender.com/api/notification/admin/all", {
+          const response = await fetch("https://kt-backend-yzr4.onrender.com/api/notification/admin/all", {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (response.ok) {
@@ -563,7 +563,7 @@ async function fetchHolidays() {
           // Fetch announcements
           let announcementsList = [];
           try {
-            const annRes = await fetch("https://kt-backend-1.onrender.com/api/notification/announcement/all", {
+            const annRes = await fetch("https://kt-backend-yzr4.onrender.com/api/notification/announcement/all", {
               headers: { Authorization: `Bearer ${token}` },
             });
             const annData = await annRes.json();
@@ -601,7 +601,7 @@ async function fetchHolidays() {
 
           // Fetch pending leaves
           try {
-            const leaveRes = await fetch("https://kt-backend-1.onrender.com/api/leave/all", {
+            const leaveRes = await fetch("https://kt-backend-yzr4.onrender.com/api/leave/all", {
               headers: { Authorization: `Bearer ${token}` },
             });
             const leaveData = await leaveRes.json();
@@ -628,7 +628,7 @@ async function fetchHolidays() {
 
           // Fetch upcoming holidays
           try {
-            const holRes = await fetch("https://kt-backend-1.onrender.com/api/holiday/current-month");
+            const holRes = await fetch("https://kt-backend-yzr4.onrender.com/api/holiday/current-month");
             if (holRes.ok) {
               const holData = await holRes.json();
               const holList = Array.isArray(holData)
@@ -702,7 +702,7 @@ async function fetchHolidays() {
 
         const token = localStorage.getItem("token");
         if (token && id && !id.startsWith("leave_") && !id.startsWith("holiday_")) {
-          fetch(`https://kt-backend-1.onrender.com/api/notification/read/${id}`, {
+          fetch(`https://kt-backend-yzr4.onrender.com/api/notification/read/${id}`, {
             method: "PUT",
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => {});
@@ -723,7 +723,7 @@ async function fetchHolidays() {
 
         const token = localStorage.getItem("token");
         if (token) {
-          fetch("https://kt-backend-1.onrender.com/api/notification/read-all", {
+          fetch("https://kt-backend-yzr4.onrender.com/api/notification/read-all", {
             method: "PUT",
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => {});
@@ -749,7 +749,7 @@ async function fetchHolidays() {
     const updateLeaveStatus = async (leaveId, status, remark = "") => {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch("https://kt-backend-1.onrender.com/api/leave/admin/approve", {
+        const response = await fetch("https://kt-backend-yzr4.onrender.com/api/leave/admin/approve", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -789,8 +789,8 @@ async function fetchHolidays() {
         };
 
         const endpoint = editingAnnouncementId
-          ? `https://kt-backend-1.onrender.com/api/notification/announcement/${editingAnnouncementId}`
-          : "https://kt-backend-1.onrender.com/api/notification/announcement/create";
+          ? `https://kt-backend-yzr4.onrender.com/api/notification/announcement/${editingAnnouncementId}`
+          : "https://kt-backend-yzr4.onrender.com/api/notification/announcement/create";
         const method = editingAnnouncementId ? "PUT" : "POST";
 
         const response = await fetch(endpoint, {
@@ -842,7 +842,7 @@ async function fetchHolidays() {
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `https://kt-backend-1.onrender.com/api/notification/announcement/${announcementId}`,
+          `https://kt-backend-yzr4.onrender.com/api/notification/announcement/${announcementId}`,
           {
             method: "DELETE",
             headers: {

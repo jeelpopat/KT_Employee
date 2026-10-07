@@ -54,7 +54,7 @@ export default function Positions() {
   const fetchPositions = async () => {
     try {
       setLoading(true);
-      const res = await fetch("https://kt-backend-1.onrender.com/api/position", {
+      const res = await fetch("https://kt-backend-yzr4.onrender.com/api/position", {
         headers: getAuthHeaders()
       });
       const data = await res.json();
@@ -76,8 +76,8 @@ export default function Positions() {
   const handleSubmit = async () => {
     try {
       const url = editId
-        ? `https://kt-backend-1.onrender.com/api/position/${editId}`
-        : `https://kt-backend-1.onrender.com/api/position/add`;
+        ? `https://kt-backend-yzr4.onrender.com/api/position/${editId}`
+        : `https://kt-backend-yzr4.onrender.com/api/position/add`;
 
       const method = editId ? "PUT" : "POST";
 
@@ -144,7 +144,7 @@ export default function Positions() {
     });
     if (confirmed) {
       try {
-        const response = await fetch(`https://kt-backend-1.onrender.com/api/position/${id}`, {
+        const response = await fetch(`https://kt-backend-yzr4.onrender.com/api/position/${id}`, {
           method: "DELETE",
           headers: getAuthHeaders(),
         });

@@ -158,7 +158,7 @@ const Performance = () => {
   const fetchAllPerformances = async () => {
     try {
       const response = await fetch(
-        "https://kt-backend-1.onrender.com/api/performance/all",
+        "https://kt-backend-yzr4.onrender.com/api/performance/all",
         { headers }
       );
 
@@ -211,17 +211,17 @@ const Performance = () => {
         teamLeadResponse,
       ] = await Promise.all([
         fetch(
-          "https://kt-backend-1.onrender.com/api/employee/list",
+          "https://kt-backend-yzr4.onrender.com/api/employee/list",
           { headers: commonHeaders }
         ),
 
         fetch(
-          "https://kt-backend-1.onrender.com/api/users/all",
+          "https://kt-backend-yzr4.onrender.com/api/users/all",
           { headers: commonHeaders }
         ),
 
         fetch(
-          "https://kt-backend-1.onrender.com/api/teamLead/team",
+          "https://kt-backend-yzr4.onrender.com/api/teamLead/team",
           { headers: commonHeaders }
         ),
       ]);
@@ -538,7 +538,7 @@ const Performance = () => {
 
     try {
       const response = await fetch(
-        "https://kt-backend-1.onrender.com/api/performance/create",
+        "https://kt-backend-yzr4.onrender.com/api/performance/create",
         {
           method: "POST",
 
@@ -645,7 +645,7 @@ const Performance = () => {
 
     try {
       const response = await fetch(
-        `https://kt-backend-1.onrender.com/api/performance/update/${editingId}`,
+        `https://kt-backend-yzr4.onrender.com/api/performance/update/${editingId}`,
         {
           method: "PUT",
 
@@ -713,7 +713,7 @@ const Performance = () => {
 
     try {
       const response = await fetch(
-        `https://kt-backend-1.onrender.com/api/performance/delete/${perf._id}`,
+        `https://kt-backend-yzr4.onrender.com/api/performance/delete/${perf._id}`,
         {
           method: "DELETE",
           headers,

@@ -1326,11 +1326,10 @@ export const SalaryView = () => {
       {/* Toast Notification */}
       {notification && (
         <div
-          className={`flex items-center justify-between p-3.5 rounded-xl text-xs font-medium border shadow-xs transition-all ${
-            notification.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-              : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
-          }`}
+          className={`flex items-center justify-between p-3.5 rounded-xl text-xs font-medium border shadow-xs transition-all ${notification.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+            : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+            }`}
         >
           <div className="flex items-center gap-2">
             {notification.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
@@ -1348,7 +1347,7 @@ export const SalaryView = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/50 text-indigo-600 dark:text-indigo-400 rounded-lg shadow-xs">
-            <Wallet size={22} />
+            <Wallet size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -1359,11 +1358,6 @@ export const SalaryView = () => {
                 {isAdmin ? 'Admin' : isTL ? 'Team Lead' : 'Employee'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {isAdmin
-                ? 'Process monthly payrolls, generate official payslips, and manage staff salary structures'
-                : 'View official monthly salary structures, deductions, TDS breakdown, and generate payslips'}
-            </p>
           </div>
         </div>
 
@@ -1373,36 +1367,23 @@ export const SalaryView = () => {
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
               <button
                 onClick={() => setAdminViewMode('processed-payrolls')}
-                className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
-                  adminViewMode === 'processed-payrolls'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
+                className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'processed-payrolls'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
               >
                 <Layers size={13} />
                 <span>Monthly Payrolls ({allProcessedPayrolls.length})</span>
               </button>
               <button
                 onClick={() => setAdminViewMode('salary-structures')}
-                className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
-                  adminViewMode === 'salary-structures'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
+                className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'salary-structures'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
               >
                 <CreditCard size={13} />
                 <span>Structures ({allSalaries.length})</span>
-              </button>
-              <button
-                onClick={() => setAdminViewMode('my-salary')}
-                className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
-                  adminViewMode === 'my-salary'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                }`}
-              >
-                <Wallet size={13} />
-                <span>My Salary</span>
               </button>
             </div>
           )}
@@ -1413,7 +1394,7 @@ export const SalaryView = () => {
               onClick={() => openProcessPayrollModal()}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
-              <Sparkles size={14} />
+              <Plus size={14} />
               <span>Process Payroll</span>
             </button>
           )}
@@ -1446,44 +1427,6 @@ export const SalaryView = () => {
       {/* ==================================================== */}
       {isAdmin && adminViewMode === 'processed-payrolls' && (
         <div className="space-y-6">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-emerald-600 rounded-xl p-4 shadow-xs">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Disbursed (Paid)</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1 font-mono">
-                {formatINR(payrollMetrics.totalDisbursed)}
-              </p>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-semibold">
-                {payrollMetrics.paidCount} paid {payrollMetrics.paidCount === 1 ? 'disbursement' : 'disbursements'}
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-amber-500 rounded-xl p-4 shadow-xs">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending / On Hold</p>
-              <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1 font-mono">
-                {formatINR(payrollMetrics.totalPending)}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                {payrollMetrics.pendingCount} pending {payrollMetrics.pendingCount === 1 ? 'disbursement' : 'disbursements'}
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-indigo-600 rounded-xl p-4 shadow-xs">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Gross Processed</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1 font-mono">
-                {formatINR(payrollMetrics.totalGross)}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">Total TDS: {formatINR(payrollMetrics.totalTds)}</p>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-purple-500 rounded-xl p-4 shadow-xs">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Generated Payslips</p>
-              <p className="text-xl font-bold text-purple-600 dark:text-purple-400 mt-1 font-mono">
-                {allPayslips.length} / {allProcessedPayrolls.length}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">Official backend PDF format</p>
-            </div>
-          </div>
 
           {/* Filter Bar */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col lg:flex-row items-center justify-between gap-3 shadow-xs">
@@ -1491,7 +1434,7 @@ export const SalaryView = () => {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search staff name or email..."
+                placeholder="Search staff by name or email"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
@@ -1539,31 +1482,28 @@ export const SalaryView = () => {
               <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
                 <button
                   onClick={() => setRoleFilter('all')}
-                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                    roleFilter === 'all'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'all'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                    }`}
                 >
                   All Roles
                 </button>
                 <button
                   onClick={() => setRoleFilter('employee')}
-                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                    roleFilter === 'employee'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'employee'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                    }`}
                 >
                   Employees
                 </button>
                 <button
                   onClick={() => setRoleFilter('team_lead')}
-                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                    roleFilter === 'team_lead'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'team_lead'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                    }`}
                 >
                   Team Leads
                 </button>
@@ -1573,23 +1513,11 @@ export const SalaryView = () => {
 
           {/* Processed Payrolls Table */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Layers size={16} className="text-emerald-600" />
-                  <span>Processed Monthly Payroll Records (GET /api/payroll) ({filteredProcessedPayrolls.length})</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Monthly payroll runs with extra bonuses, deductions, TDS withholdings, and payslip generation
-                </p>
-              </div>
-              <button
-                onClick={() => openProcessPayrollModal()}
-                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <Sparkles size={13} />
-                <span>Process Payroll Run</span>
-              </button>
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Layers size={16} className="text-emerald-600" />
+                <span>Processed Monthly Payroll Records</span>
+              </h3>
             </div>
 
             {filteredProcessedPayrolls.length === 0 ? (
@@ -1617,12 +1545,12 @@ export const SalaryView = () => {
                       <th className="py-3 px-4">Period</th>
                       <th className="py-3 px-4">Staff Member</th>
                       <th className="py-3 px-4">Base Gross</th>
-                      <th className="py-3 px-4">Bonus (Fixed + Extra)</th>
+                      <th className="py-3 px-4">Bonus</th>
                       <th className="py-3 px-4">Gross Total</th>
-                      <th className="py-3 px-4">Deductions & TDS</th>
+                      <th className="py-3 px-4">Deductions</th>
                       <th className="py-3 px-4">Net Disbursed</th>
                       <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Payslip</th>
+                      {/* <th className="py-3 px-4">Payslip</th> */}
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -1671,9 +1599,8 @@ export const SalaryView = () => {
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2.5">
                               <div
-                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 text-white shadow-xs ${
-                                  isLead ? 'bg-amber-500' : 'bg-indigo-600'
-                                }`}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 text-white shadow-xs ${isLead ? 'bg-amber-500' : 'bg-indigo-600'
+                                  }`}
                               >
                                 {initials}
                               </div>
@@ -1683,11 +1610,10 @@ export const SalaryView = () => {
                                     {u.name || 'Staff Member'}
                                   </span>
                                   <span
-                                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
-                                      isLead
-                                        ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
-                                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                    }`}
+                                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${isLead
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
+                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                      }`}
                                   >
                                     {roleLabel}
                                   </span>
@@ -1703,15 +1629,10 @@ export const SalaryView = () => {
                             {formatINR(gross - extraB)}
                           </td>
 
-                          <td className="py-3.5 px-4 font-mono text-xs">
+                          <td className="py-3.5 px-2 font-mono text-xs">
                             <div className="text-emerald-600 font-semibold">
                               +{formatINR(fixedB + extraB)}
                             </div>
-                            {extraB > 0 && (
-                              <div className="text-[10px] text-slate-400">
-                                Incl. Extra: {formatINR(extraB)}
-                              </div>
-                            )}
                           </td>
 
                           <td className="py-3.5 px-4 font-mono font-semibold text-slate-900 dark:text-slate-100">
@@ -1720,9 +1641,6 @@ export const SalaryView = () => {
 
                           <td className="py-3.5 px-4 font-mono text-rose-600 dark:text-rose-400">
                             <div>-{formatINR(totDed)}</div>
-                            <div className="text-[10px] text-slate-400">
-                              TDS: {formatINR(tdsAmt)} ({payroll.tdsPercentage || 0}%)
-                            </div>
                           </td>
 
                           <td className="py-3.5 px-4 font-mono">
@@ -1754,32 +1672,42 @@ export const SalaryView = () => {
                           </td>
 
                           {/* Payslip Download Column */}
-                          <td className="py-3.5 px-4">
-                            <button
-                              onClick={() => handleDownloadPayslipForPayroll(payroll)}
-                              disabled={downloadingSlipId === payroll._id}
-                              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
-                              title="Download Official Payslip"
-                            >
-                              {downloadingSlipId === payroll._id ? (
-                                <RefreshCw size={12} className="animate-spin" />
-                              ) : (
-                                <Download size={12} />
-                              )}
-                              <span>Download</span>
-                            </button>
-                          </td>
+                          {/* <td className="py-3.5 px-4"> */}
+                          {/* <button
+                            onClick={() => handleDownloadPayslipForPayroll(payroll)}
+                            disabled={downloadingSlipId === payroll._id}
+                            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
+                            title="Download Official Payslip"
+                          >
+                            {downloadingSlipId === payroll._id ? (
+                              <RefreshCw size={12} className="animate-spin" />
+                            ) : (
+                              <Download size={12} />
+                            )}
+                          </button> */}
+                          {/* </td> */}
 
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleDownloadPayslipForPayroll(payroll)}
+                                disabled={downloadingSlipId === payroll._id}
+                                className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
+                                title="Download Official Payslip"
+                              >
+                                {downloadingSlipId === payroll._id ? (
+                                  <RefreshCw size={12} className="animate-spin" />
+                                ) : (
+                                  <Download size={12} />
+                                )}
+                              </button>
                               <button
                                 onClick={() => handleViewPayslipForPayroll(payroll)}
                                 className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
                                 title="View Statement"
                               >
                                 <Eye size={12} />
-                                <span>View Slip</span>
                               </button>
                             </div>
                           </td>
@@ -1817,31 +1745,28 @@ export const SalaryView = () => {
               <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
                 <button
                   onClick={() => setRoleFilter('all')}
-                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                    roleFilter === 'all'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'all'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                    }`}
                 >
                   All Roles ({allSalaries.length})
                 </button>
                 <button
                   onClick={() => setRoleFilter('employee')}
-                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                    roleFilter === 'employee'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'employee'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                    }`}
                 >
                   Employees
                 </button>
                 <button
                   onClick={() => setRoleFilter('team_lead')}
-                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                    roleFilter === 'team_lead'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'team_lead'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                    }`}
                 >
                   Team Leads
                 </button>
@@ -1850,21 +1775,19 @@ export const SalaryView = () => {
               <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
                 <button
                   onClick={() => setStatusFilter('all')}
-                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                    statusFilter === 'all'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${statusFilter === 'all'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                    }`}
                 >
                   All Status
                 </button>
                 <button
                   onClick={() => setStatusFilter('active')}
-                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                    statusFilter === 'active'
-                      ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${statusFilter === 'active'
+                    ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                    }`}
                 >
                   Active Only
                 </button>
@@ -1873,23 +1796,14 @@ export const SalaryView = () => {
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <CreditCard size={16} className="text-indigo-600" />
-                  <span>Configured Staff Salary Structures ({filteredSalaries.length})</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Base compensation contracts: basic salary, HRA, allowance, bonus, deductions, and TDS
-                </p>
-              </div>
-              <button
-                onClick={() => openCreateStructureModal()}
-                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <Plus size={13} />
-                <span>Create Salary Structure</span>
-              </button>
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <CreditCard size={16} className="text-indigo-600" />
+                <span>Configured Staff Salary Structures</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Base compensation contracts: basic salary, HRA, allowance, bonus, deductions, and TDS
+              </p>
             </div>
 
             {filteredSalaries.length === 0 ? (
@@ -1943,9 +1857,8 @@ export const SalaryView = () => {
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2.5">
                               <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 text-white shadow-xs ${
-                                  isLead ? 'bg-amber-500' : 'bg-indigo-600'
-                                }`}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 text-white shadow-xs ${isLead ? 'bg-amber-500' : 'bg-indigo-600'
+                                  }`}
                               >
                                 {initials}
                               </div>
@@ -1955,11 +1868,10 @@ export const SalaryView = () => {
                                     {u.name || 'Staff Member'}
                                   </span>
                                   <span
-                                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
-                                      isLead
-                                        ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
-                                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                    }`}
+                                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${isLead
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
+                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                      }`}
                                   >
                                     {roleLabel}
                                   </span>
@@ -2026,9 +1938,9 @@ export const SalaryView = () => {
       )}
 
       {/* ==================================================== */}
-      {/* 3. EMPLOYEE & TL PERSONAL VIEW (OR ADMIN "MY SALARY") */}
+      {/* 3. EMPLOYEE & TL PERSONAL VIEW */}
       {/* ==================================================== */}
-      {(!isAdmin || adminViewMode === 'my-salary') && (
+      {!isAdmin && (
         <div className="space-y-6">
           {/* Top Metric Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2527,11 +2439,6 @@ export const SalaryView = () => {
                   <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                     {structureModalMode === 'edit' ? 'Update Salary Structure' : 'Create Salary Structure'}
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    {structureModalMode === 'edit'
-                      ? 'Modify compensation, allowance, bonus, and deduction parameters'
-                      : 'Configure new compensation structure using POST /api/payroll/salary/create'}
-                  </p>
                 </div>
               </div>
               <button
@@ -2685,45 +2592,6 @@ export const SalaryView = () => {
                 <label htmlFor="structureActiveToggle" className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                   Set as <strong>Active Structure</strong>
                 </label>
-              </div>
-
-              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800">
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-indigo-600" />
-                    <span>Real-Time Schema Calculation Preview</span>
-                  </span>
-                  <span className="font-mono text-indigo-600 text-xs">
-                    Annual CTC: {formatINR(structureCalculations.annualCtc)}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Gross Salary</span>
-                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                      {formatINR(structureCalculations.grossSalary)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Fixed Deduct</span>
-                    <span className="font-mono font-semibold text-rose-600">
-                      -{formatINR(structureCalculations.fixedDeduction)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">TDS Amount ({structureCalculations.tdsPercentage}%)</span>
-                    <span className="font-mono font-semibold text-rose-600">
-                      -{formatINR(structureCalculations.tdsAmount)}
-                    </span>
-                  </div>
-                  <div className="bg-emerald-50 dark:bg-emerald-950/40 p-1.5 rounded border border-emerald-200 dark:border-emerald-800">
-                    <span className="text-[10px] text-emerald-800 dark:text-emerald-300 uppercase font-bold block">Net Take-Home</span>
-                    <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm">
-                      {formatINR(structureCalculations.netSalary)}
-                    </span>
-                  </div>
-                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">

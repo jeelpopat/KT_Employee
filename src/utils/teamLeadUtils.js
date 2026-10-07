@@ -1,6 +1,6 @@
 import api from '../api/axios.js';
 
-const TEAM_API_URL = 'https://kt-backend-1.onrender.com/api/teamLead/team';
+const TEAM_API_URL = 'https://kt-backend-yzr4.onrender.com/api/teamLead/team';
 
 /**
  * Normalizes role string for comparison
@@ -162,7 +162,7 @@ export const getLoggedInUserIdentifiers = (currentUser) => {
 };
 
 /**
- * Fetches all teams from GET https://kt-backend-1.onrender.com/api/teamLead/team
+ * Fetches all teams from GET https://kt-backend-yzr4.onrender.com/api/teamLead/team
  */
 export const fetchTeamsList = async () => {
   try {

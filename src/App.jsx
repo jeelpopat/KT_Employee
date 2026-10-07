@@ -266,7 +266,7 @@ export default function App() {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     try {
       if (token) {
-        await fetch('https://kt-backend-1.onrender.com/api/users/logout', {
+        await fetch('https://kt-backend-yzr4.onrender.com/api/users/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

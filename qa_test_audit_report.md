@@ -71,7 +71,7 @@ The audit covered 100% of the active repository surfaces:
 - **Operating System:** Windows 10/11 x64
 - **Runtime:** Node.js v20+ / ES Modules
 - **Bundler & Dev Server:** Vite 5.x (`http://localhost:5173`)
-- **Backend API Base URL:** `https://kt-backend-1.onrender.com/api`
+- **Backend API Base URL:** `https://kt-backend-yzr4.onrender.com/api`
 - **Asset Storage:** Cloudinary (`kt-backend-1`)
 - **Local Timezone:** Indian Standard Time (IST, UTC +5:30)
 
@@ -243,7 +243,7 @@ The audit covered 100% of the active repository surfaces:
 - **Suggested Fix:**
   1. In `src/App.jsx`, inspect `window.location.pathname.includes('/reset-password')` or URL search params for `token`.
   2. If present and not authenticated, render `ResetPassword.jsx`.
-  3. Replace `process.env.REACT_APP_API_BASE_URL` with `import.meta.env.VITE_API_BASE_URL || 'https://kt-backend-1.onrender.com'`.
+  3. Replace `process.env.REACT_APP_API_BASE_URL` with `import.meta.env.VITE_API_BASE_URL || 'https://kt-backend-yzr4.onrender.com'`.
 - **Status:** Open
 
 ---
@@ -263,8 +263,8 @@ The audit covered 100% of the active repository surfaces:
   3. Click the "Reject" button.
   4. Enter a rejection reason in the remark field and confirm submission.
   5. Inspect the outgoing network request in DevTools Network tab.
-- **Expected Result:** A PUT request is sent to `https://kt-backend-1.onrender.com/api/leave/admin/reject`.
-- **Actual Result:** A PUT request is dispatched to `https://kt-backend-1.onrender.com/api/leave/admin/approve`.
+- **Expected Result:** A PUT request is sent to `https://kt-backend-yzr4.onrender.com/api/leave/admin/reject`.
+- **Actual Result:** A PUT request is dispatched to `https://kt-backend-yzr4.onrender.com/api/leave/admin/approve`.
 - **Reproducibility:** 100%
 - **Evidence:** [`src/pages/attendance/LeaveRequest.jsx:33-34`](file:///d:/Kevalon%20tech/EMPLOOYPANEL--main/EMPLOOYPANEL--main/src/pages/attendance/LeaveRequest.jsx#L33-L34):
   ```javascript
@@ -324,7 +324,7 @@ The audit covered 100% of the active repository surfaces:
   1. Navigate to Holidays & Events page.
   2. Click "Add Holiday". Fill in a Title ("Independence Day") and Date ("2026-08-15").
   3. Click "Submit".
-  4. Inspect the outgoing POST request to `https://kt-backend-1.onrender.com/api/holiday/create`.
+  4. Inspect the outgoing POST request to `https://kt-backend-yzr4.onrender.com/api/holiday/create`.
 - **Expected Result:** Request headers must include `Authorization: Bearer <token>`.
 - **Actual Result:** Request is dispatched with only `'Content-Type': 'application/json'`. No auth header is attached. The same omission occurs on DELETE in line 148.
 - **Reproducibility:** 100%
@@ -660,7 +660,7 @@ The audit covered 100% of the active repository surfaces:
 1. **Dual Transport Architecture:**  
    The repository contains two competing HTTP transport approaches:
    - Modern centralized `src/api/axios.js` (with automatic request interceptors, token injection, and response error handling).
-   - Scattered raw `fetch()` calls targeting hardcoded `https://kt-backend-1.onrender.com` URLs across Admin pages.
+   - Scattered raw `fetch()` calls targeting hardcoded `https://kt-backend-yzr4.onrender.com` URLs across Admin pages.
    
 2. **Missing Interceptors on Raw Fetch:**  
    Raw `fetch()` calls fail to automatically inject tokens or catch 401 unauthorized errors, directly causing BUG-004 and BUG-005.

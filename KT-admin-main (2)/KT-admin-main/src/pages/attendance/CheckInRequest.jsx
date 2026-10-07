@@ -12,13 +12,13 @@ import { isFinanceOrExcludedUser } from "../../utils/roleFilters";
 const ADMIN_ID = "6a23b5c49cd1507bfd5e3bcb";
 
 const PENDING_URL =
-  "https://kt-backend-1.onrender.com/api/attendance/pending";
+  "https://kt-backend-yzr4.onrender.com/api/attendance/pending";
 
 const APPROVE_URL =
-  "https://kt-backend-1.onrender.com/api/attendance/approve";
+  "https://kt-backend-yzr4.onrender.com/api/attendance/approve";
 
 const REJECT_URL =
-  "https://kt-backend-1.onrender.com/api/attendance/reject";
+  "https://kt-backend-yzr4.onrender.com/api/attendance/reject";
 
 const AVATAR_COLORS = [
   "bg-blue-600",
