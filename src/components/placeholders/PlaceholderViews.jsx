@@ -116,7 +116,7 @@ export const PerformanceView = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
@@ -399,7 +399,7 @@ export const TeamMembersView = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
@@ -712,7 +712,7 @@ export const EmployeesView = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
@@ -858,8 +858,8 @@ export const LearningHubView = () => {
   const [modules] = useState([]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs transition-colors">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-md">
             <BookOpen size={22} />
@@ -921,7 +921,7 @@ export const InternshipProgressView = () => {
   const checkpoints = [];
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
@@ -983,7 +983,7 @@ export const DocumentsView = () => {
   const docs = [];
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
@@ -1388,7 +1388,7 @@ export const TeamTaskManagementView = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Toast Notification */}
       {alertNotice && (
         <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-md transition-all ${alertNotice.type === 'error'
@@ -1458,14 +1458,16 @@ export const TeamTaskManagementView = () => {
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Tasks', value: tasks.length, color: 'text-slate-900 dark:text-slate-100', border: 'border-l-indigo-600' },
-          { label: 'To Do', value: tasks.filter(t => normalizeStatus(t.status) === 'todo').length, color: 'text-slate-600 dark:text-slate-300', border: 'border-l-slate-400' },
-          { label: 'In Progress', value: tasks.filter(t => normalizeStatus(t.status) === 'in_progress').length, color: 'text-amber-600 dark:text-amber-400', border: 'border-l-amber-500' },
-          { label: 'Completed', value: tasks.filter(t => normalizeStatus(t.status) === 'completed').length, color: 'text-emerald-600 dark:text-emerald-400', border: 'border-l-emerald-500' },
+          { label: 'Total Tasks', value: tasks.length, border: 'border-l-indigo-600' },
+          { label: 'To Do', value: tasks.filter(t => normalizeStatus(t.status) === 'todo').length, border: 'border-l-slate-400' },
+          { label: 'In Progress', value: tasks.filter(t => normalizeStatus(t.status) === 'in_progress').length, border: 'border-l-amber-500' },
+          { label: 'Completed', value: tasks.filter(t => normalizeStatus(t.status) === 'completed').length, border: 'border-l-emerald-500' },
         ].map((item, idx) => (
-          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-2xs`}>
-            <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">{item.label}</span>
-            <span className={`text-2xl font-bold mt-1 block ${item.color}`}>{item.value}</span>
+          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-xs transition-all`}>
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+            </div>
           </div>
         ))}
       </div>
@@ -2244,7 +2246,7 @@ export const TeamLeaveManagementView = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Toast Notification */}
       {alertNotice && (
         <div className={`p-3.5 rounded-lg text-xs font-semibold flex items-center justify-between shadow-md transition-all ${alertNotice.type === 'error'
@@ -2310,14 +2312,16 @@ export const TeamLeaveManagementView = () => {
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Pending Your Approval', value: pendingCount, color: 'text-amber-600 dark:text-amber-400', border: 'border-l-amber-500' },
-          { label: 'Approved by You', value: approvedCount, color: 'text-emerald-600 dark:text-emerald-400', border: 'border-l-emerald-500' },
-          { label: 'Rejected by You', value: rejectedCount, color: 'text-rose-600 dark:text-rose-400', border: 'border-l-rose-500' },
-          { label: 'Team Total Requests', value: leaves.length, color: 'text-indigo-600 dark:text-indigo-400', border: 'border-l-indigo-600' }
+          { label: 'Pending Your Approval', value: pendingCount, border: 'border-l-amber-500' },
+          { label: 'Approved by You', value: approvedCount, border: 'border-l-emerald-500' },
+          { label: 'Rejected by You', value: rejectedCount, border: 'border-l-rose-500' },
+          { label: 'Team Total Requests', value: leaves.length, border: 'border-l-indigo-600' }
         ].map((item, idx) => (
-          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-2xs`}>
-            <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">{item.label}</span>
-            <span className={`text-2xl font-bold mt-1 block ${item.color}`}>{item.value}</span>
+          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-xs transition-all`}>
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+            </div>
           </div>
         ))}
       </div>

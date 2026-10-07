@@ -977,116 +977,103 @@ const fetchAllMembers = async () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-        
-        {/* Header Section */}
-        <div className="mb-5 sm:mb-6 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 shrink-0">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Team Members</h1>
-                  <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 rounded-full">
-                    Directory
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Manage and overview all staff, team leads, interns, and employees.
-                </p>
-              </div>
-            </div>
-
-            {/* Quick Stat Chips */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedRole('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  selectedRole === 'all'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 border border-slate-200/60'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Total</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-                  selectedRole === 'all' ? 'bg-white/20 text-white' : 'bg-white text-slate-700 border border-slate-200'
-                }`}>
-                  {members.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedRole('intern')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  selectedRole === 'intern'
-                    ? 'bg-violet-600 text-white shadow-xs'
-                    : 'bg-violet-50 text-violet-700 hover:bg-violet-100/80 border border-violet-200/80'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Interns</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-                  selectedRole === 'intern' ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-800'
-                }`}>
-                  {members.filter(m => m.roleType === 'intern').length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedRole('tl')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  selectedRole === 'tl'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100/80 border border-amber-200/80'
-                }`}
-              >
-                <Star className="w-3.5 h-3.5" />
-                <span>Leads</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-                  selectedRole === 'tl' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
-                }`}>
-                  {members.filter(m => m.roleType === 'tl').length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedRole('employee')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  selectedRole === 'employee'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100/80 border border-blue-200/80'
-                }`}
-              >
-                <Building2 className="w-3.5 h-3.5" />
-                <span>Employees</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-                  selectedRole === 'employee' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
-                }`}>
-                  {members.filter(m => m.roleType === 'employee').length}
-                </span>
-              </button>
-            </div>
-          </div>
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Team Members</h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+            Manage and overview all staff, team leads, interns, and employees.
+          </p>
         </div>
 
-        {/* Filters Section - Compact & Modern */}
-        <div className="mb-4 flex flex-col sm:flex-row gap-2.5">
+        {/* Quick Stat Chips */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedRole('all')}
+            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              selectedRole === 'all'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-xs'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Total</span>
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+              selectedRole === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {members.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedRole('intern')}
+            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              selectedRole === 'intern'
+                ? 'bg-violet-600 text-white shadow-xs'
+                : 'bg-violet-50 text-violet-700 hover:bg-violet-100/80 border border-violet-200/80 shadow-xs'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Interns</span>
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+              selectedRole === 'intern' ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-800'
+            }`}>
+              {members.filter(m => m.roleType === 'intern').length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedRole('tl')}
+            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              selectedRole === 'tl'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-amber-50 text-amber-700 hover:bg-amber-100/80 border border-amber-200/80 shadow-xs'
+            }`}
+          >
+            <Star className="w-3.5 h-3.5" />
+            <span>Leads</span>
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+              selectedRole === 'tl' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+            }`}>
+              {members.filter(m => m.roleType === 'tl').length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedRole('employee')}
+            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              selectedRole === 'employee'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-blue-50 text-blue-700 hover:bg-blue-100/80 border border-blue-200/80 shadow-xs'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Employees</span>
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+              selectedRole === 'employee' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+            }`}>
+              {members.filter(m => m.roleType === 'employee').length}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Filters Section */}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row gap-2.5">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Search members by name, email, designation..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2 text-sm border border-slate-200/90 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white shadow-2xs transition-all placeholder:text-slate-400"
+              className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white transition-all placeholder:text-slate-400"
             />
           </div>
           
@@ -1095,7 +1082,7 @@ const fetchAllMembers = async () => {
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full sm:w-40 pl-3.5 pr-8 py-2 text-sm border border-slate-200/90 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white appearance-none cursor-pointer shadow-2xs font-medium text-slate-700"
+                className="w-full sm:w-40 h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 {roles.map(role => (
                   <option key={role} value={role}>
@@ -1110,7 +1097,7 @@ const fetchAllMembers = async () => {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full sm:w-36 pl-3.5 pr-8 py-2 text-sm border border-slate-200/90 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white appearance-none cursor-pointer shadow-2xs font-medium text-slate-700"
+                className="w-full sm:w-36 h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 {statuses.map(status => (
                   <option key={status} value={status}>
@@ -1122,6 +1109,7 @@ const fetchAllMembers = async () => {
             </div>
           </div>
         </div>
+      </div>
 
         {/* Content */}
         {loading ? (
@@ -1151,7 +1139,7 @@ const fetchAllMembers = async () => {
                 <div
                   key={member.id}
                   onClick={() => handleMemberClick(member)}
-                  className="group relative bg-white border border-slate-200/80 hover:border-indigo-300/90 rounded-2xl p-3.5 transition-all hover:shadow-md cursor-pointer flex flex-col justify-between"
+                  className="group relative bg-white border border-slate-200/80 hover:border-indigo-300 rounded-xl p-4 transition-all shadow-xs hover:shadow-md cursor-pointer flex flex-col justify-between"
                 >
                   <button className="absolute top-2.5 right-2.5 p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-slate-100 transition-opacity">
                     <MoreVertical className="w-3.5 h-3.5 text-slate-400" />
@@ -1201,14 +1189,13 @@ const fetchAllMembers = async () => {
             })}
           </div>
         )}
-      </div>
 
       {/* Member Detail Modal - Compact */}
       {showDetailModal && selectedMember && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3">
-          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col border border-slate-300">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col border border-slate-200/80 rounded-xl overflow-hidden">
             
-            <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-slate-300 px-4 py-3 flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-white/95 backdrop-blur-xs border-b border-slate-200/80 px-4 py-3 flex items-center justify-between z-10">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`w-8 h-8 bg-gradient-to-br ${selectedMember.avatarColor} text-white flex items-center justify-center font-bold text-xs flex-shrink-0`}>
                   {selectedMember.initials}

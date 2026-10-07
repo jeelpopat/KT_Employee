@@ -346,7 +346,7 @@ export const DailyFollowUpView = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       
       {/* 1. Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
@@ -404,67 +404,22 @@ export const DailyFollowUpView = () => {
 
       {/* 2. Top Summary KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-            <span className="text-xs font-medium uppercase tracking-wider">Team Members</span>
-            <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
-              <User size={16} />
+        {[
+          { label: "Team Members", value: stats.totalTeamMembers, accent: "border-l-indigo-600" },
+          { label: "Total Hours Logged", value: stats.totalHours, accent: "border-l-blue-500" },
+          { label: "Total Reports", value: stats.totalReports, accent: "border-l-emerald-500" },
+          { label: "Pending Blockers", value: stats.totalBlockers, accent: "border-l-amber-500" }
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+          >
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.totalTeamMembers}</span>
-            <span className="text-xs text-slate-500">reporting</span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-            <span className="text-xs font-medium uppercase tracking-wider">Total Hours Logged</span>
-            <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
-              <Clock size={16} />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.totalHours}</span>
-            <span className="text-xs text-slate-500">hrs recorded</span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-            <span className="text-xs font-medium uppercase tracking-wider">Total Reports</span>
-            <div className="p-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
-              <FileText size={16} />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.totalReports}</span>
-            <span className="text-xs text-slate-500">submitted</span>
-          </div>
-        </div>
-
-        <div className={`bg-white dark:bg-slate-900 border rounded-xl p-4 shadow-2xs ${
-          stats.totalBlockers > 0 
-            ? 'border-amber-300 dark:border-amber-800/80 bg-amber-50/20 dark:bg-amber-950/10' 
-            : 'border-slate-200 dark:border-slate-800'
-        }`}>
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-            <span className="text-xs font-medium uppercase tracking-wider">Pending Blockers</span>
-            <div className={`p-1.5 rounded-lg ${
-              stats.totalBlockers > 0 
-                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' 
-                : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
-            }`}>
-              <AlertTriangle size={16} />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className={`text-2xl font-bold ${stats.totalBlockers > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100'}`}>
-              {stats.totalBlockers}
-            </span>
-            <span className="text-xs text-slate-500">need sync</span>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* 3. Loading & Error States */}

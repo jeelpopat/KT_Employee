@@ -492,7 +492,7 @@ export const ProjectView = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
@@ -537,10 +537,10 @@ export const ProjectView = () => {
           { label: 'Completed', value: completedProjects, accent: 'border-l-emerald-500' },
           { label: 'Assigned Members', value: totalUniqueAssignedMembers, accent: 'border-l-purple-500' }
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs flex justify-between items-center`}>
-            <div>
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 mt-0.5">
+          <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
                 {isLoading ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
               </p>
             </div>

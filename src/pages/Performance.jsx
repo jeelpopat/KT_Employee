@@ -1,55 +1,187 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useConfirm } from "../components/common/ConfirmDialog";
-import { FileText, Edit3, ClipboardList, CheckCircle, XCircle } from "lucide-react";
+import {
+  BarChart3,
+  Users,
+  TrendingUp,
+  UserCheck,
+  Clock,
+  FileText,
+  Plus,
+  Search,
+  ChevronDown,
+  Calendar,
+  Edit3,
+  Trash2,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  RefreshCw,
+  Award
+} from "lucide-react";
 import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../utils/roleFilters";
+import { useApp, deriveUserRole, getRealAuthUserId } from "../context/AppContext.jsx";
+
+const DEPARTMENTS = [
+  "Development",
+  "Design",
+  "Frontend",
+  "Testing",
+  "Backend",
+  "HR"
+];
 
 const Performance = () => {
+  const { user, userRole } = useApp();
+  const normalizedRole = String(userRole || deriveUserRole(user) || "").toLowerCase().trim();
+  const isAdmin = normalizedRole === "admin";
+  const isTL = normalizedRole === "teamlead" || normalizedRole === "team_lead" || normalizedRole === "tl";
+
   const { confirm, confirmationDialog } = useConfirm();
-  const headers = {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  };
+  const headers = useMemo(() => {
+    const token = localStorage.getItem("auth_token") || localStorage.getItem("token") || "";
+    return {
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  }, []);
 
   const [employees, setEmployees] = useState([]);
   const [performances, setPerformances] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState({ message: "", type: "" });
-  const [editingId, setEditingId] = useState(null);
-  const [editRemarks, setEditRemarks] = useState("");
-  const [isEmployeeMenuOpen, setIsEmployeeMenuOpen] = useState(false);
-  const employeeMenuRef = useRef(null);
 
-  const [form, setForm] = useState({
+  // Modal States
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
+
+  // History Toolbar Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [toolbarDept, setToolbarDept] = useState("all");
+  const [toolbarPerfFilter, setToolbarPerfFilter] = useState("all");
+  const [selectedMonthYear, setSelectedMonthYear] = useState("all");
+
+  // Add / Edit Form State
+  const [modalForm, setModalForm] = useState({
     employeeID: "",
     percentage: "",
-    remarks: "",
+    department: "Development",
+    remarks: ""
   });
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchAllPerformances();
-  }, []);
+  // ============================================================
+  // FETCH ALL PERFORMANCES (LIVE API)
+  // ============================================================
+  const fetchAllPerformances = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        "https://kt-backend-yzr4.onrender.com/api/performance/all",
+        { headers }
+      );
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        employeeMenuRef.current &&
-        !employeeMenuRef.current.contains(event.target)
-      ) {
-        setIsEmployeeMenuOpen(false);
+      if (response.ok) {
+        const data = await response.json();
+        const rawPerfs = Array.isArray(data.data)
+          ? data.data
+          : Array.isArray(data.performances)
+            ? data.performances
+            : Array.isArray(data)
+              ? data
+              : [];
+
+        const filteredPerfs = rawPerfs.filter((perf) => {
+          if (!perf) return false;
+          if (isFinanceOrExcludedUser(perf)) return false;
+          if (perf.employeeID && isFinanceOrExcludedUser(perf.employeeID)) return false;
+          if (perf.employee && isFinanceOrExcludedUser(perf.employee)) return false;
+          return true;
+        });
+
+        setPerformances(filteredPerfs);
+      } else {
+        setPerformances([]);
       }
-    };
+    } catch (err) {
+      console.error("Backend performance fetch error:", err);
+      setPerformances([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [headers]);
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // ============================================================
+  // FETCH REAL EMPLOYEES (ONLY LIVE USERS, NO DUMMY DATA)
+  // ============================================================
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const response = await fetch(
+        "https://kt-backend-yzr4.onrender.com/api/employee/list",
+        { headers }
+      );
+
+      const data = await response.json();
+
+      let rawList = [];
+      if (Array.isArray(data)) rawList = data;
+      else if (Array.isArray(data.employees)) rawList = data.employees;
+      else if (Array.isArray(data.data)) rawList = data.data;
+      else if (Array.isArray(data.users)) rawList = data.users;
+
+      // Filter out finance and admin users using official utility
+      const validEmployees = filterOutFinanceUsers(rawList);
+
+      // Clean & deduplicate by email / ID
+      const seen = new Set();
+      const cleanEmployees = [];
+
+      for (const emp of validEmployees) {
+        if (!emp) continue;
+        const id = String(emp._id || emp.id || emp.userId || "");
+        const email = String(emp.email || emp.employeeEmail || "").toLowerCase().trim();
+        const key = email || id;
+
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+
+        const name =
+          emp.fullName ||
+          emp.name ||
+          emp.displayName ||
+          `${emp.firstName || ""} ${emp.lastName || ""}`.trim() ||
+          "Employee";
+
+        cleanEmployees.push({
+          _id: id,
+          name,
+          email,
+          department: emp.department || emp.dept || "Development",
+          role: emp.role || "employee",
+          designation: emp.designation || ""
+        });
+      }
+
+      setEmployees(cleanEmployees);
+    } catch (err) {
+      console.error("Failed to fetch real employees:", err);
+      setEmployees([]);
+    }
+  }, [headers]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchEmployees();
+    }
+    fetchAllPerformances();
+  }, [isAdmin, fetchAllPerformances, fetchEmployees]);
 
   useEffect(() => {
     if (notification.message) {
       const timer = setTimeout(() => {
         setNotification({ message: "", type: "" });
-      }, 3000);
-
+      }, 3500);
       return () => clearTimeout(timer);
     }
   }, [notification]);
@@ -58,29 +190,17 @@ const Performance = () => {
     setNotification({ message, type });
   };
 
-  // ============================================================
-  // GET EMPLOYEE DISPLAY NAME
-  // ============================================================
-
+  // Helper to extract employee display name
   const getEmployeeDisplayName = (perf) => {
     if (!perf) return "Unknown Employee";
 
-    if (perf.employeeID) {
-      if (typeof perf.employeeID === "object") {
-        const emp = perf.employeeID;
-
-        if (emp.name) return emp.name;
-
-        if (emp.firstName && emp.lastName) {
-          return `${emp.firstName} ${emp.lastName}`;
-        }
-
-        if (emp.firstName) return emp.firstName;
-
-        if (emp.fullName) return emp.fullName;
-
-        if (emp.displayName) return emp.displayName;
-      }
+    if (perf.employeeID && typeof perf.employeeID === "object") {
+      const emp = perf.employeeID;
+      if (emp.name) return emp.name;
+      if (emp.fullName) return emp.fullName;
+      if (emp.firstName && emp.lastName) return `${emp.firstName} ${emp.lastName}`.trim();
+      if (emp.firstName) return emp.firstName;
+      if (emp.displayName) return emp.displayName;
     }
 
     const candidates = [
@@ -93,19 +213,28 @@ const Performance = () => {
       perf.displayName,
     ];
 
-    for (const value of candidates) {
-      if (typeof value === "string" && value.trim()) {
-        return value.trim();
+    for (const val of candidates) {
+      if (typeof val === "string" && val.trim()) {
+        return val.trim();
       }
     }
 
     return "Unknown Employee";
   };
 
-  // ============================================================
-  // GET EMPLOYEE TYPE
-  // ============================================================
+  // Helper to extract employee email
+  const getEmployeeEmail = (perf) => {
+    if (!perf) return "";
+    return (
+      perf.employeeID?.email ||
+      perf.employeeEmail ||
+      perf.employee?.email ||
+      perf.email ||
+      ""
+    );
+  };
 
+  // Helper to extract employee type label
   const getEmployeeTypeLabel = (perf) => {
     const rawType =
       perf?.employeeType ||
@@ -119,597 +248,440 @@ const Performance = () => {
     switch (normalized) {
       case "intern":
         return "Intern";
-
       case "employee":
         return "Employee";
-
       case "teamlead":
       case "team lead":
       case "team_lead":
         return "Team Lead";
-
       default:
-        return rawType ? String(rawType) : "N/A";
+        return "Employee";
     }
   };
 
-  // ============================================================
-  // GET PERFORMANCE PERCENTAGE
-  // ============================================================
-
-  const getPerformancePercentage = (perf) => {
-    const percentage =
+  // Helper to extract numeric percentage
+  const getNumericPercentage = (perf) => {
+    const val =
       perf?.performancePercentage ??
       perf?.percentage ??
       perf?.performance?.performancePercentage ??
       "";
+    if (val === "" || val === null || val === undefined) return 0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  };
 
-    if (percentage === "" || percentage === null || percentage === undefined) {
-      return "-";
+  // Helper to resolve Department for an item
+  const getDepartment = (perf) => {
+    if (!perf) return "Development";
+
+    const rawDept =
+      perf.department ||
+      perf.dept ||
+      perf.employeeID?.department ||
+      perf.employee?.department;
+
+    if (rawDept) {
+      if (typeof rawDept === "string" && rawDept.trim()) return rawDept.trim();
+      if (typeof rawDept === "object" && rawDept.name) return rawDept.name;
+      if (typeof rawDept === "object" && rawDept.departmentName) return rawDept.departmentName;
     }
 
-    return `${percentage}%`;
+    const desig =
+      perf.designation ||
+      perf.employeeID?.designation ||
+      perf.employee?.designation;
+
+    if (desig) {
+      const dStr = typeof desig === "string" ? desig : (desig.name || desig.designationName || "");
+      const lower = dStr.toLowerCase();
+      if (lower.includes("frontend") || lower.includes("react") || lower.includes("ui")) return "Frontend";
+      if (lower.includes("backend") || lower.includes("node") || lower.includes("api")) return "Backend";
+      if (lower.includes("design") || lower.includes("figma") || lower.includes("ux")) return "Design";
+      if (lower.includes("test") || lower.includes("qa")) return "Testing";
+      if (lower.includes("hr") || lower.includes("human")) return "HR";
+      if (lower.includes("dev") || lower.includes("engineer")) return "Development";
+    }
+
+    const role = String(perf.role || perf.employeeID?.role || "").toLowerCase();
+    if (role.includes("lead") || role.includes("dev")) return "Development";
+    if (role.includes("hr")) return "HR";
+
+    const idStr = String(perf._id || perf.id || getEmployeeDisplayName(perf) || "item");
+    const sum = idStr.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    return DEPARTMENTS[sum % DEPARTMENTS.length];
+  };
+
+  // Department Badge color mapping
+  const getDepartmentBadgeStyle = (dept) => {
+    const d = String(dept).toLowerCase();
+    if (d.includes("front")) return "bg-[#FDF2F8] text-[#DB2777]";
+    if (d.includes("back")) return "bg-[#FFF7ED] text-[#EA580C]";
+    if (d.includes("design")) return "bg-[#FAF5FF] text-[#9333EA]";
+    if (d.includes("test") || d.includes("qa")) return "bg-[#F0FDF4] text-[#16A34A]";
+    if (d.includes("hr")) return "bg-[#FEF2F2] text-[#DC2626]";
+    return "bg-[#EFF6FF] text-[#2563EB]";
+  };
+
+  // Avatar Initials & colors
+  const getInitials = (name) => {
+    if (!name) return "EM";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const getAvatarStyle = (dept = "") => {
+    const d = String(dept).toLowerCase();
+    if (d.includes("front")) return { bg: "bg-[#FDF2F8]", text: "text-[#DB2777]" };
+    if (d.includes("back")) return { bg: "bg-[#FFF7ED]", text: "text-[#EA580C]" };
+    if (d.includes("design")) return { bg: "bg-[#FAF5FF]", text: "text-[#9333EA]" };
+    if (d.includes("test")) return { bg: "bg-[#F0FDF4]", text: "text-[#16A34A]" };
+    if (d.includes("hr")) return { bg: "bg-[#FEF2F2]", text: "text-[#DC2626]" };
+    return { bg: "bg-[#EEF2FF]", text: "text-[#4F46E5]" };
+  };
+
+  // Format date as M/D/YYYY
+  const formatRowDate = (dateVal) => {
+    if (!dateVal) return "—";
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "—";
+    return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
   };
 
   // ============================================================
-  // FETCH ALL PERFORMANCES
+  // ROLE ISOLATION: EMPLOYEE / TL OWN RECORD MATCHING
   // ============================================================
+  const isMyRecord = useCallback((perf) => {
+    if (!perf) return false;
+    const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").toLowerCase().trim();
+    const myEmail = String(user?.email || "").toLowerCase().trim();
+    const myName = String(user?.name || user?.fullName || "").toLowerCase().trim();
 
-  const fetchAllPerformances = async () => {
-    try {
-      const response = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/performance/all",
-        { headers }
-      );
+    // 1. Check ID match
+    const perfEmpId = String(
+      (typeof perf.employeeID === "object" ? (perf.employeeID?._id || perf.employeeID?.id || perf.employeeID?.userId) : perf.employeeID) ||
+      (typeof perf.employee === "object" ? (perf.employee?._id || perf.employee?.id || perf.employee?.userId) : perf.employee) ||
+      perf.employeeId ||
+      perf.userId ||
+      ""
+    ).toLowerCase().trim();
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch performances");
-      }
+    if (myId && perfEmpId && myId === perfEmpId) return true;
 
-      const data = await response.json();
+    // 2. Check Email match
+    const perfEmail = String(
+      (typeof perf.employeeID === "object" ? perf.employeeID?.email : "") ||
+      (typeof perf.employee === "object" ? perf.employee?.email : "") ||
+      perf.employeeEmail ||
+      perf.email ||
+      ""
+    ).toLowerCase().trim();
 
-      console.log("Performance API:", data);
+    if (myEmail && perfEmail && myEmail === perfEmail) return true;
 
-      if (data.success) {
-        const rawPerfs = Array.isArray(data.data) ? data.data : [];
-        const filteredPerfs = rawPerfs.filter((perf) => {
-          if (!perf) return false;
-          if (isFinanceOrExcludedUser(perf)) return false;
-          if (perf.employeeID && isFinanceOrExcludedUser(perf.employeeID)) return false;
-          if (perf.employee && isFinanceOrExcludedUser(perf.employee)) return false;
-          return true;
-        });
-        setPerformances(filteredPerfs);
-      }
-    } catch (err) {
-      console.error("Error fetching performances:", err);
+    // 3. Check Name match
+    const perfName = String(
+      (typeof perf.employeeID === "object" ? (perf.employeeID?.name || perf.employeeID?.fullName) : "") ||
+      (typeof perf.employee === "object" ? (perf.employee?.name || perf.employee?.fullName) : "") ||
+      perf.employeeName ||
+      perf.name ||
+      perf.fullName ||
+      ""
+    ).toLowerCase().trim();
 
-      showNotification(
-        "Failed to load performance history",
-        "warning"
-      );
+    if (myName && perfName && (myName === perfName || (myName.length >= 3 && perfName.length >= 3 && (myName.includes(perfName) || perfName.includes(myName))))) return true;
+
+    return false;
+  }, [user]);
+
+  // Role-isolated performances: Admin sees all; Employee and TL see ONLY their own records
+  const myPerformances = useMemo(() => {
+    if (isAdmin) {
+      return performances;
     }
-  };
+    return performances.filter(isMyRecord);
+  }, [performances, isAdmin, isMyRecord]);
 
   // ============================================================
-  // FETCH EMPLOYEES + INTERNS + TEAM LEADS
+  // PERFORMANCE METRICS CALCULATION (PURELY DYNAMIC)
   // ============================================================
+  const metrics = useMemo(() => {
+    if (!isAdmin) {
+      // Personal KPIs for Employee & Team Lead
+      const totalReviews = myPerformances.length;
+      if (totalReviews === 0) {
+        return {
+          isPersonal: true,
+          latestScore: 0,
+          averageScore: 0,
+          totalReviews: 0,
+          ratingLabel: "Pending Evaluation",
+          ratingColor: "text-slate-500",
+          latestDept: user?.department || "Development"
+        };
+      }
 
-  const fetchEmployees = async () => {
-    setLoading(true);
+      // Sort newest first
+      const sorted = [...myPerformances].sort((a, b) => {
+        const da = new Date(a.createdAt || a.date || 0);
+        const db = new Date(b.createdAt || b.date || 0);
+        return db - da;
+      });
 
-    try {
-      const token = localStorage.getItem("token");
+      const latest = sorted[0];
+      const latestScore = getNumericPercentage(latest);
 
-      const commonHeaders = {
-        Authorization: `Bearer ${token}`,
+      const sum = myPerformances.reduce((acc, p) => acc + getNumericPercentage(p), 0);
+      const averageScore = Math.round(sum / totalReviews);
+
+      let ratingLabel = "Needs Improvement";
+      let ratingColor = "text-[#F59E0B]";
+      if (latestScore >= 80) {
+        ratingLabel = "Excellent";
+        ratingColor = "text-[#10B981]";
+      } else if (latestScore >= 50) {
+        ratingLabel = "Good";
+        ratingColor = "text-[#3B82F6]";
+      }
+
+      return {
+        isPersonal: true,
+        latestScore,
+        averageScore,
+        totalReviews,
+        ratingLabel,
+        ratingColor,
+        latestDept: getDepartment(latest)
       };
-
-      const [
-        employeeResponse,
-        usersResponse,
-        teamLeadResponse,
-      ] = await Promise.all([
-        fetch(
-          "https://kt-backend-yzr4.onrender.com/api/employee/list",
-          { headers: commonHeaders }
-        ),
-
-        fetch(
-          "https://kt-backend-yzr4.onrender.com/api/users/all",
-          { headers: commonHeaders }
-        ),
-
-        fetch(
-          "https://kt-backend-yzr4.onrender.com/api/teamLead/team",
-          { headers: commonHeaders }
-        ),
-      ]);
-
-      const employeeData = await employeeResponse.json();
-      const usersData = await usersResponse.json();
-      const teamLeadData = await teamLeadResponse.json();
-
-      // ========================================================
-      // 1. EMPLOYEES
-      // ========================================================
-
-      let employeeList = [];
-
-      if (Array.isArray(employeeData)) {
-        employeeList = employeeData;
-      } else if (Array.isArray(employeeData.users)) {
-        employeeList = employeeData.users;
-      } else if (Array.isArray(employeeData.data)) {
-        employeeList = employeeData.data;
-      } else if (Array.isArray(employeeData.employees)) {
-        employeeList = employeeData.employees;
-      }
-
-      const employees = employeeList
-        .filter((emp) => emp && !isFinanceOrExcludedUser(emp))
-        .map((employee) => ({
-          _id:
-            employee._id ||
-            employee.id ||
-            employee.userId,
-
-          name:
-            employee.name ||
-            employee.fullName ||
-            employee.displayName ||
-            `${employee.firstName || ""} ${
-              employee.lastName || ""
-            }`.trim() ||
-            "Unknown Employee",
-
-          email:
-            employee.email ||
-            employee.employeeEmail ||
-            employee.user?.email ||
-            "",
-
-          type: "employee",
-
-          role:
-            employee.role ||
-            employee.user?.role ||
-            "employee",
-        }))
-        .filter((employee) => employee._id);
-
-      // ========================================================
-      // 2. INTERNS
-      // ========================================================
-
-      const users = Array.isArray(usersData)
-        ? usersData
-        : usersData.users ||
-          usersData.data ||
-          [];
-
-      const interns = users
-        .filter((user) => {
-          if (!user || isFinanceOrExcludedUser(user)) return false;
-          return String(user.role || "").toLowerCase() === "intern";
-        })
-        .map((intern) => ({
-          _id:
-            intern._id ||
-            intern.id ||
-            intern.userId,
-
-          name:
-            intern.name ||
-            intern.fullName ||
-            intern.displayName ||
-            `${intern.firstName || ""} ${
-              intern.lastName || ""
-            }`.trim() ||
-            "Unknown Intern",
-
-          email:
-            intern.email ||
-            intern.user?.email ||
-            "",
-
-          type: "intern",
-
-          role: "intern",
-        }))
-        .filter((intern) => intern._id);
-
-      // ========================================================
-      // 3. TEAM LEADS
-      // ========================================================
-
-      const teamLeadList =
-        teamLeadData.teamLeads ||
-        teamLeadData.data ||
-        teamLeadData.teamlead ||
-        teamLeadData.teams ||
-        [];
-
-      const teamLeads = Array.isArray(teamLeadList)
-        ? teamLeadList
-            .filter((tl) => {
-              if (!tl || isFinanceOrExcludedUser(tl)) return false;
-              const u = tl.user || tl.employee || tl.teamLead;
-              if (u && isFinanceOrExcludedUser(u)) return false;
-              return true;
-            })
-            .map((teamLead) => {
-              const user =
-                teamLead.user ||
-                teamLead.employee ||
-                teamLead.teamLead ||
-                teamLead;
-
-              return {
-                _id:
-                  user?._id ||
-                  user?.id ||
-                  teamLead._id ||
-                  teamLead.id ||
-                  teamLead.userId,
-
-                name:
-                  user?.name ||
-                  user?.fullName ||
-                  user?.displayName ||
-                  `${user?.firstName || ""} ${
-                    user?.lastName || ""
-                  }`.trim() ||
-                  teamLead.name ||
-                  teamLead.fullName ||
-                  "Unknown Team Lead",
-
-                email:
-                  user?.email ||
-                  teamLead.email ||
-                  "",
-
-                type: "teamlead",
-
-                role: "teamlead",
-              };
-            })
-            .filter((teamLead) => teamLead._id)
-        : [];
-
-      // Extract team leads directly from users/all
-      const usersTLs = users
-        .filter((user) => {
-          if (!user || isFinanceOrExcludedUser(user)) return false;
-          const role = String(user.role || "").toLowerCase().trim();
-          const desig = String(user.designation?.designationName || user.designation?.name || user.designation || "").toLowerCase().trim();
-          return (
-            user.isTeamLead === true ||
-            user.isTeamLeader === true ||
-            role === "team lead" ||
-            role === "team_leader" ||
-            role === "team leader" ||
-            role === "tl" ||
-            role.includes("team lead") ||
-            role.includes("lead") ||
-            desig.includes("team lead") ||
-            desig.includes("team leader")
-          );
-        })
-        .map((u) => ({
-          _id: u._id || u.id || u.userId,
-          name:
-            u.name ||
-            u.fullName ||
-            u.displayName ||
-            `${u.firstName || ""} ${u.lastName || ""}`.trim() ||
-            "Unknown Team Lead",
-          email: u.email || "",
-          type: "teamlead",
-          role: "teamlead",
-        }))
-        .filter((tl) => tl._id);
-
-      const allTeamLeads = [...usersTLs];
-      teamLeads.forEach((tl) => {
-        if (!allTeamLeads.some((c) => String(c._id) === String(tl._id) || (tl.email && c.email && c.email.toLowerCase() === tl.email.toLowerCase()))) {
-          allTeamLeads.push(tl);
-        }
-      });
-
-      // ========================================================
-      // MERGE ALL
-      // ========================================================
-
-      const combinedEmployees = [
-        ...interns,
-        ...employees,
-        ...allTeamLeads,
-      ];
-
-      // Remove duplicate IDs
-      const uniqueEmployees = Array.from(
-        new Map(
-          combinedEmployees.map((employee) => [
-            employee._id,
-            employee,
-          ])
-        ).values()
-      );
-
-      console.log(
-        "Performance Employees:",
-        uniqueEmployees
-      );
-
-      console.log("Interns:", interns);
-      console.log("Employees:", employees);
-      console.log("Team Leads:", teamLeads);
-
-      setEmployees(uniqueEmployees);
-    } catch (err) {
-      console.error(
-        "Error fetching employees, interns and team leads:",
-        err
-      );
-
-      showNotification(
-        "Failed to load employees, interns and team leads",
-        "error"
-      );
-    } finally {
-      setLoading(false);
     }
-  };
 
-  // ============================================================
-  // HANDLE FORM CHANGE
-  // ============================================================
+    // Admin Metrics (Company-wide)
+    const totalRecords = performances.length;
+    let excellentCount = 0;
+    let goodCount = 0;
+    let needsImprovementCount = 0;
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    setForm({
-      ...form,
-      [name]: value,
+    performances.forEach((perf) => {
+      const pct = getNumericPercentage(perf);
+      if (pct >= 80) excellentCount++;
+      else if (pct >= 50) goodCount++;
+      else needsImprovementCount++;
     });
-  };
 
-  const handleEmployeeSelect = (employeeId) => {
-    setForm((currentForm) => ({
-      ...currentForm,
-      employeeID: employeeId,
-    }));
-    setIsEmployeeMenuOpen(false);
-  };
+    const displayTotalEmployees = employees.length > 0 ? employees.length : totalRecords;
+    const excellentRatio = totalRecords > 0 ? (excellentCount / totalRecords) * 100 : 0;
+    const goodRatio = totalRecords > 0 ? (goodCount / totalRecords) * 100 : 0;
+    const needsImprovementRatio = totalRecords > 0 ? (needsImprovementCount / totalRecords) * 100 : 0;
 
-  // ============================================================
-  // VALIDATE FORM
-  // ============================================================
-
-  const validateForm = () => {
-    if (!form.employeeID) {
-      showNotification(
-        "Please select an employee",
-        "error"
-      );
-
-      return false;
-    }
-
-    if (
-      form.percentage === "" ||
-      Number(form.percentage) < 0 ||
-      Number(form.percentage) > 100 ||
-      Number.isNaN(Number(form.percentage))
-    ) {
-      showNotification(
-        "Please enter a percentage between 0 and 100",
-        "error"
-      );
-
-      return false;
-    }
-
-    return true;
-  };
-
-  // ============================================================
-  // SUBMIT PERFORMANCE
-  // ============================================================
-
-  const submitPerformance = async () => {
-    if (!validateForm()) return;
-
-    setSubmitting(true);
-
-    // IMPORTANT:
-    // Backend expects performancePercentage
-    const payload = {
-      employeeID: form.employeeID,
-      performancePercentage: Number(form.percentage),
-      remarks: form.remarks || "",
+    return {
+      isPersonal: false,
+      totalEmployees: displayTotalEmployees,
+      excellentCount,
+      goodCount,
+      needsImprovementCount,
+      excellentRatio,
+      goodRatio,
+      needsImprovementRatio
     };
+  }, [performances, myPerformances, employees, isAdmin, user]);
 
-    console.log(
-      "Performance Submit Payload:",
-      payload
-    );
+  // Available Month-Year Options from actual data
+  const monthYearOptions = useMemo(() => {
+    const set = new Set();
+    myPerformances.forEach((p) => {
+      const rawDate = p.createdAt || p.date;
+      if (!rawDate) return;
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        set.add(ym);
+      }
+    });
 
-    try {
-      const response = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/performance/create",
-        {
-          method: "POST",
+    return Array.from(set).sort().reverse().map((ym) => {
+      const [year, month] = ym.split("-");
+      const date = new Date(Number(year), Number(month) - 1, 1);
+      const label = date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      return { value: ym, label };
+    });
+  }, [myPerformances]);
 
-          headers: {
-            ...headers,
-            "Content-Type": "application/json",
-          },
+  // ============================================================
+  // FILTERED PERFORMANCES LIST
+  // ============================================================
+  const filteredPerformances = useMemo(() => {
+    return myPerformances.filter((perf) => {
+      const name = getEmployeeDisplayName(perf).toLowerCase();
+      const email = getEmployeeEmail(perf).toLowerCase();
+      const dept = getDepartment(perf).toLowerCase();
+      const remarks = String(perf.remarks || "").toLowerCase();
+      const pct = getNumericPercentage(perf);
 
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const data = await response.json();
-
-      console.log(
-        "Performance Create Response:",
-        data
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            "Failed to submit performance"
-        );
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesQuery =
+          name.includes(q) ||
+          email.includes(q) ||
+          dept.includes(q) ||
+          remarks.includes(q);
+        if (!matchesQuery) return false;
       }
 
-      showNotification(
-        "Performance submitted successfully!",
-        "success"
-      );
+      // Toolbar: Department Dropdown
+      if (toolbarDept !== "all") {
+        if (dept !== toolbarDept.toLowerCase()) return false;
+      }
 
-      await fetchAllPerformances();
+      // Toolbar: Performance Dropdown
+      if (toolbarPerfFilter !== "all") {
+        if (toolbarPerfFilter === "excellent" && pct < 80) return false;
+        if (toolbarPerfFilter === "good" && (pct < 50 || pct >= 80)) return false;
+        if (toolbarPerfFilter === "needs-improvement" && pct >= 50) return false;
+      }
 
-      setForm({
-        employeeID: "",
-        percentage: "",
-        remarks: "",
-      });
-    } catch (err) {
-      console.error(
-        "Error submitting performance:",
-        err
-      );
+      // Toolbar: Month / Year Filter
+      if (selectedMonthYear !== "all") {
+        const rawDate = perf.createdAt || perf.date;
+        if (!rawDate) return false;
+        const pDate = new Date(rawDate);
+        if (isNaN(pDate.getTime())) return false;
+        const ymStr = `${pDate.getFullYear()}-${String(pDate.getMonth() + 1).padStart(2, "0")}`;
+        if (ymStr !== selectedMonthYear) return false;
+      }
 
-      showNotification(
-        err.message ||
-          "Failed to submit performance. Please try again.",
-        "error"
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      return true;
+    });
+  }, [
+    myPerformances,
+    searchQuery,
+    toolbarDept,
+    toolbarPerfFilter,
+    selectedMonthYear
+  ]);
 
   // ============================================================
-  // RESET FORM
+  // FORM / MODAL ACTIONS
   // ============================================================
 
-  const resetForm = () => {
-    setForm({
+  const handleOpenAddModal = () => {
+    if (!isAdmin) return;
+    setModalForm({
       employeeID: "",
       percentage: "",
-      remarks: "",
+      department: "Development",
+      remarks: ""
     });
-
-    setEditingId(null);
-    setEditRemarks("");
-
-    showNotification(
-      "Form has been reset",
-      "info"
-    );
+    setIsAddModalOpen(true);
   };
 
-  // ============================================================
-  // EDIT PERFORMANCE
-  // ============================================================
-
-  const handleEditPerformance = (perf) => {
-    setEditingId(perf._id);
-    setEditRemarks(perf.remarks || "");
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
+  const handleOpenEditModal = (perf) => {
+    if (!isAdmin) return;
+    setEditingRecord(perf);
+    setModalForm({
+      employeeID: String(perf.employeeID?._id || perf.employeeID || perf.employee?._id || ""),
+      percentage: String(getNumericPercentage(perf)),
+      department: getDepartment(perf),
+      remarks: perf.remarks || ""
     });
+    setIsEditModalOpen(true);
   };
 
-  // ============================================================
-  // UPDATE PERFORMANCE
-  // ============================================================
+  const handleSubmitModal = async (e) => {
+    if (e) e.preventDefault();
+    if (!isAdmin) return;
 
-  const handleUpdatePerformance = async () => {
-    if (!editRemarks.trim()) {
-      showNotification(
-        "Please enter some remarks",
-        "error"
-      );
+    if (!modalForm.employeeID) {
+      showNotification("Please select an employee", "error");
+      return;
+    }
 
+    const pct = Number(modalForm.percentage);
+    if (isNaN(pct) || pct < 0 || pct > 100 || modalForm.percentage === "") {
+      showNotification("Please enter a valid percentage between 0 and 100", "error");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const response = await fetch(
-        `https://kt-backend-yzr4.onrender.com/api/performance/update/${editingId}`,
-        {
-          method: "PUT",
-
-          headers: {
-            ...headers,
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            remarks: editRemarks,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            "Failed to update performance"
+      if (isEditModalOpen && editingRecord) {
+        const response = await fetch(
+          `https://kt-backend-yzr4.onrender.com/api/performance/update/${editingRecord._id}`,
+          {
+            method: "PUT",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              remarks: modalForm.remarks,
+              performancePercentage: pct,
+              department: modalForm.department
+            }),
+          }
         );
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || "Failed to update performance record");
+        }
+
+        showNotification("Performance record updated successfully!", "success");
+        setIsEditModalOpen(false);
+        setEditingRecord(null);
+      } else {
+        const response = await fetch(
+          "https://kt-backend-yzr4.onrender.com/api/performance/create",
+          {
+            method: "POST",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              employeeID: modalForm.employeeID,
+              performancePercentage: pct,
+              remarks: modalForm.remarks || "",
+              department: modalForm.department || "Development"
+            }),
+          }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to submit performance record");
+        }
+
+        showNotification("Performance submitted successfully!", "success");
+        setIsAddModalOpen(false);
       }
 
-      showNotification(
-        "Performance updated successfully!",
-        "success"
-      );
-
       await fetchAllPerformances();
-
-      setEditingId(null);
-      setEditRemarks("");
+      setModalForm({ employeeID: "", percentage: "", department: "Development", remarks: "" });
     } catch (err) {
-      console.error(
-        "Error updating performance:",
-        err
-      );
-
-      showNotification(
-        err.message ||
-          "Failed to update performance. Please try again.",
-        "error"
-      );
+      console.error("Submit error:", err);
+      showNotification(err.message || "Operation failed", "error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ============================================================
-  // DELETE PERFORMANCE
-  // ============================================================
-
+  // Delete Record
   const handleDeletePerformance = async (perf) => {
-    const employeeName =
-      getEmployeeDisplayName(perf);
+    if (!isAdmin) return;
+    const employeeName = getEmployeeDisplayName(perf);
 
     const confirmed = await confirm({
       title: "Delete performance record?",
       message: `Are you sure you want to delete performance record for ${employeeName}?`,
       confirmLabel: "Delete",
     });
-    if (!confirmed) {
-      return;
-    }
+
+    if (!confirmed) return;
 
     try {
       const response = await fetch(
@@ -721,712 +693,577 @@ const Performance = () => {
       );
 
       if (!response.ok) {
-        throw new Error(
-          "Failed to delete performance"
-        );
+        throw new Error("Failed to delete performance");
       }
 
-      showNotification(
-        `Performance record for ${employeeName} deleted successfully!`,
-        "success"
-      );
-
+      showNotification(`Performance record for ${employeeName} deleted successfully!`, "success");
       await fetchAllPerformances();
     } catch (err) {
-      console.error(
-        "Error deleting performance:",
-        err
-      );
-
-      showNotification(
-        "Failed to delete performance. Please try again.",
-        "error"
-      );
+      console.error("Delete error:", err);
+      showNotification("Failed to delete performance record", "error");
     }
   };
 
-  // ============================================================
-  // CANCEL EDIT
-  // ============================================================
+  return (
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-sans">
+      {confirmationDialog}
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditRemarks("");
-  };
+      {/* Floating Toast Notification */}
+      {notification.message && (
+        <div
+          className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg border text-xs sm:text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${notification.type === "success"
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-800"
+              : notification.type === "error"
+                ? "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/80 dark:text-rose-200 dark:border-rose-800"
+                : "bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-200 dark:border-indigo-800"
+            }`}
+        >
+          {notification.type === "success" ? (
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+          ) : notification.type === "error" ? (
+            <AlertCircle size={16} className="text-rose-600 dark:text-rose-400" />
+          ) : (
+            <Sparkles size={16} className="text-indigo-600 dark:text-indigo-400" />
+          )}
+          <span>{notification.message}</span>
+          <button
+            onClick={() => setNotification({ message: "", type: "" })}
+            className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
-  // ============================================================
-  // NOTIFICATION
-  // ============================================================
+      {/* ==================================================== */}
+      {/* 1. TOP HEADER */}
+      {/* ==================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+            <BarChart3 size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                {isAdmin ? "Performance Management" : isTL ? "Team Lead Performance" : "My Performance"}
+              </h1>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                {isAdmin ? "Admin" : isTL ? "Team Lead (Read-Only)" : "Employee (Read-Only)"}
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              {isAdmin
+                ? "Track and manage employee performance with ease."
+                : "View your personal performance scores, evaluations, and supervisor remarks."}
+            </p>
+          </div>
+        </div>
 
-  const Notification = () => {
-    if (!notification.message) return null;
-
-    const bgColor = {
-      success:
-        "bg-green-100 border-green-400 text-green-700",
-
-      error:
-        "bg-red-100 border-red-400 text-red-700",
-
-      warning:
-        "bg-yellow-100 border-yellow-400 text-yellow-700",
-
-      info:
-        "bg-blue-100 border-blue-400 text-blue-700",
-    };
-
-    return (
-      <div
-        className={`fixed top-4 right-4 z-50 px-4 sm:px-6 py-3 sm:py-4 rounded-lg border max-w-[90%] sm:max-w-md ${
-          bgColor[notification.type] ||
-          bgColor.info
-        }`}
-      >
-        <div className="flex items-center text-sm sm:text-base">
-          <span className="mr-2 sm:mr-3">
-            {notification.type === "success" &&
-              "✅"}
-
-            {notification.type === "error" &&
-              "❌"}
-
-            {notification.type === "warning" &&
-              "⚠️"}
-
-            {notification.type === "info" &&
-              "ℹ️"}
-          </span>
-
-          <span className="break-words">
-            {notification.message}
-          </span>
+        {/* Sync / Refresh button */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={fetchAllPerformances}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer disabled:opacity-60 transition"
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : "text-slate-400"} />
+            <span>{loading ? "Refreshing..." : "Sync"}</span>
+          </button>
         </div>
       </div>
-    );
-  };
 
-  // ============================================================
-  // PERFORMANCE LIST
-  // ============================================================
-
-  const PerformanceList = () => {
-    if (performances.length === 0) {
-      return (
-        <div className="text-center py-8 text-gray-500 text-sm sm:text-base">
-          No performance records found
-        </div>
-      );
-    }
-
-    return (
-      <div className="mt-8 sm:mt-12 border-t pt-6 sm:pt-8">
-
-        <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">
-          <span className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-indigo-600" />
-            Performance History
-          </span>
-        </h3>
-
-        {/* ======================================================
-            MOBILE CARD VIEW
-        ====================================================== */}
-
-        <div className="block md:hidden space-y-4">
-          {performances.map((perf) => (
+      {/* ==================================================== */}
+      {/* 2. TOP METRIC CARDS (4 STATS FULL WIDTH) */}
+      {/* ==================================================== */}
+      {/* 2. TOP METRIC CARDS (4 CARDS) */}
+      {/* ==================================================== */}
+      {isAdmin ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Total Evaluated", value: metrics.totalEmployees, accent: "border-l-indigo-600" },
+            { label: "Excellent", value: `${metrics.excellentCount}`, accent: "border-l-emerald-500" },
+            { label: "Good", value: `${metrics.goodCount}`, accent: "border-l-blue-500" },
+            { label: "Needs Improvement", value: `${metrics.needsImprovementCount}`, accent: "border-l-amber-500" }
+          ].map((item, idx) => (
             <div
-              key={perf._id}
-              className="rounded-lg p-4 border border-gray-200"
+              key={idx}
+              className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
             >
-              <div className="flex justify-between items-start mb-2">
-
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900 text-sm">
-                    {getEmployeeDisplayName(perf)}
-                  </div>
-
-                  <div className="text-xs text-gray-500">
-                    {perf.employeeID?.email ||
-                      perf.employeeEmail ||
-                      "No email"}
-                  </div>
-                </div>
-
-                <span
-                  className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
-                    getEmployeeTypeLabel(perf) ===
-                    "Intern"
-                      ? "bg-purple-100 text-purple-800"
-                      : getEmployeeTypeLabel(perf) ===
-                        "Employee"
-                      ? "bg-blue-100 text-blue-800"
-                      : getEmployeeTypeLabel(perf) ===
-                        "Team Lead"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {getEmployeeTypeLabel(perf)}
-                </span>
-              </div>
-
-              {/* Percentage */}
-              <div className="mb-2">
-                <div className="text-xs text-gray-500">
-                  Performance:
-                </div>
-
-                <div className="text-lg font-bold text-indigo-600">
-                  {getPerformancePercentage(perf)}
-                </div>
-              </div>
-
-              {/* Remarks */}
-              <div className="mb-2">
-                <div className="text-xs text-gray-500">
-                  Remarks:
-                </div>
-
-                <div className="text-sm text-gray-700 break-words">
-                  {perf.remarks || "-"}
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
-
-                <div className="text-xs text-gray-500">
-                  {new Date(
-                    perf.createdAt
-                  ).toLocaleDateString()}
-                </div>
-
-                <div className="flex gap-2">
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleEditPerformance(perf)
-                    }
-                    className="px-3 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 transition duration-150"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleDeletePerformance(perf)
-                    }
-                    className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition duration-150"
-                  >
-                    Delete
-                  </button>
-
-                </div>
+              <div className="flex items-start justify-between">
+                <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
               </div>
             </div>
           ))}
         </div>
-
-        {/* ======================================================
-            DESKTOP TABLE VIEW
-        ====================================================== */}
-
-        <div className="hidden md:block overflow-x-auto">
-
-          <table className="min-w-full divide-y divide-gray-200">
-
-            <thead className="bg-gray-50">
-              <tr>
-
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Employee
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Percentage
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Remarks
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-
-              </tr>
-            </thead>
-
-            <tbody className="bg-white divide-y divide-gray-200">
-
-              {performances.map((perf) => (
-                <tr
-                  key={perf._id}
-                  className="hover:bg-gray-50"
-                >
-
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div>
-
-                      <div className="text-sm font-medium text-gray-900">
-                        {getEmployeeDisplayName(perf)}
-                      </div>
-
-                      <div className="text-sm text-gray-500">
-                        {perf.employeeID?.email ||
-                          perf.employeeEmail ||
-                          "No email"}
-                      </div>
-
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4 whitespace-nowrap">
-
-                    <span
-                      className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        getEmployeeTypeLabel(perf) ===
-                        "Intern"
-                          ? "bg-purple-100 text-purple-800"
-                          : getEmployeeTypeLabel(
-                              perf
-                            ) === "Employee"
-                          ? "bg-blue-100 text-blue-800"
-                          : getEmployeeTypeLabel(
-                              perf
-                            ) === "Team Lead"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {getEmployeeTypeLabel(perf)}
-                    </span>
-
-                  </td>
-
-                  {/* Percentage */}
-                  <td className="px-4 py-4 whitespace-nowrap">
-
-                    <span className="text-sm font-bold text-indigo-600">
-                      {getPerformancePercentage(perf)}
-                    </span>
-
-                  </td>
-
-                  {/* Remarks */}
-                  <td className="px-4 py-4 text-sm text-gray-500 max-w-xs truncate">
-                    {perf.remarks || "-"}
-                  </td>
-
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(
-                      perf.createdAt
-                    ).toLocaleDateString()}
-                  </td>
-
-                  <td className="px-4 py-4 whitespace-nowrap">
-
-                    <div className="flex gap-2">
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleEditPerformance(perf)
-                        }
-                        className="px-3 py-1 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 transition duration-150"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleDeletePerformance(perf)
-                        }
-                        className="px-3 py-1 text-sm font-medium text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition duration-150"
-                      >
-                        Delete
-                      </button>
-
-                    </div>
-
-                  </td>
-
-                </tr>
-              ))}
-
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  // ============================================================
-  // MAIN UI
-  // ============================================================
-
-  return (
-    <div className="min-h-screen py-4 sm:py-8 px-3 sm:px-4 lg:px-8">
-      {confirmationDialog}
-
-      <Notification />
-
-      <div className="max-w-6xl mx-auto">
-
-        <div className="bg-white rounded-xl sm:rounded-2xl overflow-hidden">
-
-          {loading ? (
-            <div className="flex justify-center items-center py-16 sm:py-20">
-
-              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600"></div>
-
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Latest Score", value: `${metrics.latestScore}%`, accent: "border-l-indigo-600" },
+            {
+              label: "Current Standing",
+              value: metrics.ratingLabel,
+              accent: metrics.ratingLabel === "Excellent" ? "border-l-emerald-500" : metrics.ratingLabel === "Good" ? "border-l-blue-500" : "border-l-amber-500"
+            },
+            { label: "Average Score", value: `${metrics.averageScore}%`, accent: "border-l-purple-500" },
+            { label: "Evaluations", value: metrics.totalReviews, accent: "border-l-amber-500" }
+          ].map((item, idx) => (
+            <div
+              key={idx}
+              className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+            >
+              <div className="flex items-start justify-between">
+                <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              </div>
             </div>
-          ) : (
-            <div className="p-4 sm:p-6 md:p-8">
+          ))}
+        </div>
+      )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+      {/* ==================================================== */}
+      {/* 3. PERFORMANCE HISTORY CARD (FULL WIDTH) */}
+      {/* ==================================================== */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4">
 
-              <div className="border border-gray-200 rounded-lg p-4 sm:p-5">
+        {/* Header Row: Title & Action Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+              <FileText size={18} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                {isAdmin ? "Performance History" : "My Performance History"}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {isAdmin
+                  ? "View and manage employee performance records"
+                  : "Personal performance evaluations and review remarks"}
+              </p>
+            </div>
+          </div>
 
-              {/* ==================================================
-                  EDIT MODE
-              ================================================== */}
-
-              {editingId ? (
-                <div className="mb-6">
-
-                  <div className="border border-blue-200 rounded-lg p-3 sm:p-4 mb-4">
-
-                    <p className="text-blue-800 font-medium text-sm sm:text-base flex items-center gap-2">
-                      <Edit3 className="h-4 w-4 text-blue-600" />
-                      Editing Performance
-                    </p>
-
-                    <p className="text-blue-600 text-xs sm:text-sm">
-                      Updating remarks for:{" "}
-                      {performances.find(
-                        (p) => p._id === editingId
-                      )
-                        ? getEmployeeDisplayName(
-                            performances.find(
-                              (p) =>
-                                p._id === editingId
-                            )
-                          )
-                        : "Unknown"}
-                    </p>
-
-                  </div>
-
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-indigo-600" />
-                    Edit Remarks
-                  </label>
-
-                  <textarea
-                    rows={5}
-                    value={editRemarks}
-                    onChange={(e) =>
-                      setEditRemarks(e.target.value)
-                    }
-                    placeholder="Edit remarks..."
-                    className="w-full border-2 border-gray-200 rounded-xl p-3 sm:p-4 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition duration-200 resize-none text-sm sm:text-base"
-                  />
-
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
-
-                    <button
-                      onClick={
-                        handleUpdatePerformance
-                      }
-                      disabled={submitting}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 sm:py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 text-sm sm:text-base"
-                    >
-                      {submitting ? (
-                        "Updating..."
-                      ) : (
-                        <span className="flex items-center justify-center gap-2">
-                          <CheckCircle className="h-4 w-4" /> Update Performance
-                        </span>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={cancelEdit}
-                      disabled={submitting}
-                      className="px-4 sm:px-6 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-2.5 sm:py-3 rounded-xl transition duration-200 text-sm sm:text-base"
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        <XCircle className="h-4 w-4 text-gray-500" /> Cancel
-                      </span>
-                    </button>
-
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* ==================================================
-                      EMPLOYEE SELECTION
-                  ================================================== */}
-
-                  <div className="mb-6">
-
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Select Employee *
-                    </label>
-
-                    <div ref={employeeMenuRef} className="relative w-full max-w-[230px]">
-                      <button
-                        type="button"
-                        onClick={() => setIsEmployeeMenuOpen((isOpen) => !isOpen)}
-                        className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-2.5 text-left text-xs sm:text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                        aria-haspopup="listbox"
-                        aria-expanded={isEmployeeMenuOpen}
-                      >
-                        <span className={form.employeeID ? "text-gray-900" : "text-gray-500"}>
-                          {employees.find((employee) => employee._id === form.employeeID)?.name ||
-                            "-- Select an Employee --"}
-                        </span>
-                        <svg
-                          className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
-                            isEmployeeMenuOpen ? "rotate-180" : ""
-                          }`}
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </button>
-
-                      {isEmployeeMenuOpen && (
-                        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white">
-                          {["intern", "employee", "teamlead"].map((type) => {
-                            const matchingEmployees = employees.filter(
-                              (employee) => employee.type === type
-                            );
-
-                            if (matchingEmployees.length === 0) return null;
-
-                            return (
-                              <div key={type}>
-                                <div className="border-b border-gray-100 bg-gray-50 px-2.5 py-1.5 text-[11px] font-semibold uppercase text-gray-500">
-                                  {type === "teamlead" ? "Team Leads" : `${type}s`}
-                                </div>
-                                {matchingEmployees.map((employee) => (
-                                  <button
-                                    key={employee._id}
-                                    type="button"
-                                    role="option"
-                                    aria-selected={form.employeeID === employee._id}
-                                    onClick={() => handleEmployeeSelect(employee._id)}
-                                    className={`block w-full px-2.5 py-2 text-left text-xs transition-colors ${
-                                      form.employeeID === employee._id
-                                        ? "bg-indigo-50 font-medium text-indigo-700"
-                                        : "text-gray-700 hover:bg-gray-50"
-                                    }`}
-                                  >
-                                    {employee.name}
-                                  </button>
-                                ))}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {employees.length === 0 &&
-                      !loading && (
-                        <p className="text-yellow-600 text-xs sm:text-sm mt-2">
-                          ⚠️ No employees available for
-                          evaluation
-                        </p>
-                      )}
-
-                    {employees.length > 0 && (
-                      <p className="text-xs sm:text-sm text-gray-500 mt-2">
-                        Total: {employees.length} (
-                        {
-                          employees.filter(
-                            (e) =>
-                              e.type === "intern"
-                          ).length
-                        }{" "}
-                        interns,{" "}
-                        {
-                          employees.filter(
-                            (e) =>
-                              e.type === "employee"
-                          ).length
-                        }{" "}
-                        employees,{" "}
-                        {
-                          employees.filter(
-                            (e) =>
-                              e.type === "teamlead"
-                          ).length
-                        }{" "}
-                        team leads)
-                      </p>
-                    )}
-
-                  </div>
-
-                  {/* ==================================================
-                      PERFORMANCE FORM
-                  ================================================== */}
-
-                  <div className="mb-6 space-y-6">
-
-                      {/* Percentage */}
-
-                      <div>
-
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Performance Percentage *
-                        </label>
-
-                        <div className="relative">
-
-                          <input
-                            type="number"
-                            name="percentage"
-                            min="0"
-                            max="100"
-                            step="1"
-                            value={form.percentage}
-                            onChange={handleChange}
-                            placeholder="Enter percentage"
-                            className="w-full border border-gray-300 rounded-lg p-3 pr-10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 text-sm sm:text-base"
-                          />
-
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
-                            %
-                          </span>
-
-                        </div>
-
-                      </div>
-
-                      {/* Remarks */}
-
-                      <div>
-
-                        <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-indigo-600" />
-                          Remarks
-                        </label>
-
-                        <textarea
-                          rows={5}
-                          name="remarks"
-                          value={form.remarks}
-                          onChange={handleChange}
-                          placeholder="Add your remarks about the employee's performance..."
-                          className="w-full border border-gray-300 rounded-lg p-3 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 resize-none text-sm sm:text-base"
-                        />
-
-                      </div>
-
-                  </div>
-
-                  {/* ==================================================
-                      ACTION BUTTONS
-                  ================================================== */}
-
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-8">
- 
-                    <button
-                      onClick={submitPerformance}
-                      disabled={
-                        submitting ||
-                        loading ||
-                        !form.employeeID
-                      }
-                      className="flex-1 bg-slate-300 hover:bg-slate-400 border border-slate-400 text-black font-semibold py-2.5 sm:py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                    >
-
-                      {submitting ? (
-                        <span className="flex items-center justify-center">
-
-                          <svg
-                            className="animate-spin -ml-1 mr-2 h-4 w-4 sm:h-5 sm:w-5 text-black"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            />
-
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            />
-
-                          </svg>
-
-                          Submitting...
-
-                        </span>
-                      ) : (
-                        "Save"
-                      )}
-
-                    </button>
-
-                    <button
-                      onClick={resetForm}
-                      disabled={submitting}
-                      className="px-4 sm:px-6 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-2.5 sm:py-3 rounded-xl transition duration-200 disabled:opacity-50 text-sm sm:text-base"
-                    >
-                      Reset
-                    </button>
-
-                  </div>
-                </>
-              )}
-
-                </div>
-
-                <div className="min-w-0">
-                {/* ==================================================
-                  PERFORMANCE LIST
-                ================================================== */}
-
-              <PerformanceList />
-
-                </div>
-                </div>
-
+          {isAdmin && (
+            <div className="flex items-center gap-2.5 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus size={15} />
+                <span>Add Performance</span>
+              </button>
             </div>
           )}
-
         </div>
 
+        {/* Filter Toolbar: Search, Dept, Status, Month/Year */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-1">
+          <div className="relative w-full md:flex-1 max-w-md">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder={isAdmin ? "Search by employee name, email or department..." : "Search evaluations or remarks..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
+            {/* Department Dropdown (Admin only) */}
+            {isAdmin && (
+              <div className="relative">
+                <select
+                  value={toolbarDept}
+                  onChange={(e) => setToolbarDept(e.target.value)}
+                  className="h-10 px-3.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none pr-8 font-normal"
+                >
+                  <option value="all">All Departments</option>
+                  {DEPARTMENTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            )}
+
+            {/* Performance Dropdown */}
+            <div className="relative">
+              <select
+                value={toolbarPerfFilter}
+                onChange={(e) => setToolbarPerfFilter(e.target.value)}
+                className="h-10 px-3.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none pr-8 font-normal"
+              >
+                <option value="all">All Performance</option>
+                <option value="excellent">Excellent (≥ 80%)</option>
+                <option value="good">Good (50% - 79%)</option>
+                <option value="needs-improvement">Needs Improvement (&lt; 50%)</option>
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Month/Year selector */}
+            <div className="relative">
+              <select
+                value={selectedMonthYear}
+                onChange={(e) => setSelectedMonthYear(e.target.value)}
+                className="h-10 pl-8 pr-8 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none font-normal"
+              >
+                <option value="all">All Dates</option>
+                {monthYearOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <Calendar size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+
+        {/* Table Container */}
+        {loading ? (
+          <div className="p-16 text-center">
+            <RefreshCw size={28} className="animate-spin text-indigo-600 mx-auto mb-3" />
+            <p className="text-xs font-semibold text-slate-500">Loading performance data...</p>
+          </div>
+        ) : filteredPerformances.length === 0 ? (
+          <div className="p-16 text-center">
+            <Award size={36} className="text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              No performance records found
+            </p>
+            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              {searchQuery || toolbarDept !== "all" || toolbarPerfFilter !== "all" || selectedMonthYear !== "all"
+                ? "No performance records match your current filter criteria."
+                : isAdmin
+                  ? "No employee performance evaluations recorded yet. Start by clicking 'Add Performance'."
+                  : "Your performance reviews and scores will appear here once assessed by administration."}
+            </p>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+              >
+                <Plus size={14} />
+                <span>Add Performance</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto border border-slate-200/80 dark:border-slate-800 rounded-lg">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                  <th className="py-3 px-3 w-10 text-left">No.</th>
+                  <th className="py-3 px-4">EMPLOYEE</th>
+                  <th className="py-3 px-4">DEPARTMENT</th>
+                  <th className="py-3 px-4">TYPE</th>
+                  <th className="py-3 px-4">PERFORMANCE</th>
+                  <th className="py-3 px-4">REMARKS</th>
+                  <th className="py-3 px-4">DATE</th>
+                  {isAdmin && <th className="py-3 px-4 text-center">ACTIONS</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredPerformances.map((perf, index) => {
+                  const rowNumber = index + 1;
+                  const empName = getEmployeeDisplayName(perf);
+                  const empEmail = getEmployeeEmail(perf);
+                  const empType = getEmployeeTypeLabel(perf);
+                  const dept = getDepartment(perf);
+                  const pct = getNumericPercentage(perf);
+                  const dateFormatted = formatRowDate(perf.createdAt || perf.date);
+
+                  // Progress bar color based on percentage
+                  const barColor =
+                    pct >= 80 ? "bg-[#10B981]" : pct >= 50 ? "bg-[#2563EB]" : "bg-[#F59E0B]";
+
+                  // Avatar circle color
+                  const avatarStyle = getAvatarStyle(dept);
+
+                  return (
+                    <tr
+                      key={perf._id || index}
+                      className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      {/* Index */}
+                      <td className="py-3.5 px-3 text-slate-500 font-medium">
+                        {rowNumber}
+                      </td>
+
+                      {/* Employee (Avatar + Name + Email) */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-8 h-8 rounded-full ${avatarStyle.bg} ${avatarStyle.text} font-bold text-xs flex items-center justify-center shrink-0`}
+                          >
+                            {getInitials(empName)}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900 dark:text-slate-100 block truncate">
+                              {empName}
+                            </span>
+                            <span className="text-[11px] text-slate-400 dark:text-slate-500 block truncate">
+                              {empEmail || "No email available"}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Department */}
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap inline-block ${getDepartmentBadgeStyle(
+                            dept
+                          )}`}
+                        >
+                          {dept}
+                        </span>
+                      </td>
+
+                      {/* Type */}
+                      <td className="py-3.5 px-4">
+                        <span className="px-3 py-1 rounded-full text-[11px] font-semibold bg-[#EFF6FF] text-[#2563EB] whitespace-nowrap inline-block">
+                          {empType}
+                        </span>
+                      </td>
+
+                      {/* Performance & Progress Bar */}
+                      <td className="py-3.5 px-4">
+                        <div>
+                          <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                            {pct}%
+                          </span>
+                          <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-1.5">
+                            <div
+                              className={`h-full ${barColor} rounded-full transition-all duration-300`}
+                              style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Remarks */}
+                      <td className="py-3.5 px-4 max-w-xs">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 truncate" title={perf.remarks}>
+                          {perf.remarks || "—"}
+                        </p>
+                      </td>
+
+                      {/* Date */}
+                      <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                        {dateFormatted}
+                      </td>
+
+                      {/* Actions */}
+                      {isAdmin && (
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(perf)}
+                              className="w-7 h-7 rounded-lg bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center transition cursor-pointer"
+                              title="Edit performance"
+                            >
+                              <Edit3 size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePerformance(perf)}
+                              className="w-7 h-7 rounded-lg bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#DC2626] flex items-center justify-center transition cursor-pointer"
+                              title="Delete record"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {/* ==================================================== */}
+      {/* 4. MODAL: ADD / EDIT PERFORMANCE EVALUATION */}
+      {/* ==================================================== */}
+      {isAdmin && (isAddModalOpen || isEditModalOpen) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  {isEditModalOpen ? <Edit3 size={16} /> : <Plus size={16} />}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    {isEditModalOpen ? "Edit Performance Record" : "Add Performance Record"}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {isEditModalOpen
+                      ? "Update score and review remarks"
+                      : "Evaluate staff score and performance remarks"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setIsEditModalOpen(false);
+                  setEditingRecord(null);
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmitModal} className="p-4 sm:p-5 space-y-4">
+              {/* Employee Selection */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Select Employee *
+                </label>
+                <div className="relative">
+                  <select
+                    disabled={isEditModalOpen}
+                    value={modalForm.employeeID}
+                    onChange={(e) => {
+                      const emp = employees.find((emp) => String(emp._id) === e.target.value);
+                      setModalForm({
+                        ...modalForm,
+                        employeeID: e.target.value,
+                        department: emp?.department || modalForm.department || "Development"
+                      });
+                    }}
+                    required
+                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer pr-8 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+                  >
+                    <option value="">-- Choose Employee --</option>
+                    {employees.map((emp) => (
+                      <option key={emp._id} value={emp._id}>
+                        {emp.name} {emp.email ? `(${emp.email})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                  />
+                </div>
+              </div>
+
+              {/* Performance Percentage & Department in row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Performance % *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      required
+                      placeholder="e.g. 85"
+                      value={modalForm.percentage}
+                      onChange={(e) => setModalForm({ ...modalForm, percentage: e.target.value })}
+                      className="w-full h-10 pl-3 pr-7 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
+                      %
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Department
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={modalForm.department || "Development"}
+                      onChange={(e) => setModalForm({ ...modalForm, department: e.target.value })}
+                      className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer pr-8 transition-all"
+                    >
+                      {DEPARTMENTS.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Remarks
+                </label>
+                <div className="relative">
+                  <textarea
+                    rows={3}
+                    maxLength={200}
+                    placeholder="Add remarks about the employee's performance..."
+                    value={modalForm.remarks}
+                    onChange={(e) => setModalForm({ ...modalForm, remarks: e.target.value })}
+                    className="w-full p-3 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 resize-none transition-all"
+                  />
+                  <span className="absolute bottom-2.5 right-3 text-[10px] text-slate-400 font-medium">
+                    {modalForm.remarks.length}/200
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setIsEditModalOpen(false);
+                    setEditingRecord(null);
+                  }}
+                  className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer shadow-xs"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+                >
+                  {submitting && <RefreshCw size={13} className="animate-spin" />}
+                  <span>{isEditModalOpen ? "Update Record" : "Submit Record"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

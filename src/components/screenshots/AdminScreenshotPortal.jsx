@@ -665,7 +665,7 @@ export const AdminScreenshotPortal = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       
       {/* Header Banner */}
       <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-colors">

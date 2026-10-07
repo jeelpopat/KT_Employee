@@ -59,16 +59,18 @@ export default function Setting() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in font-sans">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-sans">
       {/* Header */}
-      <div className="pb-2 border-b border-slate-200/80">
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-          <SettingsIcon className="w-5 h-5 text-indigo-600" />
-          <span>System & Workspace Settings</span>
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Manage general organization information, portal security rules, notification triggers, and user interface preferences.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            <SettingsIcon className="w-6 h-6 text-indigo-600" />
+            <span>System & Workspace Settings</span>
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+            Manage general organization information, portal security rules, notification triggers, and user interface preferences.
+          </p>
+        </div>
       </div>
 
       {feedback.message && (

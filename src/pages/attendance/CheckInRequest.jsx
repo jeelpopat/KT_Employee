@@ -666,112 +666,96 @@ export default function CheckInRequest() {
     });
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
 
       {/* =====================================================
           HEADER
       ===================================================== */}
-      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
             Check-In Requests
           </h1>
-
-          <p className="text-xs sm:text-sm text-gray-500">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
             Manage employee attendance approvals
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Total */}
-          <div className="bg-white border border-gray-300 px-2.5 sm:px-3 py-1 rounded text-xs sm:text-sm">
-            <span className="text-gray-600">
-              Total:{" "}
-            </span>
-
-            <span className="font-semibold">
+          <div className="h-10 bg-white border border-slate-200/80 px-3.5 py-1 rounded-lg shadow-xs text-xs sm:text-sm flex items-center">
+            <span className="text-gray-500">Total: </span>
+            <span className="ml-1.5 font-bold text-gray-900">
               {requests.length}
             </span>
           </div>
- 
+
           {/* Pending */}
-          <div className="bg-yellow-50 border border-yellow-300 px-2.5 sm:px-3 py-1 rounded text-xs sm:text-sm">
-            <span className="text-yellow-700 font-medium">
+          <div className="h-10 bg-amber-50 border border-amber-200/80 px-3.5 py-1 rounded-lg shadow-xs text-xs sm:text-sm flex items-center">
+            <span className="text-amber-700 font-medium">
               {pendingCount} Pending
             </span>
           </div>
-
         </div>
       </div>
 
       {/* =====================================================
           MAIN CARD
       ===================================================== */}
-      <div className="bg-white border border-gray-300 rounded-lg sm:rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
 
         {/* ===================================================
             STATS
         =================================================== */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-4 border-b border-gray-200">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-4 border-b border-slate-200/80">
 
           {/* Pending */}
-          <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-2 sm:p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-yellow-700 text-[10px] sm:text-xs font-bold uppercase">
-
+          <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-2.5 sm:p-3 text-center">
+            <div className="flex items-center justify-center gap-1 text-amber-700 text-[10px] sm:text-xs font-bold uppercase">
               <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
               <span className="hidden xs:inline">
                 Pending
               </span>
-
               <span className="xs:hidden">
                 Pend
               </span>
             </div>
 
-            <p className="text-base sm:text-xl font-bold text-yellow-700">
+            <p className="text-base sm:text-xl font-bold text-amber-700 mt-0.5">
               {pendingCount}
             </p>
           </div>
 
           {/* Approved */}
-          <div className="bg-green-50 border border-green-300 rounded-lg p-2 sm:p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-green-700 text-[10px] sm:text-xs font-bold uppercase">
-
+          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-lg p-2.5 sm:p-3 text-center">
+            <div className="flex items-center justify-center gap-1 text-emerald-700 text-[10px] sm:text-xs font-bold uppercase">
               <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
               <span className="hidden xs:inline">
                 Approved
               </span>
-
               <span className="xs:hidden">
                 Appr
               </span>
             </div>
 
-            <p className="text-base sm:text-xl font-bold text-green-700">
+            <p className="text-base sm:text-xl font-bold text-emerald-700 mt-0.5">
               {approvedCount}
             </p>
           </div>
 
           {/* Rejected */}
-          <div className="bg-red-50 border border-red-300 rounded-lg p-2 sm:p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-red-700 text-[10px] sm:text-xs font-bold uppercase">
-
+          <div className="bg-rose-50/70 border border-rose-200/80 rounded-lg p-2.5 sm:p-3 text-center">
+            <div className="flex items-center justify-center gap-1 text-rose-700 text-[10px] sm:text-xs font-bold uppercase">
               <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
               <span className="hidden xs:inline">
                 Rejected
               </span>
-
               <span className="xs:hidden">
                 Rej
               </span>
             </div>
 
-            <p className="text-base sm:text-xl font-bold text-red-700">
+            <p className="text-base sm:text-xl font-bold text-rose-700 mt-0.5">
               {rejectedCount}
             </p>
           </div>
@@ -780,14 +764,12 @@ export default function CheckInRequest() {
         {/* ===================================================
             SEARCH
         =================================================== */}
-        <div className="p-3 sm:p-4 border-b border-gray-200">
+        <div className="p-3 sm:p-4 border-b border-slate-200/80">
 
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
 
             <div className="flex-1 relative">
-
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-
+              <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search by name or role..."
@@ -797,7 +779,7 @@ export default function CheckInRequest() {
                     e.target.value
                   )
                 }
-                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-slate-400"
               />
             </div>
 

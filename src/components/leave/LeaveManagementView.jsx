@@ -570,7 +570,7 @@ export const LeaveManagementView = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
 
       {/* Action buttons aligned to the top-right */}
       <div>

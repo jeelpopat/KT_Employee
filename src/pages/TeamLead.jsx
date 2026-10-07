@@ -131,7 +131,7 @@ const AssignmentModal = ({ isOpen, onClose, lead, interns = [], employees = [], 
       ></div>
 
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden">
+        <div className="relative bg-white rounded-xl border border-slate-200/80 shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
             <div className="flex items-center justify-between">
@@ -1051,75 +1051,72 @@ const getDesignation = (lead) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-100">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Team Leads Directory</h1>
-              <p className="text-xs md:text-sm text-gray-500 mt-1">Manage team leads and member assignments with live database sync</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => fetchTeamLeads()}
-              disabled={loading}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span>{loading ? 'Syncing...' : 'Refresh Data'}</span>
-            </button>
-          </div>
-          
-          {/* Stats */}
-          <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-              <p className="text-sm text-blue-600 font-medium">Total Team Leads</p>
-              <p className="text-2xl font-bold text-blue-900">{teamLeads.length}</p>
-            </div>
-            <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
-              <p className="text-sm text-purple-600 font-medium">Total Employees</p>
-              <p className="text-2xl font-bold text-purple-900">
-                {employees.filter((employee) => employee.role?.toLowerCase().trim() === "employee").length}
-              </p>
-            </div>
-            <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
-              <p className="text-sm text-orange-600 font-medium">Total Members</p>
-              <p className="text-2xl font-bold text-orange-900">
-                {teamLeads.length + employees.filter((employee) => employee.role?.toLowerCase().trim() === "employee").length}
-              </p>
-            </div>
-          </div>
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Team Leads Directory</h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">Manage team leads and member assignments with live database sync</p>
         </div>
+        <button
+          type="button"
+          onClick={() => fetchTeamLeads()}
+          disabled={loading}
+          className="h-10 px-4 bg-white rounded-lg shadow-xs border border-slate-200/80 hover:bg-slate-50 transition-colors text-slate-700 flex items-center gap-2 text-xs sm:text-sm font-medium cursor-pointer disabled:opacity-50"
+        >
+          <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>{loading ? 'Syncing...' : 'Refresh Data'}</span>
+        </button>
+      </div>
+      
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Team Leads</p>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">{teamLeads.length}</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Employees</p>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
+            {employees.filter((employee) => employee.role?.toLowerCase().trim() === "employee").length}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Members</p>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
+            {teamLeads.length + employees.filter((employee) => employee.role?.toLowerCase().trim() === "employee").length}
+          </p>
+        </div>
+      </div>
 
-        {teamLeads.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-12 text-center border border-gray-200">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900">No Team Leads Found</h3>
-            <p className="mt-1 text-gray-500">
-              {isAdmin ? 'No team leads have been created yet.' : 'You are not assigned as a Team Lead.'}
-            </p>
+      {teamLeads.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-xs p-12 text-center border border-slate-200/80">
+          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {teamLeads.map((lead, index) => {
-              const selectedEmployees = assignedEmployees[lead._id] || [];
-              const totalAssignments = selectedEmployees.length;
-              const leadName = getUserName(lead);
-              const leadEmail = getUserEmail(lead);
-              const departmentName = getDepartment(lead, employees);
+          <h3 className="text-base font-semibold text-gray-900">No Team Leads Found</h3>
+          <p className="mt-1 text-xs sm:text-sm text-gray-500">
+            {isAdmin ? 'No team leads have been created yet.' : 'You are not assigned as a Team Lead.'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+          {teamLeads.map((lead, index) => {
+            const selectedEmployees = assignedEmployees[lead._id] || [];
+            const totalAssignments = selectedEmployees.length;
+            const leadName = getUserName(lead);
+            const leadEmail = getUserEmail(lead);
+            const departmentName = getDepartment(lead, employees);
 
-              return (
-                <div
-                  key={lead._id || index}
-                  className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 overflow-hidden"
-                >
+            return (
+              <div
+                key={lead._id || index}
+                className="group bg-white rounded-xl shadow-xs hover:shadow-md transition-all duration-300 border border-slate-200/80 hover:border-slate-300 overflow-hidden"
+              >
                   <div className="p-6">
                     {/* Header */}
                     <div className="flex items-start justify-between mb-4">
@@ -1218,7 +1215,6 @@ const getDesignation = (lead) => {
             })}
           </div>
         )}
-      </div>
 
       {/* Modal */}
       <AssignmentModal

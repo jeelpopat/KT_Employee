@@ -493,7 +493,7 @@ export default function Employees() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 px-3 sm:px-4 py-4 sm:py-6 lg:px-8">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {confirmationDialog}
       {toast.message && (
         <Toast
@@ -502,65 +502,62 @@ export default function Employees() {
           onClose={() => setToast({ message: "", type: "success" })}
         />
       )}
-      <div className="mx-auto max-w-7xl">
 
-        {/* ================= HEADER ================= */}
-        <div className="mb-4 sm:mb-6 lg:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
-                Employees
-              </h1>
+      {/* ================= HEADER ================= */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+            Employees
+          </h1>
 
-              <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
-                View and manage all employees
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-
-              {/* TOTAL */}
-              <div className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white shadow-sm border border-gray-200 flex items-center gap-1.5 sm:gap-2">
-                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
-
-                <span className="text-xs sm:text-sm text-gray-600">
-                  Total:
-                </span>
-
-                <span className="font-semibold text-gray-900 text-xs sm:text-sm">
-                  {employees.length}
-                </span>
-              </div>
-
-              {/* LIVE */}
-              <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-green-50 border border-green-200">
-                <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex h-1.5 w-1.5 sm:h-2 sm:w-2 bg-green-500" />
-                </span>
-
-                <span className="text-[10px] sm:text-xs font-medium text-green-700">
-                  Live
-                </span>
-              </div>
-
-              {/* ADD */}
-              <button
-                onClick={() => {
-                  resetForm();
-                  setShowModal(true);
-                }}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 sm:gap-2 shadow-sm text-xs sm:text-sm font-medium"
-              >
-                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Add Employee
-              </button>
-            </div>
-          </div>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+            View and manage all employees
+          </p>
         </div>
 
-        {/* ================= MAIN CONTENT ================= */}
-        <div className="bg-white shadow-sm border border-gray-200 overflow-hidden">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+
+          {/* TOTAL */}
+          <div className="px-3 sm:px-4 py-2 bg-white shadow-xs border border-slate-200/80 rounded-lg flex items-center gap-1.5 sm:gap-2">
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
+
+            <span className="text-xs sm:text-sm text-gray-600">
+              Total:
+            </span>
+
+            <span className="font-semibold text-gray-900 text-xs sm:text-sm">
+              {employees.length}
+            </span>
+          </div>
+
+          {/* LIVE */}
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 sm:h-2 sm:w-2 bg-green-500" />
+            </span>
+
+            <span className="text-[10px] sm:text-xs font-medium text-green-700">
+              Live
+            </span>
+          </div>
+
+          {/* ADD */}
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="h-10 px-4 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-xs text-xs sm:text-sm font-medium rounded-lg cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            Add Employee
+          </button>
+        </div>
+      </div>
+
+      {/* ================= MAIN CONTENT ================= */}
+      <div className="bg-white shadow-xs border border-slate-200/80 rounded-xl overflow-hidden">
 
           {/* SEARCH */}
           <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
@@ -656,11 +653,11 @@ export default function Employees() {
             <div className="p-3 sm:p-4 lg:p-6">
 
               {/* ================= DESKTOP TABLE ================= */}
-              <div className="hidden lg:block overflow-hidden border border-gray-200">
+              <div className="hidden lg:block overflow-hidden border border-slate-200/80 rounded-lg">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50 text-xs font-bold uppercase tracking-wider text-gray-500">
+                      <tr className="border-b border-slate-200/80 bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <th className="px-4 py-3 text-left">#</th>
                         <th className="px-4 py-3 text-left">Employee</th>
                         <th className="px-4 py-3 text-left">Email</th>
@@ -671,24 +668,24 @@ export default function Employees() {
                       </tr>
                     </thead>
 
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-slate-100">
                       {filteredEmployees.map((emp, index) => (
                         <tr
                           key={emp._id}
-                          className="hover:bg-gray-50 transition-colors"
+                          className="hover:bg-slate-50/60 transition-colors"
                         >
-                          <td className="px-4 py-3 text-sm font-medium text-gray-500">
+                          <td className="px-4 py-3 text-sm font-medium text-slate-500">
                             {index + 1}
                           </td>
 
                           {/* EMPLOYEE */}
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-8 w-8 items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 text-xs font-bold text-white shadow-sm flex-shrink-0">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-xs font-bold text-white shadow-xs flex-shrink-0">
                                 {(emp.name || emp.firstName || "E")?.charAt(0)?.toUpperCase()}
                               </div>
 
-                              <span className="font-medium text-gray-900">
+                              <span className="font-semibold text-slate-900">
                                 {emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim()}
                               </span>
                             </div>
@@ -698,7 +695,7 @@ export default function Employees() {
                           <td className="px-4 py-3">
                             <a
                               href={`mailto:${emp.email}`}
-                              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[150px]"
+                              className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 hover:underline truncate max-w-[150px]"
                             >
                               <Mail className="h-3.5 w-3.5 flex-shrink-0" />
 
@@ -710,8 +707,8 @@ export default function Employees() {
 
                           {/* DESIGNATION */}
                           <td className="px-4 py-3">
-                            <span className="flex items-center gap-1.5 text-gray-700">
-                              <Briefcase className="h-3.5 w-3.5 text-gray-400" />
+                            <span className="flex items-center gap-1.5 text-slate-700">
+                              <Briefcase className="h-3.5 w-3.5 text-slate-400" />
                               {emp.designation || "N/A"}
                             </span>
                           </td>
@@ -719,7 +716,7 @@ export default function Employees() {
                           {/* STATUS */}
                           <td className="px-4 py-3">
                             <span
-                              className={`inline-flex items-center px-2.5 py-1 text-xs font-medium border ${getAttendanceStyle(
+                              className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border ${getAttendanceStyle(
                                 emp.employeeStatus
                               )}`}
                             >
@@ -730,7 +727,7 @@ export default function Employees() {
                           {/* ROLE */}
                           <td className="px-4 py-3">
                             <span
-                              className={`inline-flex items-center px-2.5 py-1 text-xs font-medium border ${getRoleBadge(
+                              className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md border ${getRoleBadge(
                                 emp
                               )}`}
                             >
@@ -746,7 +743,7 @@ export default function Employees() {
                                 </>
                               ) : (
                                 <>
-                                  <User className="h-3 w-3 mr-1 text-blue-600" />
+                                  <User className="h-3 w-3 mr-1 text-indigo-600" />
                                   Employee
                                 </>
                               )}
@@ -763,7 +760,7 @@ export default function Employees() {
                                   handleEditEmployee(emp)
                                 }
                                 title="Edit Employee"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-xs cursor-pointer"
                               >
                                 <Edit className="h-3 w-3" />
                                 Edit
@@ -780,7 +777,7 @@ export default function Employees() {
                                   )
                                 }
                                 title="Delete Employee"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors shadow-xs cursor-pointer"
                               >
                                 <Trash2 className="h-3 w-3" />
                                 Delete
@@ -794,9 +791,9 @@ export default function Employees() {
                                     emp.isTeamLead
                                   )
                                 }
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors shadow-xs cursor-pointer ${
                                   emp.isTeamLead
-                                    ? "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                                    ? "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
                                     : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
                                 }`}
                               >
@@ -817,7 +814,7 @@ export default function Employees() {
                                 href={`mailto:${emp.email}`}
                                 title={`Email ${emp.firstName || "employee"}`}
                                 aria-label={`Email ${emp.firstName || "employee"}`}
-                                className="inline-flex items-center justify-center p-2 text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
+                                className="inline-flex items-center justify-center p-2 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors shadow-xs"
                               >
                                 <Mail className="h-3.5 w-3.5" />
                               </a>
@@ -836,11 +833,11 @@ export default function Employees() {
                   {filteredEmployees.map((emp) => (
                     <div
                       key={emp._id}
-                      className="border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                      className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-xs hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="flex h-10 w-10 items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 text-sm font-bold text-white shadow-sm flex-shrink-0">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-bold text-white shadow-xs flex-shrink-0">
                             {emp.firstName?.charAt(0)}
                             {emp.lastName?.charAt(0)}
                           </div>
@@ -858,7 +855,7 @@ export default function Employees() {
 
                         <div className="flex flex-col items-end gap-1 ml-2 flex-shrink-0">
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium border ${getAttendanceStyle(
+                            className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-md border ${getAttendanceStyle(
                               emp.employeeStatus
                             )}`}
                           >
@@ -866,7 +863,7 @@ export default function Employees() {
                           </span>
 
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium border ${getRoleBadge(
+                            className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-md border ${getRoleBadge(
                               emp.isTeamLead
                             )}`}
                           >
@@ -881,7 +878,7 @@ export default function Employees() {
 
                           <a
                             href={`mailto:${emp.email}`}
-                            className="truncate text-blue-600 hover:underline"
+                            className="truncate text-indigo-600 hover:underline"
                           >
                             {emp.email}
                           </a>
@@ -905,7 +902,7 @@ export default function Employees() {
                           onClick={() =>
                             handleEditEmployee(emp)
                           }
-                          className="inline-flex min-w-[76px] flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium whitespace-nowrap bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                          className="inline-flex min-w-[76px] flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium whitespace-nowrap rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-xs cursor-pointer"
                         >
                           <Edit className="h-3.5 w-3.5" />
                           Edit
@@ -920,7 +917,7 @@ export default function Employees() {
                               }`.trim()
                             )
                           }
-                          className="inline-flex min-w-[76px] flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium whitespace-nowrap bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                          className="inline-flex min-w-[76px] flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium whitespace-nowrap rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors shadow-xs cursor-pointer"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Delete
@@ -933,9 +930,9 @@ export default function Employees() {
                               emp.isTeamLead
                             )
                           }
-                          className={`inline-flex min-w-[104px] flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium whitespace-nowrap ${
+                          className={`inline-flex min-w-[104px] flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium whitespace-nowrap rounded-lg transition-colors shadow-xs cursor-pointer ${
                             emp.isTeamLead
-                              ? "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                              ? "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
                               : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
                           }`}
                         >
@@ -956,7 +953,7 @@ export default function Employees() {
                           href={`mailto:${emp.email}`}
                           title={`Email ${emp.firstName || "employee"}`}
                           aria-label={`Email ${emp.firstName || "employee"}`}
-                          className="inline-flex min-w-[42px] items-center justify-center px-2 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200"
+                          className="inline-flex min-w-[42px] items-center justify-center px-2 py-2 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors shadow-xs"
                         >
                           <Mail className="h-3.5 w-3.5" />
                         </a>
@@ -971,11 +968,11 @@ export default function Employees() {
                 {filteredEmployees.map((emp) => (
                   <div
                     key={emp._id}
-                    className="border border-gray-200 p-3 hover:shadow-md transition-shadow"
+                    className="border border-slate-200/80 rounded-xl p-3 bg-white shadow-xs hover:shadow-md transition-shadow"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <div className="flex h-9 w-9 items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 text-xs font-bold text-white shadow-sm flex-shrink-0">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-xs font-bold text-white shadow-xs flex-shrink-0">
                           {emp.firstName?.charAt(0)}
                           {emp.lastName?.charAt(0)}
                         </div>
@@ -993,7 +990,7 @@ export default function Employees() {
 
                       <div className="flex flex-col items-end gap-0.5 ml-1 flex-shrink-0">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium border ${getAttendanceStyle(
+                          className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-md border ${getAttendanceStyle(
                             emp.employeeStatus
                           )}`}
                         >
@@ -1001,7 +998,7 @@ export default function Employees() {
                         </span>
 
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium border ${getRoleBadge(
+                          className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-md border ${getRoleBadge(
                             emp.isTeamLead
                           )}`}
                         >
@@ -1015,7 +1012,7 @@ export default function Employees() {
                       <div className="flex items-center justify-between text-xs">
                         <a
                           href={`mailto:${emp.email}`}
-                          className="flex items-center gap-1 text-blue-600 hover:underline truncate max-w-[55%]"
+                          className="flex items-center gap-1 text-indigo-600 hover:underline truncate max-w-[55%]"
                         >
                           <Mail className="h-3 w-3 flex-shrink-0" />
 
@@ -1042,7 +1039,7 @@ export default function Employees() {
                           onClick={() =>
                             handleEditEmployee(emp)
                           }
-                          className="inline-flex min-w-[64px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                          className="inline-flex min-w-[64px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-xs cursor-pointer"
                         >
                           <Edit className="h-3 w-3" />
                           Edit
@@ -1057,7 +1054,7 @@ export default function Employees() {
                               }`.trim()
                             )
                           }
-                          className="inline-flex min-w-[64px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                          className="inline-flex min-w-[64px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors shadow-xs cursor-pointer"
                         >
                           <Trash2 className="h-3 w-3" />
                           Delete
@@ -1070,9 +1067,9 @@ export default function Employees() {
                               emp.isTeamLead
                             )
                           }
-                          className={`inline-flex min-w-[86px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap ${
+                          className={`inline-flex min-w-[86px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg transition-colors shadow-xs cursor-pointer ${
                             emp.isTeamLead
-                              ? "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                              ? "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
                               : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
                           }`}
                         >
@@ -1093,7 +1090,7 @@ export default function Employees() {
                           href={`mailto:${emp.email}`}
                           title={`Email ${emp.firstName || "employee"}`}
                           aria-label={`Email ${emp.firstName || "employee"}`}
-                          className="inline-flex min-w-[34px] items-center justify-center px-2 py-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200"
+                          className="inline-flex min-w-[34px] items-center justify-center px-2 py-1.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors shadow-xs"
                         >
                           <Mail className="h-3 w-3" />
                         </a>
@@ -1105,7 +1102,6 @@ export default function Employees() {
             </div>
           )}
         </div>
-      </div>
 
       {/* =====================================================
           ADD / EDIT EMPLOYEE MODAL

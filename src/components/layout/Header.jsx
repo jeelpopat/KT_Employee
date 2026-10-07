@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Bell, User, LogOut, ChevronDown, 
+import {
+  Bell, User, LogOut, ChevronDown,
   Camera, CheckCircle2, AlertCircle, CheckCheck, Plus
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
-import api from '../../api/axios.js'; 
+import api from '../../api/axios.js';
 import companyLogo from '../../assets/Logo.png';
 import { tabToPath } from '../../utils/navigation.js';
 
 export const Header = ({ onSignOut }) => {
-  const { 
-    user, currentTab, setCurrentTab, 
+  const {
+    user, currentTab, setCurrentTab,
     attendanceStatus, handleCheckOut,
     userRole, updateUserProfile
   } = useApp();
@@ -42,13 +42,13 @@ export const Header = ({ onSignOut }) => {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
-        notificationRef.current && 
+        notificationRef.current &&
         !notificationRef.current.contains(event.target)
       ) {
         setIsNotificationsOpen(false);
       }
       if (
-        profileMenuRef.current && 
+        profileMenuRef.current &&
         !profileMenuRef.current.contains(event.target)
       ) {
         setIsProfileMenuOpen(false);
@@ -229,20 +229,20 @@ export const Header = ({ onSignOut }) => {
   return (
     <header className="fixed top-14 left-0 right-0 z-30 h-16 border-b border-slate-200/80 bg-white/95 shadow-xs backdrop-blur lg:top-0 lg:left-60">
       <div className="flex h-full items-center justify-between px-4 sm:px-6">
-        
+
         {/* Left: Eyebrow and Page Title matching KT-admin PageHeader */}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kevalon Technology</p>
-          <h1 className="text-base font-semibold leading-6 text-slate-900 tracking-tight">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400"></p>
+          {/* <h1 className="text-base font-semibold leading-6 text-slate-900 tracking-tight">
             {pageTitles[currentTab] || 'Overview'}
-          </h1>
+          </h1> */}
         </div>
 
         {/* Right: Actions, Notifications & Profile */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Active monitoring badge for employees */}
           {userRole !== 'hr' && attendanceStatus === 'checked_in' && (
-            <button 
+            <button
               type="button"
               onClick={() => setCurrentTab('admin-screenshots')}
               title="Screenshot Monitoring is Active"
@@ -277,7 +277,7 @@ export const Header = ({ onSignOut }) => {
 
           {/* Notifications Button */}
           <div className="relative" ref={notificationRef}>
-            <button 
+            <button
               type="button"
               onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
               title="View notifications"
@@ -290,14 +290,14 @@ export const Header = ({ onSignOut }) => {
                 </span>
               )}
             </button>
-            
+
             {/* Notification Dropdown */}
             {isNotificationsOpen && (
               <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200/80 rounded-xl shadow-card z-50 overflow-hidden animate-fade-in">
                 <div className="flex items-center justify-between px-4 py-3 bg-slate-50/70 border-b border-slate-100">
                   <span className="text-xs font-semibold text-slate-800">Notifications ({unreadCount} unread)</span>
                   {unreadCount > 0 && (
-                    <button 
+                    <button
                       onClick={handleMarkAllAsRead}
                       className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 cursor-pointer"
                     >
@@ -310,14 +310,14 @@ export const Header = ({ onSignOut }) => {
                     <div className="p-6 text-center text-xs text-slate-400">No notifications available</div>
                   ) : (
                     notifications.map((notif) => (
-                      <div 
+                      <div
                         key={notif._id}
                         onClick={() => !notif.isRead && handleMarkAsRead(notif._id)}
                         className={`p-3.5 flex items-start gap-2.5 cursor-pointer hover:bg-slate-50/80 transition-colors ${!notif.isRead ? 'bg-indigo-50/30' : ''}`}
                       >
                         <div className="mt-0.5 shrink-0 text-slate-500">
-                          {notif.type === 'SYSTEM' ? <CheckCircle2 size={15} className="text-indigo-600" /> : 
-                           notif.type === 'ANNOUNCEMENT' ? <Bell size={15} className="text-amber-500" /> : <AlertCircle size={15} className="text-slate-400" />}
+                          {notif.type === 'SYSTEM' ? <CheckCircle2 size={15} className="text-indigo-600" /> :
+                            notif.type === 'ANNOUNCEMENT' ? <Bell size={15} className="text-amber-500" /> : <AlertCircle size={15} className="text-slate-400" />}
                         </div>
                         <div className="flex-1 text-xs">
                           <div className="font-semibold text-slate-800 flex justify-between items-center">
@@ -341,73 +341,73 @@ export const Header = ({ onSignOut }) => {
 
           {/* Profile Menu Dropdown */}
           <div className="relative" ref={profileMenuRef}>
-            <button 
+            <button
               type="button"
               onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              className="flex items-center gap-2 p-1 pl-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer border border-slate-200/80 bg-white shadow-xs"
+              className="flex items-center gap-2 p-1 pl-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer bg-white"
             >
               <div className="relative shrink-0">
                 <div className="w-7 h-7 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
                   {displayPhoto && !headerImgError ? (
-                    <img 
-                      src={displayPhoto} 
-                      alt={displayName} 
+                    <img
+                      src={displayPhoto}
+                      alt={displayName}
                       onError={() => setHeaderImgError(true)}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <img 
-                      src={companyLogo} 
-                      alt="Logo" 
+                    <img
+                      src={companyLogo}
+                      alt="Logo"
                       className="w-full h-full object-contain p-0.5"
                     />
                   )}
                 </div>
-                <span 
-                  className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white" 
-                  title="Online" 
+                <span
+                  className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white"
+                  title="Online"
                 />
               </div>
-              
+
               <div className="hidden sm:flex items-center gap-1.5 pr-1">
                 <span className="text-xs font-semibold text-slate-800 truncate max-w-[120px]">
                   {displayName}
                 </span>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase ${
-                  userRole === 'admin'
-                    ? 'bg-rose-50 text-rose-700 border border-rose-200/70'
-                    : userRole === 'team_leader'
+                {/* <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase ${userRole === 'admin'
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                  : userRole === 'team_leader'
                     ? 'bg-purple-50 text-purple-700 border border-purple-200/70'
                     : userRole === 'hr'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
-                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200/70'
-                }`}>
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                      : 'bg-indigo-50 text-indigo-700 border border-indigo-200/70'
+                  }`}>
                   {userRole === 'admin' ? 'ADMIN' : userRole === 'team_leader' ? 'TL' : userRole === 'hr' ? 'HR' : 'EMP'}
                 </span>
+              
+              <ChevronDown size={14} className="text-slate-400 hidden sm:inline" /> */}
               </div>
-              <ChevronDown size={14} className="text-slate-400 hidden sm:inline" />
             </button>
-            
+
             {/* Profile Dropdown */}
             {isProfileMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200/80 rounded-xl shadow-card z-50 py-1 divide-y divide-slate-100 animate-fade-in">
-                <div 
+                <div
                   onClick={handleOpenProfile}
                   className="px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 transition-colors"
                   title="View full profile"
                 >
                   <div className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
                     {displayPhoto && !headerImgError ? (
-                      <img 
-                        src={displayPhoto} 
-                        alt={displayName} 
+                      <img
+                        src={displayPhoto}
+                        alt={displayName}
                         onError={() => setHeaderImgError(true)}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <img 
-                        src={companyLogo} 
-                        alt="Logo" 
+                      <img
+                        src={companyLogo}
+                        alt="Logo"
                         className="w-full h-full object-contain p-0.5"
                       />
                     )}
@@ -417,9 +417,9 @@ export const Header = ({ onSignOut }) => {
                     <p className="text-[10px] text-slate-400 truncate">{displayEmail}</p>
                   </div>
                 </div>
-                
+
                 <div className="py-1">
-                  <button 
+                  <button
                     type="button"
                     onClick={handleOpenProfile}
                     className="w-full px-3.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 transition-colors cursor-pointer text-left"
@@ -427,12 +427,12 @@ export const Header = ({ onSignOut }) => {
                     <User size={14} className="text-slate-400" />
                     <span>My Profile</span>
                   </button>
-                  <button 
+                  <button
                     type="button"
-                    onClick={() => { 
-                      handleCheckOut(); 
-                      setIsProfileMenuOpen(false); 
-                      if (onSignOut) onSignOut(); 
+                    onClick={() => {
+                      handleCheckOut();
+                      setIsProfileMenuOpen(false);
+                      if (onSignOut) onSignOut();
                     }}
                     className="w-full px-3.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50/80 flex items-center gap-2 transition-colors cursor-pointer text-left"
                   >

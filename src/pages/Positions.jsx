@@ -206,148 +206,108 @@ export default function Positions() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {confirmationDialog}
-      <div className="mx-auto max-w-7xl">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-gray-900">
-                Positions
-              </h1>
-              <p className="mt-1 text-sm text-gray-500 flex items-center gap-2">
-                <span>Manage all job positions and openings</span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                  <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-                  {positions.length} active
-                </span>
-              </p>
+
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+            Positions
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500 flex items-center gap-2">
+            <span>Manage all job positions and openings</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
+              <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
+              {positions.length} active
+            </span>
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setEditId(null);
+            setFormData(initialFormState);
+            setShowModal(true);
+          }}
+          className="h-10 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-xs flex items-center gap-2 font-medium text-xs sm:text-sm cursor-pointer"
+        >
+          <Plus className="h-4 w-4" />
+          Create Position
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+        {[
+          { label: "Total", value: stats.total, accent: "border-l-indigo-600" },
+          { label: "Full-time", value: stats.fullTime, accent: "border-l-emerald-500" },
+          { label: "Part-time", value: stats.partTime, accent: "border-l-purple-500" },
+          { label: "Interns", value: stats.intern, accent: "border-l-cyan-500" },
+          { label: "Contract", value: stats.contract, accent: "border-l-amber-500" }
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs ${idx === 4 ? "col-span-2 sm:col-span-1" : ""}`}
+          >
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
             </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search positions, categories, locations..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-xs sm:text-sm"
+          />
+        </div>
+        <div className="flex gap-2.5">
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="h-10 px-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-xs sm:text-sm"
+          >
+            <option value="all">All Types</option>
+            <option value="full-time">Full-time</option>
+            <option value="part-time">Part-time</option>
+            <option value="intern">Intern</option>
+            <option value="contract">Contract</option>
+          </select>
+          <div className="flex bg-white border border-slate-200 rounded-lg p-1 h-10 items-center">
             <button
-              onClick={() => {
-                setEditId(null);
-                setFormData(initialFormState);
-                setShowModal(true);
-              }}
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200 flex items-center gap-2 font-medium text-sm"
+              onClick={() => setViewMode("grid")}
+              className={`p-1.5 rounded transition-all cursor-pointer ${
+                viewMode === "grid" 
+                  ? "bg-indigo-600 text-white shadow-xs" 
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
             >
-              <Plus className="h-5 w-5" />
-              Create Position
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded transition-all cursor-pointer ${
+                viewMode === "list" 
+                  ? "bg-indigo-600 text-white shadow-xs" 
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              <ListIcon className="h-4 w-4" />
             </button>
           </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 mt-6">
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Total</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                </div>
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Briefcase className="h-5 w-5 text-blue-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Full-time</p>
-                  <p className="text-2xl font-bold text-emerald-600">{stats.fullTime}</p>
-                </div>
-                <div className="p-2 bg-emerald-50 rounded-lg">
-                  <Clock className="h-5 w-5 text-emerald-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Part-time</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.partTime}</p>
-                </div>
-                <div className="p-2 bg-purple-50 rounded-lg">
-                  <Users className="h-5 w-5 text-purple-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Interns</p>
-                  <p className="text-2xl font-bold text-cyan-600">{stats.intern}</p>
-                </div>
-                <div className="p-2 bg-cyan-50 rounded-lg">
-                  <GraduationCap className="h-5 w-5 text-cyan-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm col-span-2 sm:col-span-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Contract</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.contract}</p>
-                </div>
-                <div className="p-2 bg-orange-50 rounded-lg">
-                  <FileText className="h-5 w-5 text-orange-600" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Search and Filter */}
-          <div className="flex flex-col sm:flex-row gap-4 mt-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search positions, categories, locations..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-              />
-            </div>
-            <div className="flex gap-3">
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-              >
-                <option value="all">All Types</option>
-                <option value="full-time">Full-time</option>
-                <option value="part-time">Part-time</option>
-                <option value="intern">Intern</option>
-                <option value="contract">Contract</option>
-              </select>
-              <div className="flex bg-white border border-gray-200 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`p-2 rounded transition-all ${
-                    viewMode === "grid" 
-                      ? "bg-blue-600 text-white shadow-sm" 
-                      : "text-gray-400 hover:text-gray-600"
-                  }`}
-                >
-                  <LayoutGrid className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`p-2 rounded transition-all ${
-                    viewMode === "list" 
-                      ? "bg-blue-600 text-white shadow-sm" 
-                      : "text-gray-400 hover:text-gray-600"
-                  }`}
-                >
-                  <ListIcon className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
+      </div>
 
-        {/* Main Content */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      {/* Main Content */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
           {loading ? (
             <div className="flex justify-center items-center py-16 sm:py-20">
               <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
@@ -552,7 +512,6 @@ export default function Positions() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Modal */}
       {showModal && (

@@ -394,52 +394,56 @@ export default function Contacts() {
   const services = ["all", ...new Set(contacts.map(c => c.service?.toLowerCase()).filter(Boolean))];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-      <div className="mx-auto max-w-7xl">
-        {/* Premium Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
-          
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+            Contacts
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+            Manage contact inquiries and messages
+          </p>
+        </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              {/* Stats card */}
-              <div className="px-3 sm:px-4 md:px-5 py-2 sm:py-3 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-50">
-                  <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] sm:text-xs text-gray-400 font-medium">Total</p>
-                  <p className="text-base sm:text-lg font-bold text-gray-900">{filteredContacts.length}</p>
-                </div>
-              </div>
-
-              {/* Live status */}
-              <div className="px-3 sm:px-4 md:px-5 py-2 sm:py-3 bg-white rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-2 sm:gap-3">
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full animate-ping bg-emerald-400 opacity-75" />
-                  <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] sm:text-xs text-emerald-600 font-medium">Status</p>
-                  <p className="text-xs sm:text-sm font-bold text-emerald-700">Live</p>
-                </div>
-              </div>
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Stats card */}
+          <div className="px-3 sm:px-4 py-2 bg-white rounded-lg shadow-xs border border-slate-200/80 flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 rounded-lg bg-indigo-50">
+              <Users className="h-4 w-4 text-indigo-500" />
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-xs text-gray-400 font-medium">Total</p>
+              <p className="text-sm sm:text-base font-bold text-gray-900">{filteredContacts.length}</p>
             </div>
           </div>
 
-          {/* Search and Filter */}
-          <div className="mt-4 sm:mt-6">
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search contacts..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all text-xs sm:text-sm"
-                />
-              </div>
+          {/* Live status */}
+          <div className="px-3 sm:px-4 py-2 bg-green-50 rounded-lg border border-green-200 flex items-center gap-2 sm:gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
+              <div className="relative h-2 w-2 rounded-full bg-green-500" />
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-xs text-green-600 font-medium">Status</p>
+              <p className="text-xs sm:text-sm font-bold text-green-700">Live</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search contacts..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all text-xs sm:text-sm"
+          />
+        </div>
 
               {/* Mobile filter toggle */}
               <button
@@ -491,11 +495,9 @@ export default function Contacts() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
 
         {/* Main Content */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-white/50 overflow-hidden p-3 sm:p-4 md:p-6">
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden p-4 sm:p-5 lg:p-6">
           {loading ? (
             <div className="flex justify-center items-center py-16 sm:py-20">
               <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
@@ -523,8 +525,7 @@ export default function Contacts() {
             </div>
           )}
         </div>
-      </div>
- 
+
       {/* Modal */}
       {selectedContact && (
         <ContactModal contact={selectedContact} onClose={() => setSelectedContact(null)} />

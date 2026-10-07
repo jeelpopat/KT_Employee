@@ -1693,27 +1693,23 @@ export default function AttendanceLogs() {
      UI
   ========================================================= */
   return (
-    <div className="p-4 max-w-7xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
 
       {/* HEADER */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-gray-800 truncate">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
             Attendance Logs
           </h1>
-
-          <p className="text-sm text-gray-500 truncate">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
             Inspect detailed attendance logs and history for your team
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
-
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* DATE */}
-          <div className="flex items-center gap-2 bg-white border border-gray-300 px-2 sm:px-3 py-1">
+          <div className="h-10 flex items-center gap-2 bg-white border border-slate-200/80 rounded-lg px-3 py-1 shadow-xs">
             <Calendar className="h-4 w-4 text-gray-500" />
-
             <input
               type="date"
               value={selectedDate}
@@ -1722,19 +1718,17 @@ export default function AttendanceLogs() {
                   e.target.value
                 )
               }
-              className="text-xs sm:text-sm text-gray-700 focus:outline-none"
+              className="text-xs sm:text-sm text-gray-700 focus:outline-none bg-transparent"
             />
           </div>
 
           {/* TOTAL */}
-          <div className="bg-white border border-gray-300 px-2 sm:px-4 py-1 flex items-center gap-1 sm:gap-2">
-            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
-
+          <div className="h-10 bg-white border border-slate-200/80 rounded-lg px-3.5 py-1 shadow-xs flex items-center gap-1.5 sm:gap-2">
+            <Users className="h-4 w-4 text-gray-400" />
             <span className="text-xs sm:text-sm text-gray-600 hidden xs:inline">
               Total:
             </span>
-
-            <span className="font-semibold text-gray-800 text-xs sm:text-sm">
+            <span className="font-semibold text-gray-900 text-xs sm:text-sm">
               {logs.length}
             </span>
           </div>
@@ -1742,19 +1736,11 @@ export default function AttendanceLogs() {
           {/* EXPORT */}
           <button
             onClick={() => setShowExportOptions(true)}
-            className="bg-emerald-600 text-white px-2 sm:px-4 py-1 hover:bg-emerald-700 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium"
+            className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1 rounded-lg shadow-xs flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
           >
-            <FileSpreadsheet className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
-            <span className="hidden xs:inline">
-              Export
-            </span>
-
-            <span className="hidden sm:inline">
-              Excel
-            </span>
+            <FileSpreadsheet className="h-4 w-4" />
+            <span>Export Excel</span>
           </button>
-
         </div>
       </div>
 
@@ -1765,7 +1751,7 @@ export default function AttendanceLogs() {
           onClick={() => !exportingMonth && setShowExportOptions(false)}
         >
           <div
-            className="w-full max-w-sm bg-white shadow-xl"
+            className="w-full max-w-sm bg-white rounded-xl border border-slate-200/80 shadow-2xl overflow-hidden"
             role="dialog"
             aria-modal="true"
             aria-labelledby="attendance-export-title"
@@ -1779,7 +1765,7 @@ export default function AttendanceLogs() {
                 type="button"
                 onClick={() => setShowExportOptions(false)}
                 aria-label="Close export options"
-                className="p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                className="p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 rounded-lg"
                 disabled={exportingMonth}
               >
                 <X className="h-5 w-5" />
@@ -1789,7 +1775,7 @@ export default function AttendanceLogs() {
               <button
                 type="button"
                 onClick={exportToExcel}
-                className="flex w-full items-center gap-3 border border-gray-200 px-3 py-3 text-left hover:bg-gray-50"
+                className="flex w-full items-center gap-3 border border-gray-200 rounded-lg px-3 py-3 text-left hover:bg-gray-50 transition-colors"
                 disabled={exportingMonth}
               >
                 <Calendar className="h-5 w-5 text-emerald-600" />
@@ -1801,7 +1787,7 @@ export default function AttendanceLogs() {
               <button
                 type="button"
                 onClick={exportMonthToExcel}
-                className="flex w-full items-center gap-3 border border-gray-200 px-3 py-3 text-left hover:bg-gray-50 disabled:cursor-wait disabled:opacity-60"
+                className="flex w-full items-center gap-3 border border-gray-200 rounded-lg px-3 py-3 text-left hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-60"
                 disabled={exportingMonth}
               >
                 <Calendar className="h-5 w-5 text-blue-600" />
@@ -1817,74 +1803,28 @@ export default function AttendanceLogs() {
         </div>
       )}
 
+      {/* STATS */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "On Time", value: onTimeCount, accent: "border-l-emerald-500" },
+          { label: "Late", value: lateCount, accent: "border-l-amber-500" },
+          { label: "Half Day", value: halfDayCount, accent: "border-l-blue-500" },
+          { label: "Absent", value: absentCount, accent: "border-l-rose-500" }
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+          >
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* MAIN CARD */}
-      <div className="bg-white border border-gray-300">
-
-        <div className="p-2 sm:p-4 border-b border-gray-200 bg-gray-50" />
-
-        {/* STATS */}
-        <div className="grid grid-cols-4 gap-1.5 sm:gap-3 p-2 sm:p-4 border-b border-gray-200">
-
-          {/* ON TIME */}
-          <div className="bg-emerald-50 border border-emerald-300 p-1.5 sm:p-3 text-center">
-            <div className="flex items-center justify-center gap-0.5 sm:gap-1 text-emerald-700 mb-0.5">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
-              <span className="text-[8px] sm:text-xs font-bold uppercase tracking-wider">
-                On Time
-              </span>
-            </div>
-
-            <p className="text-sm sm:text-lg font-bold text-emerald-700">
-              {onTimeCount}
-            </p>
-          </div>
-
-          {/* LATE */}
-          <div className="bg-yellow-50 border border-yellow-300 p-1.5 sm:p-3 text-center">
-            <div className="flex items-center justify-center gap-0.5 sm:gap-1 text-yellow-700 mb-0.5">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
-              <span className="text-[8px] sm:text-xs font-bold uppercase tracking-wider">
-                Late
-              </span>
-            </div>
-
-            <p className="text-sm sm:text-lg font-bold text-yellow-700">
-              {lateCount}
-            </p>
-          </div>
-
-          {/* HALF DAY */}
-          <div className="bg-blue-50 border border-blue-300 p-1.5 sm:p-3 text-center">
-            <div className="flex items-center justify-center gap-0.5 sm:gap-1 text-blue-700 mb-0.5">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
-              <span className="text-[8px] sm:text-xs font-bold uppercase tracking-wider">
-                Half Day
-              </span>
-            </div>
-
-            <p className="text-sm sm:text-lg font-bold text-blue-700">
-              {halfDayCount}
-            </p>
-          </div>
-
-          {/* ABSENT */}
-          <div className="bg-rose-50 border border-rose-300 p-1.5 sm:p-3 text-center">
-            <div className="flex items-center justify-center gap-0.5 sm:gap-1 text-rose-700 mb-0.5">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
-              <span className="text-[8px] sm:text-xs font-bold uppercase tracking-wider">
-                Absent
-              </span>
-            </div>
-
-            <p className="text-sm sm:text-lg font-bold text-rose-700">
-              {absentCount}
-            </p>
-          </div>
-        </div>
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
 
         {/* TIMELINE LEGEND */}
         <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-gray-700 bg-gray-50 p-3 border-b border-gray-200">
@@ -1926,9 +1866,7 @@ export default function AttendanceLogs() {
 
               {/* SEARCH */}
               <div className="relative flex-1 min-w-0">
-
-                <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
-
+                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search by name or email..."
@@ -1938,7 +1876,7 @@ export default function AttendanceLogs() {
                       e.target.value
                     )
                   }
-                  className="w-full pl-7 sm:pl-10 pr-2 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-slate-400"
                 />
               </div>
 
@@ -1949,16 +1887,14 @@ export default function AttendanceLogs() {
                     !showFilters
                   )
                 }
-                className="px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 flex items-center gap-1 sm:gap-2 whitespace-nowrap flex-shrink-0"
+                className="h-10 px-3.5 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200/80 hover:bg-slate-50 rounded-lg flex items-center gap-2 whitespace-nowrap flex-shrink-0 shadow-xs transition-colors"
               >
-                <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
+                <Filter className="h-4 w-4 text-slate-500" />
                 <span className="hidden xs:inline">
                   Filters
                 </span>
-
                 <ChevronDown
-                  className={`h-3 w-3 transition-transform ${
+                  className={`h-3.5 w-3.5 text-slate-400 transition-transform ${
                     showFilters
                       ? 'rotate-180'
                       : ''

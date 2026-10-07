@@ -1105,7 +1105,7 @@ async function fetchHolidays() {
     };
  
     return (
-      <div className="space-y-4">
+      <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
         {loading && (
           <div className="flex justify-center items-center py-16 sm:py-20">
             <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
@@ -1114,16 +1114,16 @@ async function fetchHolidays() {
         {!loading && (
           <>
         {confirmationDialog}
-        {/* Minimal Compact Header */}
-        <div className="bg-transparent p-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* Unified Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-base font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
               Dashboard
             </h1>
-            <p className="text-xs text-slate-400">Overview of organization metrics & daily status</p>
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">Overview of organization metrics & daily status</p>
           </div>
 
-          <div className="hidden items-center gap-2 shrink-0 sm:flex">
+          <div className="hidden items-center gap-3 shrink-0 sm:flex">
             {/* Exact Bell Icon & Dropdown with Real-Time Data */}
             <div className="relative">
               <button
@@ -1132,7 +1132,7 @@ async function fetchHolidays() {
                 onClick={toggleNotifications}
                 aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
                 aria-expanded={showBellDropdown}
-                className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-xs hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-xs hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
               >
                 <Bell className="h-4 w-4" aria-hidden="true" />
                 {unreadCount > 0 && (
@@ -1369,88 +1369,69 @@ async function fetchHolidays() {
                 setEditingAnnouncementId(null);
                 setShowAnnouncementModal(true);
               }}
-              className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors shadow-xs"
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 h-10 rounded-lg text-xs sm:text-sm font-medium shadow-xs transition-colors cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5" /> Post Announcement
+              <Plus className="h-4 w-4" /> Post Announcement
             </button>
           </div>
         </div>
 
-        {/* Shrink-to-fit Minimal Stat Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            const styles = getAccentStyles(stat.accent);
-            return (
-              <div
-                key={stat.id}
-                className="bg-white p-3.5 border border-slate-200/80 rounded-xl shadow-xs hover:border-slate-300 transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <div className={`p-1.5 rounded-md ${styles.iconBg}`}>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${styles.badgeBg}`}>
-                    {stat.badge}
-                  </span>
-                </div>
-                <div className="mt-2.5">
-                  <p className="text-xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
-                  <p className="text-[11px] text-slate-500 font-medium">{stat.name}</p>
-                </div>
+        {/* Unified Stat Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Total Employees", value: dashboardCounts.employeeCount, accent: "border-l-indigo-600" },
+            { label: "Total Interns", value: dashboardCounts.internCount, accent: "border-l-amber-500" },
+            { label: "Total Team Leads", value: dashboardCounts.teamLeadCount, accent: "border-l-purple-500" },
+          ].map((item, idx) => (
+            <div
+              key={idx}
+              className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+            >
+              <div className="flex items-start justify-between">
+                <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
               </div>
-            );
-          })}
+            </div>
+          ))}
 
           {/* Absent Card */}
           <button
             type="button"
             ref={absentCardRef}
             onClick={openAbsentDetails}
-            className="bg-white p-3.5 border border-rose-200/80 rounded-xl shadow-xs hover:bg-rose-50/20 hover:border-rose-300 transition-all text-left group"
+            className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-rose-500 rounded-xl p-4 transition-all shadow-xs hover:border-rose-300 dark:hover:border-rose-500/50 text-left cursor-pointer group"
           >
-            <div className="flex items-center justify-between">
-              <div className="p-1.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200/60">
-                <UserX className="h-4 w-4" />
-              </div>
-              <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200/60 px-2 py-0.5 rounded-md">
-                Action Required
-              </span>
-            </div>
-            <div className="mt-2.5 flex items-end justify-between">
-              <div>
-                <p className="text-xl font-bold text-slate-900 tracking-tight">{absentRecords.length}</p>
-                <p className="text-[11px] text-rose-600 font-medium">Absent Today</p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-rose-500 transition-colors" />
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider mt-1">Absent Today</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{absentRecords.length}</p>
             </div>
           </button>
         </div>
 
         {/* Corporate Events & Celebrations */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 items-stretch gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 items-stretch gap-5 sm:gap-6">
           
           {/* Holidays */}
           <div className="flex flex-col h-full bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
-            <div className="flex items-center justify-between px-3.5 py-2 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                  <UmbrellaIcon className="h-3 w-3 -rotate-12" />
+            <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+                  <UmbrellaIcon className="h-4 w-4 -rotate-12" />
                 </div>
-                <h2 className="text-xs font-semibold text-slate-900">Upcoming Holidays</h2>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-full">
+                <h2 className="text-sm font-semibold text-slate-900">Upcoming Holidays</h2>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
                   {upcomingHolidays.length}
                 </span>
               </div>
             </div>
 
-            <div className="p-3 flex-1 flex flex-col justify-center overflow-y-auto">
+            <div className="p-4 sm:p-5 flex-1 flex flex-col justify-center overflow-y-auto">
               {upcomingHolidays.length === 0 ? (
-                <div className="text-center py-4 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
                   No upcoming holidays
                 </div>
               ) : (
-                <div className="flex items-start gap-4 overflow-x-auto pb-0.5">
+                <div className="flex items-start gap-4 overflow-x-auto pb-1">
                   {upcomingHolidays.map((holiday) => {
                     const parts = (holiday.date || "").trim().split(" ");
                     const day = parts[0] || "";
@@ -1461,7 +1442,7 @@ async function fetchHolidays() {
                         key={holiday.id}
                         className="flex flex-col items-center text-center w-16 sm:w-20 shrink-0 group"
                       >
-                        <div className="h-11 w-11 rounded-full bg-emerald-100/70 border-2 border-emerald-200/80 text-emerald-800 flex flex-col items-center justify-center shadow-xs transition-transform duration-200 group-hover:scale-105">
+                        <div className="h-12 w-12 rounded-xl bg-emerald-100/70 border border-emerald-200/80 text-emerald-800 flex flex-col items-center justify-center shadow-xs transition-transform duration-200 group-hover:scale-105">
                           <span className="text-xs font-extrabold text-emerald-900 leading-none">
                             {day}
                           </span>
@@ -1487,25 +1468,25 @@ async function fetchHolidays() {
 
           {/* Birthdays */}
           <div className="flex flex-col h-full bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
-            <div className="flex items-center justify-between px-3.5 py-2 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                  <Cake className="h-3 w-3" />
+            <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
+                  <Cake className="h-4 w-4" />
                 </div>
-                <h2 className="text-xs font-semibold text-slate-900">Upcoming Birthdays</h2>
-                <span className="text-[10px] font-bold text-purple-700 bg-purple-100/80 px-1.5 py-0.2 rounded-full">
+                <h2 className="text-sm font-semibold text-slate-900">Upcoming Birthdays</h2>
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded-full">
                   {birthdays.length}
                 </span>
               </div>
             </div>
 
-            <div className="p-3 flex-1 flex flex-col justify-center overflow-y-auto">
+            <div className="p-4 sm:p-5 flex-1 flex flex-col justify-center overflow-y-auto">
               {birthdays.length === 0 ? (
-                <div className="text-center py-4 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
                   No birthdays this month
                 </div>
               ) : (
-                <div className="flex items-start gap-4 overflow-x-auto pb-0.5">
+                <div className="flex items-start gap-4 overflow-x-auto pb-1">
                   {birthdays.map((person) => {
                     const initials = person.name
                       .trim()
@@ -1519,7 +1500,7 @@ async function fetchHolidays() {
                         key={person.id}
                         className="flex flex-col items-center text-center w-16 sm:w-20 shrink-0 group"
                       >
-                        <div className="h-11 w-11 rounded-full bg-purple-100/70 border-2 border-purple-200/80 text-purple-700 font-bold text-xs flex items-center justify-center shadow-xs transition-transform duration-200 group-hover:scale-105">
+                        <div className="h-12 w-12 rounded-xl bg-purple-100/70 border border-purple-200/80 text-purple-700 font-bold text-xs flex items-center justify-center shadow-xs transition-transform duration-200 group-hover:scale-105">
                           {initials}
                         </div>
                         <p className="text-[11px] font-semibold text-slate-800 mt-1.5 truncate w-full" title={person.name}>
@@ -1539,17 +1520,17 @@ async function fetchHolidays() {
 
         {/* Present Today Grid */}
         <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/50">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-              <h2 className="text-xs font-semibold text-slate-900">Present Today</h2>
+          <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/50">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <h2 className="text-sm font-semibold text-slate-900">Present Today</h2>
             </div>
-            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full">
               {presentRecords.length} Active
             </span>
           </div>
 
-          <div className="p-3 max-h-[300px] overflow-y-auto">
+          <div className="p-4 sm:p-5 max-h-[320px] overflow-y-auto">
             {presentRecords.length === 0 ? (
               <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
                 No present records logged today

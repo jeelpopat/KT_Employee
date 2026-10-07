@@ -1517,27 +1517,25 @@ export const DashboardView = () => {
   });
 
   return (
-    <div className="min-h-full space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
 
-      {/* KPI Cards (5 items) */}
+      {/* KPI Cards (4 items) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Today Hours', value: formatHoursAndMinutes(totalWorkTimeDisplay), accent: 'border-l-indigo-600' },
           { label: 'Tasks To Do', value: tasksStats.todo, accent: 'border-l-slate-400' },
           { label: 'In Progress', value: tasksStats.inProgress, accent: 'border-l-amber-500' },
           { label: 'Completed', value: tasksStats.completed, accent: 'border-l-emerald-500' },
-        ].map((item, idx) => {
-          return (
-            <div key={`kpi-${idx}`} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs flex flex-col justify-between`}>
-              <div className="flex justify-between items-start w-full">
-                <span className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</span>
-                <div className="px-2 items-end text-xl font-bold text-slate-900">
-                  {isDataLoading && idx !== 0 ? <Loader2 size={20} className="animate-spin text-slate-400" /> : item.value}
-                </div>
-              </div>
+        ].map((item, idx) => (
+          <div key={`kpi-${idx}`} className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                {isDataLoading && idx !== 0 ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
+              </p>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

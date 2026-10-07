@@ -70,15 +70,15 @@ export default function OfficeSettings() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in font-sans">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/80">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-indigo-600" />
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            <Building2 className="w-6 h-6 text-indigo-600" />
             <span>Office Attendance & Schedule Settings</span>
-          </h2>
-          <p className="mt-1 text-xs text-slate-500">
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
             Configure official work timings, late grace allowances, office geofencing coordinates, and check-in parameters.
           </p>
         </div>
@@ -87,16 +87,16 @@ export default function OfficeSettings() {
           <button
             type="button"
             onClick={handleReset}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs cursor-pointer transition-colors"
+            className="h-10 px-3.5 rounded-lg border border-slate-200/80 bg-white text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-xs cursor-pointer transition-colors inline-flex items-center gap-1.5"
           >
-            <RotateCcw size={13} />
+            <RotateCcw size={14} />
             <span>Reset Defaults</span>
           </button>
         </div>
       </div>
 
       {feedback.message && (
-        <div className={`p-3 rounded-xl border text-xs font-medium flex items-center gap-2 animate-fade-in ${
+        <div className={`p-3.5 rounded-xl border text-xs sm:text-sm font-medium flex items-center gap-2 ${
           feedback.type === "success" 
             ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
             : feedback.type === "error"
@@ -108,9 +108,9 @@ export default function OfficeSettings() {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <form onSubmit={handleSave} className="space-y-5 sm:space-y-6">
         {/* Section 1: Working Hours & Shifts */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs space-y-4">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 lg:p-6 shadow-xs space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
             <Clock className="w-4 h-4 text-indigo-600" />
             <h3 className="text-sm font-semibold text-slate-900">Shift Timings & Workday Hours</h3>

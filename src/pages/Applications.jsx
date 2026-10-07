@@ -222,36 +222,34 @@ export default function Applications() {
   };
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <div>
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
-              Applications
-            </h1>
-            <p className="text-xs sm:text-sm text-gray-500">
-              Manage and track all candidate applications
-            </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+            Applications
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+            Manage and track all candidate applications
+          </p>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="px-3 py-2 bg-white border border-slate-200/80 rounded-lg shadow-xs">
+            <span className="text-xs sm:text-sm text-gray-600">Total: </span>
+            <span className="font-semibold text-gray-900">{applications.length}</span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <div className="px-2.5 sm:px-3 py-1.5 bg-white border border-gray-300 rounded-lg">
-              <span className="text-xs sm:text-sm text-gray-600">Total: </span>
-              <span className="font-semibold text-gray-900">{applications.length}</span>
-            </div>
-            <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 bg-green-50 border border-green-300 rounded-lg">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full bg-green-400 opacity-75 rounded-full"></span>
-                <span className="relative inline-flex h-2 w-2 bg-green-500 rounded-full"></span>
-              </span>
-              <span className="text-[10px] sm:text-xs font-medium text-green-700">Live</span>
-            </div>
+          <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full bg-green-400 opacity-75 rounded-full"></span>
+              <span className="relative inline-flex h-2 w-2 bg-green-500 rounded-full"></span>
+            </span>
+            <span className="text-[10px] sm:text-xs font-medium text-green-700">Live</span>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="bg-white border border-gray-300 rounded-lg sm:rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex justify-center items-center py-16 sm:py-20">
             <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />

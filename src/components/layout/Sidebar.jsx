@@ -72,7 +72,7 @@ export const Sidebar = ({ onSignOut }) => {
       items: [
         { tab: 'admin-applications', label: 'Applications', icon: FileText },
         { tab: 'admin-positions', label: 'Positions', icon: Briefcase },
-        { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: TrendingUp },
+        // { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: TrendingUp },
         { tab: 'admin-contacts', label: 'Contacts', icon: Users },
       ]
     },
@@ -225,13 +225,13 @@ export const Sidebar = ({ onSignOut }) => {
           lg:translate-x-0`}
       >
         {/* Logo Header */}
-        <div className="h-20 flex items-center justify-between px-5 border-b border-slate-100 shrink-0 overflow-hidden">
+        <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100 shrink-0 overflow-hidden">
           <div className="flex items-center justify-center h-full flex-1 overflow-hidden">
             <img
               src={logo}
               alt="Kevalon Technology"
               className="h-8 w-auto object-contain scale-[5] origin-center transition-all"
-              style={{ transform: 'scale(1.4)' }}
+              style={{ transform: 'scale(1)' }}
             />
           </div>
           <button

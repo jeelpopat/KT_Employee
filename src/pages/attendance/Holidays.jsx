@@ -368,7 +368,7 @@ export default function Holidays() {
     }).length;
 
     return (
-      <div className="bg-white border border-slate-300 rounded-lg sm:rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
         <div className="flex flex-col gap-3 px-3 sm:px-4 py-3 bg-white border-b border-slate-300 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">Holiday Calendar</p>
@@ -496,7 +496,7 @@ export default function Holidays() {
 
           <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-          <div className="inline-block align-bottom bg-white text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full w-full max-w-md border border-slate-300 rounded-lg sm:rounded-xl">
+          <div className="inline-block align-bottom bg-white text-left shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full w-full max-w-md border border-slate-200/80 rounded-xl overflow-hidden">
             <div className="bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-4 sm:pb-6">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -575,47 +575,46 @@ export default function Holidays() {
   };
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {confirmationDialog}
-      <div className="mb-4 sm:mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             <span>📅</span> Holiday Calendar
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500">Manage holiday schedules and office closure dates</p>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">Manage holiday schedules and office closure dates</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setView('calendar')}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium border border-slate-300 rounded-lg transition-all ${
-              view === 'calendar'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <span className="hidden xs:inline">Calendar View</span>
-            <span className="xs:hidden">Calendar</span>
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium border border-slate-300 rounded-lg transition-all ${
-              view === 'list'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <span className="hidden xs:inline">List View</span>
-            <span className="xs:hidden">List</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/80">
+            <button
+              onClick={() => setView('calendar')}
+              className={`h-8 px-3 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                view === 'calendar'
+                  ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Calendar View
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={`h-8 px-3 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                view === 'list'
+                  ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              List View
+            </button>
+          </div>
           <button
             onClick={() => {
               openAddHolidayModal();
             }}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium border border-slate-300 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-all"
+            className="h-10 px-4 text-xs sm:text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="hidden xs:inline">Add Holiday</span>
-            <span className="xs:hidden">+ Add</span>
+            <span>+ Add Holiday</span>
           </button>
         </div>
       </div>
@@ -629,7 +628,7 @@ export default function Holidays() {
           ) : view === 'calendar' ? (
             renderCalendar()
           ) : (
-            <div className="bg-white border border-slate-300 rounded-lg sm:rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
               <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-white border-b border-slate-300">
                 <h2 className="text-sm sm:text-base font-bold text-slate-800">
                   Holiday List ({holidays.length})

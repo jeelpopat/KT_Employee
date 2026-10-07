@@ -185,18 +185,18 @@ export default function Profile() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Panel */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-200 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Admin Profile</h1>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Admin Profile</h1>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
               <ShieldCheck className="w-3.5 h-3.5" />
               Verified
             </span>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
             Manage your personal profile details, organization settings, and security credentials.
           </p>
         </div>

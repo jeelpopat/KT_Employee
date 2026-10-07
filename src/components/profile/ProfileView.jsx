@@ -1088,7 +1088,7 @@ export const ProfileView = () => {
   const customDocs = documents.filter(d => !d.isCore);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       
       {/* Hidden File Inputs for Document & Photo Upload */}
       <input 

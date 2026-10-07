@@ -157,7 +157,8 @@ const MainLayout = ({ handleSignOut }) => {
       // Role-Specific & Standard Modules
       case 'admin-salary':
       case 'salary': return <SalaryView />;
-      case 'performance': return userRole === 'admin' ? <AdminPerformanceView /> : <PerformanceView />;
+      case 'admin-performance':
+      case 'performance': return <AdminPerformanceView />;
       case 'projects': return <ProjectView />;
       case 'holiday': return userRole === 'admin' ? <AdminHolidaysView /> : <HolidayCalendarView />;
       case 'team-members': return userRole === 'admin' ? <AdminMembersView /> : <TeamMembersView />;

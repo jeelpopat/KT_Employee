@@ -1756,7 +1756,7 @@ export default function Adjustments() {
   // ============================================================
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-3 sm:p-4">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
 
       {/* ======================================================
           TOAST
@@ -1775,9 +1775,9 @@ export default function Adjustments() {
       ====================================================== */}
 
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3">
 
-          <div className="w-full max-w-2xl bg-white border border-gray-300 shadow-xl">
+          <div className="w-full max-w-2xl bg-white rounded-xl border border-slate-200/80 shadow-2xl overflow-hidden">
 
             {/* Header */}
 
@@ -2171,83 +2171,40 @@ export default function Adjustments() {
       {/* ======================================================
           HEADER
       ====================================================== */}
-
-      <div className="border-b border-gray-300 pb-3 sm:pb-4 mb-4 sm:mb-6">
-
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-
-          <div>
-
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              Adjustments
-            </h1>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Apply direct attendance adjustments.
-            </p>
-
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+            Adjustments
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+            Apply direct attendance adjustments and configure rules
+          </p>
+          {/* Current Settings Pills */}
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+              Start: <b className="text-slate-900">{attendanceSettings.officeStartTime}</b>
+            </span>
+            <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+              Late: <b className="text-slate-900">{attendanceSettings.lateAfter}</b>
+            </span>
+            <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+              Absent: <b className="text-slate-900">{attendanceSettings.absentAfter}</b>
+            </span>
+            <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+              End: <b className="text-slate-900">{attendanceSettings.officeEndTime}</b>
+            </span>
           </div>
-
-          {/* SETTINGS BUTTON */}
-
-          <button
-            type="button"
-            onClick={
-              openSettings
-            }
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium px-4 py-2.5 transition-colors"
-          >
-            <Settings
-              size={17}
-            />
-
-            Settings
-          </button>
-
         </div>
 
-        {/* Current Settings */}
-
-        <div className="mt-3 flex flex-wrap gap-2">
-
-          <span className="text-[11px] bg-gray-50 border border-gray-200 px-2.5 py-1 text-gray-600">
-            Start:{" "}
-            <b>
-              {
-                attendanceSettings.officeStartTime
-              }
-            </b>
-          </span>
-
-          <span className="text-[11px] bg-gray-50 border border-gray-200 px-2.5 py-1 text-gray-600">
-            Late:{" "}
-            <b>
-              {
-                attendanceSettings.lateAfter
-              }
-            </b>
-          </span>
-
-          <span className="text-[11px] bg-gray-50 border border-gray-200 px-2.5 py-1 text-gray-600">
-            Absent:{" "}
-            <b>
-              {
-                attendanceSettings.absentAfter
-              }
-            </b>
-          </span>
-
-          <span className="text-[11px] bg-gray-50 border border-gray-200 px-2.5 py-1 text-gray-600">
-            End:{" "}
-            <b>
-              {
-                attendanceSettings.officeEndTime
-              }
-            </b>
-          </span>
-
-        </div>
-
+        {/* SETTINGS BUTTON */}
+        <button
+          type="button"
+          onClick={openSettings}
+          className="h-10 px-3.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-lg shadow-xs flex items-center gap-2 text-xs sm:text-sm font-medium transition-colors self-start sm:self-auto cursor-pointer"
+        >
+          <Settings size={16} className="text-slate-500" />
+          <span>Rules Settings</span>
+        </button>
       </div>
 
       {/* ======================================================
@@ -2268,7 +2225,7 @@ export default function Adjustments() {
             LEFT FORM
         ==================================================== */}
 
-        <div className="lg:col-span-2 bg-gray-50 border border-gray-300 p-3 sm:p-5">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 lg:p-6 shadow-xs">
 
           <div className="flex items-center justify-end mb-3 sm:mb-4">
 
@@ -2808,9 +2765,9 @@ export default function Adjustments() {
             RIGHT - HISTORY
         ==================================================== */}
 
-        <div className="border border-gray-300 p-3 sm:p-5 flex flex-col">
+        <div className="bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 lg:p-6 shadow-xs flex flex-col">
 
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+          <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-4">
             Recent Adjustments
           </h2>
 
@@ -2841,7 +2798,7 @@ export default function Adjustments() {
                   return (
                     <div
                       key={item._id}
-                      className="p-3.5 border border-gray-200 bg-gray-50 text-xs text-gray-600"
+                      className="p-3.5 rounded-lg border border-slate-200/80 bg-slate-50/60 text-xs text-gray-600"
                     >
                       <div className="flex flex-wrap justify-between items-start gap-2">
                         <span className="font-semibold text-gray-800 text-sm">

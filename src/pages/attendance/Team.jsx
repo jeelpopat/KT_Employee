@@ -1745,9 +1745,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   const overallProgress = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {confirmationDialog}
-      <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Top Action & Navigation Tabs Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mt-1 sm:-mt-2 mb-1">
@@ -1816,80 +1815,25 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
         {activeMainTab === 'projects' && (
           <>
-            {/* KPI Metrics Dashboard Cards (Compact) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Card 1: Total Projects */}
-          <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                Total Projects
-              </span>
-              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <FolderOpen className="w-3.5 h-3.5" />
-              </div>
+            {/* KPI Metrics Dashboard Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: "Total Projects", value: totalProjectsCount, accent: "border-l-indigo-600" },
+                { label: "Total Tasks", value: totalTasksCount, accent: "border-l-blue-500" },
+                { label: "In Progress", value: inProgressTasksCount, accent: "border-l-amber-500" },
+                { label: "Completed", value: completedTasksCount, accent: "border-l-emerald-500" }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+                >
+                  <div className="flex items-start justify-between">
+                    <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="mt-1.5 flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                {totalProjectsCount}
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">Workspaces</span>
-            </div>
-          </div>
-
-          {/* Card 2: Total Tasks */}
-          <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                Total Tasks
-              </span>
-              <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <ListTodo className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                {totalTasksCount}
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">Assigned</span>
-            </div>
-          </div>
-
-          {/* Card 3: In Progress */}
-          <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                In Progress
-              </span>
-              <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Clock className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                {inProgressTasksCount}
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">Active</span>
-            </div>
-          </div>
-
-          {/* Card 4: Completed Tasks */}
-          <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                Completed
-              </span>
-              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                {completedTasksCount}
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">({overallProgress}% Done)</span>
-            </div>
-          </div>
-        </div>
 
         {/* Search and Filters Bar */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -2428,73 +2372,23 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         {activeMainTab === 'daily-reports' && (
           <div className="space-y-6 animate-fade-in">
             {/* KPI Metrics Dashboard Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Total Reports
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <FileText className="w-3.5 h-3.5" />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: "Total Reports", value: accessibleDailyReports.length, accent: "border-l-indigo-600" },
+                { label: "Total Hours Logged", value: accessibleDailyReports.reduce((acc, r) => acc + (Number(r.hoursWorked) || 0), 0), accent: "border-l-blue-500" },
+                { label: "Staff Reporting", value: new Set(accessibleDailyReports.map(r => r.employeeId?._id || r.employeeId?.email || r.employeeId).filter(Boolean)).size, accent: "border-l-purple-500" },
+                { label: "Active Submissions", value: accessibleDailyReports.filter(r => r.todaysWork || r.workUpdate).length, accent: "border-l-emerald-500" }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+                >
+                  <div className="flex items-start justify-between">
+                    <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
                   </div>
                 </div>
-                <div className="mt-1.5 flex items-baseline gap-1.5">
-                  <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {accessibleDailyReports.length}
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-medium">Logged</span>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Total Hours Logged
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Clock className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-1.5 flex items-baseline gap-1.5">
-                  <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {accessibleDailyReports.reduce((acc, r) => acc + (Number(r.hoursWorked) || 0), 0)}
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-medium">Hours</span>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Staff Reporting
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-                    <Users className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-1.5 flex items-baseline gap-1.5">
-                  <span className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {new Set(accessibleDailyReports.map(r => r.employeeId?._id || r.employeeId?.email || r.employeeId).filter(Boolean)).size}
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-medium">Employees & TLs</span>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-3.5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Live Endpoint
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-1.5 flex items-baseline gap-1.5">
-                  <span className="text-xs font-mono font-semibold text-emerald-700 truncate">
-                    /api/dailyUpdate/list
-                  </span>
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* Filter Bar */}
@@ -2728,7 +2622,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
             </div>
           </div>
         )}
-      </div>
 
       {/* Project Modal - SAME FORM for Create + Edit */}
       {showProjectModal && (

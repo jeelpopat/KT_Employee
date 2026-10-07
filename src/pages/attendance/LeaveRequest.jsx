@@ -1516,53 +1516,39 @@ export default function LeaveRequest() {
   // ==========================================================
 
   return (
-    <div className="min-h-screen bg-gray-50 p-3 sm:p-5 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+      {/* ====================================================
+          HEADER
+      ==================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+            Leave Requests
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+            Review and manage leave applications
+          </p>
+        </div>
 
-        {/* ====================================================
-            HEADER
-        ==================================================== */}
-
-        <div className="mb-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              Leave Requests
-            </h1>
-
-            <p className="text-sm text-gray-500 mt-1">
-              Review and manage leave applications
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-
-            {currentRole && (
-              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
-
-                <span className="text-xs text-blue-600">
-                  Role
-                </span>
-
-                <span className="text-xs font-bold text-blue-800">
-                  {formatRole(currentRole)}
-                </span>
-              </div>
-            )}
-
-            <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
-              <span className="text-xs text-gray-500">
-                Total
-              </span>
-
-              <span className="ml-2 text-sm font-bold text-gray-800">
-                {requests.length}
+        <div className="flex flex-wrap items-center gap-2">
+          {currentRole && (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200/80 rounded-lg px-3 py-2 shadow-xs">
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              <span className="text-xs text-blue-600">Role</span>
+              <span className="text-xs font-bold text-blue-800">
+                {formatRole(currentRole)}
               </span>
             </div>
+          )}
 
+          <div className="bg-white border border-slate-200/80 rounded-lg px-3.5 py-2 shadow-xs">
+            <span className="text-xs text-gray-500">Total</span>
+            <span className="ml-2 text-sm font-bold text-gray-900">
+              {requests.length}
+            </span>
           </div>
         </div>
+      </div>
 
         {/* ====================================================
             SUCCESS
@@ -2169,7 +2155,6 @@ export default function LeaveRequest() {
             </>
           )}
         </div>
-      </div>
 
       {/* ========================================================
           DETAILS MODAL
@@ -2177,14 +2162,14 @@ export default function LeaveRequest() {
 
       {selectedLeave && (
         <div
-          className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5"
+          className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5"
           onClick={() =>
             setSelectedLeave(null)
           }
         >
 
           <div
-            className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
+            className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-xl border border-slate-200/80 shadow-2xl"
             onClick={(e) =>
               e.stopPropagation()
             }
@@ -2677,7 +2662,7 @@ export default function LeaveRequest() {
           onClick={closeActionModal}
         >
           <div
-            className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-150"
+            className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-200/80 animate-in fade-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* MODAL HEADER */}

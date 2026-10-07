@@ -238,7 +238,7 @@ export const AttendanceView = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -246,18 +246,14 @@ export const AttendanceView = () => {
           { label: 'Present Days', value: summaryStats.presentDays, accent: 'border-l-emerald-500' },
           { label: 'Absent Days', value: summaryStats.absentDays, accent: 'border-l-rose-500' },
           { label: 'Half Days', value: summaryStats.halfDays, accent: 'border-l-purple-500' },
-        ].map((item, idx) => {
-          return (
-            <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
-              <div>
-                <div className="flex justify-between items-center">
-                  <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider">{item.label}</p>
-                  <p className="px-2 text-xl font-bold text-slate-900">{item.value}</p>
-                </div>
-              </div>
+        ].map((item, idx) => (
+          <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       <div className="bg-white border border-slate-200/80 rounded-xl p-3 flex flex-col md:flex-row items-center justify-between gap-4 transition-all shadow-xs">

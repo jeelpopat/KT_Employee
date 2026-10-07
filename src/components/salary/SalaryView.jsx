@@ -1322,7 +1322,7 @@ export const SalaryView = () => {
   // ==========================================
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Toast Notification */}
       {notification && (
         <div
@@ -1942,56 +1942,26 @@ export const SalaryView = () => {
       {/* ==================================================== */}
       {!isAdmin && (
         <div className="space-y-6">
-          {/* Top Metric Cards */}
+          {/* Top Metric Cards: Base Salary Structure Matrix */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-emerald-600 rounded-xl p-4 shadow-xs">
-              <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <span>Monthly Net Take-Home</span>
-                <Sparkles size={14} className="text-emerald-500" />
+            {[
+              { label: "Basic Salary", value: formatINR(employeeMetrics.basicSalary), accent: "border-l-indigo-600" },
+              { label: "Allowances & Bonus", value: formatINR(employeeMetrics.hra + employeeMetrics.allowance + employeeMetrics.fixedBonus), accent: "border-l-purple-500" },
+              { label: "Monthly Gross Salary", value: formatINR(employeeMetrics.grossSalary), accent: "border-l-amber-500" },
+              { label: "Monthly Net Take-Home", value: formatINR(employeeMetrics.netSalary), accent: "border-l-emerald-500" }
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+              >
+                <div className="flex items-start justify-between">
+                  <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+                </div>
               </div>
-              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-                {formatINR(employeeMetrics.netSalary)}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">In-hand salary credited per month</p>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-indigo-600 rounded-xl p-4 shadow-xs">
-              <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <span>Monthly Gross Salary</span>
-                <ArrowUpRight size={14} className="text-indigo-500" />
-              </div>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1 font-mono">
-                {formatINR(employeeMetrics.grossSalary)}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">Annual CTC: {formatINR(employeeMetrics.annualCtc)}</p>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-purple-500 rounded-xl p-4 shadow-xs">
-              <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <span>Total Allowances & Bonus</span>
-                <DollarSign size={14} className="text-purple-500" />
-              </div>
-              <p className="text-xl font-bold text-purple-600 dark:text-purple-400 mt-1 font-mono">
-                {formatINR(employeeMetrics.hra + employeeMetrics.allowance + employeeMetrics.fixedBonus)}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                HRA ({formatINR(employeeMetrics.hra)}) + Bonus ({formatINR(employeeMetrics.fixedBonus)})
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-rose-500 rounded-xl p-4 shadow-xs">
-              <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <span>Total Deductions & TDS</span>
-                <ArrowDownRight size={14} className="text-rose-500" />
-              </div>
-              <p className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1 font-mono">
-                -{formatINR(employeeMetrics.totalDeductions)}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Deductions ({formatINR(employeeMetrics.fixedDeduction)}) + TDS ({employeeMetrics.tdsPercentage}%)
-              </p>
-            </div>
+            ))}
           </div>
+
 
           {/* Processed Monthly Payroll Statements (GET /api/payroll) */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
@@ -2075,86 +2045,6 @@ export const SalaryView = () => {
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Salary History Table (GET api/payroll/salary/user/:userId) */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Clock size={16} className="text-indigo-600" />
-                  <span>Base Salary Structure Revisions ({mySalaryHistory.length})</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Historical compensation contracts and revision dates
-                </p>
-              </div>
-            </div>
-
-            {mySalaryHistory.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400">
-                No previous salary revisions recorded.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                      <th className="py-3 px-4">Effective Date</th>
-                      <th className="py-3 px-4">Basic Pay</th>
-                      <th className="py-3 px-4">Allowances</th>
-                      <th className="py-3 px-4">Bonus</th>
-                      <th className="py-3 px-4">Gross Salary</th>
-                      <th className="py-3 px-4">Deductions & TDS</th>
-                      <th className="py-3 px-4">Net Salary</th>
-                      <th className="py-3 px-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {mySalaryHistory.map((rec) => {
-                      const b = Number(rec.basicSalary) || 0;
-                      const h = Number(rec.hra) || 0;
-                      const a = Number(rec.allowance) || 0;
-                      const bn = Number(rec.fixedBonus) || 0;
-                      const fd = Number(rec.fixedDeduction) || 0;
-                      const tp = Number(rec.tdsPercentage) || 0;
-
-                      const gr = Number(rec.grossSalary != null ? rec.grossSalary : b + h + a + bn);
-                      const td = (gr * tp) / 100;
-                      const totDed = fd + td;
-                      const nt = Number(rec.netSalary != null ? rec.netSalary : Math.max(0, gr - totDed));
-
-                      return (
-                        <tr key={rec._id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
-                          <td className="py-3 px-4 font-medium text-slate-700 dark:text-slate-300">
-                            {formatDate(rec.updatedAt || rec.createdAt)}
-                          </td>
-                          <td className="py-3 px-4 font-mono">{formatINR(b)}</td>
-                          <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">
-                            {formatINR(h + a)}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-emerald-600">{bn > 0 ? `+${formatINR(bn)}` : '—'}</td>
-                          <td className="py-3 px-4 font-mono font-semibold">{formatINR(gr)}</td>
-                          <td className="py-3 px-4 font-mono text-rose-600">-{formatINR(totDed)}</td>
-                          <td className="py-3 px-4 font-mono font-bold text-emerald-600">{formatINR(nt)}</td>
-                          <td className="py-3 px-4">
-                            {rec.isActive !== false ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Active
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
-                                Archived
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
                   </tbody>
                 </table>
               </div>

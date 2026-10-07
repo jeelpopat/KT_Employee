@@ -164,82 +164,59 @@ export default function PortfolioLeads() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 px-3 sm:px-4 py-4 sm:py-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        {/* Modern Header with Gradient */}
-        <div className="relative mb-6 sm:mb-8 lg:mb-10">
-          <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-blue-400/10 blur-3xl" />
-          <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-purple-400/10 blur-3xl" />
-          
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/25">
-                  <FolderOpen className="h-5 w-5 text-white" />
-                </div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                  Portfolio Leads
-                </h1>
-              </div>
-              <p className="text-sm text-slate-500 ml-1">
-                Manage and track all your portfolio inquiries in one place
-              </p>
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+            Portfolio Leads
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+            Manage and track all your portfolio inquiries in one place
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <button
+            onClick={fetchLeads}
+            className="h-10 px-3.5 bg-white rounded-lg shadow-xs border border-slate-200/80 hover:bg-slate-50 transition-colors text-slate-700 flex items-center gap-2 text-xs sm:text-sm font-medium"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Refresh</span>
+          </button>
+          <div className="h-10 flex items-center gap-2 px-3.5 bg-white rounded-lg shadow-xs border border-slate-200/80">
+            <div className="flex -space-x-1.5">
+              <div className="h-5 w-5 rounded-full bg-blue-500 border border-white flex items-center justify-center text-[8px] font-bold text-white">AK</div>
+              <div className="h-5 w-5 rounded-full bg-purple-500 border border-white flex items-center justify-center text-[8px] font-bold text-white">RJ</div>
+              <div className="h-5 w-5 rounded-full bg-emerald-500 border border-white flex items-center justify-center text-[8px] font-bold text-white">+2</div>
             </div>
-            
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <button className="p-2 bg-white rounded-xl shadow-sm border border-slate-200 hover:bg-slate-50 transition-all duration-200 hover:shadow-md">
-                <RefreshCw className="h-4 w-4 text-slate-500" />
-              </button>
-              <button className="p-2 bg-white rounded-xl shadow-sm border border-slate-200 hover:bg-slate-50 transition-all duration-200 hover:shadow-md">
-                <Download className="h-4 w-4 text-slate-500" />
-              </button>
-              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-200">
-                <div className="flex -space-x-2">
-                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 border-2 border-white flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-white">AK</span>
-                  </div>
-                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-purple-400 to-purple-500 border-2 border-white flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-white">RJ</span>
-                  </div>
-                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 border-2 border-white flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-white">+2</span>
-                  </div>
-                </div>
-                <span className="text-xs font-medium text-slate-600">Team</span>
-              </div>
-            </div>
+            <span className="text-xs font-medium text-slate-600">Team</span>
           </div>
         </div>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          {[
-            { label: "Total Leads", value: stats.total, icon: Users, color: "from-blue-500 to-blue-600", bg: "bg-blue-50" },
-            { label: "High Priority", value: stats.highPriority, icon: AlertTriangle, color: "from-rose-500 to-rose-600", bg: "bg-rose-50" },
-            { label: "Proposal Sent", value: stats.proposalSent, icon: Mail, color: "from-indigo-500 to-indigo-600", bg: "bg-indigo-50" },
-            { label: "Closed Deals", value: stats.closed, icon: CheckCircle, color: "from-emerald-500 to-emerald-600", bg: "bg-emerald-50" }
-          ].map((stat, idx) => (
-            <div key={idx} className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:border-slate-200">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-transparent group-hover:from-blue-50/50 rounded-2xl transition-all duration-500" />
-              <div className="relative flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">{stat.value}</p>
-                </div>
-                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.color} shadow-lg shadow-${stat.color.split(' ')[1]?.split('-')[1]}-500/20`}>
-                  <stat.icon className="h-4 w-4 text-white" />
-                </div>
-              </div>
-              <div className="relative mt-2 flex items-center gap-1">
-                <span className="text-xs text-emerald-600 font-medium">↑ 12%</span>
-                <span className="text-xs text-slate-400">from last month</span>
-              </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Total Leads", value: stats.total, accent: "border-l-indigo-600" },
+          { label: "High Priority", value: stats.highPriority, accent: "border-l-rose-500" },
+          { label: "Proposal Sent", value: stats.proposalSent, accent: "border-l-blue-500" },
+          { label: "Closed Deals", value: stats.closed, accent: "border-l-emerald-500" }
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+          >
+            <div className="flex items-start justify-between">
+              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
 
-        {/* Main Content */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 overflow-hidden">
+      {/* Main Content Card */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
           {/* Search and Filter Bar - Modern Design */}
           <div className="p-4 sm:p-6 border-b border-slate-200/70 bg-gradient-to-r from-slate-50/50 to-white">
             <div className="flex flex-col gap-4">
@@ -497,19 +474,18 @@ export default function PortfolioLeads() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Modern Modal - Enhanced Design */}
       {showModal && selectedLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={closeModal} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={closeModal} />
           
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
+          <div className="relative bg-white rounded-xl shadow-2xl border border-slate-200/80 w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
             {/* Header with Gradient */}
-            <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 rounded-t-3xl">
+            <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 rounded-t-xl">
               <button
                 onClick={closeModal}
-                className="absolute right-4 top-4 p-2 text-white/70 hover:text-white hover:bg-white/20 rounded-xl transition-colors"
+                className="absolute right-4 top-4 p-2 text-white/70 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>

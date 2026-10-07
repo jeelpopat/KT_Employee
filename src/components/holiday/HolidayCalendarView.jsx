@@ -202,7 +202,7 @@ export const HolidayCalendarView = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto animate-fade-in">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Main Single Calendar Card Matching KT-admin Design */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden transition-colors">
         
