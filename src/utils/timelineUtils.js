@@ -493,7 +493,7 @@ export const computeNineHourTimeline = ({
             });
           }
 
-          // Excess Break (> 1 hour): Grey (#94A3B8 / bg-slate-400 dark:bg-slate-500)
+          // Excess Break (> 1 hour): Grey (#94A3B8 / bg-slate-400
           if (excessBreakDuration > 0) {
             const excessStart = clampedFrom + standardBreakDuration;
             const leftPercent = Math.max(0, ((excessStart - startMinutes) / TOTAL_MINUTES) * 100);
@@ -504,7 +504,7 @@ export const computeNineHourTimeline = ({
               leftPercent,
               widthPercent,
               color: '#94A3B8',
-              colorClass: 'bg-slate-400 dark:bg-slate-500',
+              colorClass: 'bg-slate-400',
               type: 'gray',
               label: `Extra Break (>1 hr) (${formatMinutesToTimeStr(excessStart)} - ${formatMinutesToTimeStr(clampedTo)})`
             });
@@ -520,7 +520,7 @@ export const computeNineHourTimeline = ({
             leftPercent,
             widthPercent,
             color: '#94A3B8',
-            colorClass: 'bg-slate-400 dark:bg-slate-500',
+            colorClass: 'bg-slate-400',
             type: 'gray',
             label: `${seg.label || 'Early Checkout / Inactive'} (${formatMinutesToTimeStr(clampedFrom)} - ${formatMinutesToTimeStr(clampedTo)})`
           });
@@ -611,7 +611,7 @@ export const computeNineHourTimeline = ({
                   leftPercent: left,
                   widthPercent: width,
                   color: '#94A3B8',
-                  colorClass: 'bg-slate-400 dark:bg-slate-500',
+                  colorClass: 'bg-slate-400',
                   type: 'gray',
                   label: `Extra Break (>1 hr) (${formatMinutesToTimeStr(excessStart)} - ${formatMinutesToTimeStr(bClampedTo)})`
                 });
@@ -672,7 +672,7 @@ export const computeNineHourTimeline = ({
               leftPercent,
               widthPercent,
               color: '#94A3B8',
-              colorClass: 'bg-slate-400 dark:bg-slate-500',
+              colorClass: 'bg-slate-400',
               type: 'gray',
               label: `Extra Break (>1 hr) (${formatMinutesToTimeStr(excessStart)} - ${formatMinutesToTimeStr(clampedEnd)})`
             });
@@ -758,7 +758,7 @@ export const computeNineHourTimeline = ({
             minutes: segEndMins,
             percent: Number(((segEndMins - startMinutes) / TOTAL_MINUTES * 100).toFixed(1)),
             color: '#10B981',
-            badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+            badgeClass: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
             dotClass: 'bg-emerald-500'
           });
         }
@@ -791,7 +791,7 @@ export const computeNineHourTimeline = ({
             minutes: segEndMins,
             percent: Number(((segEndMins - startMinutes) / TOTAL_MINUTES * 100).toFixed(1)),
             color: '#10B981',
-            badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+            badgeClass: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
             dotClass: 'bg-emerald-500'
           });
         }
@@ -851,7 +851,7 @@ export const computeNineHourTimeline = ({
         minutes: parsedBreakOut,
         percent: bOutPct,
         color: '#10B981',
-        badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+        badgeClass: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
         dotClass: 'bg-emerald-500'
       });
     }
@@ -974,7 +974,7 @@ export const deriveAttendanceStatus = ({
       status: 'rejected',
       label: 'Rejected',
       reason: rejectionReason || 'Attendance request rejected by admin',
-      badgeClass: 'text-red-700 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/50',
+      badgeClass: 'text-red-700 bg-red-50 border-red-200',
       dotClass: 'bg-red-500'
     };
   }
@@ -991,7 +991,7 @@ export const deriveAttendanceStatus = ({
       status: 'pending',
       label: 'Pending Approval',
       reason: 'Check-in request pending admin approval',
-      badgeClass: 'text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50',
+      badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
       dotClass: 'bg-amber-500'
     };
   }
@@ -1045,7 +1045,7 @@ export const deriveAttendanceStatus = ({
         status: 'absent',
         label: 'Absent',
         reason: 'Worked less than 4 hours',
-        badgeClass: 'text-red-700 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/50',
+        badgeClass: 'text-red-700 bg-red-50 border-red-200',
         dotClass: 'bg-red-500'
       };
     }
@@ -1055,7 +1055,7 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: 'Worked less than 7h 50m',
-        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };
     }
@@ -1067,7 +1067,7 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: `Break exceeded 70 mins (${breakMins}m)`,
-        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };
     }
@@ -1078,7 +1078,7 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: 'Check-in after 10:30 AM',
-        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };
     }
@@ -1088,7 +1088,7 @@ export const deriveAttendanceStatus = ({
         status: 'late',
         label: 'Present (Late)',
         reason: 'Checked in between 10:11 - 10:30 AM',
-        badgeClass: 'text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50',
+        badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
         dotClass: 'bg-amber-500'
       };
     }
@@ -1097,7 +1097,7 @@ export const deriveAttendanceStatus = ({
       status: 'present',
       label: 'Present',
       reason: 'Standard shift completed on time',
-      badgeClass: 'text-green-700 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800/50',
+      badgeClass: 'text-green-700 bg-green-50 border-green-200',
       dotClass: 'bg-green-500'
     };
   }
@@ -1109,7 +1109,7 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: `Break exceeded 70 mins (${breakMins}m)`,
-        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };
     }
@@ -1119,7 +1119,7 @@ export const deriveAttendanceStatus = ({
         status: 'late',
         label: 'Late',
         reason: 'Checked in between 10:11 - 10:30 AM',
-        badgeClass: 'text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50',
+        badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
         dotClass: 'bg-amber-500'
       };
     }
@@ -1129,7 +1129,7 @@ export const deriveAttendanceStatus = ({
         status: 'half_day',
         label: 'Half Day',
         reason: 'Checked in between 10:31 AM - 3:00 PM',
-        badgeClass: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/50',
+        badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };
     }
@@ -1139,7 +1139,7 @@ export const deriveAttendanceStatus = ({
         status: 'absent',
         label: 'Absent',
         reason: 'Checked in after 3:00 PM',
-        badgeClass: 'text-red-700 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/50',
+        badgeClass: 'text-red-700 bg-red-50 border-red-200',
         dotClass: 'bg-red-500'
       };
     }
@@ -1147,7 +1147,7 @@ export const deriveAttendanceStatus = ({
     return {
       status: 'present',
       label: 'Present',
-      badgeClass: 'text-green-700 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800/50',
+      badgeClass: 'text-green-700 bg-green-50 border-green-200',
       dotClass: 'bg-green-500'
     };
   }
@@ -1155,7 +1155,7 @@ export const deriveAttendanceStatus = ({
   return {
     status: 'not_checked_in',
     label: 'Not Checked In',
-    badgeClass: 'text-slate-500 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700',
+    badgeClass: 'text-slate-500 bg-slate-50 border-slate-200',
     dotClass: 'bg-slate-400'
   };
 };
@@ -1173,19 +1173,19 @@ export const getQuickActionStatusConfig = ({ hasCheckedIn, isOnBreak, hasChecked
   if (isRejected) {
     return {
       statusText: 'Rejected',
-      badgeColorClass: 'text-red-600 dark:text-red-400 bg-red-500/10 border-red-500/30',
+      badgeColorClass: 'text-red-600 bg-red-500/10 border-red-500/30',
       dotColorClass: 'bg-red-500 animate-pulse'
     };
   } else if (isPending) {
     return {
       statusText: 'Pending Approval',
-      badgeColorClass: 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30',
+      badgeColorClass: 'text-amber-600 bg-amber-500/10 border-amber-500/30',
       dotColorClass: 'bg-amber-500 animate-pulse'
     };
   } else if (hasCheckedOut) {
     return {
       statusText: 'Checked Out',
-      badgeColorClass: 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700',
+      badgeColorClass: 'text-slate-600 bg-slate-100 border-slate-200',
       dotColorClass: 'bg-slate-400'
     };
   } else if (isOnBreak) {
@@ -1203,7 +1203,7 @@ export const getQuickActionStatusConfig = ({ hasCheckedIn, isOnBreak, hasChecked
   } else {
     return {
       statusText: 'Not Checked In',
-      badgeColorClass: 'text-slate-500 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700',
+      badgeColorClass: 'text-slate-500 bg-slate-50 border-slate-200',
       dotColorClass: 'bg-slate-400'
     };
   }

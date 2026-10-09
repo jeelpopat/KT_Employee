@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, User, LogOut, ChevronDown,
-  Camera, CheckCircle2, AlertCircle, CheckCheck, Plus
+  Camera, CheckCircle2, AlertCircle, CheckCheck, Plus,
+  Menu, X
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
@@ -13,7 +14,8 @@ export const Header = ({ onSignOut }) => {
   const {
     user, currentTab, setCurrentTab,
     attendanceStatus, handleCheckOut,
-    userRole, updateUserProfile
+    userRole, updateUserProfile,
+    isMobileSidebarOpen, setIsMobileSidebarOpen
   } = useApp();
   const navigate = useNavigate();
 
@@ -184,7 +186,6 @@ export const Header = ({ onSignOut }) => {
     'team-members': 'Team Members',
     'employees': 'Employees',
     'learning-hub': 'Learning Hub',
-    'internship-progress': 'Internship Progress',
     'documents': 'Documents & Records',
     'daily-follow-up': 'Daily Follow-Up',
     'team-tasks': 'Task Management',
@@ -227,21 +228,32 @@ export const Header = ({ onSignOut }) => {
   }, [displayPhoto]);
 
   return (
-    <header className="fixed top-14 left-0 right-0 z-30 h-16 border-b border-slate-200/80 bg-white/95 shadow-xs backdrop-blur lg:top-0 lg:left-60">
-      <div className="flex h-full items-center justify-between px-4 sm:px-6">
+    <header className="fixed top-0 left-0 right-0 z-30 h-16 border-b border-slate-200/80 bg-white/95 shadow-xs backdrop-blur lg:left-60">
+      <div className="flex h-full items-center justify-between px-3 sm:px-6">
 
-        {/* Left: Eyebrow and Page Title matching KT-admin PageHeader */}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400"></p>
-          {/* <h1 className="text-base font-semibold leading-6 text-slate-900 tracking-tight">
-            {pageTitles[currentTab] || 'Overview'}
-          </h1> */}
+        {/* Left: Mobile Brand (Logo & Company Name) / Desktop Page Title */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          {/* Mobile Phone View: Logo + Company Name */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <img src={companyLogo} alt="Kevalon Tech" className="h-7 w-auto object-contain shrink-0" />
+            <span className="font-semibold text-xs sm:text-sm text-slate-800 tracking-tight whitespace-nowrap">
+              Kevalon Tech
+            </span>
+          </div>
+
+          {/* Desktop Left: Eyebrow */}
+          <div className="hidden lg:block">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400"></p>
+            {/* <h1 className="text-base font-semibold leading-6 text-slate-900 tracking-tight">
+              {pageTitles[currentTab] || 'Overview'}
+            </h1> */}
+          </div>
         </div>
 
-        {/* Right: Actions, Notifications & Profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Active monitoring badge for employees */}
-          {userRole !== 'hr' && attendanceStatus === 'checked_in' && (
+        {/* Right: Actions, Notifications, Profile & Mobile Menu */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Active monitoring badge for employees and team leads */}
+          {userRole !== 'hr' && userRole !== 'admin' && attendanceStatus === 'checked_in' && (
             <button
               type="button"
               onClick={() => setCurrentTab('admin-screenshots')}
@@ -279,7 +291,11 @@ export const Header = ({ onSignOut }) => {
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
-              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              onClick={() => {
+                setIsNotificationsOpen(prev => !prev);
+                setIsProfileMenuOpen(false);
+              }}
+              aria-label="View notifications"
               title="View notifications"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors relative cursor-pointer"
             >
@@ -291,10 +307,10 @@ export const Header = ({ onSignOut }) => {
               )}
             </button>
 
-            {/* Notification Dropdown */}
+            {/* Notification Dropdown - Responsive & fully visible on all mobile screens */}
             {isNotificationsOpen && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200/80 rounded-xl shadow-card z-50 overflow-hidden animate-fade-in">
-                <div className="flex items-center justify-between px-4 py-3 bg-slate-50/70 border-b border-slate-100">
+              <div className="fixed inset-x-2.5 top-[68px] sm:top-full sm:mt-2 sm:absolute sm:right-0 sm:left-auto sm:inset-x-auto sm:w-96 sm:max-w-[calc(100vw-2rem)] bg-white border border-slate-200/80 rounded-xl shadow-card z-50 overflow-hidden animate-fade-in">
+                <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 bg-slate-50/70 border-b border-slate-100">
                   <span className="text-xs font-semibold text-slate-800">Notifications ({unreadCount} unread)</span>
                   {unreadCount > 0 && (
                     <button
@@ -305,7 +321,7 @@ export const Header = ({ onSignOut }) => {
                     </button>
                   )}
                 </div>
-                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                <div className="max-h-[calc(100vh-6rem)] sm:max-h-80 overflow-y-auto divide-y divide-slate-100 overscroll-contain">
                   {notifications.length === 0 ? (
                     <div className="p-6 text-center text-xs text-slate-400">No notifications available</div>
                   ) : (
@@ -313,23 +329,23 @@ export const Header = ({ onSignOut }) => {
                       <div
                         key={notif._id}
                         onClick={() => !notif.isRead && handleMarkAsRead(notif._id)}
-                        className={`p-3.5 flex items-start gap-2.5 cursor-pointer hover:bg-slate-50/80 transition-colors ${!notif.isRead ? 'bg-indigo-50/30' : ''}`}
+                        className={`p-3 sm:p-3.5 flex items-start gap-2.5 cursor-pointer hover:bg-slate-50/80 transition-colors ${!notif.isRead ? 'bg-indigo-50/30' : ''}`}
                       >
                         <div className="mt-0.5 shrink-0 text-slate-500">
                           {notif.type === 'SYSTEM' ? <CheckCircle2 size={15} className="text-indigo-600" /> :
                             notif.type === 'ANNOUNCEMENT' ? <Bell size={15} className="text-amber-500" /> : <AlertCircle size={15} className="text-slate-400" />}
                         </div>
-                        <div className="flex-1 text-xs">
-                          <div className="font-semibold text-slate-800 flex justify-between items-center">
-                            <span className="truncate max-w-[180px]">{notif.title}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">
+                        <div className="flex-1 min-w-0 text-xs">
+                          <div className="font-semibold text-slate-800 flex justify-between items-center gap-2">
+                            <span className="truncate">{notif.title}</span>
+                            <span className="text-[10px] text-slate-400 font-mono shrink-0">
                               {notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}
                             </span>
                           </div>
-                          <p className="text-slate-500 mt-1 text-[11px] leading-relaxed">{notif.message}</p>
+                          <p className="text-slate-500 mt-1 text-[11px] leading-relaxed break-words line-clamp-3">{notif.message}</p>
                         </div>
                         {!notif.isRead && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 self-center shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 self-center shrink-0 ml-1" />
                         )}
                       </div>
                     ))
@@ -343,8 +359,11 @@ export const Header = ({ onSignOut }) => {
           <div className="relative" ref={profileMenuRef}>
             <button
               type="button"
-              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              className="flex items-center gap-2 p-1 pl-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer bg-white"
+              onClick={() => {
+                setIsProfileMenuOpen(prev => !prev);
+                setIsNotificationsOpen(false);
+              }}
+              className="flex items-center gap-1.5 sm:gap-2 p-1 pl-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer bg-white"
             >
               <div className="relative shrink-0">
                 <div className="w-7 h-7 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
@@ -390,7 +409,7 @@ export const Header = ({ onSignOut }) => {
 
             {/* Profile Dropdown */}
             {isProfileMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200/80 rounded-xl shadow-card z-50 py-1 divide-y divide-slate-100 animate-fade-in">
+              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-white border border-slate-200/80 rounded-xl shadow-card z-50 py-1 divide-y divide-slate-100 animate-fade-in">
                 <div
                   onClick={handleOpenProfile}
                   className="px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 transition-colors"
@@ -443,6 +462,20 @@ export const Header = ({ onSignOut }) => {
               </div>
             )}
           </div>
+
+          {/* Mobile Menu 3-Line Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsMobileSidebarOpen(prev => !prev);
+              setIsNotificationsOpen(false);
+              setIsProfileMenuOpen(false);
+            }}
+            aria-label={isMobileSidebarOpen ? "Close navigation" : "Open navigation"}
+            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none cursor-pointer lg:hidden transition-colors"
+          >
+            {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
       </div>
     </header>

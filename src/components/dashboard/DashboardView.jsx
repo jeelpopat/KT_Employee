@@ -1527,10 +1527,10 @@ export const DashboardView = () => {
           { label: 'In Progress', value: tasksStats.inProgress, accent: 'border-l-amber-500' },
           { label: 'Completed', value: tasksStats.completed, accent: 'border-l-emerald-500' },
         ].map((item, idx) => (
-          <div key={`kpi-${idx}`} className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
+          <div key={`kpi-${idx}`} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">
                 {isDataLoading && idx !== 0 ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
               </p>
             </div>
@@ -1556,17 +1556,17 @@ export const DashboardView = () => {
           {/* Quick Actions */}
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <Clock size={16} className="text-slate-400" /> Quick Actions
               </h3>
               <div className="flex items-center gap-2">
                 {dailyBreaksCount > 0 && (
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
                     {dailyBreaksCount}/2 Breaks
                   </span>
                 )}
                 {parseFloat(totalBreakTimeDisplay) > 70 && (
-                  <span className="text-[10px] font-bold text-red-600 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded-full border border-red-200">
+                  <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
                     Break &gt; 70m (Half Day)
                   </span>
                 )}
@@ -1585,11 +1585,11 @@ export const DashboardView = () => {
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canCheckIn ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}
                 title={actionsAvailable.canCheckIn ? "Click to Check In" : (isRejectedAttendance ? "Check-in request was rejected by admin" : (isPendingAttendance ? "Check-in request is pending admin approval" : (attendanceStatus === 'checked_out' ? "Checked out for today (single check-in per day)" : "Already checked in today")))}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!actionsAvailable.canCheckIn ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#ECFDF5] text-[#10B981] hover:bg-[#D1FAE5] shadow-sm hover:shadow-md'}`}>
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!actionsAvailable.canCheckIn ? 'bg-slate-100 text-slate-400' : 'bg-[#ECFDF5] text-[#10B981] hover:bg-[#D1FAE5] shadow-sm hover:shadow-md'}`}>
                   {isActionLoading && actionsAvailable.canCheckIn ? <Loader2 className="animate-spin" size={24} /> : <LogIn size={24} />}
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Check In</p>
+                  <p className="text-xs font-bold text-slate-800">Check In</p>
                   <p className="text-[10px] font-mono text-slate-500 mt-0.5">{checkInTimeDisplay}</p>
                 </div>
               </button>
@@ -1601,11 +1601,11 @@ export const DashboardView = () => {
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canStartBreak ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}
                 title={actionsAvailable.canStartBreak ? "Click to Start Break" : (isRejectedAttendance ? "Cannot start break: Check-in was rejected by admin" : (isPendingAttendance ? "Check-in request is pending admin approval" : (dailyBreaksCount >= 2 ? "Maximum 2 breaks reached for today" : (attendanceStatus === 'on_break' ? "Currently on break" : "Break In not available"))))}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!actionsAvailable.canStartBreak ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#FFFBEB] text-[#F59E0B] hover:bg-[#FEF3C7] shadow-sm hover:shadow-md'}`}>
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!actionsAvailable.canStartBreak ? 'bg-slate-100 text-slate-400' : 'bg-[#FFFBEB] text-[#F59E0B] hover:bg-[#FEF3C7] shadow-sm hover:shadow-md'}`}>
                   {isActionLoading && actionsAvailable.canStartBreak ? <Loader2 className="animate-spin" size={24} /> : <Coffee size={24} />}
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Break In</p>
+                  <p className="text-xs font-bold text-slate-800">Break In</p>
                   <p className="text-[10px] font-mono text-slate-500 mt-0.5">{breakInTimeDisplay}</p>
                 </div>
               </button>
@@ -1617,11 +1617,11 @@ export const DashboardView = () => {
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canEndBreak ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}
                 title={actionsAvailable.canEndBreak ? "Click to End Break and Resume Work" : "Break Out not available"}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!actionsAvailable.canEndBreak ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#F0FDF4] text-[#16A34A] hover:bg-[#DCFCE7] shadow-sm hover:shadow-md'}`}>
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!actionsAvailable.canEndBreak ? 'bg-slate-100 text-slate-400' : 'bg-[#F0FDF4] text-[#16A34A] hover:bg-[#DCFCE7] shadow-sm hover:shadow-md'}`}>
                   {isActionLoading && actionsAvailable.canEndBreak ? <Loader2 className="animate-spin" size={24} /> : <Coffee size={24} />}
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Break Out</p>
+                  <p className="text-xs font-bold text-slate-800">Break Out</p>
                   <p className="text-[10px] font-mono text-slate-500 mt-0.5">{breakOutTimeDisplay}</p>
                 </div>
               </button>
@@ -1633,11 +1633,11 @@ export const DashboardView = () => {
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canCheckOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}
                 title={actionsAvailable.canCheckOut ? "Click to Check Out" : (isRejectedAttendance ? "Cannot check out: Check-in was rejected by admin" : (isPendingAttendance ? "Check-in request is pending admin approval" : (attendanceStatus === 'on_break' ? "Cannot check out during break. End break first." : (attendanceStatus === 'checked_out' ? "Shift completed today" : "Check Out not available"))))}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!actionsAvailable.canCheckOut ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-[#FEF2F2] text-[#EF4444] hover:bg-[#FEE2E2] shadow-sm hover:shadow-md'}`}>
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!actionsAvailable.canCheckOut ? 'bg-slate-100 text-slate-400' : 'bg-[#FEF2F2] text-[#EF4444] hover:bg-[#FEE2E2] shadow-sm hover:shadow-md'}`}>
                   {isActionLoading && actionsAvailable.canCheckOut ? <Loader2 className="animate-spin" size={24} /> : <LogOut size={24} />}
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Check Out</p>
+                  <p className="text-xs font-bold text-slate-800">Check Out</p>
                   <p className="text-[10px] font-mono text-slate-500 mt-0.5">{checkOutTimeDisplay}</p>
                 </div>
               </button>
@@ -1645,11 +1645,11 @@ export const DashboardView = () => {
           </div>
 
           {/* Timeline Visualizer - Fixed 9-Hour Timeline */}
-          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+          <div className="mt-8 pt-6 border-t border-slate-100">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
 
               {/* Timeline Legend */}
-              <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500">
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></span>
                   Working Time
@@ -1659,14 +1659,14 @@ export const DashboardView = () => {
                   Break
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
                   Extra Break
                 </span>
               </div>
             </div>
 
             {/* Fixed 9-Hour Track (Grey Base for Early Out / Remaining Time) */}
-            <div className="w-full h-4 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex relative shadow-inner group cursor-help">
+            <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden flex relative shadow-inner group cursor-help">
               {nineHourTimeline.displaySegments.map((seg) => (
                 <div
                   key={seg.id}
@@ -1694,7 +1694,7 @@ export const DashboardView = () => {
                       title={`${marker.label}: ${marker.timeStr}`}
                     >
                       <div className={`w-1 h-2 rounded-full ${marker.dotClass} mb-0.5`} />
-                      <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 leading-none">
+                      <span className="text-[10px] font-mono font-bold text-slate-700 leading-none">
                         {marker.timeStr}
                       </span>
                     </div>
@@ -1821,9 +1821,9 @@ export const DashboardView = () => {
         {/* TEAM ON LEAVE - HORIZONTAL DESIGN */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs xl:col-span-1 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Users size={16} className="text-[#F59E0B]" /> Team On Leave
-              <span className="bg-[#FFFBEB] dark:bg-amber-900/20 text-[#F59E0B] px-1.5 py-0.5 rounded-full text-[10px] font-bold">{teamOnLeave.length}</span>
+              <span className="bg-[#FFFBEB] text-[#F59E0B] px-1.5 py-0.5 rounded-full text-[10px] font-bold">{teamOnLeave.length}</span>
             </h3>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
@@ -1836,7 +1836,7 @@ export const DashboardView = () => {
                 const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name || 'User')}&background=F59E0B&color=fff&bold=true`;
                 const photoSrc = cleanPhotoUrl(t.profilePhoto) || avatarFallback;
                 return (
-                  <div key={t._id || i} className="flex flex-col items-center min-w-[96px] text-center group cursor-pointer p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all">
+                  <div key={t._id || i} className="flex flex-col items-center min-w-[96px] text-center group cursor-pointer p-2 rounded-xl hover:bg-slate-50 transition-all">
                     <div className="relative mb-2">
                       <img 
                         src={photoSrc} 
@@ -1845,14 +1845,14 @@ export const DashboardView = () => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src = avatarFallback;
                         }}
-                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 dark:border-amber-500 shadow-xs group-hover:scale-105 group-hover:border-amber-500 transition-transform bg-amber-50 dark:bg-amber-950/30" 
+                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 shadow-xs group-hover:scale-105 group-hover:border-amber-500 transition-transform bg-amber-50" 
                       />
-                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-amber-500 border-2 border-white dark:border-slate-900 rounded-full" title="On Leave" />
+                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-amber-500 border-2 border-white rounded-full" title="On Leave" />
                     </div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate w-full px-1">{t.name}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium truncate w-full px-1">{t.designation || 'Team Member'}</p>
+                    <p className="text-xs font-bold text-slate-800 truncate w-full px-1">{t.name}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium truncate w-full px-1">{t.designation || 'Team Member'}</p>
                     {t.leaveType && (
-                      <span className="mt-1 text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40 truncate max-w-full">
+                      <span className="mt-1 text-[9px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 truncate max-w-full">
                         {t.leaveType}
                       </span>
                     )}

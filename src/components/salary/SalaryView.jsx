@@ -72,7 +72,6 @@ const getRoleLabel = (u) => {
   }
   if (roleStr === 'admin') return 'Admin';
   if (roleStr === 'hr') return 'HR';
-  if (roleStr === 'intern') return 'Intern';
   return 'Employee';
 };
 
@@ -81,17 +80,17 @@ const getStatusBadgeClass = (status) => {
   const s = String(status || 'paid').toLowerCase();
   switch (s) {
     case 'paid':
-      return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     case 'pending':
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+      return 'bg-amber-50 text-amber-700 border-amber-200';
     case 'processed':
-      return 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+      return 'bg-blue-50 text-blue-700 border-blue-200';
     case 'unpaid':
-      return 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800';
+      return 'bg-rose-50 text-rose-700 border-rose-200';
     case 'hold':
-      return 'bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 border-orange-200 dark:border-orange-800';
+      return 'bg-orange-50 text-orange-700 border-orange-200';
     default:
-      return 'bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+      return 'bg-slate-50 text-slate-700 border-slate-200';
   }
 };
 
@@ -108,7 +107,7 @@ export const SalaryView = () => {
     normalizedRole === 'team leader' ||
     normalizedRole === 'teamlead' ||
     normalizedRole === 'tl';
-  const isEmployee = normalizedRole === 'employee' || normalizedRole === 'intern';
+  const isEmployee = normalizedRole === 'employee';
 
   // For Admin: view switcher ('processed-payrolls' | 'payslips' | 'salary-structures' | 'my-salary')
   const [adminViewMode, setAdminViewMode] = useState('processed-payrolls');
@@ -152,6 +151,23 @@ export const SalaryView = () => {
   // Detail / Statement Modal State (for both Admin & Employee)
   const [viewingDetailSalary, setViewingDetailSalary] = useState(null);
   const [viewingPayslipModal, setViewingPayslipModal] = useState(null);
+
+  // ==========================================
+  // MODAL: UPDATE MONTHLY PAYROLL / MARK AS PAID
+  // PUT /api/salaries/:id/pay
+  // ==========================================
+  const [isUpdatePayrollModalOpen, setIsUpdatePayrollModalOpen] = useState(false);
+  const [selectedPayrollToUpdate, setSelectedPayrollToUpdate] = useState(null);
+  const [isSubmittingUpdatePayroll, setIsSubmittingUpdatePayroll] = useState(false);
+  const [updatePayrollError, setUpdatePayrollError] = useState('');
+  const [updatePayrollForm, setUpdatePayrollForm] = useState({
+    paymentMode: 'CASH',
+    status: 'Paid',
+    paidAt: '',
+    remarks: '',
+    extraBonus: '',
+    extraDeduction: ''
+  });
 
   // ==========================================
   // MODAL 1: CREATE / EDIT SALARY STRUCTURE (ADMIN)
@@ -383,9 +399,11 @@ export const SalaryView = () => {
       const enriched = list.map((item) => {
         const uId = typeof item.userId === 'object'
           ? String(item.userId?._id || item.userId?.id || '')
-          : String(item.userId || '');
+          : typeof item.employeeId === 'object'
+            ? String(item.employeeId?._id || item.employeeId?.id || '')
+            : String(item.userId || item.employeeId || '');
 
-        const matchedUser = staffMap.get(uId) || (typeof item.userId === 'object' ? item.userId : null);
+        const matchedUser = staffMap.get(uId) || (typeof item.userId === 'object' ? item.userId : (typeof item.employeeId === 'object' ? item.employeeId : null));
         const pId = String(item._id || item.id || '');
         const currentStatus = savedOverrides[pId] || item.status || 'paid';
 
@@ -394,9 +412,9 @@ export const SalaryView = () => {
           status: currentStatus,
           userObj: matchedUser || {
             _id: uId,
-            name: item.userName || item.name || 'Staff Member',
-            email: item.userEmail || item.email || '',
-            role: item.role || 'employee'
+            name: item.userName || item.name || item.employeeId?.name || item.userId?.name || 'Staff Member',
+            email: item.userEmail || item.email || item.employeeId?.email || item.userId?.email || '',
+            role: item.role || item.employeeId?.role || item.userId?.role || 'employee'
           }
         };
       });
@@ -415,7 +433,9 @@ export const SalaryView = () => {
         const myPayrolls = enriched.filter((p) => {
           const pUserId = typeof p.userId === 'object'
             ? String(p.userId?._id || p.userId?.id || '')
-            : String(p.userId || '');
+            : typeof p.employeeId === 'object'
+              ? String(p.employeeId?._id || p.employeeId?.id || '')
+              : String(p.userId || p.employeeId || '');
           return pUserId === String(myMongoUserId);
         });
         setMyProcessedPayrolls(myPayrolls);
@@ -426,71 +446,10 @@ export const SalaryView = () => {
     }
   };
 
-  // Fetch official generated payslips: GET /api/payroll/payslip
+  // Payslips state management (avoiding failing GET /api/payroll/payslip 404 endpoint)
   const fetchPayslips = async (staffList) => {
-    try {
-      // Primary: GET /api/payroll/payslip
-      let rawSlips = [];
-      try {
-        const res = await api.get('/api/payroll/payslip');
-        rawSlips = res.data?.data || res.data?.payslips || res.data?.slips || res.data || [];
-      } catch (e1) {
-        // Fallback: GET /api/payroll/payslips
-        try {
-          const res2 = await api.get('/api/payroll/payslips');
-          rawSlips = res2.data?.data || res2.data?.payslips || res2.data?.slips || res2.data || [];
-        } catch { }
-      }
-
-      const list = Array.isArray(rawSlips) ? rawSlips : [];
-
-      const staffMap = new Map();
-      (staffList || companyStaff || []).forEach((u) => {
-        if (u?._id) staffMap.set(String(u._id), u);
-        if (u?.id) staffMap.set(String(u.id), u);
-      });
-
-      const enriched = list.map((item) => {
-        const uId = typeof item.userId === 'object'
-          ? String(item.userId?._id || item.userId?.id || '')
-          : String(item.userId || '');
-
-        const matchedUser = staffMap.get(uId) || (typeof item.userId === 'object' ? item.userId : null);
-
-        return {
-          ...item,
-          userObj: matchedUser || {
-            _id: uId,
-            name: item.userName || item.name || 'Staff Member',
-            email: item.userEmail || item.email || '',
-            role: item.role || 'employee'
-          }
-        };
-      });
-
-      enriched.sort((a, b) => {
-        const yearDiff = (Number(b.year) || 0) - (Number(a.year) || 0);
-        if (yearDiff !== 0) return yearDiff;
-        const monthDiff = (Number(b.month) || 0) - (Number(a.month) || 0);
-        if (monthDiff !== 0) return monthDiff;
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-      });
-
-      setAllPayslips(enriched);
-
-      if (myMongoUserId) {
-        const mySlips = enriched.filter((p) => {
-          const pUserId = typeof p.userId === 'object'
-            ? String(p.userId?._id || p.userId?.id || '')
-            : String(p.userId || '');
-          return pUserId === String(myMongoUserId);
-        });
-        setMyPayslips(mySlips);
-      }
-    } catch (err) {
-      console.warn('GET /api/payroll/payslip notice:', err.message);
-      setAllPayslips([]);
-    }
+    // Backend has no GET /api/payroll/payslip endpoint; payslips are maintained from processed payrolls
+    return [];
   };
 
   // Fetch individual salary history & structure: GET /api/payroll/salary/user/:userId
@@ -901,8 +860,176 @@ export const SalaryView = () => {
   };
 
   // ==========================================
+  // MODAL LOGIC: UPDATE MONTHLY PAYROLL / MARK AS PAID
+  // PUT /api/salaries/:id/pay
+  // ==========================================
+  const openUpdatePayrollModal = (payroll) => {
+    if (!payroll) return;
+    setSelectedPayrollToUpdate(payroll);
+    setUpdatePayrollError('');
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let initialPaidDate = todayStr;
+    if (payroll.paidAt) {
+      try {
+        const d = new Date(payroll.paidAt);
+        if (!isNaN(d.getTime())) {
+          initialPaidDate = d.toISOString().split('T')[0];
+        }
+      } catch { }
+    }
+
+    const currentStatus = String(payroll.status || 'Paid');
+    const capitalizedStatus =
+      currentStatus.toLowerCase() === 'paid' ? 'Paid' :
+        currentStatus.toLowerCase() === 'pending' ? 'Pending' :
+          currentStatus.toLowerCase() === 'processed' ? 'Processed' : currentStatus;
+
+    setUpdatePayrollForm({
+      paymentMode: payroll.paymentMode || 'CASH',
+      status: capitalizedStatus,
+      paidAt: initialPaidDate,
+      remarks: payroll.remarks || (payroll.paymentMode === 'CASH' || !payroll.paymentMode ? 'Salary paid in cash' : 'Salary disbursed'),
+      extraBonus: payroll.extraBonus != null && Number(payroll.extraBonus) !== 0 ? String(payroll.extraBonus) : '',
+      extraDeduction: payroll.extraDeduction != null && Number(payroll.extraDeduction) !== 0 ? String(payroll.extraDeduction) : ''
+    });
+
+    setIsUpdatePayrollModalOpen(true);
+  };
+
+  const updatePayrollCalculations = useMemo(() => {
+    if (!selectedPayrollToUpdate) {
+      return { grossSalary: 0, totalDeduction: 0, netSalary: 0 };
+    }
+
+    const prevExtraBonus = Number(selectedPayrollToUpdate.extraBonus) || 0;
+    const prevExtraDeduction = Number(selectedPayrollToUpdate.extraDeduction) || 0;
+
+    const baseGross = (Number(selectedPayrollToUpdate.grossSalary) || 0) - prevExtraBonus;
+    const baseDeductions = (Number(selectedPayrollToUpdate.totalDeduction) || 0) - prevExtraDeduction;
+
+    const newExtraBonus = Number(updatePayrollForm.extraBonus) || 0;
+    const newExtraDeduction = Number(updatePayrollForm.extraDeduction) || 0;
+
+    const grossSalary = Math.max(0, baseGross + newExtraBonus);
+    const totalDeduction = Math.max(0, baseDeductions + newExtraDeduction);
+    const netSalary = Math.max(0, grossSalary - totalDeduction);
+
+    return { grossSalary, totalDeduction, netSalary };
+  }, [selectedPayrollToUpdate, updatePayrollForm.extraBonus, updatePayrollForm.extraDeduction]);
+
+  const handleSubmitUpdatePayroll = async (e) => {
+    e.preventDefault();
+    if (!selectedPayrollToUpdate) return;
+
+    setIsSubmittingUpdatePayroll(true);
+    setUpdatePayrollError('');
+
+    const empId =
+      selectedPayrollToUpdate.employeeId?._id ||
+      selectedPayrollToUpdate.employeeId ||
+      selectedPayrollToUpdate.userId?._id ||
+      selectedPayrollToUpdate.userId ||
+      selectedPayrollToUpdate._id;
+
+    const formattedPaidAt = updatePayrollForm.paidAt
+      ? new Date(updatePayrollForm.paidAt).toISOString()
+      : new Date().toISOString();
+
+    const payload = {
+      paymentMode: updatePayrollForm.paymentMode || 'CASH',
+      remarks: updatePayrollForm.remarks || '',
+      paidAt: formattedPaidAt,
+      status: updatePayrollForm.status || 'Paid',
+      month: Number(selectedPayrollToUpdate.month),
+      year: Number(selectedPayrollToUpdate.year),
+      extraBonus: Number(updatePayrollForm.extraBonus) || 0,
+      extraDeduction: Number(updatePayrollForm.extraDeduction) || 0
+    };
+
+    try {
+      let res;
+      try {
+        // PUT: https://kt-backend-yzr4.onrender.com/api/salaries/:id/pay
+        res = await api.put(`/api/salaries/${empId}/pay`, payload);
+      } catch (errPrimary) {
+        if (selectedPayrollToUpdate._id && String(selectedPayrollToUpdate._id) !== String(empId)) {
+          res = await api.put(`/api/salaries/${selectedPayrollToUpdate._id}/pay`, payload);
+        } else {
+          throw errPrimary;
+        }
+      }
+
+      const updatedRecord = res.data?.data || res.data?.salary || res.data;
+      const successMsg = res.data?.message || 'Monthly salary marked as Paid successfully';
+
+      // Update state live across tables
+      const targetId = String(selectedPayrollToUpdate._id || empId);
+      setAllProcessedPayrolls((prev) =>
+        prev.map((item) => {
+          const itemId = String(item._id || item.id || '');
+          const itemEmpId = String(item.employeeId?._id || item.employeeId || item.userId?._id || item.userId || '');
+          if (itemId === targetId || itemEmpId === String(empId)) {
+            return {
+              ...item,
+              ...(updatedRecord && typeof updatedRecord === 'object' ? updatedRecord : {}),
+              status: payload.status,
+              paymentMode: payload.paymentMode,
+              remarks: payload.remarks,
+              paidAt: payload.paidAt,
+              netSalary: updatedRecord?.netSalary != null ? updatedRecord.netSalary : updatePayrollCalculations.netSalary,
+              grossSalary: updatedRecord?.grossSalary != null ? updatedRecord.grossSalary : updatePayrollCalculations.grossSalary,
+              totalDeduction: updatedRecord?.totalDeduction != null ? updatedRecord.totalDeduction : updatePayrollCalculations.totalDeduction
+            };
+          }
+          return item;
+        })
+      );
+
+      setMyProcessedPayrolls((prev) =>
+        prev.map((item) => {
+          const itemId = String(item._id || item.id || '');
+          const itemEmpId = String(item.employeeId?._id || item.employeeId || item.userId?._id || item.userId || '');
+          if (itemId === targetId || itemEmpId === String(empId)) {
+            return {
+              ...item,
+              ...(updatedRecord && typeof updatedRecord === 'object' ? updatedRecord : {}),
+              status: payload.status,
+              paymentMode: payload.paymentMode,
+              remarks: payload.remarks,
+              paidAt: payload.paidAt,
+              netSalary: updatedRecord?.netSalary != null ? updatedRecord.netSalary : updatePayrollCalculations.netSalary
+            };
+          }
+          return item;
+        })
+      );
+
+      invalidateCache(/salaries/);
+      invalidateCache(/salary/);
+      invalidateCache(/payroll/);
+
+      setNotification({
+        type: 'success',
+        message: successMsg
+      });
+
+      setIsUpdatePayrollModalOpen(false);
+      setSelectedPayrollToUpdate(null);
+      await loadData(true);
+    } catch (err) {
+      console.error('Failed to update monthly payroll:', err);
+      setUpdatePayrollError(
+        err.response?.data?.message || err.message || 'Failed to update monthly payroll.'
+      );
+    } finally {
+      setIsSubmittingUpdatePayroll(false);
+    }
+  };
+
+  // ==========================================
   // CHANGE SALARY STATUS (ADMIN)
-  // Updates live details in UI and synchronizes with backend
+  // Updates live details in UI and synchronizes with backend PUT /api/salaries/:id/pay
   // ==========================================
   const handleChangeSalaryStatus = async (payroll, newStatus) => {
     const pId = String(payroll?._id || payroll?.id || '');
@@ -939,35 +1066,37 @@ export const SalaryView = () => {
       localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
     } catch { }
 
-    // 3. Update backend in real-time via PUT: api/payroll/pay
+    // 3. Update backend in real-time via PUT: api/salaries/:id/pay
+    const empId =
+      payroll.employeeId?._id ||
+      payroll.employeeId ||
+      payroll.userId?._id ||
+      payroll.userId ||
+      pId;
+
+    const payload = {
+      status: newStatus,
+      paymentMode: payroll.paymentMode || 'CASH',
+      paidAt: new Date().toISOString(),
+      month: Number(payroll.month),
+      year: Number(payroll.year),
+      remarks: payroll.remarks || `Marked as ${newStatus}`
+    };
+
     let backendUpdated = false;
     try {
-      await api.put('/api/payroll/pay', {
-        payrollId: pId,
-        id: pId,
-        status: newStatus
-      });
+      await api.put(`/api/salaries/${empId}/pay`, payload);
       backendUpdated = true;
+      invalidateCache(/salaries/);
       invalidateCache(/payroll/);
     } catch (errPay) {
-      console.warn('PUT /api/payroll/pay notice:', errPay.response?.data?.message || errPay.message);
-
-      // Fallback candidate routes
-      const candidates = [
-        { method: 'patch', url: `/api/payroll/status/${pId}` },
-        { method: 'put', url: `/api/payroll/status/${pId}` },
-        { method: 'patch', url: `/api/payroll/${pId}` },
-        { method: 'put', url: `/api/payroll/${pId}` },
-        { method: 'patch', url: `/api/payroll/process/${pId}` },
-        { method: 'put', url: `/api/payroll/process/${pId}` }
-      ];
-
-      for (const c of candidates) {
+      console.warn('PUT /api/salaries/:id/pay notice:', errPay.response?.data?.message || errPay.message);
+      if (payroll._id && String(payroll._id) !== String(empId)) {
         try {
-          await api[c.method](c.url, { status: newStatus, payrollId: pId });
+          await api.put(`/api/salaries/${payroll._id}/pay`, payload);
           backendUpdated = true;
+          invalidateCache(/salaries/);
           invalidateCache(/payroll/);
-          break;
         } catch { }
       }
     }
@@ -1327,8 +1456,8 @@ export const SalaryView = () => {
       {notification && (
         <div
           className={`flex items-center justify-between p-3.5 rounded-xl text-xs font-medium border shadow-xs transition-all ${notification.type === 'success'
-            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-            : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            : 'bg-rose-50 text-rose-800 border-rose-200'
             }`}
         >
           <div className="flex items-center gap-2">
@@ -1344,19 +1473,19 @@ export const SalaryView = () => {
       {/* ==================================================== */}
       {/* 1. TOP HEADER SECTION */}
       {/* ==================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/50 text-indigo-600 dark:text-indigo-400 rounded-lg shadow-xs">
+          <div className="p-2.5 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shadow-xs">
             <Wallet size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">
                 {isAdmin ? 'Salary & Payroll Processing' : isTL ? 'Team Lead Compensation & Payslips' : 'My Salary & Payslip Statements'}
               </h2>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              {/* <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-200">
                 {isAdmin ? 'Admin' : isTL ? 'Team Lead' : 'Employee'}
-              </span>
+              </span> */}
             </div>
           </div>
         </div>
@@ -1364,12 +1493,12 @@ export const SalaryView = () => {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Admin Tabs */}
           {isAdmin && (
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold">
               <button
                 onClick={() => setAdminViewMode('processed-payrolls')}
                 className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'processed-payrolls'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white text-indigo-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 <Layers size={13} />
@@ -1378,8 +1507,8 @@ export const SalaryView = () => {
               <button
                 onClick={() => setAdminViewMode('salary-structures')}
                 className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'salary-structures'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white text-indigo-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 <CreditCard size={13} />
@@ -1413,7 +1542,7 @@ export const SalaryView = () => {
           <button
             onClick={() => loadData(true)}
             disabled={isRefreshing || isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium transition-colors cursor-pointer border border-slate-200 dark:border-slate-700 shadow-xs disabled:opacity-60"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium transition-colors cursor-pointer border border-slate-200 shadow-xs disabled:opacity-60"
             title="Refresh database records"
           >
             <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-indigo-600' : 'text-slate-400'} />
@@ -1429,7 +1558,7 @@ export const SalaryView = () => {
         <div className="space-y-6">
 
           {/* Filter Bar */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col lg:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col lg:flex-row items-center justify-between gap-3 shadow-xs">
             <div className="relative w-full lg:w-72">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -1437,7 +1566,7 @@ export const SalaryView = () => {
                 placeholder="Search staff by name or email"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
               />
             </div>
 
@@ -1445,7 +1574,7 @@ export const SalaryView = () => {
               <select
                 value={selectedMonthFilter}
                 onChange={(e) => setSelectedMonthFilter(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-700 dark:text-slate-300 focus:outline-none"
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none"
               >
                 <option value="all">All Months</option>
                 {MONTH_NAMES.map((name, idx) => (
@@ -1458,7 +1587,7 @@ export const SalaryView = () => {
               <select
                 value={selectedYearFilter}
                 onChange={(e) => setSelectedYearFilter(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-700 dark:text-slate-300 focus:outline-none"
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none"
               >
                 <option value="all">All Years</option>
                 {[2024, 2025, 2026, 2027].map((y) => (
@@ -1471,7 +1600,7 @@ export const SalaryView = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-700 dark:text-slate-300 focus:outline-none font-medium"
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none font-medium"
               >
                 <option value="all">All Statuses</option>
                 <option value="paid">Paid</option>
@@ -1479,12 +1608,12 @@ export const SalaryView = () => {
                 <option value="processed">Processed</option>
               </select>
 
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
+              <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold">
                 <button
                   onClick={() => setRoleFilter('all')}
                   className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'all'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600'
                     }`}
                 >
                   All Roles
@@ -1492,8 +1621,8 @@ export const SalaryView = () => {
                 <button
                   onClick={() => setRoleFilter('employee')}
                   className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'employee'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600'
                     }`}
                 >
                   Employees
@@ -1501,8 +1630,8 @@ export const SalaryView = () => {
                 <button
                   onClick={() => setRoleFilter('team_lead')}
                   className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'team_lead'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600'
                     }`}
                 >
                   Team Leads
@@ -1512,9 +1641,9 @@ export const SalaryView = () => {
           </div>
 
           {/* Processed Payrolls Table */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Layers size={16} className="text-emerald-600" />
                 <span>Processed Monthly Payroll Records</span>
               </h3>
@@ -1522,8 +1651,8 @@ export const SalaryView = () => {
 
             {filteredProcessedPayrolls.length === 0 ? (
               <div className="p-12 text-center">
-                <Layers size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No processed payroll records found</p>
+                <Layers size={36} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-sm font-semibold text-slate-700">No processed payroll records found</p>
                 <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
                   {searchQuery || roleFilter !== 'all' || selectedMonthFilter !== 'all'
                     ? 'No processed payroll records match your filter criteria.'
@@ -1541,7 +1670,7 @@ export const SalaryView = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                       <th className="py-3 px-4">Period</th>
                       <th className="py-3 px-4">Staff Member</th>
                       <th className="py-3 px-4">Base Gross</th>
@@ -1554,7 +1683,7 @@ export const SalaryView = () => {
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className="divide-y divide-slate-100">
                     {filteredProcessedPayrolls.map((payroll) => {
                       const u = payroll.userObj || {};
                       const roleLabel = getRoleLabel(u);
@@ -1588,10 +1717,10 @@ export const SalaryView = () => {
                       return (
                         <tr
                           key={payroll._id}
-                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                          className="hover:bg-slate-50/70 transition-colors"
                         >
-                          <td className="py-3.5 px-4 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px]">
+                          <td className="py-3.5 px-4 font-semibold text-slate-800 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px]">
                               {formatMonthYear(payroll.month, payroll.year)}
                             </span>
                           </td>
@@ -1606,13 +1735,13 @@ export const SalaryView = () => {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="font-semibold text-slate-900 dark:text-slate-100 truncate block">
+                                  <span className="font-semibold text-slate-900 truncate block">
                                     {u.name || 'Staff Member'}
                                   </span>
                                   <span
                                     className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${isLead
-                                      ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
-                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      : 'bg-slate-100 text-slate-700'
                                       }`}
                                   >
                                     {roleLabel}
@@ -1625,26 +1754,26 @@ export const SalaryView = () => {
                             </div>
                           </td>
 
-                          <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-400">
+                          <td className="py-3.5 px-4 font-mono text-slate-600">
                             {formatINR(gross - extraB)}
                           </td>
 
-                          <td className="py-3.5 px-2 font-mono text-xs">
+                          <td className="py-3.5 px-2 font-semibold text-xs">
                             <div className="text-emerald-600 font-semibold">
                               +{formatINR(fixedB + extraB)}
                             </div>
                           </td>
 
-                          <td className="py-3.5 px-4 font-mono font-semibold text-slate-900 dark:text-slate-100">
+                          <td className="py-3.5 px-4 font-mono font-semibold text-slate-900">
                             {formatINR(gross)}
                           </td>
 
-                          <td className="py-3.5 px-4 font-mono text-rose-600 dark:text-rose-400">
+                          <td className="py-3.5 px-4 font-mono text-rose-600">
                             <div>-{formatINR(totDed)}</div>
                           </td>
 
                           <td className="py-3.5 px-4 font-mono">
-                            <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/50">
+                            <span className="font-bold text-sm text-emerald-600 px-2 py-0.5 rounded">
                               {formatINR(net)}
                             </span>
                           </td>
@@ -1690,25 +1819,37 @@ export const SalaryView = () => {
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {isAdmin && (
+                                <button
+                                  onClick={() => openUpdatePayrollModal(payroll)}
+                                  className="px-2.5 py-1.5 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                                  title="Update Monthly Payroll"
+                                >
+                                  {/* <CreditCard size={12} /> */}
+                                  <Edit3 size={14} />
+                                  {/* <span>Update / Pay</span> */}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleViewPayslipForPayroll(payroll)}
+                                className="px-2.5 py-1.5 hover:bg-purple-100 text-purple-700 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                                title="View Statement"
+                              >
+                                <Eye size={14} />
+                              </button>
                               <button
                                 onClick={() => handleDownloadPayslipForPayroll(payroll)}
                                 disabled={downloadingSlipId === payroll._id}
-                                className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
+                                className="px-2.5 py-1.5 hover:bg-indigo-100 text-indigo-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-60"
                                 title="Download Official Payslip"
                               >
                                 {downloadingSlipId === payroll._id ? (
                                   <RefreshCw size={12} className="animate-spin" />
                                 ) : (
-                                  <Download size={12} />
+                                  <Download size={14} />
                                 )}
                               </button>
-                              <button
-                                onClick={() => handleViewPayslipForPayroll(payroll)}
-                                className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
-                                title="View Statement"
-                              >
-                                <Eye size={12} />
-                              </button>
+
                             </div>
                           </td>
                         </tr>
@@ -1729,7 +1870,7 @@ export const SalaryView = () => {
       {/* ==================================================== */}
       {isAdmin && adminViewMode === 'salary-structures' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
             <div className="relative w-full md:w-80">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -1737,17 +1878,17 @@ export const SalaryView = () => {
                 placeholder="Search staff by name, email, role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
               />
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
+              <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold">
                 <button
                   onClick={() => setRoleFilter('all')}
                   className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'all'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600'
                     }`}
                 >
                   All Roles ({allSalaries.length})
@@ -1755,8 +1896,8 @@ export const SalaryView = () => {
                 <button
                   onClick={() => setRoleFilter('employee')}
                   className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'employee'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600'
                     }`}
                 >
                   Employees
@@ -1764,20 +1905,20 @@ export const SalaryView = () => {
                 <button
                   onClick={() => setRoleFilter('team_lead')}
                   className={`px-2.5 py-1 rounded-md transition cursor-pointer ${roleFilter === 'team_lead'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600'
                     }`}
                 >
                   Team Leads
                 </button>
               </div>
 
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
+              <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold">
                 <button
                   onClick={() => setStatusFilter('all')}
                   className={`px-2.5 py-1 rounded-md transition cursor-pointer ${statusFilter === 'all'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600'
                     }`}
                 >
                   All Status
@@ -1785,8 +1926,8 @@ export const SalaryView = () => {
                 <button
                   onClick={() => setStatusFilter('active')}
                   className={`px-2.5 py-1 rounded-md transition cursor-pointer ${statusFilter === 'active'
-                    ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
+                    ? 'bg-white text-emerald-600 shadow-xs'
+                    : 'text-slate-600'
                     }`}
                 >
                   Active Only
@@ -1795,9 +1936,9 @@ export const SalaryView = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <CreditCard size={16} className="text-indigo-600" />
                 <span>Configured Staff Salary Structures</span>
               </h3>
@@ -1814,7 +1955,7 @@ export const SalaryView = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                       <th className="py-3 px-4">Staff Member</th>
                       <th className="py-3 px-4">Basic Pay</th>
                       <th className="py-3 px-4">HRA & Allowance</th>
@@ -1826,7 +1967,7 @@ export const SalaryView = () => {
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className="divide-y divide-slate-100">
                     {filteredSalaries.map((salary) => {
                       const u = salary.userObj || {};
                       const roleLabel = getRoleLabel(u);
@@ -1853,7 +1994,7 @@ export const SalaryView = () => {
                         .toUpperCase();
 
                       return (
-                        <tr key={salary._id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
+                        <tr key={salary._id} className="hover:bg-slate-50/70 transition">
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2.5">
                               <div
@@ -1864,13 +2005,13 @@ export const SalaryView = () => {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="font-semibold text-slate-900 dark:text-slate-100 truncate block">
+                                  <span className="font-semibold text-slate-900 truncate block">
                                     {u.name || 'Staff Member'}
                                   </span>
                                   <span
                                     className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${isLead
-                                      ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
-                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      : 'bg-slate-100 text-slate-700'
                                       }`}
                                   >
                                     {roleLabel}
@@ -1884,7 +2025,7 @@ export const SalaryView = () => {
                           </td>
 
                           <td className="py-3.5 px-4 font-mono font-medium">{formatINR(basic)}</td>
-                          <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-400">
+                          <td className="py-3.5 px-4 font-mono text-slate-600">
                             {formatINR(hra + allowance)}
                           </td>
                           <td className="py-3.5 px-4 font-mono text-emerald-600">
@@ -1893,7 +2034,7 @@ export const SalaryView = () => {
                           <td className="py-3.5 px-4 font-mono font-semibold">{formatINR(gross)}</td>
                           <td className="py-3.5 px-4 font-mono text-rose-600">-{formatINR(totalDed)}</td>
                           <td className="py-3.5 px-4">
-                            <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/50">
+                            <span className="font-mono font-bold text-sm text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
                               {formatINR(net)}
                             </span>
                           </td>
@@ -1912,14 +2053,14 @@ export const SalaryView = () => {
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => setViewingDetailSalary(salary)}
-                                className="p-1.5 rounded-md text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                className="p-1.5 rounded-md text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition cursor-pointer"
                                 title="View Breakdown"
                               >
                                 <Eye size={14} />
                               </button>
                               <button
                                 onClick={() => openEditStructureModal(salary)}
-                                className="p-1.5 rounded-md text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                className="p-1.5 rounded-md text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition cursor-pointer"
                                 title="Edit Structure"
                               >
                                 <Edit3 size={14} />
@@ -1952,11 +2093,11 @@ export const SalaryView = () => {
             ].map((item, idx) => (
               <div
                 key={idx}
-                className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+                className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
               >
                 <div className="flex items-start justify-between">
-                  <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+                  <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+                  <p className="text-xl font-bold text-slate-900">{item.value}</p>
                 </div>
               </div>
             ))}
@@ -1964,10 +2105,10 @@ export const SalaryView = () => {
 
 
           {/* Processed Monthly Payroll Statements (GET /api/payroll) */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <Layers size={16} className="text-emerald-600" />
                   <span>Monthly Processed Payroll History ({myProcessedPayrolls.length})</span>
                 </h3>
@@ -1985,7 +2126,7 @@ export const SalaryView = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                       <th className="py-3 px-4">Period</th>
                       <th className="py-3 px-4">Base Gross</th>
                       <th className="py-3 px-4">Bonus (Fixed + Extra)</th>
@@ -1996,10 +2137,10 @@ export const SalaryView = () => {
                       <th className="py-3 px-4">Payslip</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className="divide-y divide-slate-100">
                     {myProcessedPayrolls.map((rec) => (
-                      <tr key={rec._id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
-                        <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                      <tr key={rec._id} className="hover:bg-slate-50/70 transition">
+                        <td className="py-3 px-4 font-semibold text-slate-800 whitespace-nowrap">
                           {formatMonthYear(rec.month, rec.year)}
                         </td>
                         <td className="py-3 px-4 font-mono">
@@ -2020,6 +2161,16 @@ export const SalaryView = () => {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
+                            {isAdmin && (
+                              <button
+                                onClick={() => openUpdatePayrollModal(rec)}
+                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer border border-emerald-200"
+                                title="Update Monthly Payroll / Mark as Paid"
+                              >
+                                <CreditCard size={12} />
+                                <span>Update / Pay</span>
+                              </button>
+                            )}
                             <button
                               onClick={() => handleDownloadPayslipForPayroll(rec)}
                               disabled={downloadingSlipId === rec._id}
@@ -2035,7 +2186,7 @@ export const SalaryView = () => {
                             </button>
                             <button
                               onClick={() => handleViewPayslipForPayroll(rec)}
-                              className="px-2 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                              className="px-2 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
                               title="View Official Payslip"
                             >
                               <Eye size={12} />
@@ -2054,6 +2205,260 @@ export const SalaryView = () => {
       )}
 
       {/* ==================================================== */}
+      {/* MODAL: UPDATE MONTHLY PAYROLL / MARK AS PAID (PUT /api/salaries/:id/pay) */}
+      {/* ==================================================== */}
+      {isUpdatePayrollModalOpen && selectedPayrollToUpdate && (() => {
+        const staff = selectedPayrollToUpdate.userObj || selectedPayrollToUpdate.employeeId || selectedPayrollToUpdate.userId || {};
+        const staffName = staff.name || staff.fullName || resolveEmployeeName(staff) || 'Staff Member';
+        const staffRole = getRoleLabel(staff);
+        const staffInitials = (staffName || 'S')
+          .split(' ')
+          .map((w) => w[0])
+          .filter(Boolean)
+          .slice(0, 2)
+          .join('')
+          .toUpperCase();
+        const periodStr = formatMonthYear(selectedPayrollToUpdate.month, selectedPayrollToUpdate.year);
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
+            onClick={() => !isSubmittingUpdatePayroll && setIsUpdatePayrollModalOpen(false)}
+          >
+            <div
+              className="bg-white border border-slate-200 rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                    <CreditCard size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Update Monthly Payroll
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Update payment details & mark as Paid for {periodStr}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  disabled={isSubmittingUpdatePayroll}
+                  onClick={() => setIsUpdatePayrollModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Form */}
+              <form onSubmit={handleSubmitUpdatePayroll} className="p-6 overflow-y-auto space-y-4 text-xs">
+                {updatePayrollError && (
+                  <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{updatePayrollError}</span>
+                  </div>
+                )}
+
+                {/* Staff Member Info Card (Dynamically derived, zero static data) */}
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                    {staffInitials}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-slate-900 truncate">
+                        {staffName}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {staffRole}
+                      </span>
+                      {(staff.uniqueID || staff.employeeId?.uniqueID) && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono text-slate-500 bg-slate-200">
+                          {staff.uniqueID || staff.employeeId?.uniqueID}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span>Period: <strong className="text-slate-800 font-mono">{periodStr}</strong></span>
+                      {(staff.designation || staff.department) && (
+                        <span>• {staff.designation || ''}{staff.department ? ` (${staff.department})` : ''}</span>
+                      )}
+                      {(staff.email || selectedPayrollToUpdate.employeeId?.email) && (
+                        <span>• {staff.email || selectedPayrollToUpdate.employeeId?.email}</span>
+                      )}
+                    </div>
+                    {/* Dynamic Account Info if available */}
+                    {(staff.bankAccountNumber || staff.bankDetails?.accountNumber || staff.bankDetails?.bankAccountNumber || staff.upiId || staff.bankDetails?.upiId) && (
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                        {(staff.bankAccountNumber || staff.bankDetails?.accountNumber || staff.bankDetails?.bankAccountNumber) && (
+                          <span>
+                            <strong className="text-slate-700">A/C:</strong>{' '}
+                            {staff.bankAccountNumber || staff.bankDetails?.accountNumber || staff.bankDetails?.bankAccountNumber}
+                            {(staff.ifscCode || staff.bankDetails?.ifscCode) && ` (${staff.ifscCode || staff.bankDetails?.ifscCode})`}
+                          </span>
+                        )}
+                        {(staff.upiId || staff.bankDetails?.upiId) && (
+                          <span>
+                            <strong className="text-slate-700">UPI:</strong>{' '}
+                            {staff.upiId || staff.bankDetails?.upiId}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Calculated Financial Summary */}
+                <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Gross Earnings</span>
+                    <span className="font-mono font-bold text-slate-800 text-xs">
+                      {formatINR(updatePayrollCalculations.grossSalary)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Deductions</span>
+                    <span className="font-mono font-bold text-rose-600 text-xs">
+                      -{formatINR(updatePayrollCalculations.totalDeduction)}
+                    </span>
+                  </div>
+                  <div className="border-l border-slate-200 pl-2">
+                    <span className="text-[10px] text-emerald-600 uppercase font-bold block">Net Take-Home</span>
+                    <span className="font-mono font-black text-emerald-600 text-sm">
+                      {formatINR(updatePayrollCalculations.netSalary)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status & Payment Mode */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Disbursement Status <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={updatePayrollForm.status}
+                      onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, status: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-semibold cursor-pointer"
+                    >
+                      <option value="Paid">Paid</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Processed">Processed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Payment Mode <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={updatePayrollForm.paymentMode}
+                      onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, paymentMode: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      <option value="CASH">CASH (Cash in Hand)</option>
+                      <option value="BANK_TRANSFER">BANK TRANSFER (Direct Deposit)</option>
+                      <option value="UPI">UPI (Google Pay / PhonePe)</option>
+                      <option value="CHEQUE">CHEQUE</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Payment Date & Remarks */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Payment Date (Paid At)
+                    </label>
+                    <input
+                      type="date"
+                      value={updatePayrollForm.paidAt}
+                      onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, paidAt: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Payment Remarks / Note
+                    </label>
+                    <input
+                      type="text"
+                      value={updatePayrollForm.remarks}
+                      onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, remarks: e.target.value })}
+                      placeholder="e.g. Salary paid in cash"
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Optional Payroll Adjustments */}
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-700">
+                      Payroll Adjustments (Optional)
+                    </span>
+                    <span className="text-[10px] text-slate-400">Recalculates net amount</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-slate-500 mb-1">
+                        Extra Bonus / Incentive (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={updatePayrollForm.extraBonus}
+                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, extraBonus: e.target.value })}
+                        placeholder="0"
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-500 mb-1">
+                        Extra Deduction / LOP (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={updatePayrollForm.extraDeduction}
+                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, extraDeduction: e.target.value })}
+                        placeholder="0"
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer Buttons */}
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                  <button
+                    type="button"
+                    disabled={isSubmittingUpdatePayroll}
+                    onClick={() => setIsUpdatePayrollModalOpen(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingUpdatePayroll}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
+                  >
+                    {isSubmittingUpdatePayroll ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    <span>Mark as Paid & Update</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ==================================================== */}
       {/* 4. MODAL: PROCESS MONTHLY PAYROLL (POST api/payroll/process) */}
       {/* ==================================================== */}
       {isProcessModalOpen && (
@@ -2062,16 +2467,16 @@ export const SalaryView = () => {
           onClick={() => !isSubmittingProcess && setIsProcessModalOpen(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white border border-slate-200 rounded-xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
                   <Sparkles size={18} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  <h3 className="text-base font-bold text-slate-900">
                     Process Monthly Payroll
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -2082,7 +2487,7 @@ export const SalaryView = () => {
               <button
                 disabled={isSubmittingProcess}
                 onClick={() => setIsProcessModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -2090,21 +2495,21 @@ export const SalaryView = () => {
 
             <form onSubmit={handleSubmitProcessPayroll} className="p-6 overflow-y-auto space-y-4">
               {processFormError && (
-                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle size={15} className="shrink-0" />
                   <span>{processFormError}</span>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Select Staff Member (Employee or Team Lead) <span className="text-rose-500">*</span>
                 </label>
                 <select
                   required
                   value={processForm.userId}
                   onChange={(e) => setProcessForm({ ...processForm, userId: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
                 >
                   <option value="">-- Select Staff Member --</option>
                   {companyStaff.map((s) => {
@@ -2126,13 +2531,13 @@ export const SalaryView = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Payroll Month <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={processForm.month}
                     onChange={(e) => setProcessForm({ ...processForm, month: Number(e.target.value) })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
                   >
                     {MONTH_NAMES.map((mName, idx) => (
                       <option key={idx} value={idx + 1}>
@@ -2143,13 +2548,13 @@ export const SalaryView = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Payroll Year <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={processForm.year}
                     onChange={(e) => setProcessForm({ ...processForm, year: Number(e.target.value) })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
                   >
                     {[2024, 2025, 2026, 2027].map((y) => (
                       <option key={y} value={y}>
@@ -2161,10 +2566,10 @@ export const SalaryView = () => {
               </div>
 
               {selectedUserActiveStructure ? (
-                <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
-                  <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300 pb-1 border-b border-slate-200 dark:border-slate-800">
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 text-xs">
+                  <div className="flex justify-between font-semibold text-slate-700 pb-1 border-b border-slate-200">
                     <span>Active Salary Contract ID</span>
-                    <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400">
+                    <span className="font-mono text-[11px] text-indigo-600">
                       {String(selectedUserActiveStructure._id).slice(-8)}
                     </span>
                   </div>
@@ -2188,7 +2593,7 @@ export const SalaryView = () => {
                   </div>
                 </div>
               ) : processForm.userId ? (
-                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
                   <AlertCircle size={15} className="shrink-0" />
                   <span>This staff member does not have an active salary structure. Please create one before processing payroll.</span>
                 </div>
@@ -2196,7 +2601,7 @@ export const SalaryView = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Extra Bonus / Incentive (₹)
                   </label>
                   <input
@@ -2205,12 +2610,12 @@ export const SalaryView = () => {
                     placeholder="e.g. 5000"
                     value={processForm.extraBonus}
                     onChange={(e) => setProcessForm({ ...processForm, extraBonus: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Extra Deduction (₹)
                   </label>
                   <input
@@ -2219,19 +2624,19 @@ export const SalaryView = () => {
                     placeholder="e.g. 1000"
                     value={processForm.extraDeduction}
                     onChange={(e) => setProcessForm({ ...processForm, extraDeduction: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Salary Disbursement Status <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={processForm.status || 'processed'}
                   onChange={(e) => setProcessForm({ ...processForm, status: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500 font-medium"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-medium"
                 >
                   <option value="processed">Processed (Default)</option>
                   <option value="paid">Paid (Immediate Disbursal)</option>
@@ -2240,16 +2645,16 @@ export const SalaryView = () => {
               </div>
 
               {/* Auto generate payslip note */}
-              <div className="flex items-center gap-2 pt-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              <div className="flex items-center gap-2 pt-1 text-xs text-emerald-600 font-medium">
                 <CheckCircle2 size={15} />
                 <span>Status is changeable anytime from payrolls table • Official payslip automatically generated</span>
               </div>
 
               {selectedUserActiveStructure && (
-                <div className="bg-emerald-50/60 dark:bg-emerald-950/30 p-4 rounded-xl border border-emerald-200/70 dark:border-emerald-800/60 space-y-2 text-xs">
-                  <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200 border-b border-emerald-200/50 pb-1.5">
+                <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/70 space-y-2 text-xs">
+                  <div className="flex justify-between font-bold text-slate-800 border-b border-emerald-200/50 pb-1.5">
                     <span>Summary Payout Preview</span>
-                    <span className="font-mono text-emerald-700 dark:text-emerald-400">
+                    <span className="font-mono text-emerald-700">
                       {formatMonthYear(processForm.month, processForm.year)}
                     </span>
                   </div>
@@ -2257,7 +2662,7 @@ export const SalaryView = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                     <div>
                       <span className="text-[10px] text-slate-500 block uppercase">Gross Payout</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                      <span className="font-mono font-bold text-slate-900">
                         {formatINR(processCalculations.grossSalary)}
                       </span>
                     </div>
@@ -2273,11 +2678,11 @@ export const SalaryView = () => {
                         -{formatINR(processCalculations.tdsAmount)}
                       </span>
                     </div>
-                    <div className="bg-emerald-100/70 dark:bg-emerald-900/50 p-1.5 rounded">
-                      <span className="text-[10px] text-emerald-800 dark:text-emerald-300 block font-bold uppercase">
+                    <div className="bg-emerald-100/70 p-1.5 rounded">
+                      <span className="text-[10px] text-emerald-800 block font-bold uppercase">
                         Net Disbursed
                       </span>
-                      <span className="font-mono font-black text-emerald-700 dark:text-emerald-300 text-sm">
+                      <span className="font-mono font-black text-emerald-700 text-sm">
                         {formatINR(processCalculations.netSalary)}
                       </span>
                     </div>
@@ -2285,12 +2690,12 @@ export const SalaryView = () => {
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   disabled={isSubmittingProcess}
                   onClick={() => setIsProcessModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-md text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2317,16 +2722,16 @@ export const SalaryView = () => {
           onClick={() => !isSubmittingStructure && setIsStructureModalOpen(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white border border-slate-200 rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
                   {structureModalMode === 'edit' ? <Edit3 size={18} /> : <Plus size={18} />}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  <h3 className="text-base font-bold text-slate-900">
                     {structureModalMode === 'edit' ? 'Update Salary Structure' : 'Create Salary Structure'}
                   </h3>
                 </div>
@@ -2334,7 +2739,7 @@ export const SalaryView = () => {
               <button
                 disabled={isSubmittingStructure}
                 onClick={() => setIsStructureModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -2342,14 +2747,14 @@ export const SalaryView = () => {
 
             <form onSubmit={handleSubmitStructure} className="p-6 overflow-y-auto space-y-4">
               {structureFormError && (
-                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle size={15} className="shrink-0" />
                   <span>{structureFormError}</span>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Assign Staff Member (Employee or Team Lead) <span className="text-rose-500">*</span>
                 </label>
                 <select
@@ -2357,7 +2762,7 @@ export const SalaryView = () => {
                   value={structureForm.userId}
                   onChange={(e) => setStructureForm({ ...structureForm, userId: e.target.value })}
                   disabled={structureModalMode === 'edit'}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">-- Select Employee or Team Lead --</option>
                   {companyStaff.map((s) => {
@@ -2379,7 +2784,7 @@ export const SalaryView = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Basic Salary (₹) <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -2390,12 +2795,12 @@ export const SalaryView = () => {
                     placeholder="e.g. 50000"
                     value={structureForm.basicSalary}
                     onChange={(e) => setStructureForm({ ...structureForm, basicSalary: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     House Rent Allowance - HRA (₹)
                   </label>
                   <input
@@ -2405,12 +2810,12 @@ export const SalaryView = () => {
                     placeholder="e.g. 20000"
                     value={structureForm.hra}
                     onChange={(e) => setStructureForm({ ...structureForm, hra: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Special / Other Allowance (₹)
                   </label>
                   <input
@@ -2420,12 +2825,12 @@ export const SalaryView = () => {
                     placeholder="e.g. 10000"
                     value={structureForm.allowance}
                     onChange={(e) => setStructureForm({ ...structureForm, allowance: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Fixed Monthly Bonus (₹)
                   </label>
                   <input
@@ -2435,12 +2840,12 @@ export const SalaryView = () => {
                     placeholder="e.g. 5000"
                     value={structureForm.fixedBonus}
                     onChange={(e) => setStructureForm({ ...structureForm, fixedBonus: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Fixed Monthly Deduction (₹)
                   </label>
                   <input
@@ -2450,12 +2855,12 @@ export const SalaryView = () => {
                     placeholder="e.g. 2000"
                     value={structureForm.fixedDeduction}
                     onChange={(e) => setStructureForm({ ...structureForm, fixedDeduction: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     TDS Rate (%)
                   </label>
                   <input
@@ -2466,7 +2871,7 @@ export const SalaryView = () => {
                     placeholder="e.g. 10"
                     value={structureForm.tdsPercentage}
                     onChange={(e) => setStructureForm({ ...structureForm, tdsPercentage: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
@@ -2479,17 +2884,17 @@ export const SalaryView = () => {
                   onChange={(e) => setStructureForm({ ...structureForm, isActive: e.target.checked })}
                   className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
-                <label htmlFor="structureActiveToggle" className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <label htmlFor="structureActiveToggle" className="text-xs font-medium text-slate-700 cursor-pointer">
                   Set as <strong>Active Structure</strong>
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   disabled={isSubmittingStructure}
                   onClick={() => setIsStructureModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2516,17 +2921,17 @@ export const SalaryView = () => {
           onClick={() => setViewingPayslipModal(null)}
         >
           <div
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white border border-slate-200 rounded-xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-purple-50 dark:bg-purple-950/50 text-purple-600 rounded-lg">
+                <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg">
                   <FileText size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  <h3 className="text-base font-bold text-slate-900">
                     Official Salary Statement / Payslip
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -2536,21 +2941,21 @@ export const SalaryView = () => {
               </div>
               <button
                 onClick={() => setViewingPayslipModal(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Printable Content Body */}
-            <div id="printable-payslip-content" className="p-6 overflow-y-auto space-y-5 text-xs bg-white dark:bg-slate-900">
+            <div id="printable-payslip-content" className="p-6 overflow-y-auto space-y-5 text-xs bg-white">
               {/* Company & Employee Identity Banner */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest block">
                     Kevalon Technology Pvt. Ltd.
                   </span>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                  <h4 className="text-sm font-bold text-slate-900 mt-0.5">
                     {viewingPayslipModal.userObj?.name || 'Staff Member'}
                   </h4>
                   <div className="flex items-center gap-2 text-slate-500 mt-0.5 text-[11px]">
@@ -2564,7 +2969,7 @@ export const SalaryView = () => {
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                     Pay Period
                   </span>
-                  <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                  <span className="font-bold text-slate-800 text-sm">
                     {formatMonthYear(viewingPayslipModal.month, viewingPayslipModal.year)}
                   </span>
                   <div className="mt-1">
@@ -2578,11 +2983,11 @@ export const SalaryView = () => {
               {/* Earnings & Deductions Tables */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Earnings Table */}
-                <div className="p-3.5 bg-slate-50/70 dark:bg-slate-950/50 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2.5">
-                  <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block pb-1 border-b border-slate-200/60 dark:border-slate-800">
+                <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/60 space-y-2.5">
+                  <span className="text-[10px] uppercase font-bold text-emerald-700 block pb-1 border-b border-slate-200/60">
                     Earnings Breakdown (Credits)
                   </span>
-                  <div className="space-y-1.5 text-slate-700 dark:text-slate-300">
+                  <div className="space-y-1.5 text-slate-700">
                     <div className="flex justify-between">
                       <span>Basic Salary:</span>
                       <span className="font-mono font-semibold">{formatINR(viewingPayslipModal.basicSalary)}</span>
@@ -2610,18 +3015,18 @@ export const SalaryView = () => {
                       </div>
                     )}
                   </div>
-                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-slate-900 dark:text-slate-100">
+                  <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
                     <span>Total Gross Earnings:</span>
                     <span className="font-mono text-indigo-600 text-sm">{formatINR(viewingPayslipModal.grossSalary)}</span>
                   </div>
                 </div>
 
                 {/* Deductions Table */}
-                <div className="p-3.5 bg-slate-50/70 dark:bg-slate-950/50 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2.5">
-                  <span className="text-[10px] uppercase font-bold text-rose-700 dark:text-rose-400 block pb-1 border-b border-slate-200/60 dark:border-slate-800">
+                <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/60 space-y-2.5">
+                  <span className="text-[10px] uppercase font-bold text-rose-700 block pb-1 border-b border-slate-200/60">
                     Deductions Breakdown (Debits)
                   </span>
-                  <div className="space-y-1.5 text-slate-700 dark:text-slate-300">
+                  <div className="space-y-1.5 text-slate-700">
                     <div className="flex justify-between">
                       <span>Fixed Monthly Deduction:</span>
                       <span className="font-mono font-semibold text-rose-600">
@@ -2643,7 +3048,7 @@ export const SalaryView = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-rose-600">
+                  <div className="pt-8 border-t border-slate-200 flex justify-between font-bold text-rose-600">
                     <span>Total Monthly Deductions:</span>
                     <span className="font-mono text-sm">-{formatINR(viewingPayslipModal.totalDeduction)}</span>
                   </div>
@@ -2651,25 +3056,25 @@ export const SalaryView = () => {
               </div>
 
               {/* Net Salary Highlight Box */}
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
+              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] text-emerald-800 dark:text-emerald-300 uppercase font-bold block">
+                  <span className="text-[10px] text-emerald-800 uppercase font-bold block">
                     Net Take-Home Pay
                   </span>
                   <span className="text-xs text-slate-500">Credited to employee bank account</span>
                 </div>
-                <span className="font-mono font-black text-2xl text-emerald-600 dark:text-emerald-400">
+                <span className="font-mono font-black text-2xl text-emerald-600">
                   {formatINR(viewingPayslipModal.netSalary)}
                 </span>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
+            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleOpenPrintHtml(viewingPayslipModal)}
-                  className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Printer size={13} />
                   <span>Print Statement</span>
@@ -2682,6 +3087,20 @@ export const SalaryView = () => {
                   <Download size={13} />
                   <span>Download PDF</span>
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      const rec = viewingPayslipModal;
+                      setViewingPayslipModal(null);
+                      openUpdatePayrollModal(rec);
+                    }}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    title="Update Monthly Payroll / Mark as Paid"
+                  >
+                    <CreditCard size={13} />
+                    <span>Update / Pay</span>
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => setViewingPayslipModal(null)}
@@ -2703,16 +3122,16 @@ export const SalaryView = () => {
           onClick={() => setViewingDetailSalary(null)}
         >
           <div
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white border border-slate-200 rounded-xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
                   <CreditCard size={18} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  <h3 className="text-base font-bold text-slate-900">
                     Salary Structure Details
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -2722,23 +3141,23 @@ export const SalaryView = () => {
               </div>
               <button
                 onClick={() => setViewingDetailSalary(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Record Status</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="font-semibold text-slate-800">
                     {viewingDetailSalary.isActive !== false ? 'Active Structure' : 'Archived Record'}
                   </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Last Updated</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                  <span className="font-mono text-slate-700">
                     {formatDate(viewingDetailSalary.updatedAt || viewingDetailSalary.createdAt)}
                   </span>
                 </div>
@@ -2751,8 +3170,8 @@ export const SalaryView = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-emerald-600 block pb-1 border-b border-slate-200 dark:border-slate-800">
+                <div className="space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-emerald-600 block pb-1 border-b border-slate-200">
                     Earnings (Credits)
                   </span>
                   <div className="flex justify-between">
@@ -2773,14 +3192,14 @@ export const SalaryView = () => {
                       +{formatINR(viewingDetailSalary.fixedBonus)}
                     </span>
                   </div>
-                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-slate-900 dark:text-slate-100">
+                  <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
                     <span>Gross Salary:</span>
                     <span className="font-mono">{formatINR(viewingDetailSalary.grossSalary)}</span>
                   </div>
                 </div>
 
-                <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-rose-600 block pb-1 border-b border-slate-200 dark:border-slate-800">
+                <div className="space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-rose-600 block pb-1 border-b border-slate-200">
                     Deductions (Debits)
                   </span>
                   <div className="flex justify-between">
@@ -2795,7 +3214,7 @@ export const SalaryView = () => {
                       -{formatINR(((Number(viewingDetailSalary.grossSalary) || 0) * (Number(viewingDetailSalary.tdsPercentage) || 0)) / 100)}
                     </span>
                   </div>
-                  <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-rose-600">
+                  <div className="pt-8 border-t border-slate-200 flex justify-between font-bold text-rose-600">
                     <span>Total Deductions:</span>
                     <span className="font-mono">
                       -{formatINR((Number(viewingDetailSalary.fixedDeduction) || 0) + (((Number(viewingDetailSalary.grossSalary) || 0) * (Number(viewingDetailSalary.tdsPercentage) || 0)) / 100))}
@@ -2804,20 +3223,20 @@ export const SalaryView = () => {
                 </div>
               </div>
 
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
+              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] text-emerald-800 dark:text-emerald-300 uppercase font-bold block">
+                  <span className="text-[10px] text-emerald-800 uppercase font-bold block">
                     Net Take-Home Salary
                   </span>
                   <span className="text-xs text-slate-500">Baseline monthly credited amount</span>
                 </div>
-                <span className="font-mono font-black text-xl text-emerald-600 dark:text-emerald-400">
+                <span className="font-mono font-black text-xl text-emerald-600">
                   {formatINR(viewingDetailSalary.netSalary)}
                 </span>
               </div>
             </div>
 
-            <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
+            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
               {isAdmin && (
                 <button
                   onClick={() => {

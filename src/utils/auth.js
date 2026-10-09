@@ -90,7 +90,11 @@ const isAuthEndpoint = (url) => {
   return (
     urlStr.includes("/users/login") ||
     urlStr.includes("/users/forgot-password") ||
-    urlStr.includes("/users/reset-password")
+    urlStr.includes("/users/reset-password") ||
+    urlStr.includes("/api/company") ||
+    urlStr.includes("/api/branch") ||
+    urlStr.includes("/api/financial-year") ||
+    urlStr.includes("/api/users/all")
   );
 };
 

@@ -117,9 +117,6 @@ const Performance = () => {
     const normalized = String(rawType).trim().toLowerCase();
 
     switch (normalized) {
-      case "intern":
-        return "Intern";
-
       case "employee":
         return "Employee";
 
@@ -192,7 +189,7 @@ const Performance = () => {
   };
 
   // ============================================================
-  // FETCH EMPLOYEES + INTERNS + TEAM LEADS
+  // FETCH EMPLOYEES + TEAM LEADS
   // ============================================================
 
   const fetchEmployees = async () => {
@@ -278,46 +275,7 @@ const Performance = () => {
         }))
         .filter((employee) => employee._id);
 
-      // ========================================================
-      // 2. INTERNS
-      // ========================================================
 
-      const users = Array.isArray(usersData)
-        ? usersData
-        : usersData.users ||
-          usersData.data ||
-          [];
-
-      const interns = users
-        .filter((user) => {
-          if (!user || isFinanceOrExcludedUser(user)) return false;
-          return String(user.role || "").toLowerCase() === "intern";
-        })
-        .map((intern) => ({
-          _id:
-            intern._id ||
-            intern.id ||
-            intern.userId,
-
-          name:
-            intern.name ||
-            intern.fullName ||
-            intern.displayName ||
-            `${intern.firstName || ""} ${
-              intern.lastName || ""
-            }`.trim() ||
-            "Unknown Intern",
-
-          email:
-            intern.email ||
-            intern.user?.email ||
-            "",
-
-          type: "intern",
-
-          role: "intern",
-        }))
-        .filter((intern) => intern._id);
 
       // ========================================================
       // 3. TEAM LEADS
@@ -382,7 +340,6 @@ const Performance = () => {
       // ========================================================
 
       const combinedEmployees = [
-        ...interns,
         ...employees,
         ...teamLeads,
       ];
@@ -402,19 +359,18 @@ const Performance = () => {
         uniqueEmployees
       );
 
-      console.log("Interns:", interns);
       console.log("Employees:", employees);
       console.log("Team Leads:", teamLeads);
 
       setEmployees(uniqueEmployees);
     } catch (err) {
       console.error(
-        "Error fetching employees, interns and team leads:",
+        "Error fetching employees and team leads:",
         err
       );
 
       showNotification(
-        "Failed to load employees, interns and team leads",
+        "Failed to load employees and team leads",
         "error"
       );
     } finally {
@@ -815,10 +771,7 @@ const Performance = () => {
                 <span
                   className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
                     getEmployeeTypeLabel(perf) ===
-                    "Intern"
-                      ? "bg-purple-100 text-purple-800"
-                      : getEmployeeTypeLabel(perf) ===
-                        "Employee"
+                    "Employee"
                       ? "bg-blue-100 text-blue-800"
                       : getEmployeeTypeLabel(perf) ===
                         "Team Lead"
@@ -954,12 +907,9 @@ const Performance = () => {
 
                     <span
                       className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        getEmployeeTypeLabel(perf) ===
-                        "Intern"
-                          ? "bg-purple-100 text-purple-800"
-                          : getEmployeeTypeLabel(
-                              perf
-                            ) === "Employee"
+                        getEmployeeTypeLabel(
+                          perf
+                        ) === "Employee"
                           ? "bg-blue-100 text-blue-800"
                           : getEmployeeTypeLabel(
                               perf
@@ -1175,7 +1125,7 @@ const Performance = () => {
 
                       {isEmployeeMenuOpen && (
                         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white">
-                          {["intern", "employee", "teamlead"].map((type) => {
+                          {["employee", "teamlead"].map((type) => {
                             const matchingEmployees = employees.filter(
                               (employee) => employee.type === type
                             );
@@ -1221,13 +1171,6 @@ const Performance = () => {
                     {employees.length > 0 && (
                       <p className="text-xs sm:text-sm text-gray-500 mt-2">
                         Total: {employees.length} (
-                        {
-                          employees.filter(
-                            (e) =>
-                              e.type === "intern"
-                          ).length
-                        }{" "}
-                        interns,{" "}
                         {
                           employees.filter(
                             (e) =>

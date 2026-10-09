@@ -280,7 +280,7 @@ export const deriveSessionStatus = (attendanceStatus, isAutoCheckedOut = false) 
   return 'active';
 };
 
-// Helper to derive employee position (e.g. TL, EMP, HR, ADMIN, INTERN)
+// Helper to derive employee position (e.g. TL, EMP, HR, ADMIN)
 export const deriveEmployeePosition = (raw = {}, emp = {}) => {
   const nameStr = (
     raw?.employeeName ||
@@ -361,9 +361,6 @@ export const deriveEmployeePosition = (raw = {}, emp = {}) => {
   }
   if (roleStr.includes('hr')) {
     return { short: 'HR', label: 'HR Manager', code: 'hr' };
-  }
-  if (roleStr.includes('intern')) {
-    return { short: 'INTERN', label: 'Intern', code: 'intern' };
   }
   return { short: 'EMP', label: 'Employee', code: 'employee' };
 };

@@ -4216,13 +4216,10 @@ export default function Adjustments() {
                     })
                     .map((employee) => {
                     const role = (employee.roleType || "").toLowerCase();
-                    const isIntern = role.includes("intern");
                     const id = employee.employeeId ? String(employee.employeeId).trim() : "";
                     
                     let label = employee.name;
-                    if (isIntern) {
-                      label += id ? ` (Intern ID: ${id})` : ` (Intern)`;
-                    } else if (id) {
+                    if (id) {
                       label += ` (EMP ID: ${id})`;
                     } else if (employee.roleType) {
                       label += ` (${employee.roleType})`;

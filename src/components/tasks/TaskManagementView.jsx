@@ -55,13 +55,6 @@ export const TaskManagementView = () => {
     if (aEmpId && myIds.includes(String(aEmpId))) return true;
     if (myEmail && aEmpEmail && String(aEmpEmail).toLowerCase() === myEmail) return true;
 
-    // 2. Assigned Intern
-    const aInt = t.assignedIntern;
-    const aIntId = typeof aInt === 'object' ? aInt?._id : aInt;
-    const aIntEmail = typeof aInt === 'object' ? aInt?.email : null;
-    if (aIntId && myIds.includes(String(aIntId))) return true;
-    if (myEmail && aIntEmail && String(aIntEmail).toLowerCase() === myEmail) return true;
-
     // 3. Assigned Team Lead (if user is team leader viewing their personal assigned tasks)
     const aTlE = t.assignedTeamLeadEmployee;
     const aTlEId = typeof aTlE === 'object' ? aTlE?._id : aTlE;
@@ -191,15 +184,15 @@ export const TaskManagementView = () => {
   const getPriorityBadge = (priority = 'medium') => {
     const p = String(priority || '').toLowerCase();
     if (p === 'critical' || p === 'urgent') {
-      return <span className="px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-semibold text-[10px] border border-red-200 dark:border-red-800/50">Critical</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700 font-semibold text-[10px] border border-red-200">Critical</span>;
     }
     if (p === 'high') {
-      return <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-semibold text-[10px] border border-amber-200 dark:border-amber-800/50">High</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-semibold text-[10px] border border-amber-200">High</span>;
     }
     if (p === 'medium') {
-      return <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-semibold text-[10px] border border-indigo-200 dark:border-indigo-800/50">Medium</span>;
+      return <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold text-[10px] border border-indigo-200">Medium</span>;
     }
-    return <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium text-[10px] border border-slate-200 dark:border-slate-700">Low</span>;
+    return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium text-[10px] border border-slate-200">Low</span>;
   };
 
   const kanbanColumns = [
@@ -211,10 +204,10 @@ export const TaskManagementView = () => {
 
   // Mobile-Optimized and Desktop List View Table
   const ListViewTable = () => (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden transition-colors w-full shadow-xs">
+    <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden transition-colors w-full shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400 uppercase text-xs font-semibold tracking-wider border-b border-slate-200 dark:border-slate-800">
+          <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wider border-b border-slate-200">
             <tr>
               <th className="px-4 md:px-5 py-4">Task Title</th>
               <th className="px-4 md:px-5 py-4">Project</th>
@@ -225,7 +218,7 @@ export const TaskManagementView = () => {
               <th className="px-4 md:px-5 py-4 w-40">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-slate-100">
             {filteredTasks.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-5 py-8 text-center text-slate-500">No tasks found matching your filters.</td>
@@ -234,15 +227,15 @@ export const TaskManagementView = () => {
               filteredTasks.map(task => {
                 const normStatus = normalizeStatus(task.status);
                 const projectName = task.projectId?.projectName || task.projectId?.name || (typeof task.projectId === 'string' ? task.projectId : 'Project Task');
-                const assigneeName = task.assignedEmployee?.name || task.assignedIntern?.name || 'Unassigned';
+                const assigneeName = task.assignedEmployee?.name || 'Unassigned';
 
                 return (
                   <tr 
                     key={task._id} 
-                    className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer group" 
+                    className="hover:bg-slate-50 transition-colors cursor-pointer group" 
                     onClick={() => setSelectedTask(task)}
                   >
-                    <td className="px-4 md:px-5 py-4 font-semibold text-slate-900 dark:text-slate-100">
+                    <td className="px-4 md:px-5 py-4 font-semibold text-slate-900">
                       <div className="flex flex-col">
                         <span>{task.taskTitle || task.title}</span>
                         {task.taskDescription && (
@@ -253,30 +246,30 @@ export const TaskManagementView = () => {
                       </div>
                     </td>
                     <td className="px-4 md:px-5 py-4">
-                      <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-sm font-medium text-[10px] md:text-xs border border-slate-200 dark:border-slate-700 truncate max-w-[140px] md:max-w-none inline-block">
+                      <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-sm font-medium text-[10px] md:text-xs border border-slate-200 truncate max-w-[140px] md:max-w-none inline-block">
                         {projectName}
                       </span>
                     </td>
-                    <td className="hidden lg:table-cell px-5 py-4 text-xs font-medium text-slate-700 dark:text-slate-300">
+                    <td className="hidden lg:table-cell px-5 py-4 text-xs font-medium text-slate-700">
                       {assigneeName}
                     </td>
                     <td className="hidden md:table-cell px-5 py-4 whitespace-nowrap">
                       {getPriorityBadge(task.priority)}
                     </td>
-                    <td className="hidden md:table-cell px-5 py-4 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-5 py-4 font-mono text-slate-600 whitespace-nowrap">
                       {task.dueDate ? task.dueDate.split('T')[0] : 'N/A'}
                     </td>
                     <td className="hidden md:table-cell px-5 py-4">
                       <div className="w-24 flex items-center gap-3">
-                        <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
+                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                           <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${task.progress || 0}%` }} />
                         </div>
-                        <span className="font-mono text-[10px] font-semibold text-slate-700 dark:text-slate-300">{task.progress || 0}%</span>
+                        <span className="font-mono text-[10px] font-semibold text-slate-700">{task.progress || 0}%</span>
                       </div>
                     </td>
                     <td className="px-4 md:px-5 py-4" onClick={e => e.stopPropagation()}>
                       <select
-                        className="w-full text-xs font-semibold uppercase tracking-wider bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                        className="w-full text-xs font-semibold uppercase tracking-wider bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer"
                         value={normStatus}
                         onChange={(e) => handleUpdateTaskStatus(task._id, e.target.value)}
                       >
@@ -322,10 +315,10 @@ export const TaskManagementView = () => {
           { label: 'In Review / Testing', value: reviewCount, icon: AlertCircle, accent: 'border-l-indigo-500' },
           { label: 'Completed', value: completedCount, icon: FileCheck, accent: 'border-l-emerald-500' }
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
+          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">
                 {isLoading ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
               </p>
             </div>
@@ -338,13 +331,13 @@ export const TaskManagementView = () => {
         
         {/* Board / List switcher & Refresh */}
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-md border border-slate-200 dark:border-slate-800">
+          <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-md border border-slate-200">
             <button
               onClick={() => setViewMode('kanban')}
               className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors cursor-pointer ${
                 viewMode === 'kanban' 
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700' 
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200' 
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               <Kanban size={15} /> Board
@@ -353,8 +346,8 @@ export const TaskManagementView = () => {
               onClick={() => setViewMode('list')}
               className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors cursor-pointer ${
                 viewMode === 'list' 
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700' 
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200' 
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               <List size={15} /> List
@@ -364,7 +357,7 @@ export const TaskManagementView = () => {
           <button
             onClick={fetchTasks}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-60"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold border border-slate-200 transition-colors cursor-pointer disabled:opacity-60"
             title="Refresh Live Tasks"
           >
             <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
@@ -382,7 +375,7 @@ export const TaskManagementView = () => {
               placeholder="Search tasks or projects..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
 
@@ -391,7 +384,7 @@ export const TaskManagementView = () => {
             <select
               value={selectedProjectFilter}
               onChange={e => setSelectedProjectFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer max-w-[160px] truncate"
+              className="px-3 py-1.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none transition-colors cursor-pointer max-w-[160px] truncate"
             >
               <option value="all">All Projects</option>
               {projectOptions.map((name, i) => (
@@ -404,7 +397,7 @@ export const TaskManagementView = () => {
           <select
             value={selectedPriorityFilter}
             onChange={e => setSelectedPriorityFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none transition-colors cursor-pointer"
           >
             <option value="all">All Priorities</option>
             <option value="high">High</option>
@@ -416,7 +409,7 @@ export const TaskManagementView = () => {
           <select
             value={selectedStatusFilter}
             onChange={e => setSelectedStatusFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none transition-colors cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="pending">To Do</option>
@@ -445,8 +438,8 @@ export const TaskManagementView = () => {
                   return (
                     <div
                       key={col.id}
-                      className={`bg-slate-50/50 dark:bg-slate-900/50 border rounded-xl p-4 flex flex-col space-y-4 min-h-[520px] border-t-4 ${col.borderAccent} transition-colors shadow-xs ${
-                        isDragOver ? 'border-indigo-400 bg-indigo-50/30 dark:bg-indigo-900/20' : 'border-slate-200/80 dark:border-slate-800'
+                      className={`bg-slate-50/50 border rounded-xl p-4 flex flex-col space-y-4 min-h-[520px] border-t-4 ${col.borderAccent} transition-colors shadow-xs ${
+                        isDragOver ? 'border-indigo-400 bg-indigo-50/30' : 'border-slate-200/80'
                       }`}
                       onDragOver={(e) => {
                         e.preventDefault();
@@ -462,10 +455,10 @@ export const TaskManagementView = () => {
                         }
                       }}
                     >
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">{col.title}</h3>
-                          <span className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 rounded-sm text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">{col.title}</h3>
+                          <span className="px-2 py-0.5 bg-slate-200 rounded-sm text-xs font-semibold text-slate-700">
                             {columnTasks.length}
                           </span>
                         </div>
@@ -473,13 +466,13 @@ export const TaskManagementView = () => {
 
                       <div className="space-y-4 flex-1 overflow-y-auto pr-1">
                         {columnTasks.length === 0 ? (
-                          <div className="p-6 text-center text-sm text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded-md">
+                          <div className="p-6 text-center text-sm text-slate-400 border border-dashed border-slate-200 rounded-md">
                             Drop tasks here
                           </div>
                         ) : (
                           columnTasks.map(task => {
                             const projectName = task.projectId?.projectName || task.projectId?.name || (typeof task.projectId === 'string' ? task.projectId : 'Project Task');
-                            const assigneeName = task.assignedEmployee?.name || task.assignedIntern?.name || 'Unassigned';
+                            const assigneeName = task.assignedEmployee?.name || 'Unassigned';
 
                             return (
                               <div
@@ -490,11 +483,11 @@ export const TaskManagementView = () => {
                                   e.dataTransfer.effectAllowed = 'move';
                                 }}
                                 onClick={() => setSelectedTask(task)}
-                                className="bg-white dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all cursor-grab active:cursor-grabbing flex flex-col gap-3 shadow-xs hover:shadow-card"
+                                className="bg-white p-4 rounded-xl border border-slate-200/80 hover:border-indigo-400 transition-all cursor-grab active:cursor-grabbing flex flex-col gap-3 shadow-xs hover:shadow-card"
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <span 
-                                    className="text-[10px] font-semibold font-mono text-slate-600 dark:text-slate-400 uppercase bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-sm truncate max-w-[130px]" 
+                                    className="text-[10px] font-semibold font-mono text-slate-600 uppercase bg-slate-100 border border-slate-200 px-2 py-1 rounded-sm truncate max-w-[130px]" 
                                     title={projectName}
                                   >
                                     {projectName}
@@ -502,22 +495,22 @@ export const TaskManagementView = () => {
                                   {getPriorityBadge(task.priority)}
                                 </div>
 
-                                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">
+                                <h4 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2">
                                   {task.taskTitle || task.title}
                                 </h4>
 
                                 {task.taskDescription && (
-                                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                                  <p className="text-xs text-slate-500 line-clamp-2">
                                     {task.taskDescription}
                                   </p>
                                 )}
 
                                 <div className="space-y-1.5 mt-1">
-                                  <div className="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                                  <div className="flex justify-between text-xs font-medium text-slate-500">
                                     <span>Progress</span>
-                                    <span className="font-mono text-slate-700 dark:text-slate-300">{task.progress || 0}%</span>
+                                    <span className="font-mono text-slate-700">{task.progress || 0}%</span>
                                   </div>
-                                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
+                                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                                     <div
                                       className="h-full bg-indigo-600 rounded-full transition-all"
                                       style={{ width: `${task.progress || 0}%` }}
@@ -525,7 +518,7 @@ export const TaskManagementView = () => {
                                   </div>
                                 </div>
 
-                                <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
+                                <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs text-slate-500">
                                   <span className="flex items-center font-mono text-[11px]">
                                     <Clock size={13} className="mr-1 text-slate-400" /> 
                                     {task.dueDate ? task.dueDate.split('T')[0] : 'No Date'}

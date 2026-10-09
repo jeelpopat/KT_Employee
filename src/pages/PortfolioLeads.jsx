@@ -205,11 +205,11 @@ export default function PortfolioLeads() {
         ].map((item, idx) => (
           <div
             key={idx}
-            className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+            className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
           >
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">{item.value}</p>
             </div>
           </div>
         ))}

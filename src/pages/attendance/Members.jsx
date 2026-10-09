@@ -216,12 +216,10 @@ const projectMatchesMember = (project, member) => {
 
     // Members
     project?.employees,
-    project?.interns,
 
     // Other possible fields
     project?.assignedEmployee,
     project?.assignedTL,
-    project?.assignedIntern,
     project?.createdBy,
     project?.projectLead,
     project?.members,
@@ -240,7 +238,6 @@ const taskMatchesMember = (task, member) => {
   const fields = [
     task?.assignedTo,
     task?.assignedEmployee,
-    task?.assignedIntern,
     task?.assignedTeamLeadUser,
     task?.assignedTeamLeadEmployee,
     task?.employee,
@@ -442,12 +439,10 @@ const fetchAllMembers = async () => {
           .trim();
 
         const roleType =
-          role === 'intern'
-            ? 'intern'
-            : role === 'teamlead' ||
-              role === 'team lead' ||
-              role === 'team_lead' ||
-              role === 'tl'
+          role === 'teamlead' ||
+          role === 'team lead' ||
+          role === 'team_lead' ||
+          role === 'tl'
             ? 'tl'
             : 'employee';
 
@@ -469,9 +464,7 @@ const fetchAllMembers = async () => {
         // DESIGNATION
         // --------------------------------------
         let designation =
-          roleType === 'intern'
-            ? 'Intern'
-            : roleType === 'tl'
+          roleType === 'tl'
             ? 'Team Lead'
             : 'Employee';
 
@@ -878,17 +871,14 @@ const fetchAllMembers = async () => {
         projects.map(async (project) => {
           const tlIds = Array.isArray(project?.teamLead) ? project.teamLead : project?.teamLead ? [project.teamLead] : [];
           const empIds = Array.isArray(project?.employees) ? project.employees : project?.employees ? [project.employees] : [];
-          const internIds = Array.isArray(project?.interns) ? project.interns : project?.interns ? [project.interns] : [];
 
           const teamLeads = await resolveTeamMemberDetails(tlIds, members, token);
           const employees = await resolveTeamMemberDetails(empIds, members, token);
-          const interns = await resolveTeamMemberDetails(internIds, members, token);
 
           return {
             ...project,
             resolvedTeamLeads: teamLeads,
-            resolvedEmployees: employees,
-            resolvedInterns: interns
+            resolvedEmployees: employees
           };
         })
       );
@@ -945,12 +935,11 @@ const fetchAllMembers = async () => {
     }
   };
 
-  const roles = ['all', ...new Set(members.map(m => m.roleType))];
+  const roles = ['all', ...new Set(members.map(m => m.roleType).filter(Boolean))];
   const statuses = ['all', ...new Set(members.map(m => String(m.status || '').toLowerCase()))];
 
   const getRoleLabel = (role) => {
     const labels = {
-      'intern': 'Interns',
       'tl': 'Team Leads',
       'employee': 'Employees',
       'all': 'All Roles'
@@ -960,7 +949,6 @@ const fetchAllMembers = async () => {
 
   const getRoleIcon = (roleType) => {
     const icons = {
-      'intern': <BookOpen className="w-3.5 h-3.5" />,
       'tl': <Star className="w-3.5 h-3.5" />,
       'employee': <Building2 className="w-3.5 h-3.5" />
     };
@@ -969,7 +957,6 @@ const fetchAllMembers = async () => {
 
   const getRoleBadgeStyle = (roleType) => {
     const styles = {
-      'intern': 'bg-violet-50 text-violet-700 border-violet-300',
       'tl': 'bg-amber-50 text-amber-700 border-amber-300',
       'employee': 'bg-blue-50 text-blue-700 border-blue-300'
     };
@@ -983,7 +970,7 @@ const fetchAllMembers = async () => {
         <div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Team Members</h1>
           <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
-            Manage and overview all staff, team leads, interns, and employees.
+            Manage and overview all staff, team leads, and employees.
           </p>
         </div>
 
@@ -1007,23 +994,6 @@ const fetchAllMembers = async () => {
             </span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedRole('intern')}
-            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              selectedRole === 'intern'
-                ? 'bg-violet-600 text-white shadow-xs'
-                : 'bg-violet-50 text-violet-700 hover:bg-violet-100/80 border border-violet-200/80 shadow-xs'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Interns</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-              selectedRole === 'intern' ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-800'
-            }`}>
-              {members.filter(m => m.roleType === 'intern').length}
-            </span>
-          </button>
 
           <button
             type="button"
@@ -1168,7 +1138,7 @@ const fetchAllMembers = async () => {
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-md border ${roleBadgeStyle}`}>
                           {getRoleIcon(member.roleType)}
-                          {member.roleType === 'tl' ? 'Lead' : member.roleType === 'intern' ? 'Intern' : 'Employee'}
+                          {member.roleType === 'tl' ? 'Lead' : 'Employee'}
                         </span>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-md ${statusStyle.bg} ${statusStyle.text}`}>
                           {member.status}
@@ -1382,20 +1352,6 @@ const fetchAllMembers = async () => {
                             </div>
                           )}
                           
-                          {/* Interns */}
-                          {project?.resolvedInterns && project.resolvedInterns.length > 0 && (
-                            <div>
-                              <div className="text-[9px] font-semibold text-violet-700 mb-1">Interns:</div>
-                              <div className="flex flex-wrap gap-1">
-                                {project.resolvedInterns.map((intern) => (
-                                  <span key={intern?.id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-violet-50 text-violet-700 text-[9px] font-medium border border-violet-200">
-                                    <BookOpen className="w-2.5 h-2.5" />
-                                    {intern?.name || 'Intern'}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </li>
                       ))}
                     </ul>

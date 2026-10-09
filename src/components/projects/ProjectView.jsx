@@ -75,32 +75,18 @@ const buildAssignedMemberList = (proj, membersData) => {
     }
   });
 
-  // 3. Assigned Interns from membersData + proj.interns
-  const interns = [
-    ...(Array.isArray(membersData?.interns) ? membersData.interns : []),
-    ...(Array.isArray(proj.interns) ? proj.interns : [])
-  ];
-  interns.forEach(intern => {
-    if (intern) {
-      const enriched = (Array.isArray(proj.interns) 
-        ? proj.interns.find(pi => pi?._id === intern._id || (pi?.email && pi?.email === intern.email)) 
-        : null) || intern;
-      addMember(enriched, 'Intern', 'INT', false);
-    }
-  });
-
   return list;
 };
 
 export const ProjectView = () => {
   const { user, userRole, setSelectedTask } = useApp();
 
-  // Role detection: employees / interns cannot create, edit, or delete projects, nor view client details or budgets
+  // Role detection: employees cannot create, edit, or delete projects, nor view client details or budgets
   const rawRole = userRole || deriveUserRole(user);
   const normalizedRole = String(rawRole || '').toLowerCase().trim();
   const isAdmin = isAdminRole(normalizedRole, user);
   const isTL = !isAdmin && isTeamLeadRole(normalizedRole, user);
-  const isEmployee = !isAdmin && !isTL && (normalizedRole === 'employee' || normalizedRole === 'intern');
+  const isEmployee = !isAdmin && !isTL && normalizedRole === 'employee';
   const userIdentifiers = useMemo(() => getLoggedInUserIdentifiers(user), [user]);
 
   const [projects, setProjects] = useState([]);
@@ -130,12 +116,11 @@ export const ProjectView = () => {
     priority: 'medium',
     status: 'pending',
     teamLeadUser: '',
-    employees: [],
-    interns: []
+    employees: []
   };
   const [formData, setFormData] = useState(initialFormState);
 
-  // Fetch company staff for assigning team leads, employees, interns
+  // Fetch company staff for assigning team leads, employees
   useEffect(() => {
     const fetchStaff = async () => {
       try {
@@ -172,8 +157,7 @@ export const ProjectView = () => {
       priority: prj.priority || 'medium',
       status: prj.status || 'pending',
       teamLeadUser: prj.teamLeadUser?._id || prj.teamLeadUser || '',
-      employees: Array.isArray(prj.employees) ? prj.employees.map(e => typeof e === 'object' ? e._id : e) : [],
-      interns: Array.isArray(prj.interns) ? prj.interns.map(i => typeof i === 'object' ? i._id : i) : []
+      employees: Array.isArray(prj.employees) ? prj.employees.map(e => typeof e === 'object' ? e._id : e) : []
     });
     setIsFormModalOpen(true);
   };
@@ -202,7 +186,6 @@ export const ProjectView = () => {
       if (formData.endDate) payload.endDate = formData.endDate;
       if (formData.teamLeadUser) payload.teamLeadUser = formData.teamLeadUser;
       if (formData.employees && formData.employees.length > 0) payload.employees = formData.employees;
-      if (formData.interns && formData.interns.length > 0) payload.interns = formData.interns;
 
       if (editingProject) {
         // UPDATE PROJECT: PUT /api/projectManage/project/:id
@@ -286,8 +269,7 @@ export const ProjectView = () => {
               status: typeof p === 'object' ? (p.status || 'active') : 'active',
               priority: typeof p === 'object' ? (p.priority || 'medium') : 'medium',
               progress: typeof p === 'object' ? (p.progress || 0) : 0,
-              employees: typeof p === 'object' ? (p.employees || []) : [],
-              interns: typeof p === 'object' ? (p.interns || []) : []
+              employees: typeof p === 'object' ? (p.employees || []) : []
             });
           }
         }
@@ -402,20 +384,17 @@ export const ProjectView = () => {
         // Also check if any task inside the project is assigned to user
         const hasTaskMatch = (p.tasks || []).some(t => {
           const aEmp = t.assignedEmployee;
-          const aInt = t.assignedIntern;
           const aTlU = t.assignedTeamLeadUser;
           const aTlE = t.assignedTeamLeadEmployee;
 
           const ids = [
             typeof aEmp === 'object' ? aEmp?._id : aEmp,
-            typeof aInt === 'object' ? aInt?._id : aInt,
             typeof aTlU === 'object' ? aTlU?._id : aTlU,
             typeof aTlE === 'object' ? aTlE?._id : aTlE,
           ].filter(Boolean).map(String);
 
           const emails = [
             typeof aEmp === 'object' ? aEmp?.email : null,
-            typeof aInt === 'object' ? aInt?.email : null,
             typeof aTlU === 'object' ? aTlU?.email : null,
             typeof aTlE === 'object' ? aTlE?.email : null,
           ].filter(Boolean).map(e => String(e).toLowerCase());
@@ -454,27 +433,27 @@ export const ProjectView = () => {
     const s = String(status).toLowerCase();
     if (s === 'completed') {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
           Completed
         </span>
       );
     }
     if (s === 'review' || s === 'testing') {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60">
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
           Review
         </span>
       );
     }
     if (s === 'pending') {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60">
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
           Pending
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60">
+      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
         Active
       </span>
     );
@@ -537,10 +516,10 @@ export const ProjectView = () => {
           { label: 'Completed', value: completedProjects, accent: 'border-l-emerald-500' },
           { label: 'Assigned Members', value: totalUniqueAssignedMembers, accent: 'border-l-purple-500' }
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
+          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">
                 {isLoading ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
               </p>
             </div>
@@ -549,7 +528,7 @@ export const ProjectView = () => {
       </div>
 
       {/* Controls Bar: Search, Status Filter & Assignment Filter */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-4 flex flex-col lg:flex-row items-center justify-between gap-4 transition-colors shadow-xs">
+      <div className="bg-white border border-slate-200 rounded-md p-4 flex flex-col lg:flex-row items-center justify-between gap-4 transition-colors shadow-xs">
         {/* Search */}
         <div className="relative w-full lg:w-96">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -558,7 +537,7 @@ export const ProjectView = () => {
             placeholder={isEmployee ? "Search by project or assigned member name/email..." : "Search by project, client, or assigned member name/email..."}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
+            className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
           />
         </div>
 
@@ -566,13 +545,13 @@ export const ProjectView = () => {
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
           {/* Assignment Filter Pills */}
           {!isTL ? (
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs">
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs">
               <button
                 onClick={() => setAssignedFilter('all')}
                 className={`px-3 py-1.5 rounded-md font-medium transition cursor-pointer ${
                   assignedFilter === 'all'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 All Projects
@@ -581,8 +560,8 @@ export const ProjectView = () => {
                 onClick={() => setAssignedFilter('assigned_to_me')}
                 className={`px-3 py-1.5 rounded-md font-medium transition cursor-pointer flex items-center gap-1.5 ${
                   assignedFilter === 'assigned_to_me'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-white text-indigo-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <UserCheck size={13} />
@@ -590,7 +569,7 @@ export const ProjectView = () => {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 rounded-lg text-xs font-semibold">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold">
               <UserCheck size={14} />
               <span>Assigned Projects ({accessibleProjects.length})</span>
             </div>
@@ -602,7 +581,7 @@ export const ProjectView = () => {
             <select
               value={selectedStatusFilter}
               onChange={e => setSelectedStatusFilter(e.target.value)}
-              className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
+              className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none transition-colors cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -622,9 +601,9 @@ export const ProjectView = () => {
           <p className="text-sm text-slate-500">Loading live projects and assigned team members...</p>
         </div>
       ) : filteredProjects.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-12 text-center shadow-xs">
+        <div className="bg-white border border-slate-200 rounded-lg p-12 text-center shadow-xs">
           <FolderKanban size={40} className="mx-auto text-slate-400 mb-3 opacity-60" />
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No Projects Found</h3>
+          <h3 className="text-base font-bold text-slate-800">No Projects Found</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
             {isTL
               ? 'You do not have any projects assigned to you as Team Lead.'
@@ -650,19 +629,19 @@ export const ProjectView = () => {
             return (
               <div 
                 key={prj._id} 
-                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-all hover:border-indigo-300 dark:hover:border-slate-700 flex flex-col justify-between space-y-4 hover:shadow-card"
+                className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-all hover:border-indigo-300 flex flex-col justify-between space-y-4 hover:shadow-card"
               >
                 {/* Card Top */}
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50 uppercase">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200 uppercase">
                           PRJ-{String(prj._id).slice(-4)}
                         </span>
                         {prj.priority && getPriorityBadge(prj.priority)}
                       </div>
-                      <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-2 truncate" title={prj.projectName}>
+                      <h4 className="text-base font-bold text-slate-900 mt-2 truncate" title={prj.projectName}>
                         {prj.projectName}
                       </h4>
                     </div>
@@ -676,7 +655,7 @@ export const ProjectView = () => {
                               e.stopPropagation();
                               openEditModal(prj);
                             }}
-                            className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                            className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition cursor-pointer"
                             title="Edit Project"
                           >
                             <Edit3 size={14} />
@@ -686,7 +665,7 @@ export const ProjectView = () => {
                               e.stopPropagation();
                               setDeletingProject(prj);
                             }}
-                            className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-slate-100 transition cursor-pointer"
                             title="Delete Project"
                           >
                             <Trash2 size={14} />
@@ -697,19 +676,19 @@ export const ProjectView = () => {
                   </div>
 
                   {prj.projectDescription && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
                       {prj.projectDescription}
                     </p>
                   )}
                 </div>
 
                 {/* Assigned Members Section */}
-                <div className="p-3 bg-slate-50/80 dark:bg-slate-950/60 rounded-lg border border-slate-100 dark:border-slate-800/80 space-y-2">
+                <div className="p-3 bg-slate-50/80 rounded-lg border border-slate-100 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-600 flex items-center gap-1.5">
                       <Users size={13} className="text-indigo-500" /> Assigned Team
                     </span>
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    <span className="text-[11px] font-medium text-slate-500">
                       {assignedMembers.length} {assignedMembers.length === 1 ? 'Member' : 'Members'}
                     </span>
                   </div>
@@ -717,13 +696,13 @@ export const ProjectView = () => {
                   {/* Team Lead Indicator */}
                   {lead && (
                     <div className="flex items-center gap-2 pt-0.5">
-                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 flex items-center justify-center text-[10px] font-bold shrink-0">
+                      <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-[10px] font-bold shrink-0">
                         <Shield size={10} />
                       </div>
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                      <span className="text-xs font-semibold text-slate-800 truncate">
                         {lead.name}
                       </span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 shrink-0">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-600 border border-amber-200 shrink-0">
                         Lead
                       </span>
                     </div>
@@ -745,7 +724,7 @@ export const ProjectView = () => {
                           <div
                             key={member.id || mIdx}
                             title={`${member.name} (${member.role}) - ${member.email}`}
-                            className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white dark:border-slate-900 shadow-xs cursor-pointer ${
+                            className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-xs cursor-pointer ${
                               member.isLead
                                 ? 'bg-amber-500 text-white'
                                 : member.roleType === 'INT'
@@ -758,13 +737,13 @@ export const ProjectView = () => {
                         );
                       })}
                       {assignedMembers.length > 4 && (
-                        <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-[10px] font-bold border-2 border-white dark:border-slate-900">
+                        <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px] font-bold border-2 border-white">
                           +{assignedMembers.length - 4}
                         </div>
                       )}
                     </div>
 
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    <span className="text-[11px] text-slate-500 font-mono">
                       {prj.tasks.length} {prj.tasks.length === 1 ? 'task' : 'tasks'}
                     </span>
                   </div>
@@ -772,13 +751,13 @@ export const ProjectView = () => {
 
                 {/* Progress Bar */}
                 <div className="space-y-1.5 pt-1">
-                  <div className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                  <div className="flex justify-between text-xs font-medium text-slate-600">
                     <span className="flex items-center gap-1.5">
                       <TrendingUp size={13} className="text-indigo-500" /> Progress
                     </span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{prj.progress}%</span>
+                    <span className="font-mono font-bold text-slate-900">{prj.progress}%</span>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                     <div 
                       className="bg-indigo-600 h-full rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min(100, Math.max(0, prj.progress))}%` }} 
@@ -790,19 +769,19 @@ export const ProjectView = () => {
                 </div>
 
                 {/* Metadata & Actions */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <div className="pt-3 border-t border-slate-100 space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {!isEmployee ? (
                       <>
                         <div>
                           <span className="block text-[10px] uppercase font-semibold text-slate-400">Client</span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate block">
+                          <span className="font-medium text-slate-700 truncate block">
                             {prj.clientName || 'In-House'}
                           </span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase font-semibold text-slate-400">Target Date</span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300 font-mono">
+                          <span className="font-medium text-slate-700 font-mono">
                             {targetDateStr}
                           </span>
                         </div>
@@ -811,13 +790,13 @@ export const ProjectView = () => {
                       <>
                         <div>
                           <span className="block text-[10px] uppercase font-semibold text-slate-400">Target Date</span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300 font-mono">
+                          <span className="font-medium text-slate-700 font-mono">
                             {targetDateStr}
                           </span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase font-semibold text-slate-400">Tasks</span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300 font-mono">
+                          <span className="font-medium text-slate-700 font-mono">
                             {completedTasks} / {prj.tasks.length} Done
                           </span>
                         </div>
@@ -828,7 +807,7 @@ export const ProjectView = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedProjectModal(prj)}
-                    className="w-full py-2 bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="w-full py-2 bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <span>View Project & Team ({assignedMembers.length} Members)</span>
                     <ChevronRight size={13} />
@@ -847,13 +826,13 @@ export const ProjectView = () => {
           onClick={() => setSelectedProjectModal(null)}
         >
           <div 
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white border border-slate-200 rounded-xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
                   <Briefcase size={20} />
                 </div>
                 <div className="min-w-0">
@@ -862,14 +841,14 @@ export const ProjectView = () => {
                     {getStatusBadge(selectedProjectModal.status)}
                     {getPriorityBadge(selectedProjectModal.priority)}
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
+                  <h3 className="text-base font-bold text-slate-900 truncate mt-0.5">
                     {selectedProjectModal.projectName}
                   </h3>
                 </div>
               </div>
               <button 
                 onClick={() => setSelectedProjectModal(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -878,48 +857,48 @@ export const ProjectView = () => {
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto space-y-6">
               {/* Project Overview Details */}
-              <div className={`grid grid-cols-2 ${isEmployee ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-4 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs`}>
+              <div className={`grid grid-cols-2 ${isEmployee ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-4 p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs`}>
                 {!isEmployee && (
                   <>
                     <div>
                       <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Client Name</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedProjectModal.clientName || 'In-House'}</span>
+                      <span className="font-semibold text-slate-800">{selectedProjectModal.clientName || 'In-House'}</span>
                     </div>
                     <div>
                       <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Client Email</span>
-                      <span className="font-mono text-slate-600 dark:text-slate-400 truncate block">{selectedProjectModal.clientEmail || 'N/A'}</span>
+                      <span className="font-mono text-slate-600 truncate block">{selectedProjectModal.clientEmail || 'N/A'}</span>
                     </div>
                   </>
                 )}
                 <div>
                   <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Start Date</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                  <span className="font-mono text-slate-700">
                     {selectedProjectModal.startDate ? selectedProjectModal.startDate.split('T')[0] : 'N/A'}
                   </span>
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Target End Date</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                  <span className="font-mono text-slate-700">
                     {selectedProjectModal.endDate ? selectedProjectModal.endDate.split('T')[0] : 'N/A'}
                   </span>
                 </div>
                 {!isEmployee && selectedProjectModal.projectBudget && (
                   <div>
                     <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Project Budget</span>
-                    <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">${Number(selectedProjectModal.projectBudget).toLocaleString()}</span>
+                    <span className="font-bold font-mono text-emerald-600">${Number(selectedProjectModal.projectBudget).toLocaleString()}</span>
                   </div>
                 )}
                 <div>
                   <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Progress</span>
-                  <span className="font-bold font-mono text-indigo-600 dark:text-indigo-400">{selectedProjectModal.progress}%</span>
+                  <span className="font-bold font-mono text-indigo-600">{selectedProjectModal.progress}%</span>
                 </div>
               </div>
 
               {/* Description */}
               {selectedProjectModal.projectDescription && (
                 <div>
-                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Description</h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 leading-relaxed whitespace-pre-wrap">
+                  <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Description</h4>
+                  <p className="text-xs text-slate-600 bg-slate-50 p-3.5 rounded-lg border border-slate-200 leading-relaxed whitespace-pre-wrap">
                     {selectedProjectModal.projectDescription}
                   </p>
                 </div>
@@ -927,7 +906,7 @@ export const ProjectView = () => {
 
               {/* Assigned Project Team Members (Live /members API) */}
               <div>
-                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3 flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-3 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Users size={15} className="text-indigo-600" />
                     <span>Assigned Project Members ({selectedProjectModal.allAssigned?.length || 0})</span>
@@ -938,28 +917,28 @@ export const ProjectView = () => {
                 </h4>
 
                 {(!selectedProjectModal.allAssigned || selectedProjectModal.allAssigned.length === 0) ? (
-                  <p className="text-xs text-slate-400 text-center py-5 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <p className="text-xs text-slate-400 text-center py-5 bg-slate-50 rounded-lg border border-slate-200">
                     No team members are currently assigned to this project.
                   </p>
                 ) : (
                   <div className="space-y-3">
                     {/* Team Leader Card */}
                     {selectedProjectModal.leadMember && (
-                       <div className="p-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg flex items-center justify-between gap-4">
+                       <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
                             <Shield size={18} />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <h5 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                              <h5 className="text-sm font-bold text-slate-900 truncate">
                                 {selectedProjectModal.leadMember.name}
                               </h5>
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
                                 Team Leader
                               </span>
                             </div>
-                            <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                               {selectedProjectModal.leadMember.employeeID && (
                                 <span className="font-mono font-medium">ID: {selectedProjectModal.leadMember.employeeID}</span>
                               )}
@@ -977,7 +956,7 @@ export const ProjectView = () => {
                       </div>
                     )}
 
-                    {/* Assigned Employees and Interns Grid */}
+                    {/* Assigned Employees Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {selectedProjectModal.allAssigned
                         .filter(m => !m.isLead)
@@ -990,30 +969,22 @@ export const ProjectView = () => {
                             .join('')
                             .toUpperCase() || 'M';
 
-                          const isIntern = member.roleType === 'INT';
-
                           return (
                             <div 
                               key={member.id || idx}
-                              className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between gap-3"
+                              className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between gap-3"
                             >
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-xs ${
-                                  isIntern ? 'bg-purple-600' : 'bg-indigo-600'
-                                }`}>
+                                <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-xs bg-indigo-600">
                                   {initials}
                                 </div>
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-1.5">
-                                    <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                                    <h5 className="text-xs font-bold text-slate-800 truncate">
                                       {member.name}
                                     </h5>
-                                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                                      isIntern 
-                                        ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800' 
-                                        : 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-                                    }`}>
-                                      {isIntern ? 'Intern' : 'Employee'}
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                      Employee
                                     </span>
                                   </div>
                                   <div className="text-[11px] text-slate-400 truncate mt-0.5">
@@ -1032,12 +1003,12 @@ export const ProjectView = () => {
 
               {/* Associated Live Tasks */}
               <div>
-                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3 flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-3 flex items-center justify-between">
                   <span>Linked Tasks ({selectedProjectModal.tasks.length})</span>
                 </h4>
 
                 {selectedProjectModal.tasks.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-4 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <p className="text-xs text-slate-400 text-center py-4 bg-slate-50 rounded-lg border border-slate-200">
                     No tasks currently created for this project.
                   </p>
                 ) : (
@@ -1049,14 +1020,14 @@ export const ProjectView = () => {
                           setSelectedProjectModal(null);
                           if (setSelectedTask) setSelectedTask(task);
                         }}
-                        className="p-3.5 bg-slate-50 dark:bg-slate-950 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 rounded-lg transition-colors cursor-pointer flex items-center justify-between gap-4"
+                        className="p-3.5 bg-slate-50 hover:bg-indigo-50/50 border border-slate-200 hover:border-indigo-300 rounded-lg transition-colors cursor-pointer flex items-center justify-between gap-4"
                       >
                         <div className="min-w-0 flex-1">
-                          <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                          <h5 className="text-xs font-bold text-slate-800 truncate">
                             {task.taskTitle || task.title}
                           </h5>
                           <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
-                            <span>Assignee: {task.assignedEmployee?.name || task.assignedIntern?.name || 'Unassigned'}</span>
+                            <span>Assignee: {task.assignedEmployee?.name || 'Unassigned'}</span>
                             {task.dueDate && <span>Due: {task.dueDate.split('T')[0]}</span>}
                             <span>Progress: {task.progress || 0}%</span>
                           </div>
@@ -1064,7 +1035,7 @@ export const ProjectView = () => {
 
                         <div className="flex items-center gap-2 shrink-0">
                           {getPriorityBadge(task.priority)}
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 text-slate-700">
                             {task.status}
                           </span>
                         </div>
@@ -1076,7 +1047,7 @@ export const ProjectView = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
+            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
               {!isEmployee ? (
                 <div className="flex items-center gap-2">
                   <button
@@ -1085,7 +1056,7 @@ export const ProjectView = () => {
                       setSelectedProjectModal(null);
                       openEditModal(p);
                     }}
-                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <Edit3 size={13} />
                     <span>Edit Project</span>
@@ -1096,7 +1067,7 @@ export const ProjectView = () => {
                       setSelectedProjectModal(null);
                       setDeletingProject(p);
                     }}
-                    className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border border-rose-200 dark:border-rose-800/50"
+                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border border-rose-200"
                   >
                     <Trash2 size={13} />
                     <span>Delete</span>
@@ -1124,20 +1095,20 @@ export const ProjectView = () => {
           onClick={() => !isSubmitting && setIsFormModalOpen(false)}
         >
           <div 
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white border border-slate-200 rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
                   {editingProject ? <Edit3 size={18} /> : <Plus size={18} />}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  <h3 className="text-base font-bold text-slate-900">
                     {editingProject ? 'Edit Project' : 'Create New Project'}
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500">
                     {editingProject ? 'Update deliverables, client, and team allocation' : 'Configure deliverables, budget, and assign team members'}
                   </p>
                 </div>
@@ -1145,7 +1116,7 @@ export const ProjectView = () => {
               <button
                 disabled={isSubmitting}
                 onClick={() => setIsFormModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1154,7 +1125,7 @@ export const ProjectView = () => {
             {/* Modal Form */}
             <form onSubmit={handleSaveProject} className="p-6 overflow-y-auto space-y-4">
               {formError && (
-                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle size={15} className="shrink-0" />
                   <span>{formError}</span>
                 </div>
@@ -1163,7 +1134,7 @@ export const ProjectView = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Project Name */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Project Name <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -1172,13 +1143,13 @@ export const ProjectView = () => {
                     placeholder="e.g. KT CRM & HRMS"
                     value={formData.projectName}
                     onChange={e => setFormData({ ...formData, projectName: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 {/* Client Name */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Client Name <span className="text-rose-500">*</span>
                   </label>
                   <input
@@ -1187,13 +1158,13 @@ export const ProjectView = () => {
                     placeholder="e.g. Kevalon Technology"
                     value={formData.clientName}
                     onChange={e => setFormData({ ...formData, clientName: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 {/* Client Email */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Client Email
                   </label>
                   <input
@@ -1201,13 +1172,13 @@ export const ProjectView = () => {
                     placeholder="client@company.com"
                     value={formData.clientEmail}
                     onChange={e => setFormData({ ...formData, clientEmail: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 {/* Budget */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Budget ($)
                   </label>
                   <input
@@ -1216,19 +1187,19 @@ export const ProjectView = () => {
                     placeholder="e.g. 50000"
                     value={formData.projectBudget}
                     onChange={e => setFormData({ ...formData, projectBudget: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
 
                 {/* Priority */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Priority
                   </label>
                   <select
                     value={formData.priority}
                     onChange={e => setFormData({ ...formData, priority: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -1239,13 +1210,13 @@ export const ProjectView = () => {
 
                 {/* Status */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Status
                   </label>
                   <select
                     value={formData.status}
                     onChange={e => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="pending">Pending</option>
                     <option value="active">Active</option>
@@ -1257,38 +1228,38 @@ export const ProjectView = () => {
 
                 {/* Dates */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Start Date
                   </label>
                   <input
                     type="date"
                     value={formData.startDate}
                     onChange={e => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Target End Date
                   </label>
                   <input
                     type="date"
                     value={formData.endDate}
                     onChange={e => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
 
                 {/* Team Leader */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Assign Team Leader
                   </label>
                   <select
                     value={formData.teamLeadUser}
                     onChange={e => setFormData({ ...formData, teamLeadUser: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="">-- Select Team Leader --</option>
                     {companyStaff.map(st => (
@@ -1301,7 +1272,7 @@ export const ProjectView = () => {
 
                 {/* Description */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Project Description
                   </label>
                   <textarea
@@ -1309,18 +1280,18 @@ export const ProjectView = () => {
                     placeholder="Overview of project scope, objectives, and deliverables..."
                     value={formData.projectDescription}
                     onChange={e => setFormData({ ...formData, projectDescription: e.target.value })}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               {/* Submit Buttons */}
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+              <div className="pt-4 border-t border-slate-200 flex justify-end gap-2">
                 <button
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => setIsFormModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md text-xs font-semibold transition cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold transition cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1354,17 +1325,17 @@ export const ProjectView = () => {
           onClick={() => !isSubmitting && setDeletingProject(null)}
         >
           <div 
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-md p-6 shadow-2xl space-y-4"
+            className="bg-white border border-slate-200 rounded-xl w-full max-w-md p-6 shadow-2xl space-y-4"
             onClick={e => e.stopPropagation()}
           >
-            <div className="w-11 h-11 rounded-full bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
               <Trash2 size={20} />
             </div>
 
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Delete Project?</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                Are you sure you want to delete <span className="font-semibold text-slate-800 dark:text-slate-200">{deletingProject.projectName}</span>? This action cannot be undone.
+              <h3 className="text-base font-bold text-slate-900">Delete Project?</h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Are you sure you want to delete <span className="font-semibold text-slate-800">{deletingProject.projectName}</span>? This action cannot be undone.
               </p>
             </div>
 
@@ -1373,7 +1344,7 @@ export const ProjectView = () => {
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setDeletingProject(null)}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>

@@ -160,8 +160,6 @@ export default function Positions() {
         return "bg-gradient-to-r from-emerald-500 to-teal-500";
       case "part-time":
         return "bg-gradient-to-r from-purple-500 to-pink-500";
-      case "intern":
-        return "bg-gradient-to-r from-blue-500 to-cyan-500";
       case "contract":
         return "bg-gradient-to-r from-orange-500 to-amber-500";
       default:
@@ -194,7 +192,6 @@ export default function Positions() {
     total: positions.length,
     fullTime: positions.filter(p => p.type === "Full-time").length,
     partTime: positions.filter(p => p.type === "Part-time").length,
-    intern: positions.filter(p => p.type === "Intern").length,
     contract: positions.filter(p => p.type === "Contract").length
   };
 
@@ -231,7 +228,7 @@ export default function Positions() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 mt-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-4 mt-6">
             <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
@@ -268,17 +265,6 @@ export default function Positions() {
             <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Interns</p>
-                  <p className="text-2xl font-bold text-cyan-600">{stats.intern}</p>
-                </div>
-                <div className="p-2 bg-cyan-50 rounded-lg">
-                  <GraduationCap className="h-5 w-5 text-cyan-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm col-span-2 sm:col-span-1">
-              <div className="flex items-center justify-between">
-                <div>
                   <p className="text-sm text-gray-500">Contract</p>
                   <p className="text-2xl font-bold text-orange-600">{stats.contract}</p>
                 </div>
@@ -310,7 +296,6 @@ export default function Positions() {
                 <option value="all">All Types</option>
                 <option value="full-time">Full-time</option>
                 <option value="part-time">Part-time</option>
-                <option value="intern">Intern</option>
                 <option value="contract">Contract</option>
               </select>
               <div className="flex bg-white border border-gray-200 rounded-lg p-1">
@@ -673,7 +658,6 @@ export default function Positions() {
                     >
                       <option value="Full-time">Full-time</option>
                       <option value="Part-time">Part-time</option>
-                      <option value="Intern">Intern</option>
                       <option value="Contract">Contract</option>
                     </select>
                   </div>

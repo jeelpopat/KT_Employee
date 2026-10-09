@@ -309,12 +309,12 @@ export const DailyFollowUpView = () => {
   // Avatar initial color generator
   const getAvatarColor = (name = '') => {
     const colors = [
-      'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
-      'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
-      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-      'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
-      'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-      'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+      'bg-indigo-100 text-indigo-700',
+      'bg-teal-100 text-teal-700',
+      'bg-emerald-100 text-emerald-700',
+      'bg-violet-100 text-violet-700',
+      'bg-amber-100 text-amber-700',
+      'bg-rose-100 text-rose-700'
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -349,19 +349,19 @@ export const DailyFollowUpView = () => {
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       
       {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3.5">
           <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-sm">
             <PhoneCall size={22} className="animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Team Daily Follow-Up</h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800">
+              <h2 className="text-xl font-bold text-slate-900">Team Daily Follow-Up</h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200/60">
                 Live Data
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Review daily standup submissions, hours worked, task progress, and blockers by person
             </p>
           </div>
@@ -377,12 +377,12 @@ export const DailyFollowUpView = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search employee, task, project..."
-              className="w-full pl-9 pr-7 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              className="w-full pl-9 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
               >
                 ✕
               </button>
@@ -392,7 +392,7 @@ export const DailyFollowUpView = () => {
           <button
             onClick={() => loadData(true)}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
             title="Refresh live daily reports"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-indigo-600' : ''} />
@@ -412,11 +412,11 @@ export const DailyFollowUpView = () => {
         ].map((item, idx) => (
           <div
             key={idx}
-            className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+            className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
           >
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">{item.value}</p>
             </div>
           </div>
         ))}
@@ -424,15 +424,15 @@ export const DailyFollowUpView = () => {
 
       {/* 3. Loading & Error States */}
       {isLoading ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center shadow-xs">
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-xs">
           <RefreshCw size={28} className="animate-spin text-indigo-600 mx-auto mb-3" />
-          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Loading Team Daily Reports...</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Connecting to /api/dailyUpdate/list?teamLeadId={tlUserId || 'TL_ID'}</p>
+          <p className="text-sm font-bold text-slate-800">Loading Team Daily Reports...</p>
+          <p className="text-xs text-slate-500 mt-1">Connecting to /api/dailyUpdate/list?teamLeadId={tlUserId || 'TL_ID'}</p>
         </div>
       ) : fetchError && groupedByPerson.length === 0 ? (
-        <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-xl p-6 text-center space-y-2">
-          <AlertCircle size={28} className="text-rose-600 dark:text-rose-400 mx-auto" />
-          <p className="text-sm font-bold text-rose-900 dark:text-rose-300">{fetchError}</p>
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center space-y-2">
+          <AlertCircle size={28} className="text-rose-600 mx-auto" />
+          <p className="text-sm font-bold text-rose-900">{fetchError}</p>
           <button
             onClick={() => loadData(true)}
             className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
@@ -442,12 +442,12 @@ export const DailyFollowUpView = () => {
         </div>
       ) : groupedByPerson.length === 0 ? (
         /* Empty State */
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-xs space-y-3">
+          <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
             <Clock size={24} />
           </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">No Daily Updates Found</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+          <h3 className="text-base font-bold text-slate-900">No Daily Updates Found</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
             No daily tasks have been recorded by your team members yet.
           </p>
           <div className="flex justify-center gap-2 pt-2">
@@ -468,12 +468,12 @@ export const DailyFollowUpView = () => {
             return (
               <div
                 key={person.employeeId}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden transition-all"
+                className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden transition-all"
               >
                 {/* Person Header Card */}
                 <div 
                   onClick={() => toggleExpand(person.employeeId)}
-                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition select-none"
+                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/80 transition select-none"
                 >
                   <div className="flex items-center gap-3.5">
                     {/* Employee Avatar */}
@@ -481,7 +481,7 @@ export const DailyFollowUpView = () => {
                       <img
                         src={person.avatar}
                         alt={person.name}
-                        className="w-11 h-11 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-2xs"
+                        className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-2xs"
                       />
                     ) : (
                       <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm shadow-2xs ${getAvatarColor(person.name)}`}>
@@ -491,17 +491,17 @@ export const DailyFollowUpView = () => {
 
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{person.name}</h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                        <h3 className="text-sm font-bold text-slate-900">{person.name}</h3>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                           {person.designation}
                         </span>
                         {person.role.toLowerCase().includes('lead') && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200/60 flex items-center gap-0.5">
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5">
                             <Shield size={10} /> Lead
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-0.5">
                         {person.reports.length} report{person.reports.length > 1 ? 's' : ''} logged
                       </p>
                     </div>
@@ -510,25 +510,25 @@ export const DailyFollowUpView = () => {
                   {/* Summary Pills & Expand Toggle */}
                   <div className="flex items-center gap-3 self-end sm:self-center">
                     <div className="flex items-center gap-2">
-                      <div className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5">
+                      <div className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1.5">
                         <Clock size={13} className="text-indigo-600" />
                         <span>{person.totalHours} hrs</span>
                       </div>
 
                       {person.blockersCount > 0 ? (
-                        <div className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-bold flex items-center gap-1.5 animate-pulse">
-                          <AlertTriangle size={13} className="text-amber-600 dark:text-amber-400" />
+                        <div className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1.5 animate-pulse">
+                          <AlertTriangle size={13} className="text-amber-600" />
                           <span>{person.blockersCount} Blocker{person.blockersCount > 1 ? 's' : ''}</span>
                         </div>
                       ) : (
-                        <div className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-xs font-semibold flex items-center gap-1.5">
+                        <div className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1.5">
                           <CheckCircle2 size={13} className="text-emerald-600" />
                           <span>No Blockers</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <div className="p-1 rounded-md text-slate-400 hover:text-slate-600">
                       {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </div>
                   </div>
@@ -536,7 +536,7 @@ export const DailyFollowUpView = () => {
 
                 {/* Collapsible Daily Reports List for this Employee */}
                 {isExpanded && (
-                  <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 sm:p-5 space-y-4">
+                  <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:p-5 space-y-4">
                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                       <Calendar size={13} /> Daily Updates & Task Timeline
                     </h4>
@@ -553,18 +553,18 @@ export const DailyFollowUpView = () => {
                         return (
                           <div
                             key={report._id}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-2xs space-y-3 hover:border-slate-300 dark:hover:border-slate-700 transition"
+                            className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3 hover:border-slate-300 transition"
                           >
                             {/* Report Meta Row */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1">
+                                <span className="font-bold text-xs text-slate-900 flex items-center gap-1">
                                   <Calendar size={12} className="text-indigo-600" />
                                   {formatDate(report.reportDate || report.createdAt)}
                                 </span>
 
                                 {report.projectId?.projectName && (
-                                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 flex items-center gap-1">
                                     <Briefcase size={11} className="text-slate-500" />
                                     Project: <strong>{report.projectId.projectName}</strong>
                                   </span>
@@ -572,13 +572,13 @@ export const DailyFollowUpView = () => {
                               </div>
 
                               <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800">
+                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                                   {report.hoursWorked || 0} Hours Logged
                                 </span>
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  report.status === 'Approved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                                  report.status === 'Pending' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' :
-                                  'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                  report.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                                  report.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-slate-100 text-slate-700'
                                 }`}>
                                   {report.status || 'Submitted'}
                                 </span>
@@ -588,31 +588,31 @@ export const DailyFollowUpView = () => {
                             {/* Work Content Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                               {/* Today's Work */}
-                              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-                                <p className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 text-[11px] uppercase tracking-wider">
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1">
+                                <p className="font-bold text-slate-700 flex items-center gap-1 text-[11px] uppercase tracking-wider">
                                   <CheckCircle2 size={12} className="text-emerald-500" /> Completed Work
                                 </p>
-                                <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
+                                <p className="text-slate-800 leading-relaxed font-medium whitespace-pre-wrap">
                                   {report.todaysWork || 'No details provided'}
                                 </p>
                               </div>
 
                               {/* Pending Work */}
-                              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-                                <p className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 text-[11px] uppercase tracking-wider">
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1">
+                                <p className="font-bold text-slate-700 flex items-center gap-1 text-[11px] uppercase tracking-wider">
                                   <Hourglass size={12} className="text-amber-500" /> In Progress / Pending
                                 </p>
-                                <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
+                                <p className="text-slate-800 leading-relaxed font-medium whitespace-pre-wrap">
                                   {report.pendingWork || 'None'}
                                 </p>
                               </div>
 
                               {/* Next Day Plan */}
-                              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-                                <p className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 text-[11px] uppercase tracking-wider">
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1">
+                                <p className="font-bold text-slate-700 flex items-center gap-1 text-[11px] uppercase tracking-wider">
                                   <TrendingUp size={12} className="text-indigo-600" /> Next Day Plan
                                 </p>
-                                <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
+                                <p className="text-slate-800 leading-relaxed font-medium whitespace-pre-wrap">
                                   {report.tomorrowPlan || 'None'}
                                 </p>
                               </div>
@@ -620,12 +620,12 @@ export const DailyFollowUpView = () => {
 
                             {/* Blockers & Issues (if reported) */}
                             {hasBlocker && (
-                              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs space-y-1">
-                                <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-300">
-                                  <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400" />
+                              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs space-y-1">
+                                <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                                  <AlertTriangle size={14} className="text-amber-600" />
                                   <span>Blocker / Issue Reported</span>
                                 </div>
-                                <p className="text-amber-800 dark:text-amber-300/90 leading-relaxed pl-5 font-medium">
+                                <p className="text-amber-800 leading-relaxed pl-5 font-medium">
                                   {report.issuesFaced}
                                 </p>
                               </div>
@@ -633,32 +633,32 @@ export const DailyFollowUpView = () => {
 
                             {/* Remarks */}
                             {report.remarks && report.remarks.trim().length > 0 && (
-                              <div className="text-[11px] text-slate-600 dark:text-slate-400 italic bg-slate-50/80 dark:bg-slate-800/40 p-2 rounded border border-slate-100 dark:border-slate-800">
+                              <div className="text-[11px] text-slate-600 italic bg-slate-50/80 p-2 rounded border border-slate-100">
                                 <strong>Remarks:</strong> {report.remarks}
                               </div>
                             )}
 
                             {/* Task References Breakdown */}
                             {Array.isArray(report.taskReferences) && report.taskReferences.length > 0 && (
-                              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                              <div className="pt-2 border-t border-slate-100 space-y-2">
+                                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                                   <Layers size={11} /> Associated Tasks ({report.taskReferences.length})
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                   {report.taskReferences.map((tRef, tIdx) => (
                                     <div
                                       key={tRef._id || tIdx}
-                                      className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 text-xs space-y-1.5"
+                                      className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 text-xs space-y-1.5"
                                     >
                                       <div className="flex items-center justify-between">
-                                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
+                                        <span className="font-semibold text-slate-800 truncate pr-2">
                                           {tRef.taskTitle || 'Untitled Task'}
                                         </span>
-                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">
                                           {tRef.progress || 0}%
                                         </span>
                                       </div>
-                                      <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
                                         <div
                                           className="bg-indigo-600 h-full rounded-full transition-all duration-300"
                                           style={{ width: `${Math.min(100, Math.max(0, tRef.progress || 0))}%` }}
@@ -674,15 +674,15 @@ export const DailyFollowUpView = () => {
                             )}
 
                             {/* TL Follow-Up Note & Action Area */}
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                               {noteData ? (
-                                <div className="flex-1 p-2 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/40 rounded-lg flex items-start justify-between gap-2">
+                                <div className="flex-1 p-2 bg-indigo-50/60 border border-indigo-200 rounded-lg flex items-start justify-between gap-2">
                                   <div className="space-y-0.5">
-                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-700">
                                       <MessageSquare size={11} />
                                       <span>TL Note by {noteData.author} ({noteData.savedAt}):</span>
                                     </div>
-                                    <p className="text-slate-800 dark:text-slate-200 text-xs font-medium pl-4">
+                                    <p className="text-slate-800 text-xs font-medium pl-4">
                                       {noteData.note}
                                     </p>
                                   </div>
@@ -701,7 +701,7 @@ export const DailyFollowUpView = () => {
                                     value={currentNoteText}
                                     onChange={(e) => setCurrentNoteText(e.target.value)}
                                     placeholder="Add standup note or action item for this report..."
-                                    className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') handleSaveNote(report._id);
                                     }}
@@ -728,7 +728,7 @@ export const DailyFollowUpView = () => {
                                     setActiveNoteInput(report._id);
                                     setCurrentNoteText('');
                                   }}
-                                  className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                  className="text-indigo-600 hover:text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                                 >
                                   <Plus size={13} /> Add Follow-Up Note
                                 </button>

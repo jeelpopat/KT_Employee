@@ -37,6 +37,21 @@ export const AdminScreenshotPortal = () => {
     captureRealScreenNow
   } = useApp();
 
+  const effectiveRole = String(
+    userRole ||
+    user?.role?.roleName ||
+    user?.role ||
+    localStorage.getItem('active_role') ||
+    localStorage.getItem('user_role') ||
+    ''
+  ).toLowerCase().trim();
+
+  const isAdminOrHr =
+    effectiveRole === 'admin' ||
+    effectiveRole === 'administrator' ||
+    effectiveRole === 'superadmin' ||
+    effectiveRole === 'hr';
+
   // State
   const [remoteScreenshots, setRemoteScreenshots] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -311,7 +326,7 @@ export const AdminScreenshotPortal = () => {
     return `Kevalon Workspace • Core Operations (${empInfo?.id || 'EMP1008'})`;
   };
 
-  // Helper to extract employee position (EMP, TL, HR, ADMIN, INTERN)
+  // Helper to extract employee position (EMP, TL, HR, ADMIN)
   const getRecordPosition = (rec) => {
     if (!rec) return { short: 'EMP', label: 'Employee' };
 
@@ -364,7 +379,6 @@ export const AdminScreenshotPortal = () => {
       }
       if (userRole === 'admin') return { short: 'ADMIN', label: 'Administrator', code: 'admin' };
       if (userRole === 'hr') return { short: 'HR', label: 'HR Manager', code: 'hr' };
-      if (userRole === 'intern') return { short: 'INTERN', label: 'Intern', code: 'intern' };
     }
 
     // 3. Team leader flags and role strings
@@ -667,9 +681,12 @@ export const AdminScreenshotPortal = () => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       
-      {/* Header Banner */}
-      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-colors">
-        <div className="space-y-1.5">
+      {/* Upper section shown in screenshot (Kept for Employee & TL, hidden for Admin & HR) */}
+      {!isAdminOrHr && (
+        <>
+          {/* Header Banner */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-colors">
+            <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-semibold border border-indigo-200/70 flex items-center gap-1.5">
               <ShieldCheck size={13} />
@@ -832,9 +849,11 @@ export const AdminScreenshotPortal = () => {
           </span>
         </div>
       </div>
+        </>
+      )}
 
       {/* Filter & Search Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 transition-colors">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 transition-colors">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Employee Filter */}
           <div className="flex items-center gap-1.5 text-xs">
@@ -842,7 +861,7 @@ export const AdminScreenshotPortal = () => {
             <select
               value={selectedEmployeeFilter}
               onChange={e => setSelectedEmployeeFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition cursor-pointer"
+              className="px-3 py-1.5 text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-none transition cursor-pointer"
             >
               <option value="all">All Employees ({allScreenshots.length})</option>
               {uniqueEmployees.map(emp => (
@@ -860,12 +879,12 @@ export const AdminScreenshotPortal = () => {
               type="date"
               value={selectedDateFilter}
               onChange={e => setSelectedDateFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition cursor-pointer"
+              className="px-2.5 py-1.5 text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-none transition cursor-pointer"
             />
             {selectedDateFilter && (
               <button 
                 onClick={() => setSelectedDateFilter('')}
-                className="text-2xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                className="text-2xs text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 Clear
               </button>
@@ -873,29 +892,56 @@ export const AdminScreenshotPortal = () => {
           </div>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full md:w-72">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search employee, ID, app window..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition"
-          />
+        {/* Search Input & Action Controls for Admin/HR */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="relative w-full md:w-72">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search employee, ID, app window..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:border-indigo-500 transition"
+            />
+          </div>
+
+          {isAdminOrHr && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => fetchScreenshots(true)}
+                disabled={isRefreshing}
+                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 border border-slate-200 transition cursor-pointer shadow-xs disabled:opacity-50"
+                title="Refresh Screenshot Feed"
+              >
+                <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-indigo-600' : 'text-slate-400'} />
+                <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  fetchSettings();
+                  setIsSettingsModalOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+              >
+                <Settings size={13} />
+                <span>Settings</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Gallery Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden transition-colors">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden transition-colors">
         
-        <div className="p-4 bg-slate-50/70 dark:bg-slate-950/70 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-              <Camera size={14} className="text-indigo-600 dark:text-indigo-400" />
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+              <Camera size={14} className="text-indigo-600" />
               All Monitored Screenshots Feed
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-[11px] text-slate-500">
               Showing {filteredScreenshots.length} of {allScreenshots.length} frames archived in Cloudinary
             </p>
           </div>
@@ -911,7 +957,7 @@ export const AdminScreenshotPortal = () => {
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-xs transition cursor-pointer ${
               isPlayingTimeline 
                 ? 'bg-amber-600 hover:bg-amber-500 text-white' 
-                : 'bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white'
+                : 'bg-slate-900 hover:bg-slate-800 text-white'
             }`}
           >
             {isPlayingTimeline ? <Pause size={14} /> : <Play size={14} />}
@@ -926,8 +972,8 @@ export const AdminScreenshotPortal = () => {
           </div>
         ) : filteredScreenshots.length === 0 ? (
           <div className="p-16 text-center space-y-2">
-            <Camera size={36} className="mx-auto text-slate-400 dark:text-slate-600" />
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No screenshots match the criteria</p>
+            <Camera size={36} className="mx-auto text-slate-400" />
+            <p className="text-sm font-semibold text-slate-700">No screenshots match the criteria</p>
             <p className="text-xs text-slate-500">Screenshots will appear here automatically every minute during active work sessions.</p>
           </div>
         ) : (
@@ -936,7 +982,7 @@ export const AdminScreenshotPortal = () => {
               <div 
                 key={scr.id || idx}
                 onClick={() => setLightboxRecord(scr)}
-                className="bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-card transition-all cursor-pointer group p-2.5 space-y-2"
+                className="bg-white rounded-xl border border-slate-200 shadow-xs hover:border-indigo-500 hover:shadow-card transition-all cursor-pointer group p-2.5 space-y-2"
               >
                 <div className="relative rounded-lg overflow-hidden bg-slate-900 h-40">
                   <img 
@@ -969,33 +1015,31 @@ export const AdminScreenshotPortal = () => {
                       <div className="flex items-center justify-between text-[10px]">
                         <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide ${
                           cardPos.short === 'TL'
-                            ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                            ? 'bg-purple-100 text-purple-700 border border-purple-200'
                             : cardPos.short === 'HR'
-                            ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                             : cardPos.short === 'ADMIN'
-                            ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                            : cardPos.short === 'INTERN'
-                            ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                            : 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                            ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                            : 'bg-indigo-100 text-indigo-700 border border-indigo-200'
                         }`}>
                           {cardPos.short} ({cardPos.label})
                         </span>
-                        <span className="text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+                        <span className="text-[10px] font-mono font-semibold text-slate-500 truncate max-w-[120px]">
                           {cardEmp.id}
                         </span>
                       </div>
-                      <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate block">
+                      <span className="text-xs font-semibold text-slate-900 truncate block">
                         {cardEmp.name}
                       </span>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-normal" title={getRecordActiveWindow(scr, cardEmp)}>
+                      <p className="text-xs text-slate-500 truncate font-normal" title={getRecordActiveWindow(scr, cardEmp)}>
                         {getRecordActiveWindow(scr, cardEmp)}
                       </p>
                       {scr.deviceInfo && (
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate" title={scr.deviceInfo}>
+                        <p className="text-[10px] text-slate-400 font-mono truncate" title={scr.deviceInfo}>
                           💻 {scr.deviceInfo}
                         </p>
                       )}
-                      <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-1.5 border-t border-slate-100">
                         <span>{scr.captureTime}</span>
                         <span>{scr.date}</span>
                       </div>
@@ -1010,22 +1054,22 @@ export const AdminScreenshotPortal = () => {
       </div>
 
       {/* Inactivity Events Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-5 space-y-4 transition-colors">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4 transition-colors">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center space-x-2">
             <AlertTriangle size={18} className="text-amber-500" />
-            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Inactivity Event Log (HR Auditing)
             </h3>
           </div>
-          <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs font-medium">
+          <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono text-xs font-medium">
             {inactivityEvents.length} Events Logged
           </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800 uppercase text-[10px] tracking-wider">
+            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-4">Employee</th>
                 <th className="py-3 px-4">Start Time</th>
@@ -1034,35 +1078,35 @@ export const AdminScreenshotPortal = () => {
                 <th className="py-3 px-4">Employee Response</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+            <tbody className="divide-y divide-slate-100 font-medium">
               {inactivityEvents.map((evt) => (
-                <tr key={evt.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
+                <tr key={evt.id} className="hover:bg-slate-50/70 transition">
                   <td className="py-3 px-4">
-                    <span className="font-semibold text-slate-900 dark:text-slate-100">{evt.employeeName}</span>
+                    <span className="font-semibold text-slate-900">{evt.employeeName}</span>
                     <span className="text-[10px] text-slate-400 font-mono block">{evt.employeeId}</span>
                   </td>
-                  <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300">{evt.startTime}</td>
+                  <td className="py-3 px-4 font-mono text-slate-700">{evt.startTime}</td>
                   <td className="py-3 px-4">
-                    <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/50 font-medium">
+                    <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 font-medium">
                       {evt.duration}
                     </span>
                   </td>
-                  <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">{evt.sessionId}</td>
+                  <td className="py-3 px-4 font-mono text-slate-600">{evt.sessionId}</td>
                   <td className="py-3 px-4">
                     {evt.responseStatus === 'Acknowledged - Working' && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-medium flex items-center space-x-1 w-fit">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium flex items-center space-x-1 w-fit">
                         <CheckCircle2 size={12} />
                         <span>Acknowledged - Working</span>
                       </span>
                     )}
                     {evt.responseStatus === 'Switched to Break' && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-medium flex items-center space-x-1 w-fit">
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-medium flex items-center space-x-1 w-fit">
                         <Pause size={12} />
                         <span>Switched to Break</span>
                       </span>
                     )}
                     {evt.responseStatus === 'Waiting for Employee Response' && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-medium flex items-center space-x-1 w-fit">
+                      <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium flex items-center space-x-1 w-fit">
                         <AlertTriangle size={12} />
                         <span>Waiting Response</span>
                       </span>
@@ -1236,8 +1280,6 @@ export const AdminScreenshotPortal = () => {
                               ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
                               : pos.short === 'ADMIN'
                               ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40'
-                              : pos.short === 'INTERN'
-                              ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
                               : 'bg-indigo-500/25 text-indigo-300 border border-indigo-500/40'
                           }`}>
                             {pos.short} ({pos.label})
@@ -1325,16 +1367,16 @@ export const AdminScreenshotPortal = () => {
       {/* Settings Modal (Configures POST /api/employee-panel/monitoring/settings) */}
       {isSettingsModalOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+          <div className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
             
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <Settings size={18} className="text-indigo-600" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Screenshot Monitoring Settings</h3>
+                <h3 className="text-base font-bold text-slate-900">Screenshot Monitoring Settings</h3>
               </div>
               <button
                 onClick={() => setIsSettingsModalOpen(false)}
-                className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                className="p-1 rounded text-slate-400 hover:text-slate-700 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1343,14 +1385,14 @@ export const AdminScreenshotPortal = () => {
             <form onSubmit={handleSaveSettings} className="p-6 space-y-5 text-xs">
               
               {settingsSuccessMsg && (
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-xl border border-emerald-200 dark:border-emerald-800 font-semibold flex items-center gap-2">
+                <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 font-semibold flex items-center gap-2">
                   <CheckCircle2 size={16} />
                   <span>{settingsSuccessMsg}</span>
                 </div>
               )}
 
               {settingsErrorMsg && (
-                <div className="p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 font-semibold flex items-center gap-2">
+                <div className="p-3 bg-rose-50 text-rose-700 rounded-xl border border-rose-200 font-semibold flex items-center gap-2">
                   <AlertTriangle size={16} />
                   <span>{settingsErrorMsg}</span>
                 </div>
@@ -1358,7 +1400,7 @@ export const AdminScreenshotPortal = () => {
 
               {/* Capture Interval */}
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block font-bold text-slate-700 mb-1.5">
                   Capture Frequency (Every N Minutes)
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -1369,8 +1411,8 @@ export const AdminScreenshotPortal = () => {
                       onClick={() => setSettingsForm(prev => ({ ...prev, intervalMinutes: mins, intervalSeconds: mins * 60 }))}
                       className={`py-2 px-3 rounded-xl border font-semibold transition cursor-pointer text-center ${
                         settingsForm.intervalMinutes === mins
-                          ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500/20'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-500/20'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                       }`}
                     >
                       {mins} Min {mins === 5 ? '(Default)' : ''}
@@ -1384,9 +1426,9 @@ export const AdminScreenshotPortal = () => {
 
               {/* Switches */}
               <div className="space-y-3 pt-2">
-                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 cursor-pointer">
+                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
                   <div>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 block text-xs">Background Monitoring</span>
+                    <span className="font-semibold text-slate-800 block text-xs">Background Monitoring</span>
                     <span className="text-2xs text-slate-500">Enable automatic periodic capturing when employees are checked in</span>
                   </div>
                   <input
@@ -1397,9 +1439,9 @@ export const AdminScreenshotPortal = () => {
                   />
                 </label>
 
-                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 cursor-pointer">
+                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
                   <div>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 block text-xs">Pause On Break</span>
+                    <span className="font-semibold text-slate-800 block text-xs">Pause On Break</span>
                     <span className="text-2xs text-slate-500">Pause monitoring immediately whenever employee starts a break</span>
                   </div>
                   <input
@@ -1428,11 +1470,11 @@ export const AdminScreenshotPortal = () => {
               </div>
 
               {/* Modal Actions */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsSettingsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer transition"
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition"
                 >
                   Cancel
                 </button>

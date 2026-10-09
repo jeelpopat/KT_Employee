@@ -116,7 +116,6 @@ const formatRole = (role) => {
   if (normalized === "hr") return "HR";
   if (normalized === "admin") return "Admin";
   if (normalized === "employee") return "Employee";
-  if (normalized === "intern") return "Intern";
 
   return role || "Unknown";
 };
@@ -477,7 +476,6 @@ export default function LeaveRequest() {
           isApproved(hrStatus) &&
           (
             normalizeRole(employeeRole) === "employee" ||
-            normalizeRole(employeeRole) === "intern" ||
             normalizeRole(employeeRole) === "teamlead"
           )
         ) {
@@ -678,13 +676,12 @@ export default function LeaveRequest() {
     const role = normalizeRole(leave.role);
 
     // --------------------------------------------------------
-    // EMPLOYEE / INTERN
+    // EMPLOYEE
     // Team Lead -> HR
     // --------------------------------------------------------
 
     if (
-      role === "employee" ||
-      role === "intern"
+      role === "employee"
     ) {
       if (isRejected(leave.teamLeadStatus)) {
         return "rejected";
@@ -830,11 +827,10 @@ export default function LeaveRequest() {
         return false;
       }
 
-      // Employee / Intern:
+      // Employee:
       // TL approval compulsory
       if (
-        applicantRole === "employee" ||
-        applicantRole === "intern"
+        applicantRole === "employee"
       ) {
         return (
           isApproved(leave.teamLeadStatus) &&
@@ -859,10 +855,7 @@ export default function LeaveRequest() {
     if (loggedRole === "teamlead") {
       const isMyTeamEmployee = isLeaveOfAssignedTeam(leave, teamEmployeesScope, usersMap);
       return (
-        (
-          applicantRole === "employee" ||
-          applicantRole === "intern"
-        ) &&
+        applicantRole === "employee" &&
         isMyTeamEmployee &&
         isPending(leave.teamLeadStatus)
       );
@@ -1342,7 +1335,7 @@ export default function LeaveRequest() {
       const applicantRole = normalizeRole(leave?.role);
 
       // If logged in as HR and employee leave hasn't been approved by TL yet
-      if (loggedRole === "hr" && (applicantRole === "employee" || applicantRole === "intern")) {
+      if (loggedRole === "hr" && applicantRole === "employee") {
         if (isPending(leave?.teamLeadStatus)) {
           return (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
@@ -2645,7 +2638,7 @@ export default function LeaveRequest() {
                       : normalizeRole(
                           currentRole
                         ) === "teamlead"
-                      ? "View only. Team Lead can act only on Employee/Intern pending leaves."
+                      ? "View only. Team Lead can act only on Employee pending leaves."
                       : "View only. No action is required from your role."}
 
                   </div>

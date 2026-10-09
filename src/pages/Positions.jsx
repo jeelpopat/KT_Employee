@@ -167,8 +167,6 @@ export default function Positions() {
         return "bg-gradient-to-r from-emerald-500 to-teal-500";
       case "part-time":
         return "bg-gradient-to-r from-purple-500 to-pink-500";
-      case "intern":
-        return "bg-gradient-to-r from-blue-500 to-cyan-500";
       case "contract":
         return "bg-gradient-to-r from-orange-500 to-amber-500";
       default:
@@ -201,7 +199,6 @@ export default function Positions() {
     total: positions.length,
     fullTime: positions.filter(p => p.type === "Full-time").length,
     partTime: positions.filter(p => p.type === "Part-time").length,
-    intern: positions.filter(p => p.type === "Intern").length,
     contract: positions.filter(p => p.type === "Contract").length
   };
 
@@ -237,21 +234,20 @@ export default function Positions() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-4">
         {[
           { label: "Total", value: stats.total, accent: "border-l-indigo-600" },
           { label: "Full-time", value: stats.fullTime, accent: "border-l-emerald-500" },
           { label: "Part-time", value: stats.partTime, accent: "border-l-purple-500" },
-          { label: "Interns", value: stats.intern, accent: "border-l-cyan-500" },
           { label: "Contract", value: stats.contract, accent: "border-l-amber-500" }
         ].map((item, idx) => (
           <div
             key={idx}
-            className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs ${idx === 4 ? "col-span-2 sm:col-span-1" : ""}`}
+            className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
           >
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">{item.value}</p>
             </div>
           </div>
         ))}
@@ -278,7 +274,6 @@ export default function Positions() {
             <option value="all">All Types</option>
             <option value="full-time">Full-time</option>
             <option value="part-time">Part-time</option>
-            <option value="intern">Intern</option>
             <option value="contract">Contract</option>
           </select>
           <div className="flex bg-white border border-slate-200 rounded-lg p-1 h-10 items-center">
@@ -639,7 +634,6 @@ export default function Positions() {
                     >
                       <option value="Full-time">Full-time</option>
                       <option value="Part-time">Part-time</option>
-                      <option value="Intern">Intern</option>
                       <option value="Contract">Contract</option>
                     </select>
                   </div>

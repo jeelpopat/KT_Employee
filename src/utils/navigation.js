@@ -38,7 +38,6 @@ export const pathToTab = {
   '/team-members': 'team-members',
   '/employees': 'employees',
   '/learning-hub': 'learning-hub',
-  '/internship-progress': 'internship-progress',
   '/documents': 'documents',
   '/report': 'report',
 };
@@ -80,7 +79,6 @@ export const tabToPath = {
   'team-members': '/team-members',
   'employees': '/employees',
   'learning-hub': '/learning-hub',
-  'internship-progress': '/internship-progress',
   'documents': '/documents',
   'report': '/report',
 };

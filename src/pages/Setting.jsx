@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Settings as SettingsIcon, Shield, Bell, Moon, Sun, Monitor, 
+  Settings as SettingsIcon, Shield, Bell, Sun, 
   Save, CheckCircle2, AlertCircle, Building, Mail, Clock, Lock
 } from "lucide-react";
 import api from "../api/axios";
 
 export default function Setting() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+  const [theme] = useState("light");
+  const handleThemeChange = () => {
+    localStorage.setItem("theme", "light");
+    document.documentElement.classList.remove("dark");
+  };
   const [formData, setFormData] = useState(() => {
     try {
       const saved = localStorage.getItem("kt_system_settings");
@@ -27,16 +31,6 @@ export default function Setting() {
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
 
-  const handleThemeChange = (newTheme) => {
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    const root = document.documentElement;
-    if (newTheme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-  };
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -92,44 +86,19 @@ export default function Setting() {
             <h3 className="text-sm font-semibold text-slate-900">Interface Theme</h3>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() => handleThemeChange("light")}
-              className={`p-3 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer ${
-                theme === "light" 
-                  ? "border-indigo-600 bg-indigo-50/40 text-indigo-900 ring-1 ring-indigo-600" 
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-sm">
+            <div
+              className="p-3 rounded-xl border text-left flex flex-col gap-2 border-indigo-600 bg-indigo-50/40 text-indigo-900 ring-1 ring-indigo-600"
             >
               <div className="flex items-center justify-between">
-                <Sun size={18} className={theme === "light" ? "text-indigo-600" : "text-slate-400"} />
-                {theme === "light" && <span className="w-2 h-2 rounded-full bg-indigo-600"></span>}
+                <Sun size={18} className="text-indigo-600" />
+                <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
               </div>
               <div>
-                <p className="text-xs font-semibold">Light Mode</p>
-                <p className="text-[10px] text-slate-500">Standard crisp bright theme</p>
+                <p className="text-xs font-semibold">Light Theme</p>
+                <p className="text-[10px] text-slate-500">Standard crisp clean white theme</p>
               </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleThemeChange("dark")}
-              className={`p-3 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer ${
-                theme === "dark" 
-                  ? "border-indigo-600 bg-indigo-50/40 text-indigo-900 ring-1 ring-indigo-600" 
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <Moon size={18} className={theme === "dark" ? "text-indigo-600" : "text-slate-400"} />
-                {theme === "dark" && <span className="w-2 h-2 rounded-full bg-indigo-600"></span>}
-              </div>
-              <div>
-                <p className="text-xs font-semibold">Dark Mode</p>
-                <p className="text-[10px] text-slate-500">Reduced eye strain in low light</p>
-              </div>
-            </button>
+            </div>
           </div>
         </div>
 

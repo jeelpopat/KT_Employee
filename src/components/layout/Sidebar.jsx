@@ -61,6 +61,7 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-team-tasks', label: 'Task Management', icon: ListTodo },
       ]
     },
+
     {
       title: "Monitoring & Security",
       items: [
@@ -188,28 +189,11 @@ export const Sidebar = ({ onSignOut }) => {
     admin: 'Administrator',
     hr: 'HR Manager',
     team_leader: 'Team Leader',
-    employee: 'Employee',
-    intern: 'Intern'
+    employee: 'Employee'
   };
 
   return (
     <>
-      {/* Mobile Toggle Bar */}
-      <div className="lg:hidden fixed top-0 left-0 w-full h-14 bg-white border-b border-slate-200/80 px-4 flex items-center justify-between z-40 shadow-xs">
-        <div className="flex items-center gap-2">
-          <img src={logo} alt="Kevalon Tech" className="h-7 w-auto object-contain" />
-          <span className="font-semibold text-xs text-slate-800 tracking-tight">Kevalon Tech</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          aria-label={isMobileSidebarOpen ? "Close navigation" : "Open navigation"}
-          className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none cursor-pointer"
-        >
-          {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </div>
-
       {/* Backdrop (Mobile only) */}
       {isMobileSidebarOpen && (
         <div

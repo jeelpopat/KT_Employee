@@ -11,7 +11,7 @@ import {
   MessageSquare,
   X,
   Check,
-  CheckCircle, 
+  CheckCircle,
   XCircle,
   RefreshCw,
   User,
@@ -116,7 +116,6 @@ const formatRole = (role) => {
   if (normalized === "hr") return "HR";
   if (normalized === "admin") return "Admin";
   if (normalized === "employee") return "Employee";
-  if (normalized === "intern") return "Intern";
 
   return role || "Unknown";
 };
@@ -180,9 +179,8 @@ const getEmployeeName = (employee, leave) => {
   if (employee.name) return employee.name;
 
   const fullName =
-    `${employee.firstName || ""} ${
-      employee.lastName || ""
-    }`.trim();
+    `${employee.firstName || ""} ${employee.lastName || ""
+      }`.trim();
 
   return (
     fullName ||
@@ -408,174 +406,173 @@ export default function LeaveRequest() {
           return true;
         })
         .map((leave, index) => {
-        const employee =
-          leave?.employeeId &&
-          typeof leave.employeeId === "object"
-            ? leave.employeeId
-            : leave?.employee ||
+          const employee =
+            leave?.employeeId &&
+              typeof leave.employeeId === "object"
+              ? leave.employeeId
+              : leave?.employee ||
               leave?.user ||
               leave?.userId ||
               {};
 
-        const employeeName = getEmployeeName(
-          employee,
-          leave
-        );
+          const employeeName = getEmployeeName(
+            employee,
+            leave
+          );
 
-        const employeeRole = getEmployeeRole(
-          employee,
-          leave
-        );
+          const employeeRole = getEmployeeRole(
+            employee,
+            leave
+          );
 
-        const teamLeadStatus = normalizeStatus(
-          leave.teamLeadStatus
-        );
+          const teamLeadStatus = normalizeStatus(
+            leave.teamLeadStatus
+          );
 
-        const hrStatus = normalizeStatus(
-          leave.hrStatus ||
+          const hrStatus = normalizeStatus(
+            leave.hrStatus ||
             leave.hrApprovalStatus
-        );
+          );
 
-        const leaveId =
-          leave?._id ||
-          leave?.id ||
-          `${employee?._id || "employee"}-${index}`;
-
-        const isHrApplicant = normalizeRole(employeeRole) === "hr";
-
-        let rawAdminStatus = leave.adminStatus;
-        if (localOverrides[leaveId]) {
-          rawAdminStatus = localOverrides[leaveId];
-        } else if (!rawAdminStatus) {
-          if (isHrApplicant) {
-            const leaveFinal = getLeaveFinalStatus(leave);
-            if (leaveFinal === "approved") {
-              rawAdminStatus = "Approved";
-            } else if (leaveFinal === "rejected") {
-              rawAdminStatus = "Rejected";
-            } else {
-              rawAdminStatus = "Pending";
-            }
-          }
-        }
-
-        const adminStatus = normalizeStatus(rawAdminStatus);
-
-        // ======================================================
-        // OVERALL STATUS
-        // ======================================================
-
-        let overallStatus = "Pending";
-
-        if (
-          isRejected(teamLeadStatus) ||
-          isRejected(hrStatus) ||
-          isRejected(adminStatus)
-        ) {
-          overallStatus = "Rejected";
-        } else if (
-          isApproved(hrStatus) &&
-          (
-            normalizeRole(employeeRole) === "employee" ||
-            normalizeRole(employeeRole) === "intern" ||
-            normalizeRole(employeeRole) === "teamlead"
-          )
-        ) {
-          overallStatus = "Approved";
-        } else if (
-          isApproved(adminStatus) &&
-          normalizeRole(employeeRole) === "hr"
-        ) {
-          overallStatus = "Approved";
-        }
-
-        return {
-          id:
+          const leaveId =
             leave?._id ||
             leave?.id ||
-            `${employee?._id || "employee"}-${index}`,
+            `${employee?._id || "employee"}-${index}`;
 
-          employeeId: getEmployeeId(
-            leave?.employeeId || employee
-          ),
+          const isHrApplicant = normalizeRole(employeeRole) === "hr";
 
-          name: employeeName,
+          let rawAdminStatus = leave.adminStatus;
+          if (localOverrides[leaveId]) {
+            rawAdminStatus = localOverrides[leaveId];
+          } else if (!rawAdminStatus) {
+            if (isHrApplicant) {
+              const leaveFinal = getLeaveFinalStatus(leave);
+              if (leaveFinal === "approved") {
+                rawAdminStatus = "Approved";
+              } else if (leaveFinal === "rejected") {
+                rawAdminStatus = "Rejected";
+              } else {
+                rawAdminStatus = "Pending";
+              }
+            }
+          }
 
-          email:
-            employee?.email ||
-            leave?.email ||
-            "",
+          const adminStatus = normalizeStatus(rawAdminStatus);
 
-          role: employeeRole,
+          // ======================================================
+          // OVERALL STATUS
+          // ======================================================
 
-          leaveType:
-            leave?.leaveType ||
-            leave?.type ||
-            "Leave",
+          let overallStatus = "Pending";
 
-          startDate:
-            leave?.startDate ||
-            leave?.fromDate ||
-            "",
+          if (
+            isRejected(teamLeadStatus) ||
+            isRejected(hrStatus) ||
+            isRejected(adminStatus)
+          ) {
+            overallStatus = "Rejected";
+          } else if (
+            isApproved(hrStatus) &&
+            (
+              normalizeRole(employeeRole) === "employee" ||
+              normalizeRole(employeeRole) === "teamlead"
+            )
+          ) {
+            overallStatus = "Approved";
+          } else if (
+            isApproved(adminStatus) &&
+            normalizeRole(employeeRole) === "hr"
+          ) {
+            overallStatus = "Approved";
+          }
 
-          endDate:
-            leave?.endDate ||
-            leave?.toDate ||
-            "",
+          return {
+            id:
+              leave?._id ||
+              leave?.id ||
+              `${employee?._id || "employee"}-${index}`,
 
-          totalDays:
-            leave?.totalDays ??
-            calculateDays(
-              leave?.startDate,
-              leave?.endDate
+            employeeId: getEmployeeId(
+              leave?.employeeId || employee
             ),
 
-          reason: leave?.reason || "",
+            name: employeeName,
 
-          teamLeadStatus,
+            email:
+              employee?.email ||
+              leave?.email ||
+              "",
 
-          hrStatus,
+            role: employeeRole,
 
-          adminStatus,
+            leaveType:
+              leave?.leaveType ||
+              leave?.type ||
+              "Leave",
 
-          approvalStatus: overallStatus,
+            startDate:
+              leave?.startDate ||
+              leave?.fromDate ||
+              "",
 
-          appliedOn:
-            leave?.createdAt ||
-            leave?.appliedOn ||
-            "",
+            endDate:
+              leave?.endDate ||
+              leave?.toDate ||
+              "",
 
-          remark:
-            leave?.remark ||
-            leave?.description ||
-            "",
+            totalDays:
+              leave?.totalDays ??
+              calculateDays(
+                leave?.startDate,
+                leave?.endDate
+              ),
 
-          description:
-            leave?.description ||
-            leave?.remark ||
-            "",
+            reason: leave?.reason || "",
 
-          teamLeadRemark:
-            leave?.teamLeadRemark ||
-            leave?.teamLeadComment ||
-            leave?.teamLeadRemarks ||
-            "",
+            teamLeadStatus,
 
-          hrRemark:
-            leave?.hrRemark ||
-            leave?.hrComment ||
-            leave?.hrRemarks ||
-            "",
+            hrStatus,
 
-          adminRemark:
-            leave?.adminRemark ||
-            leave?.adminComment ||
-            leave?.adminRemarks ||
-            "",
+            adminStatus,
 
-          rawLeave: leave,
-        };
-      });
+            approvalStatus: overallStatus,
+
+            appliedOn:
+              leave?.createdAt ||
+              leave?.appliedOn ||
+              "",
+
+            remark:
+              leave?.remark ||
+              leave?.description ||
+              "",
+
+            description:
+              leave?.description ||
+              leave?.remark ||
+              "",
+
+            teamLeadRemark:
+              leave?.teamLeadRemark ||
+              leave?.teamLeadComment ||
+              leave?.teamLeadRemarks ||
+              "",
+
+            hrRemark:
+              leave?.hrRemark ||
+              leave?.hrComment ||
+              leave?.hrRemarks ||
+              "",
+
+            adminRemark:
+              leave?.adminRemark ||
+              leave?.adminComment ||
+              leave?.adminRemarks ||
+              "",
+
+            rawLeave: leave,
+          };
+        });
 
       const loggedRole = normalizeRole(currentRole || currentUser?.role);
       let finalLeaves = normalized;
@@ -603,7 +600,7 @@ export default function LeaveRequest() {
 
       setError(
         error?.message ||
-          "Failed to load leave requests."
+        "Failed to load leave requests."
       );
 
       setRequests([]);
@@ -632,7 +629,7 @@ export default function LeaveRequest() {
     return (
       Math.ceil(
         (end - start) /
-          (1000 * 60 * 60 * 24)
+        (1000 * 60 * 60 * 24)
       ) + 1
     );
   }
@@ -678,13 +675,12 @@ export default function LeaveRequest() {
     const role = normalizeRole(leave.role);
 
     // --------------------------------------------------------
-    // EMPLOYEE / INTERN
+    // EMPLOYEE
     // Team Lead -> HR
     // --------------------------------------------------------
 
     if (
-      role === "employee" ||
-      role === "intern"
+      role === "employee"
     ) {
       if (isRejected(leave.teamLeadStatus)) {
         return "rejected";
@@ -830,11 +826,10 @@ export default function LeaveRequest() {
         return false;
       }
 
-      // Employee / Intern:
+      // Employee:
       // TL approval compulsory
       if (
-        applicantRole === "employee" ||
-        applicantRole === "intern"
+        applicantRole === "employee"
       ) {
         return (
           isApproved(leave.teamLeadStatus) &&
@@ -859,10 +854,7 @@ export default function LeaveRequest() {
     if (loggedRole === "teamlead") {
       const isMyTeamEmployee = isLeaveOfAssignedTeam(leave, teamEmployeesScope, usersMap);
       return (
-        (
-          applicantRole === "employee" ||
-          applicantRole === "intern"
-        ) &&
+        applicantRole === "employee" &&
         isMyTeamEmployee &&
         isPending(leave.teamLeadStatus)
       );
@@ -1116,11 +1108,10 @@ export default function LeaveRequest() {
         if (!alreadyProcessedMessage) {
           throw new Error(
             responseData?.message ||
-              `Failed to ${
-                status === "approved"
-                  ? "approve"
-                  : "reject"
-              } leave`
+            `Failed to ${status === "approved"
+              ? "approve"
+              : "reject"
+            } leave`
           );
         }
       }
@@ -1181,7 +1172,7 @@ export default function LeaveRequest() {
       );
     });
   }, [
-    requests, 
+    requests,
     searchTerm,
     filterType,
   ]);
@@ -1190,7 +1181,7 @@ export default function LeaveRequest() {
     () => [...new Set(requests.map((request) => normalizeLeaveType(request.leaveType)).filter(Boolean))].sort(),
     [requests]
   );
- 
+
   // ==========================================================
   // DATE
   // ==========================================================
@@ -1342,7 +1333,7 @@ export default function LeaveRequest() {
       const applicantRole = normalizeRole(leave?.role);
 
       // If logged in as HR and employee leave hasn't been approved by TL yet
-      if (loggedRole === "hr" && (applicantRole === "employee" || applicantRole === "intern")) {
+      if (loggedRole === "hr" && applicantRole === "employee") {
         if (isPending(leave?.teamLeadStatus)) {
           return (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
@@ -1499,7 +1490,7 @@ export default function LeaveRequest() {
       </div>
     );
   };
- 
+
 
   // ==========================================================
   // LOADER
@@ -1530,8 +1521,8 @@ export default function LeaveRequest() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {currentRole && (
+        {/* <div className="flex flex-wrap items-center gap-2">
+           {currentRole && (
             <div className="flex items-center gap-2 bg-blue-50 border border-blue-200/80 rounded-lg px-3 py-2 shadow-xs">
               <ShieldCheck className="w-4 h-4 text-blue-600" />
               <span className="text-xs text-blue-600">Role</span>
@@ -1539,7 +1530,7 @@ export default function LeaveRequest() {
                 {formatRole(currentRole)}
               </span>
             </div>
-          )}
+          )} 
 
           <div className="bg-white border border-slate-200/80 rounded-lg px-3.5 py-2 shadow-xs">
             <span className="text-xs text-gray-500">Total</span>
@@ -1547,524 +1538,329 @@ export default function LeaveRequest() {
               {requests.length}
             </span>
           </div>
-        </div>
+        </div> */}
       </div>
 
-        {/* ====================================================
+      {/* ====================================================
             SUCCESS
         ==================================================== */}
 
-        {success && (
-          <div className="mb-4 flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
-            <CheckCircle className="w-5 h-5" />
-            <span>{success}</span>
-          </div>
-        )}
+      {success && (
+        <div className="mb-4 flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
+          <CheckCircle className="w-5 h-5" />
+          <span>{success}</span>
+        </div>
+      )}
 
-        {/* ====================================================
+      {/* ====================================================
             ERROR
         ==================================================== */}
 
-        {error && (
-          <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
-            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+      {error && (
+        <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
 
-            <span className="flex-1">
-              {error}
-            </span>
+          <span className="flex-1">
+            {error}
+          </span>
 
-            <button
-              type="button"
-              onClick={() =>
-                setError("")
-              }
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+          <button
+            type="button"
+            onClick={() =>
+              setError("")
+            }
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
-        {/* ====================================================
+      {/* ====================================================
             TEAM LEAD ASSIGNED BANNER
         ==================================================== */}
 
-        {normalizeRole(currentRole) === "teamlead" && (
-          <div className="mb-4">
-            {assignedTeams.length > 0 ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs">
-                <div className="flex items-center gap-2 text-indigo-900 font-medium">
-                  <User className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span>
-                    Viewing leaves for your assigned team: <strong>{assignedTeams.map(t => t.name || 'My Team').join(', ')}</strong> ({teamEmployeesScope?.memberIds?.size || 0} Members)
-                  </span>
-                </div>
-                <span className="text-[11px] text-indigo-700 font-semibold bg-white px-2.5 py-1 rounded-md border border-indigo-200 shadow-2xs">
-                  Requests forward to HR upon your approval
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+      {normalizeRole(currentRole) === "teamlead" && (
+        <div className="mb-4">
+          {assignedTeams.length > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs">
+              <div className="flex items-center gap-2 text-indigo-900 font-medium">
+                <User className="w-4 h-4 text-indigo-600 shrink-0" />
                 <span>
-                  No specific team assigned to your Team Lead account in <code>/api/teamLead/team</code>. Only leaves for your assigned team members will appear here.
+                  Viewing leaves for your assigned team: <strong>{assignedTeams.map(t => t.name || 'My Team').join(', ')}</strong> ({teamEmployeesScope?.memberIds?.size || 0} Members)
                 </span>
               </div>
-            )}
-          </div>
-        )}
+              <span className="text-[11px] text-indigo-700 font-semibold bg-white px-2.5 py-1 rounded-md border border-indigo-200 shadow-2xs">
+                Requests forward to HR upon your approval
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                No specific team assigned to your Team Lead account in <code>/api/teamLead/team</code>. Only leaves for your assigned team members will appear here.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* ====================================================
+      {/* ====================================================
             MAIN CARD
         ==================================================== */}
 
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
 
-          {/* ==================================================
+        {/* ==================================================
               SEARCH
           ================================================== */}
 
-          <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200">
 
-            <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
 
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
 
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) =>
-                    setSearchTerm(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Search employee, role, leave type..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) =>
+                  setSearchTerm(
+                    e.target.value
+                  )
+                }
+                placeholder="Search employee, role, leave type..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-              <div className="relative" ref={filterDropdownRef}>
-                <button
-                  type="button"
-                  aria-expanded={showFilters}
-                  aria-haspopup="true"
-                  onClick={() =>
-                    setShowFilters(
-                      (previous) =>
-                        !previous
-                    )
-                  }
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium"
-                >
-                  <Filter className="w-4 h-4" />
+            <div className="relative" ref={filterDropdownRef}>
+              <button
+                type="button"
+                aria-expanded={showFilters}
+                aria-haspopup="true"
+                onClick={() =>
+                  setShowFilters(
+                    (previous) =>
+                      !previous
+                  )
+                }
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium"
+              >
+                <Filter className="w-4 h-4" />
 
-                  Filters
+                Filters
 
-                  <ChevronDown
-                    className={`w-4 h-4 transition ${
-                      showFilters
-                        ? "rotate-180"
-                        : ""
+                <ChevronDown
+                  className={`w-4 h-4 transition ${showFilters
+                    ? "rotate-180"
+                    : ""
                     }`}
-                  />
-                </button>
+                />
+              </button>
 
-                {showFilters && (
-                  <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-                    <p className="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-600">
-                      Leave Type
-                    </p>
+              {showFilters && (
+                <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <p className="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-600">
+                    Leave Type
+                  </p>
 
-                    <div className="max-h-72 overflow-y-auto p-1.5">
-                      {[{ value: "all", label: "All Types" }, ...availableLeaveTypes.map((type) => ({
-                        value: type,
-                        label: formatLeaveType(type),
-                      }))].map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => {
-                            setFilterType(option.value);
-                            setShowFilters(false);
-                          }}
-                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm transition ${
-                            filterType === option.value
-                              ? "bg-blue-50 font-semibold text-blue-700"
-                              : "text-gray-700 hover:bg-gray-50"
+                  <div className="max-h-72 overflow-y-auto p-1.5">
+                    {[{ value: "all", label: "All Types" }, ...availableLeaveTypes.map((type) => ({
+                      value: type,
+                      label: formatLeaveType(type),
+                    }))].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setFilterType(option.value);
+                          setShowFilters(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm transition ${filterType === option.value
+                          ? "bg-blue-50 font-semibold text-blue-700"
+                          : "text-gray-700 hover:bg-gray-50"
                           }`}
-                        >
-                          {option.label}
-                          {filterType === option.value && (
-                            <Check className="h-4 w-4" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
+                      >
+                        {option.label}
+                        {filterType === option.value && (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </button>
+                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* ==================================================
+        {/* ==================================================
               LOADING
           ================================================== */}
 
-          {loading ? (
-            <Loader />
-          ) : filteredRequests.length === 0 ? (
+        {loading ? (
+          <Loader />
+        ) : filteredRequests.length === 0 ? (
 
-            <div className="py-16 text-center">
+          <div className="py-16 text-center">
 
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-50 mb-4">
-                <Calendar className="w-7 h-7 text-blue-500" />
-              </div>
-
-              <h3 className="text-lg font-semibold text-gray-800">
-                {searchTerm ||
-                filterType !== "all"
-                  ? "No Results Found"
-                  : "No Leave Requests"}
-              </h3>
-
-              <p className="text-sm text-gray-500 mt-1">
-                {searchTerm ||
-                filterType !== "all"
-                  ? "Try changing your search or filter."
-                  : "Leave applications will appear here."}
-              </p>
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-50 mb-4">
+              <Calendar className="w-7 h-7 text-blue-500" />
             </div>
 
-          ) : (
+            <h3 className="text-lg font-semibold text-gray-800">
+              {searchTerm ||
+                filterType !== "all"
+                ? "No Results Found"
+                : "No Leave Requests"}
+            </h3>
 
-            <>
-              {/* ==================================================
+            <p className="text-sm text-gray-500 mt-1">
+              {searchTerm ||
+                filterType !== "all"
+                ? "Try changing your search or filter."
+                : "Leave applications will appear here."}
+            </p>
+          </div>
+
+        ) : (
+
+          <>
+            {/* ==================================================
                   DESKTOP TABLE
               ================================================== */}
 
-              <div className="hidden xl:block overflow-hidden">
+            <div className="hidden xl:block overflow-hidden">
 
-                <table className="w-full table-fixed text-xs">
-                  <colgroup>
-                    <col className="w-[4%]" />
-                    <col className="w-[15%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[11%]" />
-                    <col className="w-[11%]" />
-                  </colgroup>
+              <table className="w-full table-fixed text-xs">
+                <colgroup>
+                  <col className="w-[4%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                </colgroup>
 
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        #
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      #
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        Employee
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      Employee
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        Leave
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      Leave
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        Duration
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      Duration
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        Dates
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      Dates
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        Team Lead
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      Team Lead
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        HR
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      HR
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        Admin
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      Admin
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        Workflow
-                      </th>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      Workflow
+                    </th>
 
-                      <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                        Approve / Reject Reason
-                      </th>
-                    </tr>
-                  </thead>
+                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                      Approve / Reject Reason
+                    </th>
+                  </tr>
+                </thead>
 
-                  <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100">
 
-                    {filteredRequests.map(
-                      (request, index) => (
+                  {filteredRequests.map(
+                    (request, index) => (
 
-                        <tr
-                          key={request.id}
-                          onClick={() =>
-                            setSelectedLeave(
-                              request
-                            )
-                          }
-                          className="hover:bg-blue-50 cursor-pointer transition"
-                        >
+                      <tr
+                        key={request.id}
+                        onClick={() =>
+                          setSelectedLeave(
+                            request
+                          )
+                        }
+                        className="hover:bg-blue-50 cursor-pointer transition"
+                      >
 
-                          <td className="px-2 py-3 text-gray-500">
-                            {index + 1}
-                          </td>
+                        <td className="px-2 py-3 text-gray-500">
+                          {index + 1}
+                        </td>
 
-                          <td className="px-2 py-3">
+                        <td className="px-2 py-3">
 
-                              <div className="flex min-w-0 items-center gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
 
-                              <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                                {getInitials(
-                                  request.name
-                                )}
-                              </div>
-
-                              <div className="min-w-0">
-                                <p className="break-words font-semibold text-gray-800">
-                                  {request.name}
-                                </p>
-
-                                <p className="text-xs text-gray-500">
-                                  {formatRole(
-                                    request.role
-                                  )}
-                                </p>
-                              </div>
-
+                            <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {getInitials(
+                                request.name
+                              )}
                             </div>
-                          </td>
 
-                          <td className="px-2 py-3">
+                            <div className="min-w-0">
+                              <p className="break-words font-semibold text-gray-800">
+                                {request.name}
+                              </p>
 
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${getLeaveTypeStyle(
-                                request.leaveType
-                              )}`}
-                            >
-                              {getLeaveTypeIcon(
-                                request.leaveType
-                              )}
-
-                              {formatLeaveType(request.leaveType)}
-                            </span>
-                          </td>
-
-                          <td className="px-2 py-3 font-semibold text-gray-800">
-                            {formatDuration(request)}
-                          </td>
-
-                          <td className="px-2 py-3 text-xs text-gray-600">
-                            <span className="block">{formatDate(request.startDate)}</span>
-                            <span className="block">to {formatDate(request.endDate)}</span>
-                          </td>
-
-                          <td className="px-2 py-3">
-                            {normalizeRole(currentRole) === "teamlead" && canTakeAction(request) ? (
-                              <ApprovalActions leave={request} />
-                            ) : (
-                              <ApprovalStatus
-                                leave={request}
-                                stage="teamlead"
-                                status={request.teamLeadStatus}
-                              />
-                            )}
-                          </td>
-
-                          <td className="px-2 py-3">
-                            {normalizeRole(currentRole) === "hr" && canTakeAction(request) ? (
-                              <ApprovalActions leave={request} />
-                            ) : (
-                              <ApprovalStatus
-                                leave={request}
-                                stage="hr"
-                                status={request.hrStatus}
-                              />
-                            )}
-                          </td>
-
-                          <td className="px-2 py-3">
-                            {normalizeRole(request.role) === "hr" ? (
-                              normalizeRole(currentRole) === "admin" && canTakeAction(request) ? (
-                                <ApprovalActions leave={request} />
-                              ) : (
-                                <StatusBadge status={request.adminStatus} />
-                              )
-                            ) : (
-                              <span className="text-sm text-gray-400">
-                                -
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="px-2 py-3">
-                            <span className="text-xs font-medium text-gray-600">
-                              {getWorkflowText(
-                                request
-                              )}
-                            </span>
-                          </td>
-
-                          <td className="px-2 py-3">
-                            {request.teamLeadRemark || request.hrRemark || request.adminRemark || request.remark || request.description ? (
-                              <div className="space-y-1.5 text-xs">
-                                {request.teamLeadRemark && (
-                                  <div className="flex items-start gap-1">
-                                    <span className="font-bold text-amber-700 shrink-0">TL:</span>
-                                    <span className="text-gray-700 whitespace-normal break-words">
-                                      {request.teamLeadRemark}
-                                    </span>
-                                  </div>
+                              <p className="text-xs text-gray-500">
+                                {formatRole(
+                                  request.role
                                 )}
-                                {request.hrRemark && (
-                                  <div className="flex items-start gap-1">
-                                    <span className="font-bold text-purple-700 shrink-0">HR:</span>
-                                    <span className="text-gray-700 whitespace-normal break-words">
-                                      {request.hrRemark}
-                                    </span>
-                                  </div>
-                                )}
-                                {request.adminRemark && (
-                                  <div className="flex items-start gap-1">
-                                    <span className="font-bold text-blue-700 shrink-0">Admin:</span>
-                                    <span className="text-gray-700 whitespace-normal break-words">
-                                      {request.adminRemark}
-                                    </span>
-                                  </div>
-                                )}
-                                {!request.teamLeadRemark && !request.hrRemark && !request.adminRemark && (request.remark || request.description) && (
-                                  <span className="text-gray-700 whitespace-normal break-words">
-                                    {request.remark || request.description}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </td>
+                              </p>
+                            </div>
 
-                        </tr>
-                      )
-                    )}
-
-                  </tbody>
-                </table>
-              </div>
-
-              {/* ==================================================
-                  MOBILE CARDS
-              ================================================== */}
-
-              <div className="xl:hidden p-3 space-y-3">
-
-                {filteredRequests.map(
-                  (request) => (
-
-                    <div
-                      key={request.id}
-                      onClick={() =>
-                        setSelectedLeave(
-                          request
-                        )
-                      }
-                      className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer transition"
-                    >
-
-                      <div className="flex items-start justify-between gap-3">
-
-                        <div className="flex items-center gap-3">
-
-                          <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
-                            {getInitials(
-                              request.name
-                            )}
                           </div>
+                        </td>
 
-                          <div>
-                            <p className="font-semibold text-gray-800">
-                              {request.name}
-                            </p>
+                        <td className="px-2 py-3">
 
-                            <p className="text-xs text-gray-500">
-                              {formatRole(
-                                request.role
-                              )}
-                            </p>
-                          </div>
-
-                        </div>
-
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium ${getLeaveTypeStyle(
-                            request.leaveType
-                          )}`}
-                        >
-                          {getLeaveTypeIcon(
-                            request.leaveType
-                          )}
-
-                          {formatLeaveType(request.leaveType)}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-
-                        <div>
-                          <p className="text-[11px] text-gray-400 uppercase">
-                            Dates
-                          </p>
-
-                          <p className="text-xs font-medium text-gray-700 mt-1">
-                            {formatDate(
-                              request.startDate
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${getLeaveTypeStyle(
+                              request.leaveType
+                            )}`}
+                          >
+                            {getLeaveTypeIcon(
+                              request.leaveType
                             )}
-                            {" - "}
-                            {formatDate(
-                              request.endDate
-                            )}
-                          </p>
-                        </div>
 
-                        <div>
-                          <p className="text-[11px] text-gray-400 uppercase">
-                            Duration
-                          </p>
+                            {formatLeaveType(request.leaveType)}
+                          </span>
+                        </td>
 
-                          <p className="text-xs font-semibold text-gray-700 mt-1">
-                            {formatDuration(request)}
-                          </p>
-                        </div>
-                      </div>
+                        <td className="px-2 py-3 font-semibold text-gray-800">
+                          {formatDuration(request)}
+                        </td>
 
-                      {request.reason && (
-                        <div className="mt-3 flex items-start gap-2">
-                          <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <td className="px-2 py-3 text-xs text-gray-600">
+                          <span className="block">{formatDate(request.startDate)}</span>
+                          <span className="block">to {formatDate(request.endDate)}</span>
+                        </td>
 
-                          <p className="text-xs text-gray-500 line-clamp-2">
-                            {request.reason}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="mt-4 pt-3 border-t border-gray-200 grid grid-cols-3 gap-2">
-
-                        <div>
-                          <p className="text-[10px] text-gray-400 mb-1">
-                            TEAM LEAD
-                          </p>
-
+                        <td className="px-2 py-3">
                           {normalizeRole(currentRole) === "teamlead" && canTakeAction(request) ? (
                             <ApprovalActions leave={request} />
                           ) : (
@@ -2074,13 +1870,9 @@ export default function LeaveRequest() {
                               status={request.teamLeadStatus}
                             />
                           )}
-                        </div>
+                        </td>
 
-                        <div>
-                          <p className="text-[10px] text-gray-400 mb-1">
-                            HR
-                          </p>
-
+                        <td className="px-2 py-3">
                           {normalizeRole(currentRole) === "hr" && canTakeAction(request) ? (
                             <ApprovalActions leave={request} />
                           ) : (
@@ -2090,71 +1882,268 @@ export default function LeaveRequest() {
                               status={request.hrStatus}
                             />
                           )}
-                        </div>
+                        </td>
 
-                        <div>
-                          <p className="text-[10px] text-gray-400 mb-1">
-                            ADMIN
-                          </p>
-
+                        <td className="px-2 py-3">
                           {normalizeRole(request.role) === "hr" ? (
                             normalizeRole(currentRole) === "admin" && canTakeAction(request) ? (
                               <ApprovalActions leave={request} />
                             ) : (
-                              <StatusBadge
-                                status={
-                                  request.adminStatus
-                                }
-                              />
+                              <StatusBadge status={request.adminStatus} />
                             )
                           ) : (
                             <span className="text-sm text-gray-400">
                               -
                             </span>
                           )}
+                        </td>
+
+                        <td className="px-2 py-3">
+                          <span className="text-xs font-medium text-gray-600">
+                            {getWorkflowText(
+                              request
+                            )}
+                          </span>
+                        </td>
+
+                        <td className="px-2 py-3">
+                          {request.teamLeadRemark || request.hrRemark || request.adminRemark || request.remark || request.description ? (
+                            <div className="space-y-1.5 text-xs">
+                              {request.teamLeadRemark && (
+                                <div className="flex items-start gap-1">
+                                  <span className="font-bold text-amber-700 shrink-0">TL:</span>
+                                  <span className="text-gray-700 whitespace-normal break-words">
+                                    {request.teamLeadRemark}
+                                  </span>
+                                </div>
+                              )}
+                              {request.hrRemark && (
+                                <div className="flex items-start gap-1">
+                                  <span className="font-bold text-purple-700 shrink-0">HR:</span>
+                                  <span className="text-gray-700 whitespace-normal break-words">
+                                    {request.hrRemark}
+                                  </span>
+                                </div>
+                              )}
+                              {request.adminRemark && (
+                                <div className="flex items-start gap-1">
+                                  <span className="font-bold text-blue-700 shrink-0">Admin:</span>
+                                  <span className="text-gray-700 whitespace-normal break-words">
+                                    {request.adminRemark}
+                                  </span>
+                                </div>
+                              )}
+                              {!request.teamLeadRemark && !request.hrRemark && !request.adminRemark && (request.remark || request.description) && (
+                                <span className="text-gray-700 whitespace-normal break-words">
+                                  {request.remark || request.description}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
+                        </td>
+
+                      </tr>
+                    )
+                  )}
+
+                </tbody>
+              </table>
+            </div>
+
+            {/* ==================================================
+                  MOBILE CARDS
+              ================================================== */}
+
+            <div className="xl:hidden p-3 space-y-3">
+
+              {filteredRequests.map(
+                (request) => (
+
+                  <div
+                    key={request.id}
+                    onClick={() =>
+                      setSelectedLeave(
+                        request
+                      )
+                    }
+                    className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer transition"
+                  >
+
+                    <div className="flex items-start justify-between gap-3">
+
+                      <div className="flex items-center gap-3">
+
+                        <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+                          {getInitials(
+                            request.name
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="font-semibold text-gray-800">
+                            {request.name}
+                          </p>
+
+                          <p className="text-xs text-gray-500">
+                            {formatRole(
+                              request.role
+                            )}
+                          </p>
                         </div>
 
                       </div>
 
-                      {(request.teamLeadRemark || request.hrRemark || request.adminRemark || request.remark || request.description) && (
-                        <div className="mt-2.5 pt-2 border-t border-gray-100 space-y-1 text-xs">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            Approve / Reject Reason
-                          </p>
-                          {request.teamLeadRemark && (
-                            <p className="text-xs text-gray-600">
-                              <span className="font-semibold text-amber-700">TL: </span>
-                              {request.teamLeadRemark}
-                            </p>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium ${getLeaveTypeStyle(
+                          request.leaveType
+                        )}`}
+                      >
+                        {getLeaveTypeIcon(
+                          request.leaveType
+                        )}
+
+                        {formatLeaveType(request.leaveType)}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+
+                      <div>
+                        <p className="text-[11px] text-gray-400 uppercase">
+                          Dates
+                        </p>
+
+                        <p className="text-xs font-medium text-gray-700 mt-1">
+                          {formatDate(
+                            request.startDate
                           )}
-                          {request.hrRemark && (
-                            <p className="text-xs text-gray-600">
-                              <span className="font-semibold text-purple-700">HR: </span>
-                              {request.hrRemark}
-                            </p>
+                          {" - "}
+                          {formatDate(
+                            request.endDate
                           )}
-                          {request.adminRemark && (
-                            <p className="text-xs text-gray-600">
-                              <span className="font-semibold text-blue-700">Admin: </span>
-                              {request.adminRemark}
-                            </p>
-                          )}
-                          {!request.teamLeadRemark && !request.hrRemark && !request.adminRemark && (request.remark || request.description) && (
-                            <p className="text-xs text-gray-600">
-                              {request.remark || request.description}
-                            </p>
-                          )}
-                        </div>
-                      )}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[11px] text-gray-400 uppercase">
+                          Duration
+                        </p>
+
+                        <p className="text-xs font-semibold text-gray-700 mt-1">
+                          {formatDuration(request)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {request.reason && (
+                      <div className="mt-3 flex items-start gap-2">
+                        <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+
+                        <p className="text-xs text-gray-500 line-clamp-2">
+                          {request.reason}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="mt-4 pt-3 border-t border-gray-200 grid grid-cols-3 gap-2">
+
+                      <div>
+                        <p className="text-[10px] text-gray-400 mb-1">
+                          TEAM LEAD
+                        </p>
+
+                        {normalizeRole(currentRole) === "teamlead" && canTakeAction(request) ? (
+                          <ApprovalActions leave={request} />
+                        ) : (
+                          <ApprovalStatus
+                            leave={request}
+                            stage="teamlead"
+                            status={request.teamLeadStatus}
+                          />
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] text-gray-400 mb-1">
+                          HR
+                        </p>
+
+                        {normalizeRole(currentRole) === "hr" && canTakeAction(request) ? (
+                          <ApprovalActions leave={request} />
+                        ) : (
+                          <ApprovalStatus
+                            leave={request}
+                            stage="hr"
+                            status={request.hrStatus}
+                          />
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] text-gray-400 mb-1">
+                          ADMIN
+                        </p>
+
+                        {normalizeRole(request.role) === "hr" ? (
+                          normalizeRole(currentRole) === "admin" && canTakeAction(request) ? (
+                            <ApprovalActions leave={request} />
+                          ) : (
+                            <StatusBadge
+                              status={
+                                request.adminStatus
+                              }
+                            />
+                          )
+                        ) : (
+                          <span className="text-sm text-gray-400">
+                            -
+                          </span>
+                        )}
+                      </div>
 
                     </div>
-                  )
-                )}
 
-              </div>
-            </>
-          )}
-        </div>
+                    {(request.teamLeadRemark || request.hrRemark || request.adminRemark || request.remark || request.description) && (
+                      <div className="mt-2.5 pt-2 border-t border-gray-100 space-y-1 text-xs">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                          Approve / Reject Reason
+                        </p>
+                        {request.teamLeadRemark && (
+                          <p className="text-xs text-gray-600">
+                            <span className="font-semibold text-amber-700">TL: </span>
+                            {request.teamLeadRemark}
+                          </p>
+                        )}
+                        {request.hrRemark && (
+                          <p className="text-xs text-gray-600">
+                            <span className="font-semibold text-purple-700">HR: </span>
+                            {request.hrRemark}
+                          </p>
+                        )}
+                        {request.adminRemark && (
+                          <p className="text-xs text-gray-600">
+                            <span className="font-semibold text-blue-700">Admin: </span>
+                            {request.adminRemark}
+                          </p>
+                        )}
+                        {!request.teamLeadRemark && !request.hrRemark && !request.adminRemark && (request.remark || request.description) && (
+                          <p className="text-xs text-gray-600">
+                            {request.remark || request.description}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                )
+              )}
+
+            </div>
+          </>
+        )}
+      </div>
 
       {/* ========================================================
           DETAILS MODAL
@@ -2475,70 +2464,70 @@ export default function LeaveRequest() {
                 selectedLeave.hrRemark ||
                 selectedLeave.adminRemark ||
                 selectedLeave.remark) && (
-                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/70 space-y-3">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <MessageSquare className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      Remarks & Descriptions
-                    </span>
-                  </div>
-
-                  {selectedLeave.teamLeadRemark && (
-                    <div className="bg-white border border-blue-100 rounded-lg p-3">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                          Team Lead Remark
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-700">
-                        {selectedLeave.teamLeadRemark}
-                      </p>
+                  <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/70 space-y-3">
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <MessageSquare className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        Remarks & Descriptions
+                      </span>
                     </div>
-                  )}
 
-                  {selectedLeave.hrRemark && (
-                    <div className="bg-white border border-purple-100 rounded-lg p-3">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                          HR Remark
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-700">
-                        {selectedLeave.hrRemark}
-                      </p>
-                    </div>
-                  )}
-
-                  {selectedLeave.adminRemark && (
-                    <div className="bg-white border border-amber-100 rounded-lg p-3">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                          Admin Remark
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-700">
-                        {selectedLeave.adminRemark}
-                      </p>
-                    </div>
-                  )}
-
-                  {selectedLeave.remark &&
-                    selectedLeave.remark !== selectedLeave.teamLeadRemark &&
-                    selectedLeave.remark !== selectedLeave.hrRemark &&
-                    selectedLeave.remark !== selectedLeave.adminRemark && (
-                      <div className="bg-white border border-gray-200 rounded-lg p-3">
+                    {selectedLeave.teamLeadRemark && (
+                      <div className="bg-white border border-blue-100 rounded-lg p-3">
                         <div className="flex items-center gap-1.5 mb-1">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                            Description / Remark
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            Team Lead Remark
                           </span>
                         </div>
                         <p className="text-xs text-gray-700">
-                          {selectedLeave.remark}
+                          {selectedLeave.teamLeadRemark}
                         </p>
                       </div>
                     )}
-                </div>
-              )}
+
+                    {selectedLeave.hrRemark && (
+                      <div className="bg-white border border-purple-100 rounded-lg p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            HR Remark
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-700">
+                          {selectedLeave.hrRemark}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedLeave.adminRemark && (
+                      <div className="bg-white border border-amber-100 rounded-lg p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            Admin Remark
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-700">
+                          {selectedLeave.adminRemark}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedLeave.remark &&
+                      selectedLeave.remark !== selectedLeave.teamLeadRemark &&
+                      selectedLeave.remark !== selectedLeave.hrRemark &&
+                      selectedLeave.remark !== selectedLeave.adminRemark && (
+                        <div className="bg-white border border-gray-200 rounded-lg p-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                              Description / Remark
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-700">
+                            {selectedLeave.remark}
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                )}
 
             </div>
 
@@ -2584,7 +2573,7 @@ export default function LeaveRequest() {
                       <CheckCircle className="w-4 h-4" />
 
                       {actioningId ===
-                      selectedLeave.id
+                        selectedLeave.id
                         ? "Processing..."
                         : "Approve"}
                     </button>
@@ -2608,7 +2597,7 @@ export default function LeaveRequest() {
                       <XCircle className="w-4 h-4" />
 
                       {actioningId ===
-                      selectedLeave.id
+                        selectedLeave.id
                         ? "Processing..."
                         : "Reject"}
                     </button>
@@ -2624,14 +2613,14 @@ export default function LeaveRequest() {
                     ) === "admin"
                       ? "View only. Admin can approve/reject only HR leave pending for Admin approval."
                       : normalizeRole(
-                          currentRole
-                        ) === "hr"
-                      ? "View only. HR can act after Team Lead approval or directly on Team Lead leave."
-                      : normalizeRole(
+                        currentRole
+                      ) === "hr"
+                        ? "View only. HR can act after Team Lead approval or directly on Team Lead leave."
+                        : normalizeRole(
                           currentRole
                         ) === "teamlead"
-                      ? "View only. Team Lead can act only on Employee/Intern pending leaves."
-                      : "View only. No action is required from your role."}
+                          ? "View only. Team Lead can act only on Employee pending leaves."
+                          : "View only. No action is required from your role."}
 
                   </div>
                 )}
@@ -2667,18 +2656,16 @@ export default function LeaveRequest() {
           >
             {/* MODAL HEADER */}
             <div
-              className={`p-5 flex items-start gap-4 border-b ${
-                actionModal.status === "approved"
-                  ? "bg-emerald-50/70 border-emerald-100"
-                  : "bg-rose-50/70 border-rose-100"
-              }`}
+              className={`p-5 flex items-start gap-4 border-b ${actionModal.status === "approved"
+                ? "bg-emerald-50/70 border-emerald-100"
+                : "bg-rose-50/70 border-rose-100"
+                }`}
             >
               <div
-                className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${
-                  actionModal.status === "approved"
-                    ? "bg-emerald-600 text-white"
-                    : "bg-rose-600 text-white"
-                }`}
+                className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${actionModal.status === "approved"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-rose-600 text-white"
+                  }`}
               >
                 {actionModal.status === "approved" ? (
                   <CheckCircle className="w-6 h-6" />
@@ -2790,11 +2777,10 @@ export default function LeaveRequest() {
                   actioningId === actionModal.leave?.id ||
                   !actionModal.remark?.trim()
                 }
-                className={`inline-flex items-center gap-1.5 px-5 py-2 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  actionModal.status === "approved"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-rose-600 hover:bg-rose-700"
-                }`}
+                className={`inline-flex items-center gap-1.5 px-5 py-2 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${actionModal.status === "approved"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-rose-600 hover:bg-rose-700"
+                  }`}
               >
                 {actioningId === actionModal.leave?.id ? (
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -2806,8 +2792,8 @@ export default function LeaveRequest() {
                 {actioningId === actionModal.leave?.id
                   ? "Processing..."
                   : actionModal.status === "approved"
-                  ? "Confirm Approve"
-                  : "Confirm Reject"}
+                    ? "Confirm Approve"
+                    : "Confirm Reject"}
               </button>
             </div>
           </div>

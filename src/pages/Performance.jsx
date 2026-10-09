@@ -246,8 +246,6 @@ const Performance = () => {
     const normalized = String(rawType).trim().toLowerCase();
 
     switch (normalized) {
-      case "intern":
-        return "Intern";
       case "employee":
         return "Employee";
       case "teamlead":
@@ -712,23 +710,23 @@ const Performance = () => {
       {notification.message && (
         <div
           className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg border text-xs sm:text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${notification.type === "success"
-              ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-800"
-              : notification.type === "error"
-                ? "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/80 dark:text-rose-200 dark:border-rose-800"
-                : "bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-200 dark:border-indigo-800"
+            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+            : notification.type === "error"
+              ? "bg-rose-50 text-rose-800 border-rose-200"
+              : "bg-indigo-50 text-indigo-800 border-indigo-200"
             }`}
         >
           {notification.type === "success" ? (
-            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+            <CheckCircle2 size={16} className="text-emerald-600" />
           ) : notification.type === "error" ? (
-            <AlertCircle size={16} className="text-rose-600 dark:text-rose-400" />
+            <AlertCircle size={16} className="text-rose-600" />
           ) : (
-            <Sparkles size={16} className="text-indigo-600 dark:text-indigo-400" />
+            <Sparkles size={16} className="text-indigo-600" />
           )}
           <span>{notification.message}</span>
           <button
             onClick={() => setNotification({ message: "", type: "" })}
-            className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            className="ml-2 text-slate-400 hover:text-slate-600 cursor-pointer"
           >
             <X size={14} />
           </button>
@@ -740,23 +738,23 @@ const Performance = () => {
       {/* ==================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
             <BarChart3 size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
                 {isAdmin ? "Performance Management" : isTL ? "Team Lead Performance" : "My Performance"}
               </h1>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              {/* <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-200">
                 {isAdmin ? "Admin" : isTL ? "Team Lead (Read-Only)" : "Employee (Read-Only)"}
-              </span>
+              </span> */}
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            {/* <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               {isAdmin
                 ? "Track and manage employee performance with ease."
                 : "View your personal performance scores, evaluations, and supervisor remarks."}
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -766,7 +764,7 @@ const Performance = () => {
             type="button"
             onClick={fetchAllPerformances}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer disabled:opacity-60 transition"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 shadow-xs cursor-pointer disabled:opacity-60 transition"
           >
             <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : "text-slate-400"} />
             <span>{loading ? "Refreshing..." : "Sync"}</span>
@@ -789,11 +787,11 @@ const Performance = () => {
           ].map((item, idx) => (
             <div
               key={idx}
-              className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+              className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
             >
               <div className="flex items-start justify-between">
-                <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+                <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+                <p className="text-xl font-bold text-slate-900">{item.value}</p>
               </div>
             </div>
           ))}
@@ -812,11 +810,11 @@ const Performance = () => {
           ].map((item, idx) => (
             <div
               key={idx}
-              className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+              className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
             >
               <div className="flex items-start justify-between">
-                <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+                <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+                <p className="text-xl font-bold text-slate-900">{item.value}</p>
               </div>
             </div>
           ))}
@@ -826,19 +824,19 @@ const Performance = () => {
       {/* ==================================================== */}
       {/* 3. PERFORMANCE HISTORY CARD (FULL WIDTH) */}
       {/* ==================================================== */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4">
 
         {/* Header Row: Title & Action Buttons */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
               <FileText size={18} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              <h3 className="text-base font-bold text-slate-900">
                 {isAdmin ? "Performance History" : "My Performance History"}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {isAdmin
                   ? "View and manage employee performance records"
                   : "Personal performance evaluations and review remarks"}
@@ -869,7 +867,7 @@ const Performance = () => {
               placeholder={isAdmin ? "Search by employee name, email or department..." : "Search evaluations or remarks..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
             />
           </div>
 
@@ -880,7 +878,7 @@ const Performance = () => {
                 <select
                   value={toolbarDept}
                   onChange={(e) => setToolbarDept(e.target.value)}
-                  className="h-10 px-3.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none pr-8 font-normal"
+                  className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none pr-8 font-normal"
                 >
                   <option value="all">All Departments</option>
                   {DEPARTMENTS.map((d) => (
@@ -898,7 +896,7 @@ const Performance = () => {
               <select
                 value={toolbarPerfFilter}
                 onChange={(e) => setToolbarPerfFilter(e.target.value)}
-                className="h-10 px-3.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none pr-8 font-normal"
+                className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none pr-8 font-normal"
               >
                 <option value="all">All Performance</option>
                 <option value="excellent">Excellent (≥ 80%)</option>
@@ -913,7 +911,7 @@ const Performance = () => {
               <select
                 value={selectedMonthYear}
                 onChange={(e) => setSelectedMonthYear(e.target.value)}
-                className="h-10 pl-8 pr-8 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none font-normal"
+                className="h-10 pl-8 pr-8 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none font-normal"
               >
                 <option value="all">All Dates</option>
                 {monthYearOptions.map((opt) => (
@@ -936,8 +934,8 @@ const Performance = () => {
           </div>
         ) : filteredPerformances.length === 0 ? (
           <div className="p-16 text-center">
-            <Award size={36} className="text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            <Award size={36} className="text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-700">
               No performance records found
             </p>
             <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
@@ -959,10 +957,10 @@ const Performance = () => {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto border border-slate-200/80 dark:border-slate-800 rounded-lg">
+          <div className="overflow-x-auto border border-slate-200/80 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                <tr className="border-b border-slate-200/80 bg-slate-50/80 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
                   <th className="py-3 px-3 w-10 text-left">No.</th>
                   <th className="py-3 px-4">EMPLOYEE</th>
                   <th className="py-3 px-4">DEPARTMENT</th>
@@ -973,7 +971,7 @@ const Performance = () => {
                   {isAdmin && <th className="py-3 px-4 text-center">ACTIONS</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {filteredPerformances.map((perf, index) => {
                   const rowNumber = index + 1;
                   const empName = getEmployeeDisplayName(perf);
@@ -993,7 +991,7 @@ const Performance = () => {
                   return (
                     <tr
                       key={perf._id || index}
-                      className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
+                      className="hover:bg-slate-50/50 transition-colors"
                     >
                       {/* Index */}
                       <td className="py-3.5 px-3 text-slate-500 font-medium">
@@ -1009,10 +1007,10 @@ const Performance = () => {
                             {getInitials(empName)}
                           </div>
                           <div className="min-w-0">
-                            <span className="font-bold text-slate-900 dark:text-slate-100 block truncate">
+                            <span className="font-bold text-slate-900 block truncate">
                               {empName}
                             </span>
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 block truncate">
+                            <span className="text-[11px] text-slate-400 block truncate">
                               {empEmail || "No email available"}
                             </span>
                           </div>
@@ -1040,10 +1038,10 @@ const Performance = () => {
                       {/* Performance & Progress Bar */}
                       <td className="py-3.5 px-4">
                         <div>
-                          <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                          <span className="font-bold text-xs text-slate-900">
                             {pct}%
                           </span>
-                          <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-1.5">
+                          <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1.5">
                             <div
                               className={`h-full ${barColor} rounded-full transition-all duration-300`}
                               style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
@@ -1054,13 +1052,13 @@ const Performance = () => {
 
                       {/* Remarks */}
                       <td className="py-3.5 px-4 max-w-xs">
-                        <p className="text-xs text-slate-600 dark:text-slate-400 truncate" title={perf.remarks}>
+                        <p className="text-xs text-slate-600 truncate" title={perf.remarks}>
                           {perf.remarks || "—"}
                         </p>
                       </td>
 
                       {/* Date */}
-                      <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
                         {dateFormatted}
                       </td>
 
@@ -1101,18 +1099,18 @@ const Performance = () => {
       {/* ==================================================== */}
       {isAdmin && (isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95">
+          <div className="bg-white border border-slate-200/80 rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95">
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                   {isEditModalOpen ? <Edit3 size={16} /> : <Plus size={16} />}
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  <h3 className="text-sm font-bold text-slate-900">
                     {isEditModalOpen ? "Edit Performance Record" : "Add Performance Record"}
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-slate-500 mt-0.5">
                     {isEditModalOpen
                       ? "Update score and review remarks"
                       : "Evaluate staff score and performance remarks"}
@@ -1126,7 +1124,7 @@ const Performance = () => {
                   setIsEditModalOpen(false);
                   setEditingRecord(null);
                 }}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -1136,7 +1134,7 @@ const Performance = () => {
             <form onSubmit={handleSubmitModal} className="p-4 sm:p-5 space-y-4">
               {/* Employee Selection */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Select Employee *
                 </label>
                 <div className="relative">
@@ -1152,7 +1150,7 @@ const Performance = () => {
                       });
                     }}
                     required
-                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer pr-8 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer pr-8 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                   >
                     <option value="">-- Choose Employee --</option>
                     {employees.map((emp) => (
@@ -1171,7 +1169,7 @@ const Performance = () => {
               {/* Performance Percentage & Department in row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Performance % *
                   </label>
                   <div className="relative">
@@ -1184,7 +1182,7 @@ const Performance = () => {
                       placeholder="e.g. 85"
                       value={modalForm.percentage}
                       onChange={(e) => setModalForm({ ...modalForm, percentage: e.target.value })}
-                      className="w-full h-10 pl-3 pr-7 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+                      className="w-full h-10 pl-3 pr-7 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                     />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
                       %
@@ -1193,14 +1191,14 @@ const Performance = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Department
                   </label>
                   <div className="relative">
                     <select
                       value={modalForm.department || "Development"}
                       onChange={(e) => setModalForm({ ...modalForm, department: e.target.value })}
-                      className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer pr-8 transition-all"
+                      className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer pr-8 transition-all"
                     >
                       {DEPARTMENTS.map((dept) => (
                         <option key={dept} value={dept}>
@@ -1218,7 +1216,7 @@ const Performance = () => {
 
               {/* Remarks */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Remarks
                 </label>
                 <div className="relative">
@@ -1228,7 +1226,7 @@ const Performance = () => {
                     placeholder="Add remarks about the employee's performance..."
                     value={modalForm.remarks}
                     onChange={(e) => setModalForm({ ...modalForm, remarks: e.target.value })}
-                    className="w-full p-3 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 resize-none transition-all"
+                    className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 resize-none transition-all"
                   />
                   <span className="absolute bottom-2.5 right-3 text-[10px] text-slate-400 font-medium">
                     {modalForm.remarks.length}/200
@@ -1237,7 +1235,7 @@ const Performance = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   disabled={submitting}

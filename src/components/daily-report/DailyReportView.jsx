@@ -388,7 +388,7 @@ export const DailyReportView = () => {
         </div>
 
         {formMsg.text && (
-          <div className={`mb-5 p-3 rounded-md text-sm font-medium border ${formMsg.type === 'error' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400' : 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:border-green-800/50 dark:text-green-400'}`}>
+          <div className={`mb-5 p-3 rounded-md text-sm font-medium border ${formMsg.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
             {formMsg.text}
           </div>
         )}
@@ -401,17 +401,17 @@ export const DailyReportView = () => {
             ) : taskRows.map((row, idx) => {
               const availableTasks = getTasksForProject(row.projectId);
               return (
-                <div key={row.id} className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4 transition-colors overflow-hidden">
+                <div key={row.id} className="p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4 transition-colors overflow-hidden">
                   
-                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 tracking-wide">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                    <span className="text-sm font-semibold text-slate-700 tracking-wide">
                       Entry #{idx + 1}
                     </span>
                     {taskRows.length > 1 && (
                       <button 
                         type="button" 
                         onClick={() => handleRemoveRow(row.id)}
-                        className="text-red-500 hover:text-red-600 dark:hover:text-red-400 p-1 text-sm font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="text-red-500 hover:text-red-600 p-1 text-sm font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Trash2 size={16} />
                         <span className="hidden sm:inline">Remove</span>
@@ -423,13 +423,13 @@ export const DailyReportView = () => {
                     
                     {/* Project */}
                     <div className="md:col-span-4">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                         Assigned Project *
                       </label>
                       <select 
                         value={row.projectId}
                         onChange={e => handleRowChange(row.id, 'projectId', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                         required
                       >
                         <option value="">Select Project</option>
@@ -441,13 +441,13 @@ export const DailyReportView = () => {
 
                     {/* Task Reference */}
                     <div className="md:col-span-5">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                         Task Reference (Optional)
                       </label>
                       <select 
                         value={row.taskId}
                         onChange={e => handleRowChange(row.id, 'taskId', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                       >
                         <option value="">No task linked</option>
                         {availableTasks.map(t => (
@@ -458,7 +458,7 @@ export const DailyReportView = () => {
 
                     {/* Hours */}
                     <div className="md:col-span-3">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                         Hours Worked *
                       </label>
                       <input 
@@ -466,14 +466,14 @@ export const DailyReportView = () => {
                         min="0.5" max="16" step="0.5"
                         value={row.hoursWorked}
                         onChange={e => handleRowChange(row.id, 'hoursWorked', parseFloat(e.target.value))}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors"
                         required
                       />
                     </div>
 
                     {/* Today's Work */}
                     <div className="md:col-span-12">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                         Today's Work Summary *
                       </label>
                       <textarea 
@@ -481,14 +481,14 @@ export const DailyReportView = () => {
                         placeholder="What did you accomplish today?"
                         value={row.todaysWork}
                         onChange={e => handleRowChange(row.id, 'todaysWork', e.target.value)}
-                        className="w-full px-3 py-3 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors resize-y"
+                        className="w-full px-3 py-3 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors resize-y"
                         required
                       />
                     </div>
 
                     {/* Pending Work */}
                     <div className="md:col-span-6">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                         Pending Work
                       </label>
                       <input 
@@ -496,13 +496,13 @@ export const DailyReportView = () => {
                         placeholder="What is left to do?"
                         value={row.pendingWork}
                         onChange={e => handleRowChange(row.id, 'pendingWork', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                     </div>
 
                     {/* Tomorrow's Plan */}
                     <div className="md:col-span-6">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                         Tomorrow's Plan
                       </label>
                       <input 
@@ -510,13 +510,13 @@ export const DailyReportView = () => {
                         placeholder="What will you work on tomorrow?"
                         value={row.tomorrowPlan}
                         onChange={e => handleRowChange(row.id, 'tomorrowPlan', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                     </div>
 
                     {/* Issues Faced */}
                     <div className="md:col-span-12">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                         Issues Faced
                       </label>
                       <input 
@@ -524,7 +524,7 @@ export const DailyReportView = () => {
                         placeholder="Any blockers or challenges?"
                         value={row.issuesFaced}
                         onChange={e => handleRowChange(row.id, 'issuesFaced', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                     </div>
                   </div>
@@ -578,13 +578,13 @@ export const DailyReportView = () => {
                 placeholder="Search description..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
             <select 
               value={selectedProjectFilter}
               onChange={e => setSelectedProjectFilter(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
             >
               <option value="all">All Projects</option>
               {assignedProjects.map(p => (
@@ -595,7 +595,7 @@ export const DailyReportView = () => {
               type="button"
               onClick={fetchHistory}
               disabled={isHistoryLoading}
-              className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 transition cursor-pointer shrink-0"
+              className="p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-200/50 transition cursor-pointer shrink-0"
               title="Refresh History"
             >
               <RefreshCw size={16} className={isHistoryLoading ? 'animate-spin text-indigo-500' : ''} />
@@ -608,7 +608,7 @@ export const DailyReportView = () => {
             <div className="flex justify-center p-12"><Loader2 size={24} className="animate-spin text-indigo-500" /></div>
           ) : (
             <table className="w-full text-left text-sm min-w-[800px]">
-              <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400 uppercase text-xs font-semibold tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="px-5 py-4">Date</th>
                   <th className="px-5 py-4">Project</th>
@@ -617,10 +617,10 @@ export const DailyReportView = () => {
                   <th className="px-5 py-4 w-1/4">Tomorrow's Plan</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {filteredReports.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-5 py-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
                       No daily reports match your criteria.
                     </td>
                   </tr>
@@ -634,27 +634,27 @@ export const DailyReportView = () => {
                     const issues = report.issuesFaced || report.blockers || '';
 
                     return (
-                      <tr key={report._id || `rep-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
-                        <td className="px-5 py-4 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                      <tr key={report._id || `rep-${idx}`} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-5 py-4 font-medium text-slate-900 whitespace-nowrap">
                           {rDate}
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap">
-                          <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium text-xs">
+                          <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-slate-700 font-medium text-xs">
                             {projName}
                           </span>
                         </td>
-                        <td className="px-5 py-4 font-mono font-medium text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                        <td className="px-5 py-4 font-mono font-medium text-indigo-600 whitespace-nowrap">
                           {hours} hrs
                         </td>
-                        <td className="px-5 py-4 text-slate-600 dark:text-slate-400 max-w-sm">
+                        <td className="px-5 py-4 text-slate-600 max-w-sm">
                           <p className="line-clamp-2" title={work}>{work}</p>
                           {issues && (
-                            <span className="inline-block text-[11px] text-amber-600 dark:text-amber-400 mt-1" title={issues}>
+                            <span className="inline-block text-[11px] text-amber-600 mt-1" title={issues}>
                               Issue: {issues}
                             </span>
                           )}
                         </td>
-                        <td className="px-5 py-4 text-slate-600 dark:text-slate-400 max-w-sm">
+                        <td className="px-5 py-4 text-slate-600 max-w-sm">
                           <p className="line-clamp-2" title={plan}>{plan}</p>
                         </td>
                       </tr>

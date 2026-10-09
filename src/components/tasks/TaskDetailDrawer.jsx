@@ -133,22 +133,22 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
       />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
-        <div className="w-screen max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col justify-between border-l border-slate-200 dark:border-slate-800">
+        <div className="w-screen max-w-2xl bg-white shadow-2xl flex flex-col justify-between border-l border-slate-200">
           
           {/* Header */}
-          <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+          <div className="px-6 py-4 bg-white text-slate-900 flex items-center justify-between border-b border-slate-200">
             <div className="flex items-center space-x-3 min-w-0">
-              {isLoading ? <Loader2 size={20} className="animate-spin text-slate-400" /> : <CheckSquare size={20} className="text-indigo-400" />}
+              {isLoading ? <Loader2 size={20} className="animate-spin text-slate-400" /> : <CheckSquare size={20} className="text-indigo-600" />}
               <div className="min-w-0">
-                <span className="text-[10px] text-indigo-300 font-mono font-medium uppercase truncate block max-w-xs">
+                <span className="text-[10px] text-indigo-600 font-mono font-medium uppercase truncate block max-w-xs">
                   {projectObj?.projectName || displayTask.projectId?.name || (typeof displayTask.projectId === 'string' ? displayTask.projectId : 'Project Task')}
                 </span>
-                <h2 className="text-sm font-semibold truncate max-w-md">{displayTask.taskTitle || displayTask.title}</h2>
+                <h2 className="text-sm font-semibold text-slate-900 truncate max-w-md">{displayTask.taskTitle || displayTask.title}</h2>
               </div>
             </div>
             <button
               onClick={() => setSelectedTask(null)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
             >
               <X size={18} />
             </button>
@@ -158,13 +158,13 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
             {/* Status & Priority */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
               <div>
                 <span className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Status</span>
                 <select
                   value={currentNormalizedStatus}
                   onChange={(e) => handleUpdateStatus(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition cursor-pointer"
+                  className="w-full px-2.5 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none transition cursor-pointer"
                 >
                   <option value="pending">To Do (Pending)</option>
                   <option value="in_progress">In Progress</option>
@@ -182,7 +182,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
 
               <div>
                 <span className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Assigned By</span>
-                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                <span className="text-xs font-semibold text-slate-800 truncate block">
                   {displayTask.assignedBy?.name || displayTask.assignedBy?.email || 'Admin'}
                 </span>
               </div>
@@ -190,30 +190,30 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
 
             {/* People & Assignments */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1 flex items-center gap-1">
                   <User size={12} /> Assigned Employee
                 </span>
-                <p className="font-semibold text-slate-800 dark:text-slate-200">
-                  {displayTask.assignedEmployee?.name || displayTask.assignedIntern?.name || 'Unassigned'}
+                <p className="font-semibold text-slate-800">
+                  {displayTask.assignedEmployee?.name || 'Unassigned'}
                 </p>
-                {(displayTask.assignedEmployee?.email || displayTask.assignedIntern?.email) && (
+                {displayTask.assignedEmployee?.email && (
                   <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate">
-                    {displayTask.assignedEmployee?.email || displayTask.assignedIntern?.email}
+                    {displayTask.assignedEmployee?.email}
                   </p>
                 )}
               </div>
 
               {projectObj?.clientName && (
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1 flex items-center gap-1">
                     <Briefcase size={12} /> Client & Budget
                   </span>
-                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                  <p className="font-semibold text-slate-800">
                     {projectObj.clientName}
                   </p>
                   {projectObj.projectBudget && (
-                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-bold mt-0.5">
+                    <p className="text-[11px] text-emerald-600 font-mono font-bold mt-0.5">
                       Budget: ${Number(projectObj.projectBudget).toLocaleString()}
                     </p>
                   )}
@@ -222,10 +222,10 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
             </div>
 
             {/* Progress Slider */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
-              <div className="flex justify-between text-xs font-medium text-slate-800 dark:text-slate-200">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div className="flex justify-between text-xs font-medium text-slate-800">
                 <span>Task Completion Progress</span>
-                <span className="text-indigo-600 dark:text-indigo-400 font-mono font-bold">{displayTask.progress || 0}%</span>
+                <span className="text-indigo-600 font-mono font-bold">{displayTask.progress || 0}%</span>
               </div>
               <input 
                 type="range" 
@@ -233,35 +233,35 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                 max="100" 
                 value={displayTask.progress || 0}
                 onChange={handleUpdateProgress}
-                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
               />
             </div>
 
             {/* Description */}
             <div>
-              <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-wider">
+              <h4 className="text-xs font-semibold text-slate-700 uppercase mb-2 tracking-wider">
                 Task Description
               </h4>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-950/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800 whitespace-pre-wrap">
+              <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200 whitespace-pre-wrap">
                 {displayTask.taskDescription || displayTask.description || 'No detailed description provided for this task.'}
               </p>
             </div>
 
             {/* Dates & Hours */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[10px] uppercase font-semibold text-slate-400 block">Due Date</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
+                <span className="font-semibold text-slate-800 font-mono">
                   {displayTask.dueDate ? displayTask.dueDate.split('T')[0] : 'Not Set'}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[10px] uppercase font-semibold text-slate-400 block">Est. Hours</span>
-                <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{displayTask.estimatedHours || 0} hrs</span>
+                <span className="font-mono font-semibold text-slate-800">{displayTask.estimatedHours || 0} hrs</span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[10px] uppercase font-semibold text-slate-400 block">Created On</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
+                <span className="font-semibold text-slate-800 font-mono">
                   {displayTask.createdAt ? displayTask.createdAt.split('T')[0] : 'N/A'}
                 </span>
               </div>
@@ -270,17 +270,17 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
             {/* Subtasks or Checklist */}
             {(subTasks.length > 0 || checklist.length > 0) && (
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                   <ListChecks size={14} className="text-slate-400" />
                   <span>Checklist & Subtasks</span>
                 </h4>
                 <div className="space-y-1.5">
                   {[...subTasks, ...checklist].map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 p-2.5 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-lg text-xs">
-                      <div className="w-4 h-4 rounded border border-slate-300 dark:border-slate-700 flex items-center justify-center bg-white dark:bg-slate-900">
+                    <div key={i} className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                      <div className="w-4 h-4 rounded border border-slate-300 flex items-center justify-center bg-white">
                         <Check size={11} className="text-indigo-600" />
                       </div>
-                      <span className="text-slate-700 dark:text-slate-300">{typeof item === 'string' ? item : item.title || item.name}</span>
+                      <span className="text-slate-700">{typeof item === 'string' ? item : item.title || item.name}</span>
                     </div>
                   ))}
                 </div>
@@ -290,14 +290,14 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
             {/* Attachments */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
+                <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
                   <Paperclip size={14} className="text-slate-400" />
                   <span>Attachments ({attachments.length})</span>
                 </h4>
               </div>
 
               {attachments.length === 0 ? (
-                <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-center text-xs text-slate-400">
+                <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
                   No attachments linked to this task.
                 </div>
               ) : (
@@ -308,9 +308,9 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                       href={att.fileUrl || att.url || (typeof att === 'string' ? att : '#')}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs hover:border-indigo-400 transition"
+                      className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs hover:border-indigo-400 transition"
                     >
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block max-w-[200px]">
+                      <span className="font-semibold text-slate-800 truncate block max-w-[200px]">
                         {att.fileName || att.name || 'Attachment ' + (idx + 1)}
                       </span>
                     </a>
@@ -321,32 +321,32 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
 
             {/* Comments Thread */}
             <div className="space-y-3">
-              <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
                 <MessageSquare size={14} className="text-slate-400" />
                 <span>Comments & Discussion ({comments.length})</span>
               </h4>
 
               <div className="space-y-2.5">
                 {comments.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <p className="text-xs text-slate-400 text-center py-3 bg-slate-50 rounded-xl border border-slate-200">
                     No comments yet. Start the conversation below.
                   </p>
                 ) : (
                   comments.map((c, idx) => (
-                    <div key={c._id || idx} className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl flex items-start space-x-3 text-xs">
-                      <div className="w-7 h-7 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0 ring-1 ring-indigo-200 dark:ring-indigo-800">
+                    <div key={c._id || idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start space-x-3 text-xs">
+                      <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0 ring-1 ring-indigo-200">
                         {String(c.userId?.name || c.commentedBy?.name || 'TM').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center">
-                          <span className="font-semibold text-slate-900 dark:text-slate-100">
+                          <span className="font-semibold text-slate-900">
                             {c.userId?.name || c.commentedBy?.name || 'Team Member'}
                           </span>
                           <span className="text-[10px] text-slate-400 font-mono">
                             {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
                           </span>
                         </div>
-                        <p className="text-slate-600 dark:text-slate-400 mt-1 whitespace-pre-wrap">{c.text || c.comment}</p>
+                        <p className="text-slate-600 mt-1 whitespace-pre-wrap">{c.text || c.comment}</p>
                       </div>
                     </div>
                   ))
@@ -359,7 +359,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                   placeholder="Add a comment or work update..."
                   value={commentText}
                   onChange={e => setCommentText(e.target.value)}
-                  className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition"
+                  className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-indigo-500 transition"
                 />
                 <button 
                   type="submit" 
@@ -374,7 +374,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
           </div>
 
           {/* Footer Actions */}
-          <div className="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
             {currentNormalizedStatus !== 'completed' ? (
               <button
                 onClick={() => handleUpdateStatus('completed')}
@@ -384,13 +384,13 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                 <span>Mark as Completed</span>
               </button>
             ) : (
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600">
                 <CheckCircle2 size={16} /> Task Completed
               </span>
             )}
             <button
               onClick={() => setSelectedTask(null)}
-              className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+              className="px-4 py-2 bg-slate-200 text-slate-800 hover:bg-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
             >
               Close
             </button>

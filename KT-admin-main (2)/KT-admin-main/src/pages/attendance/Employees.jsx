@@ -15,7 +15,6 @@ import {
   UserMinus,
   X,
   User,
-  GraduationCap,
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
 import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../../utils/roleFilters";
@@ -187,9 +186,6 @@ export default function Employees() {
   const getRoleBadge = (emp) => {
     if (emp?.isTeamLead || emp?.role === "team lead") {
       return "bg-amber-50 text-amber-700 border-amber-200";
-    }
-    if (emp?.role === "intern") {
-      return "bg-purple-50 text-purple-700 border-purple-200";
     }
 
     return "bg-blue-50 text-blue-700 border-blue-200";
@@ -724,11 +720,6 @@ export default function Employees() {
                                   <Crown className="h-3 w-3 mr-1 text-amber-600" />
                                   Team Lead
                                 </>
-                              ) : emp.role === "intern" ? (
-                                <>
-                                  <GraduationCap className="h-3 w-3 mr-1 text-purple-600" />
-                                  Intern
-                                </>
                               ) : (
                                 <>
                                   <User className="h-3 w-3 mr-1 text-blue-600" />
@@ -1250,7 +1241,6 @@ export default function Employees() {
                     className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg bg-white"
                   >
                     <option value="employee">Employee</option>
-                    <option value="intern">Intern</option>
                     <option value="team lead">Team Lead</option>
                   </select>
                 </div>

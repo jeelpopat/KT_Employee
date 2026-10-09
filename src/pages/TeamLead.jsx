@@ -5,7 +5,7 @@ import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../utils/roleFil
 const BASE_URL = "https://kt-backend-yzr4.onrender.com/api";
 
 // Modal Component for Assignments
-const AssignmentModal = ({ isOpen, onClose, lead, interns = [], employees = [], onSave, departmentName }) => {
+const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, departmentName }) => {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -74,15 +74,14 @@ const AssignmentModal = ({ isOpen, onClose, lead, interns = [], employees = [], 
     return idMatch || emailMatch || nameMatch;
   };
 
-  // Available Employees: Purely employees (NOT intern, NOT team lead, NOT admin, NOT finance, NOT current lead)
+  // Available Employees: Purely employees (NOT team lead, NOT admin, NOT finance, NOT current lead)
   const availableEmployees = (employees || []).filter((emp) => {
     if (isCurrentLead(emp)) return false;
     if (isFinanceOrExcludedUser(emp)) return false;
     const role = (emp.role || emp.designation || '').toLowerCase().trim();
-    const isIntern = role.includes('intern') || emp.isIntern === true;
     const isTeamLead = role.includes('lead') || emp.isTeamLead === true;
     const isAdmin = role.includes('admin');
-    return !isIntern && !isTeamLead && !isAdmin;
+    return !isTeamLead && !isAdmin;
   });
 
   const handleEmployeeToggle = (employeeId) => {
@@ -259,7 +258,6 @@ const AssignmentModal = ({ isOpen, onClose, lead, interns = [], employees = [], 
 // Main TeamLead Component
 export const TeamLead = () => {
   const [teamLeads, setTeamLeads] = useState([]);
-  const [interns, setInterns] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -289,20 +287,6 @@ export const TeamLead = () => {
     );
   };
 
-  const normalizeInternId = (item) => {
-    if (!item) return null;
-    if (typeof item === "string") return item;
-    if (typeof item === "number") return String(item);
-    if (typeof item === "object") {
-      if (item._id) return String(item._id);
-      if (item.id) return String(item.id);
-      if (item.internId) return String(item.internId);
-      if (item.userId) return String(item.userId);
-      if (item.user) return normalizeInternId(item.user);
-    }
-    return null;
-  };
-
   const normalizeEmployeeId = (item) => { 
     if (!item) return null;
     if (typeof item === "string") return item;
@@ -327,19 +311,6 @@ export const TeamLead = () => {
     if (employee.fullName) return employee.fullName;
     if (employee.displayName) return employee.displayName;
     if (employee.email) return employee.email;
-    return "Unnamed";
-  };
-
-  const getInternDisplayName = (intern) => {
-    if (!intern) return "Unnamed";
-    if (intern.name) return intern.name;
-    if (intern.fullName) return intern.fullName;
-    if (intern.displayName) return intern.displayName;
-    if (intern.firstName) {
-      const lastName = intern.lastName || "";
-      return `${intern.firstName} ${lastName}`.trim();
-    }
-    if (intern.email) return intern.email;
     return "Unnamed";
   };
 
@@ -649,11 +620,8 @@ const getDesignation = (lead) => {
         teamLeadsData = [];
       }
 
-      // Fetch employees and interns simultaneously from live backend
-      const [fetchedEmployees] = await Promise.all([
-        fetchEmployees(headers),
-        fetchInterns(headers)
-      ]);
+      // Fetch employees from live backend
+      const fetchedEmployees = await fetchEmployees(headers);
 
       // Extract all employees from database marked as team lead (e.g. Yash Vaghasiya)
       const employeeTeamLeads = (fetchedEmployees || []).filter((emp) => {
@@ -858,43 +826,15 @@ const getDesignation = (lead) => {
     }
   };
 
-  const fetchInterns = async (headers) => {
-    try {
-      let allUsers = [];
-      try {
-        const usersResponse = await axios.get(`${BASE_URL}/user/all`, { headers });
-        allUsers = usersResponse?.data?.users || usersResponse?.data?.data || (Array.isArray(usersResponse?.data) ? usersResponse.data : []);
-      } catch (e1) {
-        try {
-          const usersResponse = await axios.get(`${BASE_URL}/users/all`, { headers });
-          allUsers = usersResponse?.data?.users || usersResponse?.data?.data || (Array.isArray(usersResponse?.data) ? usersResponse.data : []);
-        } catch (e2) {
-          const usersResponse = await axios.get(`${BASE_URL}/users/all`);
-          allUsers = usersResponse?.data?.users || usersResponse?.data?.data || (Array.isArray(usersResponse?.data) ? usersResponse.data : []);
-        }
-      }
-      const internUsers = allUsers.filter((user) => {
-        if (!user || isFinanceOrExcludedUser(user)) return false;
-        const name = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim();
-        if (!name || name === "Unnamed" || name === "No Name" || name === "Unknown Employee" || name === "Unknown User") return false;
-        return user.role?.toLowerCase().trim() === "intern";
-      });
-      setInterns(internUsers);
-    } catch (error) {
-      console.log("Could not fetch interns:", error);
-      setInterns([]);
-    }
-  };
-
   const fetchEmployees = async (headers) => {
     try {
       let allEmployees = [];
       try {
-        const res = await axios.get(`${BASE_URL}/employee/all`, { headers });
-        allEmployees = res?.data?.data || res?.data?.employees || (Array.isArray(res?.data) ? res.data : []);
+        const res = await axios.get(`${BASE_URL}/employee/list`, { headers });
+        allEmployees = res?.data?.employees || res?.data?.data || (Array.isArray(res?.data) ? res.data : []);
       } catch (e) {
-        const fallbackRes = await axios.get(`${BASE_URL}/employee/list`, { headers });
-        allEmployees = fallbackRes?.data?.employees || fallbackRes?.data?.data || (Array.isArray(fallbackRes?.data) ? fallbackRes.data : []);
+        const fallbackRes = await axios.get(`${BASE_URL}/users/all`, { headers });
+        allEmployees = fallbackRes?.data?.users || fallbackRes?.data?.data || (Array.isArray(fallbackRes?.data) ? fallbackRes.data : []);
       }
 
       const validEmployees = (Array.isArray(allEmployees) ? allEmployees : []).filter((emp) => {
@@ -968,8 +908,7 @@ const getDesignation = (lead) => {
   
       const payload = {
         teamLead: data.leadId,
-        employees: employeeIds,
-        interns: []
+        employees: employeeIds
       };
 
       console.log('Sending payload:', payload);
@@ -1221,7 +1160,6 @@ const getDesignation = (lead) => {
         isOpen={modalOpen}
         onClose={handleCloseModal}
         lead={selectedLead}
-        interns={interns}
         employees={employees}
         departmentName={selectedLead ? getDepartment(selectedLead, employees) : "Unknown Department"}
         onSave={handleSaveAssignments}

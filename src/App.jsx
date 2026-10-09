@@ -47,7 +47,6 @@ const PerformanceView = lazy(() => import('./components/placeholders/Placeholder
 const TeamMembersView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.TeamMembersView })));
 const EmployeesView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.EmployeesView })));
 const LearningHubView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.LearningHubView })));
-const InternshipProgressView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.InternshipProgressView })));
 const DocumentsView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.DocumentsView })));
 const DailyFollowUpView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.DailyFollowUpView })));
 const TeamTaskManagementView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.TeamTaskManagementView })));
@@ -164,7 +163,6 @@ const MainLayout = ({ handleSignOut }) => {
       case 'team-members': return userRole === 'admin' ? <AdminMembersView /> : <TeamMembersView />;
       case 'employees': return userRole === 'admin' ? <AdminEmployeesView /> : <EmployeesView />;
       case 'learning-hub': return <LearningHubView />;
-      case 'internship-progress': return <InternshipProgressView />;
       case 'documents': return <DocumentsView />;
       case 'daily-follow-up': return <DailyFollowUpView />;
       case 'team-tasks': return <AdminTeamTasksView />;
@@ -184,7 +182,7 @@ const MainLayout = ({ handleSignOut }) => {
         <Suspense fallback={<div className="h-16 border-b border-slate-200/80 bg-white" />}>
           <Header onSignOut={handleSignOut} />
         </Suspense>
-        <main className="flex-1 p-3 pt-32 sm:p-5 sm:pt-32 lg:p-6 lg:pt-20">
+        <main className="flex-1 p-3 pt-20 sm:p-5 sm:pt-20 lg:p-6 lg:pt-20">
           <div className="page-content w-full">
             <Suspense fallback={
               <div className="flex items-center justify-center min-h-[350px]">
@@ -247,15 +245,8 @@ export default function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    const storedTheme = localStorage.getItem('theme');
-
-    if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      root.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
+    root.classList.remove('dark');
+    localStorage.setItem('theme', 'light');
   }, []);
 
   const handleLoginSuccess = () => {

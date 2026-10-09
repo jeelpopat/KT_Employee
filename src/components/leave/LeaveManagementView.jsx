@@ -52,7 +52,7 @@ export const LeaveManagementView = () => {
   // Leave policy: leaves must be applied at least 2 days in advance (e.g., if today is 3/10, selectable from 5/10 onwards)
   const minAllowedDate = getLocalDateString(2);
 
-  // Resolve applicant role strictly matching schema enum: ["employee", "intern", "team lead", "hr", "admin"]
+  // Resolve applicant role strictly matching schema enum: ["employee", "team lead", "hr", "admin"]
   const resolveApplicantRole = () => {
     const rawRole = (
       userRole ||
@@ -63,7 +63,6 @@ export const LeaveManagementView = () => {
       ''
     ).toString().toLowerCase().trim();
 
-    if (rawRole.includes('intern')) return 'intern';
     if (rawRole.includes('lead') || rawRole.includes('tl') || rawRole.includes('leader')) return 'team lead';
     if (rawRole.includes('hr')) return 'hr';
     if (rawRole.includes('admin')) return 'admin';
@@ -113,7 +112,7 @@ export const LeaveManagementView = () => {
     const addName = (name) => {
       if (typeof name === 'string') {
         const cleaned = name.trim().toLowerCase();
-        if (cleaned && !['employee', 'team member', 'user', 'admin', 'hr', 'intern', 'team lead', 'team leader'].includes(cleaned)) {
+        if (cleaned && !['employee', 'team member', 'user', 'admin', 'hr', 'team lead', 'team leader'].includes(cleaned)) {
           names.add(cleaned);
         }
       }
@@ -506,19 +505,19 @@ export const LeaveManagementView = () => {
 
     return (
       <div>
-        <span className="font-semibold text-slate-900 dark:text-slate-100 uppercase block text-xs sm:text-sm">
+        <span className="font-semibold text-slate-900 uppercase block text-xs sm:text-sm">
           {displayTitle}
         </span>
         <div className="flex flex-wrap items-center gap-1.5 mt-1">
           <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm border ${
             isHalfDayActive 
-              ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800' 
-              : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800'
+              ? 'bg-amber-50 text-amber-700 border-amber-200' 
+              : 'bg-indigo-50 text-indigo-700 border-indigo-200'
           }`}>
             {isHalfDayActive ? 'Half Day' : 'Full Day'}
           </span>
           {isHalfDayActive && (
-            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm border bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm border bg-indigo-50 text-indigo-700 border-indigo-200">
               {halfType === 'first-half' ? '1st Half' : halfType === 'second-half' ? '2nd Half' : 'Half Day'}
             </span>
           )}
@@ -535,7 +534,7 @@ export const LeaveManagementView = () => {
 
     if (statusStr === 'approved' || hrStatus === 'approved') {
       return (
-        <span className="px-2.5 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit">
+        <span className="px-2.5 py-1 rounded-md bg-green-50 text-green-700 border border-green-200 text-xs font-semibold flex items-center gap-1.5 w-fit">
           <CheckCircle2 size={14} /> Approved
         </span>
       );
@@ -543,27 +542,27 @@ export const LeaveManagementView = () => {
     if (statusStr === 'rejected' || tlStatus === 'rejected' || hrStatus === 'rejected') {
       const rejectNote = tlStatus === 'rejected' ? 'Rejected by TL' : hrStatus === 'rejected' ? 'Rejected by HR' : 'Rejected';
       return (
-        <span className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit" title={rejectNote}>
+        <span className="px-2.5 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 text-xs font-semibold flex items-center gap-1.5 w-fit" title={rejectNote}>
           <XCircle size={14} /> {rejectNote}
         </span>
       );
     }
     if (statusStr === 'pending_hr' || tlStatus === 'approved') {
       return (
-        <span className="px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit" title="Approved by your Team Lead, awaiting final HR approval">
+        <span className="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold flex items-center gap-1.5 w-fit" title="Approved by your Team Lead, awaiting final HR approval">
           <Clock size={14} /> Pending HR (TL Approved)
         </span>
       );
     }
     if (statusStr === 'pending_admin') {
       return (
-        <span className="px-2.5 py-1 rounded-md bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit">
+        <span className="px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold flex items-center gap-1.5 w-fit">
           <Clock size={14} /> Pending Admin
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-xs font-semibold flex items-center gap-1.5 w-fit" title="Submitted to your Team Lead for initial approval">
+      <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold flex items-center gap-1.5 w-fit" title="Submitted to your Team Lead for initial approval">
         <Clock size={14} /> Waiting for TL Approval
       </span>
     );
@@ -577,8 +576,8 @@ export const LeaveManagementView = () => {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Leave Management</h2>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Apply for leave, track requests, and check quotas</p>
+              <h2 className="text-xl font-bold text-slate-900">Leave Management</h2>
+              <p className="text-xs sm:text-sm text-slate-500">Apply for leave, track requests, and check quotas</p>
             </div>
               
             <div className="flex items-center justify-end gap-2">
@@ -607,10 +606,10 @@ export const LeaveManagementView = () => {
       {/* Leave History Table */}
       <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden transition-all shadow-xs">
         
-        <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-950/50">
+        <div className="p-5 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50/50">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">My Leave History</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Track and view your past and active leave applications</p>
+            <h3 className="text-lg font-semibold text-slate-900">My Leave History</h3>
+            <p className="text-sm text-slate-500 mt-0.5">Track and view your past and active leave applications</p>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
@@ -621,13 +620,13 @@ export const LeaveManagementView = () => {
                 placeholder="Search reason or type..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
             <select 
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="approved">Approved</option>
@@ -642,7 +641,7 @@ export const LeaveManagementView = () => {
               onClick={() => fetchData(false)}
               disabled={isRefreshing}
               title="Refresh Leave History"
-              className="p-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg text-slate-600 dark:text-slate-300 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50"
+              className="p-2 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50"
             >
               <RefreshCw size={16} className={isRefreshing ? 'animate-spin text-indigo-500' : ''} />
             </button>
@@ -657,7 +656,7 @@ export const LeaveManagementView = () => {
              </div>
           ) : (
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400 uppercase text-xs font-semibold tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="px-5 py-4">Leave Type</th>
                   <th className="px-5 py-4">Duration & Dates</th>
@@ -665,7 +664,7 @@ export const LeaveManagementView = () => {
                   <th className="px-5 py-4">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {filteredLeaves.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-5 py-8 text-center text-slate-500">No leave requests found.</td>
@@ -674,24 +673,24 @@ export const LeaveManagementView = () => {
                   filteredLeaves.map((l, index) => {
                     const activeRemarks = l.adminRemark || l.hrRemark || l.teamLeadRemark || l.remark;
                     return (
-                      <tr key={l._id || index} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                      <tr key={l._id || index} className="hover:bg-slate-50 transition-colors">
                         <td className="px-5 py-4">
                           {renderLeaveCategoryBadge(l.leaveType, l.isHalfDay, l.halfDayType)}
                         </td>
                         <td className="px-5 py-4">
-                          <span className="font-semibold text-slate-900 dark:text-slate-100 block">
+                          <span className="font-semibold text-slate-900 block">
                             {formatDate(l.startDate)} {l.startDate !== l.endDate ? `to ${formatDate(l.endDate)}` : ''}
                           </span>
-                          <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-1 block">
+                          <span className="text-xs text-indigo-600 font-semibold mt-1 block">
                             {l.totalDays} {l.totalDays === 1 || l.totalDays === 0.5 ? 'Day' : 'Days'} {l.isHalfDay ? `(${l.halfDayType === 'first-half' ? '1st Half' : l.halfDayType === 'second-half' ? '2nd Half' : 'Half Day'})` : ''}
                           </span>
                         </td>
-                        <td className="px-5 py-4 text-slate-600 dark:text-slate-400 max-w-xs">
-                          <p className="truncate font-medium text-slate-800 dark:text-slate-200" title={l.reason}>
+                        <td className="px-5 py-4 text-slate-600 max-w-xs">
+                          <p className="truncate font-medium text-slate-800" title={l.reason}>
                             {l.reason || 'No reason provided'}
                           </p>
                           {activeRemarks && (
-                            <div className="mt-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded border border-amber-200 dark:border-amber-800/40">
+                            <div className="mt-1 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
                               <span className="font-semibold">Remark:</span> {activeRemarks}
                             </div>
                           )}
@@ -700,7 +699,7 @@ export const LeaveManagementView = () => {
                               href={l.attachment} 
                               target="_blank" 
                               rel="noreferrer" 
-                              className="mt-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                              className="mt-1 text-xs text-indigo-600 hover:underline flex items-center gap-1"
                             >
                               <Paperclip size={12} /> View Attachment
                             </a>
@@ -721,54 +720,54 @@ export const LeaveManagementView = () => {
 
       {/* Policy Modal */}
       {isPolicyModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 dark:bg-black/60 transition-opacity flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden max-h-[90vh]">
-            <div className="px-4 sm:px-6 py-4 sm:py-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 transition-opacity flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white rounded-xl shadow-xs border border-slate-200 flex flex-col overflow-hidden max-h-[90vh]">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <FileText size={20} className="text-slate-500" />
                   Leave Policies
                 </h3>
               </div>
               <button 
                 onClick={() => setIsPolicyModalOpen(false)}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer shrink-0"
               >
                 <XCircle size={20} />
               </button>
             </div>
             
             <div className="p-6 overflow-y-auto space-y-6">
-              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950/50 shadow-xs">
+              <div className="p-5 border border-slate-200 rounded-xl bg-white shadow-xs">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-500 rounded-lg">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
                     <Calendar size={20} />
                   </div>
-                  <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Full Day Leave</h4>
+                  <h4 className="text-lg font-bold text-slate-900">Full Day Leave</h4>
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
+                <p className="text-sm text-slate-600 mb-4 leading-relaxed">
                   Full day leaves cover entire working days for planned vacations, personal commitments, or health rest.
                 </p>
-                <h5 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-3">Policy Rules:</h5>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-400 marker:text-indigo-500">
+                <h5 className="font-semibold text-slate-800 text-sm mb-3">Policy Rules:</h5>
+                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 marker:text-indigo-500">
                   <li>Total leave days are computed excluding company holidays and weekly off (Sundays).</li>
                   <li>Applications must be submitted at least 2 days in advance (dates starting 2 days after today).</li>
                   <li>Approval follows the standard hierarchy (Team Lead &rarr; HR &rarr; Admin).</li>
                 </ul>
               </div>
 
-              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950/50 shadow-xs">
+              <div className="p-5 border border-slate-200 rounded-xl bg-white shadow-xs">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 rounded-lg">
+                  <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
                     <Clock size={20} />
                   </div>
-                  <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">Half Day Leave</h4>
+                  <h4 className="text-lg font-bold text-slate-900">Half Day Leave</h4>
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
+                <p className="text-sm text-slate-600 mb-4 leading-relaxed">
                   Half day leaves count as 0.5 working day and allow flexibility for urgent morning or afternoon personal matters.
                 </p>
-                <h5 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-3">Policy Rules:</h5>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-400 marker:text-amber-500">
+                <h5 className="font-semibold text-slate-800 text-sm mb-3">Policy Rules:</h5>
+                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-600 marker:text-amber-500">
                   <li>Choose either <strong>First Half (Morning)</strong> or <strong>Second Half (Afternoon)</strong> shift.</li>
                   <li>Deducts 0.5 days from your leave balance.</li>
                   <li>Supporting documents or certificates can be optionally attached.</li>
@@ -776,10 +775,10 @@ export const LeaveManagementView = () => {
               </div>
             </div>
             
-            <div className="px-4 sm:px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end">
               <button 
                 onClick={() => setIsPolicyModalOpen(false)}
-                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 text-white dark:text-slate-900 font-medium rounded-lg shadow-xs transition-colors cursor-pointer"
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg shadow-xs transition-colors cursor-pointer"
               >
                 Close Policies
               </button>
@@ -790,19 +789,19 @@ export const LeaveManagementView = () => {
 
       {/* Apply Leave Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 dark:bg-black/60 transition-opacity flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 transition-opacity flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-xl shadow-xs border border-slate-200 flex flex-col overflow-hidden">
             
-            <div className="px-4 sm:px-6 py-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Apply For Leave</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Applying as <span className="font-semibold uppercase text-indigo-600 dark:text-indigo-400">{resolveApplicantRole()}</span>
+                <h3 className="text-lg font-bold text-slate-900">Apply For Leave</h3>
+                <p className="text-xs text-slate-500">
+                  Applying as <span className="font-semibold uppercase text-indigo-600">{resolveApplicantRole()}</span>
                 </p>
               </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer shrink-0"
               >
                 <XCircle size={20} />
               </button>
@@ -811,20 +810,20 @@ export const LeaveManagementView = () => {
             <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 text-sm">
               
               {formError && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg text-red-700 dark:text-red-400 font-medium text-sm flex items-start gap-2">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 font-medium text-sm flex items-start gap-2">
                   <AlertCircle size={18} className="shrink-0 mt-0.5" />
                   <span>{formError}</span>
                 </div>
               )}
               {successMsg && (
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg text-green-700 dark:text-green-400 font-medium text-sm flex items-center justify-center gap-2">
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 font-medium text-sm flex items-center justify-center gap-2">
                   <CheckCircle2 size={18} /> {successMsg}
                 </div>
               )}
 
               {/* Leave Type Selector (Strictly enum: ["full_day", "half_day"]) */}
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block font-semibold text-slate-700 mb-2">
                   Leave Type
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -837,16 +836,16 @@ export const LeaveManagementView = () => {
                     }}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
                       leaveType === 'full_day' && !isHalfDay
-                        ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-900/30 text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20 shadow-xs'
-                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 ring-2 ring-indigo-500/20 shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                     }`}
                   >
                     <div>
                       <div className="font-semibold text-sm">Full Day</div>
-                      <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">Whole working day(s)</div>
+                      <div className="text-2xs text-slate-500 mt-0.5">Whole working day(s)</div>
                     </div>
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                      leaveType === 'full_day' && !isHalfDay ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300 dark:border-slate-600'
+                      leaveType === 'full_day' && !isHalfDay ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'
                     }`}>
                       {leaveType === 'full_day' && !isHalfDay && (
                         <div className="w-1.5 h-1.5 rounded-full bg-white" />
@@ -864,16 +863,16 @@ export const LeaveManagementView = () => {
                     }}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
                       leaveType === 'half_day' || isHalfDay
-                        ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-900/30 text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20 shadow-xs'
-                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 ring-2 ring-indigo-500/20 shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                     }`}
                   >
                     <div>
                       <div className="font-semibold text-sm">Half Day</div>
-                      <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">0.5 day shift</div>
+                      <div className="text-2xs text-slate-500 mt-0.5">0.5 day shift</div>
                     </div>
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                      leaveType === 'half_day' || isHalfDay ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300 dark:border-slate-600'
+                      leaveType === 'half_day' || isHalfDay ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'
                     }`}>
                       {(leaveType === 'half_day' || isHalfDay) && (
                         <div className="w-1.5 h-1.5 rounded-full bg-white" />
@@ -885,15 +884,15 @@ export const LeaveManagementView = () => {
 
               {/* Half Day Shift Selector (shown when half_day is selected) */}
               {(isHalfDay || leaveType === 'half_day') && (
-                <div className="p-3 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/40">
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 text-xs mb-2">
+                <div className="p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                  <label className="block font-semibold text-slate-700 text-xs mb-2">
                     Shift Selection
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <label className={`flex items-center gap-2.5 p-2 rounded-md border cursor-pointer text-xs font-medium transition-colors ${
                       halfDayType === 'first-half'
-                        ? 'bg-white dark:bg-slate-900 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-2xs'
-                        : 'bg-white/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                        ? 'bg-white border-indigo-500 text-indigo-700 shadow-2xs'
+                        : 'bg-white/60 border-slate-200 text-slate-700'
                     }`}>
                       <input 
                         type="radio" 
@@ -908,8 +907,8 @@ export const LeaveManagementView = () => {
 
                     <label className={`flex items-center gap-2.5 p-2 rounded-md border cursor-pointer text-xs font-medium transition-colors ${
                       halfDayType === 'second-half'
-                        ? 'bg-white dark:bg-slate-900 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-2xs'
-                        : 'bg-white/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                        ? 'bg-white border-indigo-500 text-indigo-700 shadow-2xs'
+                        : 'bg-white/60 border-slate-200 text-slate-700'
                     }`}>
                       <input 
                         type="radio" 
@@ -929,7 +928,7 @@ export const LeaveManagementView = () => {
               <div className="space-y-1.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Start Date</label>
+                    <label className="block font-semibold text-slate-700 mb-2">Start Date</label>
                     <input 
                       type="date" 
                       min={minAllowedDate}
@@ -946,12 +945,12 @@ export const LeaveManagementView = () => {
                           setEndDate(val);
                         }
                       }}
-                      className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">End Date</label>
+                    <label className="block font-semibold text-slate-700 mb-2">End Date</label>
                     <input 
                       type="date" 
                       min={startDate || minAllowedDate}
@@ -966,12 +965,12 @@ export const LeaveManagementView = () => {
                         setEndDate(val);
                       }}
                       disabled={isHalfDay || leaveType === 'half_day'}
-                      className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                       required
                     />
                   </div>
                 </div>
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                <p className="text-[11px] text-amber-600 font-medium">
                   Notice: Leaves must be applied at least 2 days in advance (selectable from {minAllowedDate}).
                 </p>
               </div>
@@ -980,8 +979,8 @@ export const LeaveManagementView = () => {
               {startDate && endDate && (
                 <div className={`p-2.5 rounded-lg border text-sm font-semibold flex items-center justify-between ${
                   calculatedDays === 0 
-                    ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50' 
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800/50'
+                    ? 'bg-red-50 text-red-700 border-red-200' 
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                 }`}>
                   <span>Working Days Requested:</span>
                   <span className="font-mono text-base">
@@ -991,26 +990,26 @@ export const LeaveManagementView = () => {
               )}
 
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Reason</label>
+                <label className="block font-semibold text-slate-700 mb-2">Reason</label>
                 <textarea 
                   rows={2}
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   placeholder="Provide brief explanation for leave..."
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors resize-y"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors resize-y"
                   required
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">Document Link (Optional)</label>
+                <label className="block font-semibold text-slate-700 mb-2">Document Link (Optional)</label>
                 <div className="flex items-center gap-3">
                   <input 
                     type="text" 
                     placeholder="Provide a link to medical doc / certificate..."
                     value={attachmentName}
                     onChange={(e) => setAttachmentName(e.target.value)}
-                    className="flex-1 px-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                    className="flex-1 px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                 </div>
               </div>
@@ -1019,7 +1018,7 @@ export const LeaveManagementView = () => {
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg font-medium shadow-xs transition-colors cursor-pointer"
+                  className="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg font-medium shadow-xs transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>

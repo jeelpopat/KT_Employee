@@ -247,10 +247,10 @@ export const AttendanceView = () => {
           { label: 'Absent Days', value: summaryStats.absentDays, accent: 'border-l-rose-500' },
           { label: 'Half Days', value: summaryStats.halfDays, accent: 'border-l-purple-500' },
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
+          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">{item.value}</p>
             </div>
           </div>
         ))}
@@ -289,7 +289,7 @@ export const AttendanceView = () => {
                 type="month"
                 value={selectedMonthStr}
                 onChange={(e) => setSelectedMonthStr(e.target.value)}
-                className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
+                className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 focus:outline-none transition-colors cursor-pointer"
               />
             </div>
           )}
@@ -304,7 +304,7 @@ export const AttendanceView = () => {
               placeholder="Search date..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
 
@@ -315,7 +315,7 @@ export const AttendanceView = () => {
               name="statusFilter"
               value={selectedStatusFilter}
               onChange={e => setSelectedStatusFilter(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none transition-colors cursor-pointer"
+              className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none transition-colors cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="present">Present / On Time</option>
@@ -328,7 +328,7 @@ export const AttendanceView = () => {
 
           <button
             onClick={() => { setActiveFilterTab('10days'); setSearchQuery(''); setSelectedStatusFilter('all'); }}
-            className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg transition-colors cursor-pointer shadow-xs"
+            className="p-2 text-slate-500 hover:text-slate-800 bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer shadow-xs"
             title="Reset Filters"
           >
             <RotateCcw size={14} />
@@ -343,8 +343,8 @@ export const AttendanceView = () => {
             <span className="text-sm font-medium text-slate-500">Loading attendance history...</span>
           </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="xl:col-span-2 flex flex-col items-center justify-center p-16 space-y-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-xs">
-            <Calendar size={48} className="text-slate-300 dark:text-slate-700" />
+          <div className="xl:col-span-2 flex flex-col items-center justify-center p-16 space-y-4 bg-white border border-slate-200/80 rounded-xl shadow-xs">
+            <Calendar size={48} className="text-slate-300" />
             <span className="text-sm font-medium text-slate-500">No attendance records found for this criteria.</span>
           </div>
         ) : (
@@ -393,18 +393,18 @@ export const AttendanceView = () => {
                 <div className="flex items-start justify-between border-b border-slate-100 pb-3 mb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-lg bg-slate-50 border border-slate-200 flex flex-col items-center justify-center shrink-0">
-                      <span className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-none">{dateObj.day}</span>
+                      <span className="text-lg font-bold text-slate-800 leading-none">{dateObj.day}</span>
                       <span className="text-[9px] font-semibold text-slate-500 uppercase mt-1">{dateObj.month}</span>
                     </div>
                     <div>
-                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                      <h3 className="text-base font-semibold text-slate-900">
                         {getDayName(record.date)}
                       </h3>
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-medium font-mono">
                         <MapPin size={12} className="text-slate-400" /> Verified Geofence
                       </p>
                       {isRecordRejected && displayRejectionReason && (
-                        <p className="text-[11px] text-red-600 dark:text-red-400 mt-1 font-medium">
+                        <p className="text-[11px] text-red-600 mt-1 font-medium">
                           Rejected: {displayRejectionReason}
                         </p>
                       )}
@@ -429,7 +429,7 @@ export const AttendanceView = () => {
 
                       if (isRecordRejected || derived.status === 'rejected') {
                         return (
-                          <span className="px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="px-2.5 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
                             Rejected
                           </span>
@@ -438,7 +438,7 @@ export const AttendanceView = () => {
 
                       if (isRecordPending || derived.status === 'pending') {
                         return (
-                          <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                             Pending Approval
                           </span>
@@ -448,34 +448,34 @@ export const AttendanceView = () => {
                       if (isToday) {
                         if (record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null') {
                           return (
-                            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">
+                            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold uppercase tracking-wider">
                               Checked Out ({derived.label})
                             </span>
                           );
                         } else if (record.isOnBreak || statusLabel === 'on_break') {
                           return (
-                            <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 text-[#F59E0B] border border-amber-200 dark:border-amber-800/50 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="px-2.5 py-1 rounded-md bg-amber-50 text-[#F59E0B] border border-amber-200 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse"></span>
                               On Break
                             </span>
                           );
                         } else if (record.checkInTime) {
                           return (
-                            <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-[#00E676] border border-[#00E676]/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-[#00E676] border border-[#00E676]/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse"></span>
                               Working ({derived.label})
                             </span>
                           );
                         } else {
                           return (
-                            <span className="px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-800/50 text-slate-500 border border-slate-200 dark:border-slate-700 text-[10px] font-medium uppercase tracking-wider">
+                            <span className="px-2.5 py-1 rounded-md bg-slate-50 text-slate-500 border border-slate-200 text-[10px] font-medium uppercase tracking-wider">
                               Not Checked In
                             </span>
                           );
                         }
                       } else {
                         if (record.isAutoCheckedOut) {
-                          return <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">Checked Out (7:00 PM)</span>;
+                          return <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold uppercase tracking-wider">Checked Out (7:00 PM)</span>;
                         }
                         return (
                           <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${derived.badgeClass || 'bg-slate-100 text-slate-700'}`}>
@@ -490,24 +490,24 @@ export const AttendanceView = () => {
                 <div className="grid grid-cols-4 gap-3 mb-6">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><PlayCircle size={10} className="text-green-500" /> In</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{formatISOToLocalTime(record.checkInTime)}</span>
+                    <span className="text-sm font-bold text-slate-800">{formatISOToLocalTime(record.checkInTime)}</span>
                   </div>
-                  <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
+                  <div className="flex flex-col border-l border-slate-100 pl-3">
                     <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><StopCircle size={10} className="text-red-500" /> Out</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{formatISOToLocalTime(record.checkOutTime)}</span>
+                    <span className="text-sm font-bold text-slate-800">{formatISOToLocalTime(record.checkOutTime)}</span>
                   </div>
-                  <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
+                  <div className="flex flex-col border-l border-slate-100 pl-3">
                     <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1 mb-1"><Coffee size={10} className="text-amber-500" /> Break</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{isRecordRejected ? '0m' : `${Math.round(parseFloat(String(record.totalBreakTime || 0).replace(/[^\d.-]/g, '')) || 0)}m`}</span>
+                    <span className="text-sm font-bold text-slate-800">{isRecordRejected ? '0m' : `${Math.round(parseFloat(String(record.totalBreakTime || 0).replace(/[^\d.-]/g, '')) || 0)}m`}</span>
                   </div>
-                  <div className="flex flex-col border-l border-slate-100 dark:border-slate-800 pl-3">
-                    <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase mb-1">Work</span>
-                    <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{isRecordRejected ? '0h' : (record.totalWorkTimeDisplay || `${Math.round(parseFloat(String(record.totalWorkTime || 0)) || 0)}h`)}</span>
+                  <div className="flex flex-col border-l border-slate-100 pl-3">
+                    <span className="text-[10px] font-semibold text-indigo-600 uppercase mb-1">Work</span>
+                    <span className="text-sm font-bold text-indigo-600">{isRecordRejected ? '0h' : (record.totalWorkTimeDisplay || `${Math.round(parseFloat(String(record.totalWorkTime || 0)) || 0)}h`)}</span>
                   </div>
                 </div>
 
                 {/* --- 9-Hour Fixed Shift Timeline --- */}
-                <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                <div className="mt-auto pt-3 border-t border-slate-100">
                   <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 mb-2">
 
                     <div className="flex items-center gap-3 text-[10px]">
@@ -520,14 +520,14 @@ export const AttendanceView = () => {
                         Break
                       </span>
                       <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+                        <span className="w-2 h-2 rounded-full bg-slate-400"></span>
                         Extra Break
                       </span>
                     </div>
                   </div>
 
                   {/* Fixed 9-Hour Track (Grey Base for Early Out / Remaining Time) */}
-                  <div className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex relative group cursor-help shadow-inner">
+                  <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex relative group cursor-help shadow-inner">
                     {nineHourTimeline.displaySegments.map((seg) => (
                       <div
                         key={seg.id}
@@ -555,7 +555,7 @@ export const AttendanceView = () => {
                             title={`${marker.label}: ${marker.timeStr}`}
                           >
                             <div className={`w-0.5 h-1.5 rounded-full ${marker.dotClass} mb-0.5`} />
-                            <span className="text-[9px] font-mono font-bold text-slate-700 dark:text-slate-300 leading-none">
+                            <span className="text-[9px] font-mono font-bold text-slate-700 leading-none">
                               {marker.timeStr}
                             </span>
                           </div>

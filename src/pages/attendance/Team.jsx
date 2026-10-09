@@ -395,7 +395,6 @@ export default function Team() {
 const [projectTeamMembers, setProjectTeamMembers] = useState({
   tl: null,
   employees: [],
-  interns: [],
 });
 
   const [projectForm, setProjectForm] = useState({
@@ -410,7 +409,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     status: "pending",
     assignedEmployees: [],
     assignedTL: "",
-    assignedInterns: [],
   });
 
   const defaultProjectForm = {
@@ -425,7 +423,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     status: "pending",
     assignedEmployees: [],
     assignedTL: "",
-    assignedInterns: [],
   };
 
   const [taskForm, setTaskForm] = useState({
@@ -798,38 +795,36 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
       const userTeamLeads = (Array.isArray(allUsers) ? allUsers : []).filter(isTeamLeadUser);
 
-      // Optional: check teamLead/team for assigned interns/employees if available
-      let teamLeadsData = [];
-      try {
-        const res = await axios.get(TEAM_LEAD_URL, { headers });
-        const payload = res?.data?.data || res?.data?.teamLeads || res?.data?.teamLead || res?.data || [];
-        teamLeadsData = Array.isArray(payload) ? payload : [];
-      } catch (err) {
-        // Safe to ignore if endpoint is not used
-      }
+        // Optional: check teamLead/team for assigned employees if available
+        let teamLeadsData = [];
+        try {
+          const res = await axios.get(TEAM_LEAD_URL, { headers });
+          const payload = res?.data?.data || res?.data?.teamLeads || res?.data?.teamLead || res?.data || [];
+          teamLeadsData = Array.isArray(payload) ? payload : [];
+        } catch (err) {
+          // Safe to ignore if endpoint is not used
+        }
 
-      const userOptions = userTeamLeads.map((u) => {
-        const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Team Lead';
-        const matchingDoc = teamLeadsData.find((doc) => {
-          const docId = doc?.teamLead?.userId || doc?.teamLead?._id || doc?.teamLead?.employeeId || doc?.userId || doc?._id;
-          const docEmail = doc?.teamLead?.email || doc?.email;
-          return (docId && String(docId) === String(u._id)) || (docEmail && docEmail.toLowerCase() === (u.email || '').toLowerCase());
+        const userOptions = userTeamLeads.map((u) => {
+          const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Team Lead';
+          const matchingDoc = teamLeadsData.find((doc) => {
+            const docId = doc?.teamLead?.userId || doc?.teamLead?._id || doc?.teamLead?.employeeId || doc?.userId || doc?._id;
+            const docEmail = doc?.teamLead?.email || doc?.email;
+            return (docId && String(docId) === String(u._id)) || (docEmail && docEmail.toLowerCase() === (u.email || '').toLowerCase());
+          });
+
+          const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || []).filter((e) => !isFinanceOrExcludedUser(e));
+
+          return {
+            _id: String(u._id),
+            value: String(u._id),
+            name: name,
+            email: u.email || "",
+            department: u.department || "",
+            designation: typeof u.designation === 'object' ? (u.designation?.designationName || u.designation?.name || "") : (u.designation || ""),
+            employees: Array.isArray(employees) ? employees : [],
+          };
         });
-
-        const interns = (matchingDoc?.teamLead?.interns || matchingDoc?.interns || []).filter((i) => !isFinanceOrExcludedUser(i));
-        const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || []).filter((e) => !isFinanceOrExcludedUser(e));
-
-        return {
-          _id: String(u._id),
-          value: String(u._id),
-          name: name,
-          email: u.email || "",
-          department: u.department || "",
-          designation: typeof u.designation === 'object' ? (u.designation?.designationName || u.designation?.name || "") : (u.designation || ""),
-          interns: Array.isArray(interns) ? interns : [],
-          employees: Array.isArray(employees) ? employees : [],
-        };
-      });
 
       // Include any extra TLs from teamLeadsData not yet present
       const extraOptions = teamLeadsData
@@ -865,14 +860,12 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
             return null;
           }
 
-          const interns = (teamLeadRecord?.interns || lead?.interns || []).filter((i) => !isFinanceOrExcludedUser(i));
           const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || []).filter((e) => !isFinanceOrExcludedUser(e));
 
           return {
             _id: String(leadId),
             value: String(leadId),
             name: name,
-            interns: Array.isArray(interns) ? interns : [],
             employees: Array.isArray(employees) ? employees : [],
           };
         })
@@ -1074,7 +1067,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     setProjectTeamMembers({
       tl: null,
       employees: [],
-      interns: [],
     });
     return;
   }
@@ -1100,19 +1092,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         .filter(Boolean)
     : [];
 
-  const internList = Array.isArray(project.interns)
-    ? project.interns
-        .map((intern) =>
-          findEntity(users, intern) ||
-          findEntity(employees, intern)
-        )
-        .filter(Boolean)
-    : [];
-
   setProjectTeamMembers({
     tl,
     employees: employeeList,
-    interns: internList,
   });
 };
 
@@ -1197,11 +1179,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       if (member) members.push({ member, role: "Employee" });
     });
 
-    (Array.isArray(project.interns) ? project.interns : []).forEach((intern) => {
-      const member = findEntity(users, intern) || findEntity(employees, intern) || intern;
-      if (member) members.push({ member, role: "Intern" });
-    });
-
     return members.filter(({ member }, index, allMembers) => {
       const memberId = normalizeId(member);
       return memberId && allMembers.findIndex(({ member: candidate }) => normalizeId(candidate) === memberId) === index;
@@ -1212,7 +1189,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     const assignedId =
       task?.assignedTo ||
       task?.assignedEmployee ||
-      task?.assignedIntern ||
       task?.assignedTeamLeadUser ||
       task?.assignedTeamLeadEmployee;
     if (!assignedId) return null;
@@ -1254,21 +1230,20 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     setProjectForm((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === "assignedTL" ? { assignedEmployees: [], assignedInterns: [] } : {}),
+      ...(name === "assignedTL" ? { assignedEmployees: [] } : {}),
     }));
   };
 
   const getProjectParticipants = (task) => {
-    if (!task) return { empNames: "", internNames: "", tlName: "" };
+    if (!task) return { empNames: "", tlName: "" };
     const projId =
       task?.projectId?._id || task?.projectId || task?.project?._id || task?.project || "";
     const project = findEntity(projects, projId) || null;
 
     const empNames = project ? getNamesByIds(employees, project.employees, "employee") : "";
-    const internNames = project ? getNamesByIds(users, project.interns, "user") : "";
     const tlName = project ? getTeamLeadNameById(project.teamLeadUser || project.teamLeadEmployee) : "";
 
-    return { empNames, internNames, tlName };
+    return { empNames, tlName };
   };
   const handleTaskChange = (e) => {
     const { name, value } = e.target;
@@ -1467,12 +1442,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         ? [normalizeId(project.employees)].filter(Boolean)
         : [];
 
-    const internList = Array.isArray(project?.interns)
-      ? project.interns.map(normalizeId).filter(Boolean)
-      : project?.interns
-        ? [normalizeId(project.interns)].filter(Boolean)
-        : [];
-
     const tlId =
       normalizeId(project?.teamLeadUser || project?.teamLeadEmployee) || "";
 
@@ -1488,7 +1457,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       status: project?.status || "pending",
       assignedEmployees: empList,
       assignedTL: tlId,
-      assignedInterns: internList,
     });
 
     setShowProjectModal(true);
@@ -1516,7 +1484,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         status: projectForm.status || "pending",
         employees: Array.isArray(projectForm.assignedEmployees) ? projectForm.assignedEmployees : [],
         teamLeadUser: projectForm.assignedTL || null,
-        interns: Array.isArray(projectForm.assignedInterns) ? projectForm.assignedInterns : [],
       };
 
       if (!projectForm.projectName.trim()) {
@@ -1555,7 +1522,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       setProjectTeamMembers({
         tl: null,
         employees: [],
-        interns: [],
       });
     } catch (error) {
       console.error("Project save error:", error?.response?.data || error);
@@ -1825,11 +1791,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
               ].map((item, idx) => (
                 <div
                   key={idx}
-                  className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+                  className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
                 >
                   <div className="flex items-start justify-between">
-                    <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+                    <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+                    <p className="text-xl font-bold text-slate-900">{item.value}</p>
                   </div>
                 </div>
               ))}
@@ -2381,11 +2347,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
               ].map((item, idx) => (
                 <div
                   key={idx}
-                  className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+                  className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
                 >
                   <div className="flex items-start justify-between">
-                    <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+                    <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+                    <p className="text-xl font-bold text-slate-900">{item.value}</p>
                   </div>
                 </div>
               ))}
@@ -2804,7 +2770,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 </div>
 
                 {(() => {
-                  // Compute options for TL, Employees, and Interns with proper deduplication
+                  // Compute options for TL and Employees with proper deduplication
 
                   // 1. Team Leads
                   const tlMap = new Map();
@@ -2901,23 +2867,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       return isSameId(employee.id, matchedEmployee);
                     })
                   );
-                  const teamLeadInterns = (selectedTeamLead?.interns || [])
-                    .map((intern) => {
-                      const member =
-                        findEntity(users, intern) ||
-                        findEntity(employees, intern) ||
-                        intern;
-                      return {
-                        id: normalizeId(member),
-                        name: getUserName(member),
-                        subText: member?.email || "Intern",
-                      };
-                    })
-                    .filter((intern, index, allInterns) =>
-                      intern.id &&
-                      intern.name &&
-                      allInterns.findIndex((candidate) => candidate.id === intern.id) === index
-                    );
 
                   return (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2946,7 +2895,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       </div>
 
                       {/* Multiple Employees */}
-                      <div>
+                      <div className="md:col-span-1">
                         <MultiSelectDropdown
                           label="Employees"
                           icon={User}
@@ -2957,22 +2906,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                             setProjectForm((prev) => ({
                               ...prev,
                               assignedEmployees: newValues,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div>
-                        <MultiSelectDropdown
-                          label="Interns"
-                          icon={User}
-                          placeholder={projectForm.assignedTL ? "Select Interns..." : "Select Team Lead first..."}
-                          options={teamLeadInterns}
-                          selectedValues={projectForm.assignedInterns || []}
-                          onChange={(newValues) =>
-                            setProjectForm((prev) => ({
-                              ...prev,
-                              assignedInterns: newValues,
                             }))
                           }
                         />
@@ -3048,9 +2981,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       )}
                       {projectTeamMembers.employees.map((employee) => (
                         <span key={normalizeId(employee)} className="rounded-md border border-blue-200 bg-white px-2.5 py-1">Employee: {getUserName(employee)}</span>
-                      ))}
-                      {projectTeamMembers.interns.map((intern) => (
-                        <span key={normalizeId(intern)} className="rounded-md border border-blue-200 bg-white px-2.5 py-1">Intern: {getUserName(intern)}</span>
                       ))}
                     </div>
                   </div>

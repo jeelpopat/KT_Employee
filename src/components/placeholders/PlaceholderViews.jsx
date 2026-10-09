@@ -95,11 +95,11 @@ export const PerformanceView = () => {
   const score = Number(performanceData?.performancePercentage ?? 0);
 
   const getScoreRating = (val) => {
-    if (val >= 90) return { label: 'Outstanding (Exceeding Expectations)', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' };
-    if (val >= 75) return { label: 'Very Good (Above Standard)', color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800' };
-    if (val >= 50) return { label: 'Good (Meets Expectations)', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' };
-    if (val > 0) return { label: 'Needs Improvement', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800' };
-    return { label: 'Evaluation In Progress', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' };
+    if (val >= 90) return { label: 'Outstanding (Exceeding Expectations)', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' };
+    if (val >= 75) return { label: 'Very Good (Above Standard)', color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200' };
+    if (val >= 50) return { label: 'Good (Meets Expectations)', color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' };
+    if (val > 0) return { label: 'Needs Improvement', color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200' };
+    return { label: 'Evaluation In Progress', color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' };
   };
 
   const ratingInfo = getScoreRating(score);
@@ -118,14 +118,14 @@ export const PerformanceView = () => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
+          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
             <TrendingUp size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">My Performance</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-xl font-bold text-slate-900">My Performance</h2>
+            <p className="text-xs sm:text-sm text-slate-500">
               Personal performance percentage, productivity score, and supervisor feedback
             </p>
           </div>
@@ -134,7 +134,7 @@ export const PerformanceView = () => {
         <button
           onClick={fetchMyPerformance}
           disabled={isLoading}
-          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
           Refresh
@@ -142,14 +142,14 @@ export const PerformanceView = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white border border-slate-200/80 rounded-xl">
           <Loader2 size={32} className="animate-spin text-indigo-500" />
           <p className="text-xs text-slate-500 font-medium">Loading your performance metrics...</p>
         </div>
       ) : (
         <>
           {/* Main Scorecard Banner */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 shadow-xs transition-colors">
+          <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs transition-colors">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
 
               {/* Left Details */}
@@ -161,25 +161,25 @@ export const PerformanceView = () => {
                   </span>
                 </div>
 
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                <h3 className="text-2xl font-bold text-slate-900">
                   {user?.name || performanceData?.employeeName || 'Pandya Hetvi'}
                 </h3>
 
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-                  <span>Email: <strong className="text-slate-700 dark:text-slate-300">{user?.email || performanceData?.employeeEmail || 'N/A'}</strong></span>
-                  <span>Role: <strong className="text-slate-700 dark:text-slate-300 uppercase">{user?.role || performanceData?.employeeType || 'Team Leader'}</strong></span>
-                  <span>Evaluated Date: <strong className="text-slate-700 dark:text-slate-300">{formatDate(performanceData?.updatedAt || performanceData?.createdAt)}</strong></span>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                  <span>Email: <strong className="text-slate-700">{user?.email || performanceData?.employeeEmail || 'N/A'}</strong></span>
+                  <span>Role: <strong className="text-slate-700 uppercase">{user?.role || performanceData?.employeeType || 'Team Leader'}</strong></span>
+                  <span>Evaluated Date: <strong className="text-slate-700">{formatDate(performanceData?.updatedAt || performanceData?.createdAt)}</strong></span>
                 </div>
 
                 {/* Progress Bar */}
                 <div className="space-y-1.5 pt-2 max-w-xl">
-                  <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <div className="flex justify-between text-xs font-semibold text-slate-700">
                     <span>Performance Rating</span>
                     <span>{score}%</span>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${score >= 75 ? 'bg-emerald-500' : score >= 50 ? 'bg-indigo-600' : score > 0 ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                      className={`h-full rounded-full transition-all duration-500 ${score >= 75 ? 'bg-emerald-500' : score >= 50 ? 'bg-indigo-600' : score > 0 ? 'bg-amber-500' : 'bg-slate-300'
                         }`}
                       style={{ width: `${Math.max(score, 4)}%` }}
                     />
@@ -188,11 +188,11 @@ export const PerformanceView = () => {
               </div>
 
               {/* Big Percentage Badge */}
-              <div className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 rounded-xl min-w-[180px] text-center shrink-0">
-                <span className="text-4xl font-extrabold text-slate-900 dark:text-slate-100">
+              <div className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200/80 rounded-xl min-w-[180px] text-center shrink-0">
+                <span className="text-4xl font-extrabold text-slate-900">
                   {score}%
                 </span>
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+                <span className="text-xs font-semibold text-slate-500 mt-1">
                   Overall Rating
                 </span>
                 <span className="text-[11px] text-slate-400 mt-0.5 font-mono">
@@ -202,10 +202,10 @@ export const PerformanceView = () => {
             </div>
 
             {/* Evaluator Remarks */}
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+            <div className="mt-6 pt-5 border-t border-slate-100">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Evaluator Remarks & Feedback</h4>
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl">
-                <p className="text-xs text-slate-700 dark:text-slate-300 italic leading-relaxed">
+              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl">
+                <p className="text-xs text-slate-700 italic leading-relaxed">
                   "{performanceData?.remarks || 'No specific remarks recorded for this evaluation cycle yet. Keep up the consistent deliverables.'}"
                 </p>
               </div>
@@ -282,7 +282,6 @@ export const TeamMembersView = () => {
             const tlUser = pMembers?.teamLeadUser || p.teamLeadUser;
             const tlEmp = pMembers?.teamLeadEmployee || p.teamLeadEmployee;
             const emps = [...(pMembers?.employees || []), ...(p.employees || [])];
-            const interns = [...(pMembers?.interns || []), ...(p.interns || [])];
 
             const isUserLead = (
               (tlUser?.email && tlUser.email.toLowerCase() === userEmail) ||
@@ -298,12 +297,6 @@ export const TeamMembersView = () => {
               (e?.id && String(e.id) === userId)
             );
 
-            const isUserIntern = interns.some(i =>
-              (i?.email && String(i.email).toLowerCase() === userEmail) ||
-              (i?._id && String(i._id) === userId) ||
-              (i?.id && String(i.id) === userId)
-            );
-
             // Also check if any task in this project is assigned to user
             const hasTaskInProject = tasks.some(t => {
               const tPId = typeof t.projectId === 'object' ? t.projectId?._id : t.projectId;
@@ -311,18 +304,14 @@ export const TeamMembersView = () => {
 
               const aEmpId = typeof t.assignedEmployee === 'object' ? t.assignedEmployee?._id : t.assignedEmployee;
               const aEmpEmail = typeof t.assignedEmployee === 'object' ? t.assignedEmployee?.email : null;
-              const aIntId = typeof t.assignedIntern === 'object' ? t.assignedIntern?._id : t.assignedIntern;
-              const aIntEmail = typeof t.assignedIntern === 'object' ? t.assignedIntern?.email : null;
 
               return (
                 (aEmpId && String(aEmpId) === userId) ||
-                (aEmpEmail && String(aEmpEmail).toLowerCase() === userEmail) ||
-                (aIntId && String(aIntId) === userId) ||
-                (aIntEmail && String(aIntEmail).toLowerCase() === userEmail)
+                (aEmpEmail && String(aEmpEmail).toLowerCase() === userEmail)
               );
             });
 
-            const isUserInThisProject = isUserLead || isUserEmp || isUserIntern || hasTaskInProject;
+            const isUserInThisProject = isUserLead || isUserEmp || hasTaskInProject;
 
             // ONLY IF the current user is part of this project, collect team members from it!
             if (isUserInThisProject) {
@@ -369,9 +358,6 @@ export const TeamMembersView = () => {
 
               // Add Employees
               emps.forEach(e => addMem(e, 'Employee', false));
-
-              // Add Interns
-              interns.forEach(i => addMem(i, 'Intern', false));
             }
           })
         );
@@ -401,14 +387,14 @@ export const TeamMembersView = () => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
+          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
             <Users size={22} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">My Team Members</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-xl font-bold text-slate-900">My Team Members</h2>
+            <p className="text-xs sm:text-sm text-slate-500">
               Colleagues and team leaders in your assigned project teams
             </p>
           </div>
@@ -422,18 +408,18 @@ export const TeamMembersView = () => {
             placeholder="Search teammates by name, email..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
           />
         </div>
       </div>
 
       {/* Active Team Projects Tag */}
       {userProjects.length > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl text-xs">
-          <span className="font-semibold text-indigo-700 dark:text-indigo-300">My Assigned Projects:</span>
+        <div className="flex items-center gap-2 p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs">
+          <span className="font-semibold text-indigo-700">My Assigned Projects:</span>
           <div className="flex flex-wrap gap-1.5">
             {userProjects.map((p, i) => (
-              <span key={i} className="px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-800 text-indigo-800 dark:text-indigo-200 font-semibold border border-indigo-200 dark:border-indigo-800 shadow-xs">
+              <span key={i} className="px-2.5 py-0.5 rounded-full bg-white text-indigo-800 font-semibold border border-indigo-200 shadow-xs">
                 {p}
               </span>
             ))}
@@ -447,9 +433,9 @@ export const TeamMembersView = () => {
           <p className="text-sm text-slate-500">Loading your project teammates...</p>
         </div>
       ) : filteredMembers.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-10 text-center shadow-xs">
+        <div className="bg-white border border-slate-200/80 rounded-xl p-10 text-center shadow-xs">
           <Users size={36} className="mx-auto text-slate-400 mb-2 opacity-60" />
-          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">No Team Members Found</h4>
+          <h4 className="text-sm font-bold text-slate-800">No Team Members Found</h4>
           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
             {search
               ? 'No teammates match your search criteria.'
@@ -470,23 +456,21 @@ export const TeamMembersView = () => {
             return (
               <div
                 key={m.id || idx}
-                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-slate-700 rounded-xl p-4 shadow-xs flex flex-col justify-between space-y-3 transition-all"
+                className="bg-white border border-slate-200/80 hover:border-indigo-300 rounded-xl p-4 shadow-xs flex flex-col justify-between space-y-3 transition-all"
               >
                 <div className="flex items-start gap-3">
                   <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${m.isLead
                     ? 'bg-amber-500'
-                    : m.role === 'Intern'
-                      ? 'bg-purple-600'
-                      : 'bg-indigo-600'
+                    : 'bg-indigo-600'
                     }`}>
                     {initials}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <div className="flex items-center gap-1.5 truncate">
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{m.name}</h4>
+                        <h4 className="text-sm font-bold text-slate-900 truncate">{m.name}</h4>
                         {m.isMe && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-500">
                             You
                           </span>
                         )}
@@ -495,10 +479,8 @@ export const TeamMembersView = () => {
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${m.isLead
-                        ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                        : m.role === 'Intern'
-                          ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                          : 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                         }`}>
                         {m.role}
                       </span>
@@ -512,12 +494,12 @@ export const TeamMembersView = () => {
 
                 {/* Assigned Projects Tags */}
                 {m.projects && m.projects.length > 0 && (
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 flex-wrap">
+                  <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] uppercase font-semibold text-slate-400">Team Project:</span>
                     {m.projects.map((pr, pIdx) => (
                       <span
                         key={pIdx}
-                        className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium truncate max-w-[140px]"
+                        className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 font-medium truncate max-w-[140px]"
                         title={pr}
                       >
                         {pr}
@@ -606,7 +588,6 @@ export const EmployeesView = () => {
           const isEmployee =
             role.includes('employee') ||
             role === 'staff' ||
-            role.includes('intern') ||
             desig.includes('developer') ||
             desig.includes('designer') ||
             desig.includes('engineer');
@@ -659,9 +640,6 @@ export const EmployeesView = () => {
           } else if (roleStr.includes('admin') || roleStr.includes('ceo') || desigStr.includes('ceo') || desigStr.includes('admin')) {
             category = 'ADMIN';
             roleFull = u.designation || 'Administrator';
-          } else if (roleStr.includes('intern') || roleStr === 'int') {
-            category = 'INT';
-            roleFull = 'Intern';
           } else {
             category = 'EMP';
             roleFull = u.designation || 'Employee';
@@ -713,21 +691,21 @@ export const EmployeesView = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
+          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
             <Building2 size={22} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Company Employee Directory</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-xl font-bold text-slate-900">Company Employee Directory</h2>
+            <p className="text-xs sm:text-sm text-slate-500">
               Company staff directory including Employees, Team Leaders, HR, and Administrators
             </p>
           </div>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs self-start sm:self-auto flex-wrap">
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg text-xs self-start sm:self-auto flex-wrap">
           {[
             { tag: 'ALL', label: 'All Staff' },
             { tag: 'EMP', label: 'Employees' },
@@ -741,7 +719,7 @@ export const EmployeesView = () => {
               className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 filterRole === tag
                   ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {label}
@@ -751,7 +729,7 @@ export const EmployeesView = () => {
       </div>
 
       {/* Directory Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="relative w-full sm:max-w-sm">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -760,11 +738,11 @@ export const EmployeesView = () => {
               placeholder="Search by name, email, department, role..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500"
             />
           </div>
           <span className="text-xs text-slate-400 self-end sm:self-auto">
-            Showing <span className="font-bold text-slate-700 dark:text-slate-200">{filtered.length}</span> of {employees.length} members
+            Showing <span className="font-bold text-slate-700">{filtered.length}</span> of {employees.length} members
           </span>
         </div>
 
@@ -775,13 +753,13 @@ export const EmployeesView = () => {
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <Users size={36} className="mx-auto text-slate-400 mb-2 opacity-60" />
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No members match your criteria</p>
+            <p className="text-sm font-semibold text-slate-700">No members match your criteria</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                <tr className="border-b border-slate-200 text-slate-500">
                   <th className="py-3 px-4 font-semibold">ID</th>
                   <th className="py-3 px-4 font-semibold">Name & Contact</th>
                   <th className="py-3 px-4 font-semibold">Role & Category</th>
@@ -789,7 +767,7 @@ export const EmployeesView = () => {
                   <th className="py-3 px-4 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {filtered.map((emp, i) => {
                   const initials = emp.name
                     .split(' ')
@@ -800,7 +778,7 @@ export const EmployeesView = () => {
                     .toUpperCase() || 'M';
 
                   return (
-                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-4 font-mono font-semibold text-slate-500 text-xs">
                         {emp.id}
                       </td>
@@ -810,34 +788,33 @@ export const EmployeesView = () => {
                             emp.role === 'TL' ? 'bg-amber-500' :
                             emp.role === 'HR' ? 'bg-rose-500' :
                             emp.role === 'ADMIN' ? 'bg-purple-600' :
-                            emp.role === 'INT' ? 'bg-emerald-600' :
                             'bg-indigo-600'
                           }`}>
                             {initials}
                           </div>
                           <div>
-                            <div className="font-semibold text-slate-900 dark:text-slate-100">{emp.name}</div>
+                            <div className="font-semibold text-slate-900">{emp.name}</div>
                             <div className="text-[11px] text-slate-400">{emp.email}</div>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                          emp.role === 'TL' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800' :
-                          emp.role === 'HR' ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800' :
-                          emp.role === 'ADMIN' ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800' :
-                          emp.role === 'INT' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800' :
-                          'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                          emp.role === 'TL' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                          emp.role === 'HR' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                          emp.role === 'ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                          emp.role === 'INT' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                          'bg-indigo-50 text-indigo-700 border border-indigo-200'
                         }`}>
                           {emp.roleFull}
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="text-slate-800 dark:text-slate-200 font-medium">{emp.designation}</div>
+                        <div className="text-slate-800 font-medium">{emp.designation}</div>
                         <div className="text-[11px] text-slate-400">{emp.dept}</div>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-1.5">
+                        <span className="text-emerald-600 text-xs font-semibold flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {emp.status}
                         </span>
                       </td>
@@ -853,59 +830,59 @@ export const EmployeesView = () => {
   );
 };
 
-// 6. LEARNING HUB (Intern #3)
+// 6. LEARNING HUB
 export const LearningHubView = () => {
   const [modules] = useState([]);
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-md">
+          <div className="p-2.5 bg-purple-50 text-purple-600 rounded-md">
             <BookOpen size={22} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Internship Learning Hub</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Curated training modules, documentation guidelines, and developer roadmaps</p>
+            <h2 className="text-xl font-bold text-slate-900">Employee Learning Hub</h2>
+            <p className="text-xs sm:text-sm text-slate-500">Curated employee training modules, documentation guidelines, and developer roadmaps</p>
           </div>
         </div>
       </div>
 
       {modules.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto">
+        <div className="bg-white border border-slate-200 rounded-lg p-10 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto">
             <BookOpen size={24} />
           </div>
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Learning Modules Assigned</h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+          <h4 className="text-sm font-bold text-slate-900">No Learning Modules Assigned</h4>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
             Your mentor or team leader has not assigned any training modules to your account yet.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {modules.map((mod, idx) => (
-            <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-4">
+            <div key={idx} className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-100 text-purple-700">
                     {mod.level}
                   </span>
-                  <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-2">{mod.title}</h4>
+                  <h4 className="text-base font-bold text-slate-900 mt-2">{mod.title}</h4>
                 </div>
                 <span className="text-xs font-semibold text-slate-500">{mod.hours}</span>
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                <div className="flex justify-between text-xs font-medium text-slate-600">
                   <span>Completion Status</span>
                   <span>{mod.completed}%</span>
                 </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                   <div className="bg-purple-600 h-full rounded-full" style={{ width: `${mod.completed}%` }} />
                 </div>
               </div>
 
-              <button className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer">
+              <button className="w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-xs font-semibold text-slate-700 transition-colors cursor-pointer">
                 {mod.completed === 100 ? 'Review Material' : 'Continue Module'}
               </button>
             </div>
@@ -916,46 +893,46 @@ export const LearningHubView = () => {
   );
 };
 
-// 7. INTERNSHIP PROGRESS (Intern #4)
-export const InternshipProgressView = () => {
+// 7. EMPLOYEE GROWTH TRACKER
+export const EmployeeGrowthTrackerView = () => {
   const checkpoints = [];
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
+          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
             <GraduationCap size={22} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Internship Progress Tracker</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Internship roadmap, weekly evaluations, and mentor checkpoints</p>
+            <h2 className="text-xl font-bold text-slate-900">Employee Growth Tracker</h2>
+            <p className="text-xs sm:text-sm text-slate-500">Employee growth roadmap, quarterly evaluations, and checkpoints</p>
           </div>
         </div>
       </div>
 
       {checkpoints.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-10 text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+        <div className="bg-white border border-slate-200/80 rounded-xl p-10 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
             <GraduationCap size={24} />
           </div>
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Evaluation Checkpoints Yet</h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+          <h4 className="text-sm font-bold text-slate-900">No Evaluation Checkpoints Yet</h4>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
             Your monthly roadmap checkpoints and evaluation scores will appear here once submitted by your mentor.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {checkpoints.map((item, idx) => (
-            <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-3">
+            <div key={idx} className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs space-y-3">
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${item.status === 'Completed' ? 'bg-green-100 text-green-700' : item.status === 'In Progress' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'
                 }`}>
                 {item.status}
               </span>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">{item.month}</h4>
+              <h4 className="text-sm font-bold text-slate-900">{item.month}</h4>
               <div className="text-xs text-slate-500 space-y-1">
-                <p>Evaluation Score: <span className="font-semibold text-slate-700 dark:text-slate-300">{item.score}</span></p>
-                <p>Assigned Mentor: <span className="font-semibold text-slate-700 dark:text-slate-300">{item.mentor}</span></p>
+                <p>Evaluation Score: <span className="font-semibold text-slate-700">{item.score}</span></p>
+                <p>Assigned Mentor: <span className="font-semibold text-slate-700">{item.mentor}</span></p>
               </div>
             </div>
           ))}
@@ -965,7 +942,7 @@ export const InternshipProgressView = () => {
   );
 };
 
-// 8. DOCUMENTS & CERTIFICATE (Intern #7)
+// 8. DOCUMENTS & CERTIFICATE
 export const DocumentsView = () => {
   const { user, setCurrentTab } = useApp();
   const currentUserId = user?.id || user?._id || user?.employeeId || 'current_user';
@@ -985,14 +962,14 @@ export const DocumentsView = () => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl">
+          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
             <FileBadge size={22} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Documents & Certificates</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Official onboarding documents, statutory identity proofs, and certificates</p>
+            <h2 className="text-xl font-bold text-slate-900">Documents & Certificates</h2>
+            <p className="text-xs sm:text-sm text-slate-500">Official onboarding documents, statutory identity proofs, and certificates</p>
           </div>
         </div>
 
@@ -1008,32 +985,32 @@ export const DocumentsView = () => {
       {/* Statutory Identity Proofs Section */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
             Statutory Identity Documents (Aadhar, PAN & Photo)
           </h3>
           <button
             onClick={() => setCurrentTab('profile')}
-            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+            className="text-xs font-semibold text-indigo-600 hover:underline cursor-pointer"
           >
             Upload or Update in Profile &rarr;
           </button>
         </div>
 
         {employeeDocs.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+          <div className="bg-white border border-slate-200/80 rounded-xl p-6 text-center text-xs text-slate-500">
             No identity proofs saved yet. You can upload your Aadhar Card, PAN Card, and photo from the{' '}
-            <button onClick={() => setCurrentTab('profile')} className="text-indigo-600 dark:text-indigo-400 font-semibold underline cursor-pointer">
+            <button onClick={() => setCurrentTab('profile')} className="text-indigo-600 font-semibold underline cursor-pointer">
               Profile section
             </button>.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {employeeDocs.slice(0, 3).map((doc) => (
-              <div key={doc.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 shadow-xs flex flex-col justify-between">
+              <div key={doc.id} className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{doc.title}</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50">
+                    <span className="text-xs font-bold text-slate-900">{doc.title}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-green-50 text-green-700 border border-green-200">
                       {doc.status === 'uploaded' ? 'Uploaded' : 'Pending'}
                     </span>
                   </div>
@@ -1043,7 +1020,7 @@ export const DocumentsView = () => {
 
                 <button
                   onClick={() => setCurrentTab('profile')}
-                  className="mt-3 w-full py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
+                  className="mt-3 w-full py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
                 >
                   <Eye size={13} /> View / Update in Profile
                 </button>
@@ -1055,29 +1032,29 @@ export const DocumentsView = () => {
 
       {/* Onboarding & HR Documents */}
       <div>
-        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
           Onboarding & Corporate Agreements
         </h3>
         {docs.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+          <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-xs text-slate-500">
             No corporate agreements or onboarding documents currently issued.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {docs.map((doc, idx) => (
-              <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs flex items-center justify-between gap-4">
+              <div key={idx} className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md">
+                  <div className="p-2.5 bg-slate-100 text-slate-600 rounded-md">
                     <FileText size={20} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{doc.date} • {doc.size}</p>
+                    <h4 className="text-sm font-semibold text-slate-900">{doc.title}</h4>
+                    <p className="text-xs text-slate-500">{doc.date} • {doc.size}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => alert(`Viewing document: ${doc.title}`)}
-                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                 >
                   <Download size={13} /> View
                 </button>
@@ -1204,8 +1181,7 @@ export const TeamTaskManagementView = () => {
   // Open Edit Modal
   const handleOpenEditModal = (task, e) => {
     if (e) e.stopPropagation();
-    const assignedUser = task.assignedEmployee?._id || task.assignedEmployee ||
-      task.assignedIntern?._id || task.assignedIntern || '';
+    const assignedUser = task.assignedEmployee?._id || task.assignedEmployee || '';
     setTaskForm({
       taskTitle: task.taskTitle || task.title || '',
       projectId: task.projectId?._id || task.projectId || '',
@@ -1244,17 +1220,9 @@ export const TeamTaskManagementView = () => {
       };
       if (taskForm.dueDate) payload.dueDate = taskForm.dueDate;
 
-      // Assign employee or intern
+      // Assign employee
       if (taskForm.assignedTo) {
-        const selectedUserObj = usersList.find(u => (u._id || u.id) === taskForm.assignedTo);
-        const roleStr = String(selectedUserObj?.role?.roleName || selectedUserObj?.role || '').toLowerCase();
-        if (roleStr.includes('intern')) {
-          payload.assignedIntern = taskForm.assignedTo;
-          payload.assignedEmployee = null;
-        } else {
-          payload.assignedEmployee = taskForm.assignedTo;
-          payload.assignedIntern = null;
-        }
+        payload.assignedEmployee = taskForm.assignedTo;
       }
 
       // If user is TL, attach TL reference
@@ -1343,7 +1311,7 @@ export const TeamTaskManagementView = () => {
       const title = (task.taskTitle || task.title || '').toLowerCase();
       const desc = (task.taskDescription || task.description || '').toLowerCase();
       const pName = (task.projectId?.projectName || task.projectId?.name || '').toLowerCase();
-      const empName = (task.assignedEmployee?.name || task.assignedIntern?.name || '').toLowerCase();
+      const empName = (task.assignedEmployee?.name || '').toLowerCase();
       const q = searchQuery.toLowerCase();
 
       const matchesSearch = !q || title.includes(q) || desc.includes(q) || pName.includes(q) || empName.includes(q);
@@ -1367,24 +1335,24 @@ export const TeamTaskManagementView = () => {
   const completedTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'completed');
 
   const columns = [
-    { title: 'To Do', count: todoTasks.length, statusKey: 'pending', tasks: todoTasks, accent: 'border-t-slate-400 bg-slate-50 dark:bg-slate-900/40' },
-    { title: 'In Progress', count: inProgressTasks.length, statusKey: 'in_progress', tasks: inProgressTasks, accent: 'border-t-amber-500 bg-amber-50/20 dark:bg-amber-950/10' },
-    { title: 'Testing & Review', count: reviewTasks.length, statusKey: 'review', tasks: reviewTasks, accent: 'border-t-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/10' },
-    { title: 'Completed', count: completedTasks.length, statusKey: 'completed', tasks: completedTasks, accent: 'border-t-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10' }
+    { title: 'To Do', count: todoTasks.length, statusKey: 'pending', tasks: todoTasks, accent: 'border-t-slate-400 bg-slate-50' },
+    { title: 'In Progress', count: inProgressTasks.length, statusKey: 'in_progress', tasks: inProgressTasks, accent: 'border-t-amber-500 bg-amber-50/20' },
+    { title: 'Testing & Review', count: reviewTasks.length, statusKey: 'review', tasks: reviewTasks, accent: 'border-t-indigo-500 bg-indigo-50/20' },
+    { title: 'Completed', count: completedTasks.length, statusKey: 'completed', tasks: completedTasks, accent: 'border-t-emerald-500 bg-emerald-50/20' }
   ];
 
   const getPriorityBadge = (priority = 'medium') => {
     const p = String(priority || '').toLowerCase();
     if (['critical', 'urgent'].includes(p)) {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">Critical</span>;
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">Critical</span>;
     }
     if (p === 'high') {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">High</span>;
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">High</span>;
     }
     if (p === 'low') {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Low</span>;
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Low</span>;
     }
-    return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">Medium</span>;
+    return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">Medium</span>;
   };
 
   return (
@@ -1392,8 +1360,8 @@ export const TeamTaskManagementView = () => {
       {/* Toast Notification */}
       {alertNotice && (
         <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-md transition-all ${alertNotice.type === 'error'
-          ? 'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-200 dark:border-rose-800'
-          : 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-800'
+          ? 'bg-rose-50 text-rose-800 border border-rose-200'
+          : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
           }`}>
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} />
@@ -1406,14 +1374,14 @@ export const TeamTaskManagementView = () => {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
+          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
             <ListTodo size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Team Task Management</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-xl font-bold text-slate-900">Team Task Management</h2>
+            <p className="text-xs sm:text-sm text-slate-500">
               Live task assignments, workload distribution, and deliverables
             </p>
           </div>
@@ -1423,23 +1391,23 @@ export const TeamTaskManagementView = () => {
           <button
             onClick={fetchAllData}
             disabled={isLoading}
-            className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            className="p-2 text-slate-600 hover:text-slate-900 bg-slate-100 rounded-lg transition-colors cursor-pointer"
             title="Refresh Tasks"
           >
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
           </button>
 
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
             <button
               onClick={() => setViewMode('kanban')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${viewMode === 'kanban' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs' : 'text-slate-600 dark:text-slate-400'
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${viewMode === 'kanban' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-600'
                 }`}
             >
               <Layers size={14} /> Kanban
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs' : 'text-slate-600 dark:text-slate-400'
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-600'
                 }`}
             >
               <CheckSquare size={14} /> List
@@ -1463,17 +1431,17 @@ export const TeamTaskManagementView = () => {
           { label: 'In Progress', value: tasks.filter(t => normalizeStatus(t.status) === 'in_progress').length, border: 'border-l-amber-500' },
           { label: 'Completed', value: tasks.filter(t => normalizeStatus(t.status) === 'completed').length, border: 'border-l-emerald-500' },
         ].map((item, idx) => (
-          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-xs transition-all`}>
+          <div key={idx} className={`p-4 bg-white border border-slate-200/80 border-l-4 ${item.border} rounded-xl shadow-xs transition-all`}>
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              <p className="text-2xs font-semibold uppercase tracking-wider text-slate-500 mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">{item.value}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col md:flex-row gap-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3.5 rounded-xl shadow-2xs">
+      <div className="flex flex-col md:flex-row gap-3 bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-2xs">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -1481,7 +1449,7 @@ export const TeamTaskManagementView = () => {
             placeholder="Search by title, description, project, assignee..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-200"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-800"
           />
         </div>
 
@@ -1489,7 +1457,7 @@ export const TeamTaskManagementView = () => {
           <select
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none"
           >
             <option value="all">All Projects</option>
             {projects.map(p => (
@@ -1500,7 +1468,7 @@ export const TeamTaskManagementView = () => {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none"
           >
             <option value="all">All Priorities</option>
             <option value="critical">Critical</option>
@@ -1512,7 +1480,7 @@ export const TeamTaskManagementView = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none"
           >
             <option value="all">All Stages</option>
             <option value="todo">To Do</option>
@@ -1525,16 +1493,16 @@ export const TeamTaskManagementView = () => {
 
       {/* Main Content Area */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white border border-slate-200/80 rounded-xl">
           <Loader2 size={32} className="animate-spin text-indigo-500" />
           <p className="text-xs text-slate-500 font-medium">Loading live team tasks...</p>
         </div>
       ) : filteredTasks.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-12 text-center space-y-3">
-          <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-full w-fit mx-auto">
+        <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center space-y-3">
+          <div className="p-3 bg-slate-100 text-slate-400 rounded-full w-fit mx-auto">
             <ListTodo size={32} />
           </div>
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No tasks found</h3>
+          <h3 className="text-base font-bold text-slate-800">No tasks found</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {searchQuery || projectFilter !== 'all' ? 'No tasks match the active filters.' : 'Get started by creating your team’s first project task.'}
           </p>
@@ -1551,74 +1519,74 @@ export const TeamTaskManagementView = () => {
           {columns.map((col, idx) => (
             <div
               key={idx}
-              className={`rounded-lg p-3.5 space-y-3 border border-slate-200 dark:border-slate-800 border-t-4 ${col.accent}`}
+              className={`rounded-lg p-3.5 space-y-3 border border-slate-200 border-t-4 ${col.accent}`}
             >
-              <div className="flex items-center justify-between pb-1 border-b border-slate-200/60 dark:border-slate-700/60">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
                   {col.title}
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-2xs">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-slate-600 shadow-2xs">
                   {col.count}
                 </span>
               </div>
 
               <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
                 {col.tasks.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-8 border border-dashed border-slate-200 dark:border-slate-800 rounded-md">
+                  <p className="text-xs text-slate-400 text-center py-8 border border-dashed border-slate-200 rounded-md">
                     No tasks in this stage
                   </p>
                 ) : (
                   col.tasks.map((task) => {
-                    const assignedName = task.assignedEmployee?.name || task.assignedIntern?.name || 'Unassigned';
+                    const assignedName = task.assignedEmployee?.name || 'Unassigned';
                     const projectName = task.projectId?.projectName || task.projectId?.name || 'Project';
 
                     return (
                       <div
                         key={task._id}
                         onClick={() => setSelectedTask && setSelectedTask(task)}
-                        className="group p-3.5 bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 rounded-xl shadow-2xs hover:shadow-xs hover:border-indigo-400 dark:hover:border-indigo-500 transition-all cursor-pointer space-y-2.5 relative"
+                        className="group p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-2xs hover:shadow-xs hover:border-indigo-400 transition-all cursor-pointer space-y-2.5 relative"
                       >
                         {/* Top row: Project badge & Priority */}
                         <div className="flex items-center justify-between gap-1.5">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 truncate max-w-[130px]">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 truncate max-w-[130px]">
                             {projectName}
                           </span>
                           {getPriorityBadge(task.priority)}
                         </div>
 
                         {/* Task Title */}
-                        <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs line-clamp-2 leading-relaxed">
+                        <p className="font-semibold text-slate-900 text-xs line-clamp-2 leading-relaxed">
                           {task.taskTitle || task.title}
                         </p>
 
                         {/* Description excerpt */}
                         {task.taskDescription && (
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
+                          <p className="text-[11px] text-slate-500 line-clamp-2">
                             {task.taskDescription}
                           </p>
                         )}
 
                         {/* Assignee & Due Date */}
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
                           <div className="flex items-center gap-1.5 truncate max-w-[140px]" title={assignedName}>
-                            <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center text-[9px] font-bold shrink-0">
+                            <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[9px] font-bold shrink-0">
                               {assignedName.charAt(0).toUpperCase()}
                             </div>
                             <span className="truncate">{assignedName}</span>
                           </div>
 
-                          <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 shrink-0">
+                          <span className="font-mono text-[10px] text-slate-500 shrink-0">
                             {task.dueDate ? task.dueDate.split('T')[0] : 'No due date'}
                           </span>
                         </div>
 
                         {/* Action buttons (Edit, Delete, Advance Status) */}
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60 gap-1" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-1" onClick={e => e.stopPropagation()}>
                           {/* Quick Status Dropdown */}
                           <select
                             value={task.status || 'pending'}
                             onChange={(e) => handleQuickStatusChange(task, e.target.value, e)}
-                            className="text-[10px] px-1.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 focus:outline-none"
+                            className="text-[10px] px-1.5 py-1 bg-slate-50 border border-slate-200 rounded text-slate-700 focus:outline-none"
                           >
                             <option value="pending">To Do</option>
                             <option value="in_progress">In Progress</option>
@@ -1629,7 +1597,7 @@ export const TeamTaskManagementView = () => {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={(e) => handleOpenEditModal(task, e)}
-                              className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded transition cursor-pointer"
                               title="Edit Task"
                             >
                               <Edit3 size={13} />
@@ -1639,7 +1607,7 @@ export const TeamTaskManagementView = () => {
                                 e.stopPropagation();
                                 setDeletingTask(task);
                               }}
-                              className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
                               title="Delete Task"
                             >
                               <Trash2 size={13} />
@@ -1656,9 +1624,9 @@ export const TeamTaskManagementView = () => {
         </div>
       ) : (
         /* List View */
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto shadow-xs">
+        <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto shadow-xs">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 uppercase text-[11px] font-semibold border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-50 text-slate-500 uppercase text-[11px] font-semibold border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3">Task Details</th>
                 <th className="px-4 py-3">Project</th>
@@ -1669,27 +1637,27 @@ export const TeamTaskManagementView = () => {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100">
               {filteredTasks.map(task => (
-                <tr key={task._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                <tr key={task._id} className="hover:bg-slate-50 transition">
                   <td className="px-4 py-3.5 max-w-xs">
-                    <span className="font-semibold text-slate-900 dark:text-slate-100 block">
+                    <span className="font-semibold text-slate-900 block">
                       {task.taskTitle || task.title}
                     </span>
                     {task.taskDescription && (
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                      <span className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
                         {task.taskDescription}
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                    <span className="font-medium text-slate-700">
                       {task.projectId?.projectName || task.projectId?.name || 'Project'}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className="text-slate-700 dark:text-slate-300">
-                      {task.assignedEmployee?.name || task.assignedIntern?.name || 'Unassigned'}
+                    <span className="text-slate-700">
+                      {task.assignedEmployee?.name || 'Unassigned'}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
@@ -1699,7 +1667,7 @@ export const TeamTaskManagementView = () => {
                     <select
                       value={task.status || 'pending'}
                       onChange={(e) => handleQuickStatusChange(task, e.target.value)}
-                      className="text-xs px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-800 dark:text-slate-200"
+                      className="text-xs px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-800"
                     >
                       <option value="pending">To Do</option>
                       <option value="in_progress">In Progress</option>
@@ -1707,21 +1675,21 @@ export const TeamTaskManagementView = () => {
                       <option value="completed">Completed</option>
                     </select>
                   </td>
-                  <td className="px-4 py-3.5 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                  <td className="px-4 py-3.5 font-mono text-[11px] text-slate-600">
                     {task.dueDate ? task.dueDate.split('T')[0] : '—'}
                   </td>
                   <td className="px-4 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => handleOpenEditModal(task)}
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition cursor-pointer"
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded transition cursor-pointer"
                         title="Edit Task"
                       >
                         <Edit3 size={14} />
                       </button>
                       <button
                         onClick={() => setDeletingTask(task)}
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition cursor-pointer"
+                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
                         title="Delete Task"
                       >
                         <Trash2 size={14} />
@@ -1738,19 +1706,19 @@ export const TeamTaskManagementView = () => {
       {/* CREATE & EDIT TASK MODAL */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <div className="bg-white border border-slate-200 rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                <h3 className="text-base font-bold text-slate-900">
                   {editingTask ? 'Edit Task' : 'Create New Task'}
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500">
                   {editingTask ? 'Update task assignment and details' : 'Assign a new task to your team'}
                 </p>
               </div>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1759,7 +1727,7 @@ export const TeamTaskManagementView = () => {
             <form onSubmit={handleSaveTask} className="p-5 space-y-4">
               {/* Task Title */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Task Title *
                 </label>
                 <input
@@ -1768,20 +1736,20 @@ export const TeamTaskManagementView = () => {
                   placeholder="e.g. Design authentication modal"
                   value={taskForm.taskTitle}
                   onChange={(e) => setTaskForm({ ...taskForm, taskTitle: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                 />
               </div>
 
               {/* Project Dropdown */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Project *
                 </label>
                 <select
                   required
                   value={taskForm.projectId}
                   onChange={(e) => setTaskForm({ ...taskForm, projectId: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                 >
                   <option value="">Select Project</option>
                   {projects.map(p => (
@@ -1792,13 +1760,13 @@ export const TeamTaskManagementView = () => {
 
               {/* Assigned Member */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Assignee
                 </label>
                 <select
                   value={taskForm.assignedTo}
                   onChange={(e) => setTaskForm({ ...taskForm, assignedTo: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                 >
                   <option value="">Unassigned</option>
                   {usersList.map(u => {
@@ -1815,13 +1783,13 @@ export const TeamTaskManagementView = () => {
               {/* Priority & Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Priority
                   </label>
                   <select
                     value={taskForm.priority}
                     onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -1832,13 +1800,13 @@ export const TeamTaskManagementView = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Status
                   </label>
                   <select
                     value={taskForm.status}
                     onChange={(e) => setTaskForm({ ...taskForm, status: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                   >
                     <option value="pending">To Do / Pending</option>
                     <option value="in_progress">In Progress</option>
@@ -1852,19 +1820,19 @@ export const TeamTaskManagementView = () => {
               {/* Due Date & Estimated Hours */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Due Date
                   </label>
                   <input
                     type="date"
                     value={taskForm.dueDate}
                     onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Estimated Hours
                   </label>
                   <input
@@ -1873,14 +1841,14 @@ export const TeamTaskManagementView = () => {
                     placeholder="e.g. 16"
                     value={taskForm.estimatedHours}
                     onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                   />
                 </div>
               </div>
 
               {/* Task Description */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Description
                 </label>
                 <textarea
@@ -1888,16 +1856,16 @@ export const TeamTaskManagementView = () => {
                   placeholder="Provide scope, requirements, or acceptance criteria..."
                   value={taskForm.taskDescription}
                   onChange={(e) => setTaskForm({ ...taskForm, taskDescription: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                 />
               </div>
 
               {/* Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                  className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1918,25 +1886,25 @@ export const TeamTaskManagementView = () => {
       {/* DELETE CONFIRMATION MODAL */}
       {deletingTask && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg max-w-sm w-full p-5 shadow-xl space-y-4">
+          <div className="bg-white border border-slate-200 rounded-lg max-w-sm w-full p-5 shadow-xl space-y-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-full">
+              <div className="p-2.5 bg-rose-100 text-rose-600 rounded-full">
                 <AlertTriangle size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">Delete Task</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400">This action cannot be undone.</p>
+                <h4 className="text-sm font-bold text-slate-900">Delete Task</h4>
+                <p className="text-xs text-slate-500">This action cannot be undone.</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Are you sure you want to delete <span className="font-semibold text-slate-900 dark:text-slate-100">"{deletingTask.taskTitle || deletingTask.title}"</span>?
+            <p className="text-xs text-slate-600">
+              Are you sure you want to delete <span className="font-semibold text-slate-900">"{deletingTask.taskTitle || deletingTask.title}"</span>?
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setDeletingTask(null)}
-                className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition cursor-pointer"
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -2231,12 +2199,12 @@ export const TeamLeaveManagementView = () => {
   // Avatar initial background color generator
   const getAvatarColor = (name = '') => {
     const colors = [
-      'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
-      'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
-      'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-      'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-      'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+      'bg-indigo-100 text-indigo-700',
+      'bg-teal-100 text-teal-700',
+      'bg-purple-100 text-purple-700',
+      'bg-emerald-100 text-emerald-700',
+      'bg-amber-100 text-amber-700',
+      'bg-rose-100 text-rose-700'
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -2250,8 +2218,8 @@ export const TeamLeaveManagementView = () => {
       {/* Toast Notification */}
       {alertNotice && (
         <div className={`p-3.5 rounded-lg text-xs font-semibold flex items-center justify-between shadow-md transition-all ${alertNotice.type === 'error'
-          ? 'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-200 dark:border-rose-800'
-          : 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-800'
+          ? 'bg-rose-50 text-rose-800 border border-rose-200'
+          : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
           }`}>
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} />
@@ -2264,14 +2232,14 @@ export const TeamLeaveManagementView = () => {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs transition-colors">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl">
+          <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
             <CalendarX size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Team Leave Approvals</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-xl font-bold text-slate-900">Team Leave Approvals</h2>
+            <p className="text-xs sm:text-sm text-slate-500">
               Review and approve leave applications for your assigned team members before they proceed to HR
             </p>
           </div>
@@ -2280,7 +2248,7 @@ export const TeamLeaveManagementView = () => {
         <button
           onClick={fetchLeaves}
           disabled={isLoading}
-          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
           Refresh
@@ -2289,20 +2257,20 @@ export const TeamLeaveManagementView = () => {
 
       {/* Team Assignment Banner */}
       {assignedTeams.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-xl text-xs">
-          <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
-            <Users size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl text-xs">
+          <div className="flex items-center gap-2 text-indigo-900">
+            <Users size={16} className="text-indigo-600 shrink-0" />
             <span>
               Your Assigned Team: <strong>{assignedTeams.map(t => t.name || 'My Team').join(', ')}</strong> ({assignedEmployeesCount} Assigned Members)
             </span>
           </div>
-          <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold bg-white dark:bg-slate-900 px-2.5 py-1 rounded-md border border-indigo-200 dark:border-indigo-800">
+          <span className="text-[11px] text-indigo-600 font-semibold bg-white px-2.5 py-1 rounded-md border border-indigo-200">
             Requests forward to HR upon your approval
           </span>
         </div>
       ) : (
-        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl text-xs text-amber-800 dark:text-amber-300">
-          <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+        <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+          <AlertCircle size={16} className="text-amber-600 shrink-0" />
           <span>
             No specific team currently assigned to your Team Lead account in <code>/api/teamLead/team</code>. Only leave requests from your assigned team members will appear here.
           </span>
@@ -2317,18 +2285,18 @@ export const TeamLeaveManagementView = () => {
           { label: 'Rejected by You', value: rejectedCount, border: 'border-l-rose-500' },
           { label: 'Team Total Requests', value: leaves.length, border: 'border-l-indigo-600' }
         ].map((item, idx) => (
-          <div key={idx} className={`p-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.border} rounded-xl shadow-xs transition-all`}>
+          <div key={idx} className={`p-4 bg-white border border-slate-200/80 border-l-4 ${item.border} rounded-xl shadow-xs transition-all`}>
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              <p className="text-2xs font-semibold uppercase tracking-wider text-slate-500 mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">{item.value}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3 rounded-xl shadow-2xs">
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg w-full sm:w-auto">
           {[
             { key: 'pending', label: `Pending (${pendingCount})` },
             { key: 'all', label: `All (${leaves.length})` },
@@ -2339,8 +2307,8 @@ export const TeamLeaveManagementView = () => {
               key={tab.key}
               onClick={() => setFilterTab(tab.key)}
               className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${filterTab === tab.key
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                ? 'bg-white text-indigo-600 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
                 }`}
             >
               {tab.label}
@@ -2355,21 +2323,21 @@ export const TeamLeaveManagementView = () => {
             placeholder="Search team applicant, reason..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-200"
+            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-800"
           />
         </div>
       </div>
 
       {/* Applications List */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white border border-slate-200 rounded-lg">
           <Loader2 size={32} className="animate-spin text-rose-500" />
           <p className="text-xs text-slate-500 font-medium">Loading team leave requests...</p>
         </div>
       ) : filteredLeaves.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-12 text-center space-y-2">
+        <div className="bg-white border border-slate-200 rounded-lg p-12 text-center space-y-2">
           <CheckCircle2 size={36} className="text-emerald-500 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No leave requests found</h3>
+          <h3 className="text-base font-bold text-slate-800">No leave requests found</h3>
           <p className="text-xs text-slate-500">
             {filterTab === 'pending'
               ? 'All caught up! No pending leave applications from your team members require your review.'
@@ -2387,7 +2355,7 @@ export const TeamLeaveManagementView = () => {
             return (
               <div
                 key={l._id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 transition hover:border-slate-300 dark:hover:border-slate-700"
+                className="bg-white border border-slate-200 rounded-lg p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 transition hover:border-slate-300"
               >
                 {/* Left: Applicant details and leave info */}
                 <div className="space-y-2 flex-1">
@@ -2401,7 +2369,7 @@ export const TeamLeaveManagementView = () => {
                           const fallback = e.currentTarget.parentElement?.querySelector('.avatar-initial-fallback');
                           if (fallback) fallback.style.display = 'flex';
                         }}
-                        className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-2xs"
+                        className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-2xs"
                       />
                     ) : null}
                     <div
@@ -2411,26 +2379,26 @@ export const TeamLeaveManagementView = () => {
                       {applicantName.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <span className="font-bold text-sm text-slate-900 dark:text-slate-100 mr-2">
+                      <span className="font-bold text-sm text-slate-900 mr-2">
                         {applicantName}
                       </span>
-                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                      <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                         {applicantRole}
                       </span>
                     </div>
 
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                       (l.leaveType === 'half_day' || l.isHalfDay) 
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' 
-                        : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+                        ? 'bg-amber-100 text-amber-700' 
+                        : 'bg-indigo-100 text-indigo-700'
                     }`}>
                       {(l.leaveType === 'half_day' || l.isHalfDay) ? 'Half Day Leave' : 'Full Day Leave'}
                     </span>
 
                     {/* Status Badge */}
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${tlStatus === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
-                      tlStatus === 'rejected' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300' :
-                        'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${tlStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                      tlStatus === 'rejected' ? 'bg-rose-100 text-rose-700' :
+                        'bg-amber-100 text-amber-700'
                       }`}>
                       {tlStatus === 'approved'
                         ? 'Approved by You • Awaiting HR Approval'
@@ -2441,9 +2409,9 @@ export const TeamLeaveManagementView = () => {
                   </div>
 
                   {/* Dates & Reason */}
-                  <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1">
+                  <div className="text-xs text-slate-600 space-y-1">
                     <p>
-                      Duration: <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      Duration: <span className="font-semibold text-slate-900">
                         {formatDate(l.startDate)} {l.endDate && l.endDate !== l.startDate ? `to ${formatDate(l.endDate)}` : ''}
                       </span>
                       <span className="ml-2 text-slate-500">
@@ -2455,11 +2423,11 @@ export const TeamLeaveManagementView = () => {
                         )}
                       </span>
                     </p>
-                    <p className="italic text-slate-500 dark:text-slate-400">
+                    <p className="italic text-slate-500">
                       Reason: "{l.reason || 'No reason specified'}"
                     </p>
                     {tlRemark && (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 rounded inline-block">
+                      <p className="text-[11px] text-amber-700 bg-amber-50 px-2 py-1 rounded inline-block">
                         <span className="font-semibold">TL Note:</span> {tlRemark}
                       </p>
                     )}
@@ -2492,11 +2460,11 @@ export const TeamLeaveManagementView = () => {
                   ) : (
                     <div className="flex items-center gap-1.5">
                       {tlStatus === 'approved' ? (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-md text-xs font-semibold">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-xs font-semibold">
                           <Check size={13} /> Approved by You (Sent to HR)
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-md text-xs font-semibold">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-xs font-semibold">
                           <X size={13} /> Rejected by You
                         </span>
                       )}
@@ -2512,29 +2480,29 @@ export const TeamLeaveManagementView = () => {
       {/* APPROVE / REJECT MODAL */}
       {actionModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg max-w-md w-full p-5 shadow-xl space-y-4">
+          <div className="bg-white border border-slate-200 rounded-lg max-w-md w-full p-5 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className={`p-2 rounded-full ${actionModal.type === 'approve'
-                  ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                  : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
+                  ? 'bg-emerald-100 text-emerald-600'
+                  : 'bg-rose-100 text-rose-600'
                   }`}>
                   {actionModal.type === 'approve' ? <Check size={18} /> : <X size={18} />}
                 </div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                <h4 className="text-sm font-bold text-slate-900">
                   {actionModal.type === 'approve' ? 'Approve & Forward to HR' : 'Reject Leave Request'}
                 </h4>
               </div>
               <button
                 onClick={() => setActionModal(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-md text-xs space-y-1">
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
+            <div className="bg-slate-50 p-3 rounded-md text-xs space-y-1">
+              <p className="font-semibold text-slate-800">
                 {resolveApplicantDetails(actionModal.leave).name}
                 <span className="text-slate-500 font-normal ml-1.5">
                   ({resolveApplicantDetails(actionModal.leave).role})
@@ -2543,13 +2511,13 @@ export const TeamLeaveManagementView = () => {
               <p className="text-slate-500">
                 {formatDate(actionModal.leave?.startDate)} to {formatDate(actionModal.leave?.endDate)} ({actionModal.leave?.totalDays || 1} Days)
               </p>
-              <p className="text-slate-600 dark:text-slate-400 italic">
+              <p className="text-slate-600 italic">
                 "{actionModal.leave?.reason}"
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 {actionModal.type === 'approve' ? 'Approval Remarks (Forwarded to HR)' : 'Rejection Reason / Remarks'}
               </label>
               <textarea
@@ -2557,15 +2525,15 @@ export const TeamLeaveManagementView = () => {
                 placeholder={actionModal.type === 'approve' ? 'e.g. Approved by Team Leader' : 'e.g. Rejected by Team Leader'}
                 value={remarksText}
                 onChange={(e) => setRemarksText(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+                className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setActionModal(null)}
-                className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition cursor-pointer"
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md transition cursor-pointer"
               >
                 Cancel
               </button>

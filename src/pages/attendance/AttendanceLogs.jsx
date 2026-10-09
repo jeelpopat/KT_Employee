@@ -32,7 +32,7 @@ const AVATAR_COLORS = [
   'bg-indigo-600',
   'bg-teal-600',
 ];
- 
+
 const WORKDAY_MINUTES = 9 * 60;
 
 /* =========================================================
@@ -147,9 +147,9 @@ const normalizeStatus = (item) => {
 
   const rawStatus = String(
     item?.status ||
-      item?.attendanceStatus ||
-      item?.attendance?.status ||
-      ''
+    item?.attendanceStatus ||
+    item?.attendance?.status ||
+    ''
   )
     .trim()
     .toLowerCase();
@@ -249,33 +249,31 @@ const mapLog = (item, index) => {
         : []),
     ...(item?.breakStart || item?.breakEnd
       ? [
-          {
-            startTime: item.breakStart,
-            endTime: item.breakEnd,
-          },
-        ]
+        {
+          startTime: item.breakStart,
+          endTime: item.breakEnd,
+        },
+      ]
       : []),
     ...(Array.isArray(item?.sessions)
       ? item.sessions
-          .filter(
-            (session) =>
-              session?.breakStart || session?.breakEnd
-          )
-          .map((session) => ({
-            startTime: session.breakStart,
-            endTime: session.breakEnd,
-          }))
+        .filter(
+          (session) =>
+            session?.breakStart || session?.breakEnd
+        )
+        .map((session) => ({
+          startTime: session.breakStart,
+          endTime: session.breakEnd,
+        }))
       : []),
   ].filter((breakItem, breakIndex, allBreaks) => {
-    const key = `${breakItem?.startTime || ''}-${
-      breakItem?.endTime || ''
-    }`;
+    const key = `${breakItem?.startTime || ''}-${breakItem?.endTime || ''
+      }`;
 
     return (
       allBreaks.findIndex(
         (candidate) =>
-          `${candidate?.startTime || ''}-${
-            candidate?.endTime || ''
+          `${candidate?.startTime || ''}-${candidate?.endTime || ''
           }` === key
       ) === breakIndex
     );
@@ -289,10 +287,10 @@ const mapLog = (item, index) => {
 
   const rawStatus = String(
     item?.status ||
-      item?.attendanceStatus ||
-      item?.attendance?.status ||
-      item?.adminDecision ||
-      ''
+    item?.attendanceStatus ||
+    item?.attendance?.status ||
+    item?.adminDecision ||
+    ''
   )
     .trim()
     .toLowerCase();
@@ -318,22 +316,22 @@ const mapLog = (item, index) => {
   const approvedCheckIn =
     isApproved || hasCheckIn
       ? (
-          item?.approvedCheckInTime ||
-          item?.checkInTime ||
-          item?.punchIn ||
-          firstSession.checkin ||
-          ''
-        )
+        item?.approvedCheckInTime ||
+        item?.checkInTime ||
+        item?.punchIn ||
+        firstSession.checkin ||
+        ''
+      )
       : '';
 
   const approvedCheckOut =
     isApproved || hasCheckIn
       ? (
-          item?.checkOutTime ||
-          item?.punchOut ||
-          firstSession.checkout ||
-          ''
-        )
+        item?.checkOutTime ||
+        item?.punchOut ||
+        firstSession.checkout ||
+        ''
+      )
       : '';
 
   const approvedBreaks = (isApproved || hasCheckIn) ? breaks : [];
@@ -382,12 +380,12 @@ const mapLog = (item, index) => {
 
     totalHours: isApproved
       ? (
-          item?.totalWorkTimeDisplay ||
-          item?.totalWorkTimeHours ||
-          item?.totalHours ||
-          item?.hours ||
-          '0h'
-        )
+        item?.totalWorkTimeDisplay ||
+        item?.totalWorkTimeHours ||
+        item?.totalHours ||
+        item?.hours ||
+        '0h'
+      )
       : '0h',
 
     isLate: isApproved && item?.isLate === true,
@@ -526,13 +524,13 @@ const calculateAttendanceProgress = (
     .map((item) => ({
       start: parseTimeToMinutes(
         item?.startTime ||
-          item?.startTimeFullDisplay ||
-          item?.startTimeDisplay
+        item?.startTimeFullDisplay ||
+        item?.startTimeDisplay
       ),
       end: parseTimeToMinutes(
         item?.endTime ||
-          item?.endTimeFullDisplay ||
-          item?.endTimeDisplay
+        item?.endTimeFullDisplay ||
+        item?.endTimeDisplay
       ),
     }))
     .filter(
@@ -796,8 +794,8 @@ const AttendanceTimeline = ({
           const isHovered =
             localHoveredSegment === idx;
 
-          return ( 
-            <div 
+          return (
+            <div
               key={idx}
               className={`
                 ${getColorClass(segment.color)}
@@ -815,20 +813,18 @@ const AttendanceTimeline = ({
                 transition-all
                 duration-200
                 cursor-pointer
-                ${
-                  isHovered
-                    ? 'shadow-lg z-10 scale-y-105'
-                    : ''
+                ${isHovered
+                  ? 'shadow-lg z-10 scale-y-105'
+                  : ''
                 }
               `}
               style={{
                 width: `${width}%`,
-                left: `${
-                  ((segment.start -
-                    segments[0].start) /
-                    totalDuration) *
+                left: `${((segment.start -
+                  segments[0].start) /
+                  totalDuration) *
                   100
-                }%`,
+                  }%`,
                 boxShadow: isHovered
                   ? '0 4px 12px rgba(0,0,0,0.3)'
                   : 'none',
@@ -1039,7 +1035,7 @@ export default function AttendanceLogs() {
         if (historyRes.ok) {
           const historyData = await historyRes.json();
           const historyList = historyData.data || historyData.adjustments || [];
-          
+
           const getIstDateString = (dateVal) => {
             if (!dateVal) return '';
             const d = new Date(dateVal);
@@ -1073,7 +1069,7 @@ export default function AttendanceLogs() {
               const valUser = val?.employee || val?.user || (typeof val?.userId === 'object' ? val?.userId : {}) || {};
               const valId = valUser?._id || valUser?.id || val?._id || val?.userId;
               if (targetId && valId && String(valId) === targetId) return key;
-              
+
               const valName = getEmpNameFromVal(val);
               if (targetName && valName && (targetName === valName || targetName.includes(valName) || valName.includes(targetName))) {
                 return key;
@@ -1179,7 +1175,7 @@ export default function AttendanceLogs() {
             };
 
             const firstSess = Array.isArray(adj.sessions) && adj.sessions[0] ? adj.sessions[0] : {};
-            
+
             let checkinVal = adj.checkInTime || firstSess.checkin || "";
             let checkoutVal = adj.checkOutTime || firstSess.checkout || "";
 
@@ -1285,9 +1281,9 @@ export default function AttendanceLogs() {
       'h-3 w-3 sm:h-3.5 sm:w-3.5';
 
     switch (
-      String(status || '')
-        .toLowerCase()
-        .trim()
+    String(status || '')
+      .toLowerCase()
+      .trim()
     ) {
       case 'on time':
       case 'present':
@@ -1355,9 +1351,9 @@ export default function AttendanceLogs() {
   ========================================================= */
   const getStatusStyle = (status) => {
     switch (
-      String(status || '')
-        .toLowerCase()
-        .trim()
+    String(status || '')
+      .toLowerCase()
+      .trim()
     ) {
       case 'on time':
       case 'present':
@@ -1539,8 +1535,8 @@ export default function AttendanceLogs() {
               .map((breakItem) =>
                 formatTime(
                   breakItem?.startTime ||
-                    breakItem?.startTimeFullDisplay ||
-                    breakItem?.startTimeDisplay
+                  breakItem?.startTimeFullDisplay ||
+                  breakItem?.startTimeDisplay
                 )
               )
               .join(', '),
@@ -1548,8 +1544,8 @@ export default function AttendanceLogs() {
               .map((breakItem) =>
                 formatTime(
                   breakItem?.endTime ||
-                    breakItem?.endTimeFullDisplay ||
-                    breakItem?.endTimeDisplay
+                  breakItem?.endTimeFullDisplay ||
+                  breakItem?.endTimeDisplay
                 )
               )
               .join(', '),
@@ -1698,12 +1694,12 @@ export default function AttendanceLogs() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 tracking-tight">
             Attendance Logs
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+          {/* <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
             Inspect detailed attendance logs and history for your team
-          </p>
+          </p> */}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1813,11 +1809,11 @@ export default function AttendanceLogs() {
         ].map((item, idx) => (
           <div
             key={idx}
-            className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+            className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
           >
             <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{item.value}</p>
+              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
+              <p className="text-xl font-bold text-slate-900">{item.value}</p>
             </div>
           </div>
         ))}
@@ -1894,11 +1890,10 @@ export default function AttendanceLogs() {
                   Filters
                 </span>
                 <ChevronDown
-                  className={`h-3.5 w-3.5 text-slate-400 transition-transform ${
-                    showFilters
-                      ? 'rotate-180'
-                      : ''
-                  }`}
+                  className={`h-3.5 w-3.5 text-slate-400 transition-transform ${showFilters
+                    ? 'rotate-180'
+                    : ''
+                    }`}
                 />
               </button>
             </div>
@@ -2030,7 +2025,7 @@ export default function AttendanceLogs() {
             <h3 className="text-base sm:text-lg font-semibold text-gray-800">
 
               {searchTerm ||
-              filterStatus !== 'all'
+                filterStatus !== 'all'
                 ? 'No Results Found'
                 : 'No Attendance Logs'}
 
@@ -2039,7 +2034,7 @@ export default function AttendanceLogs() {
             <p className="mt-1 text-xs sm:text-sm text-gray-500 px-4">
 
               {searchTerm ||
-              filterStatus !== 'all'
+                filterStatus !== 'all'
                 ? 'Try adjusting your search or filter terms'
                 : 'Attendance records will appear here.'}
 
@@ -2174,7 +2169,7 @@ export default function AttendanceLogs() {
                                 log.status
                               )}`}
                             >
-                              {icon} 
+                              {icon}
                             </span>
 
                           </td>
@@ -2330,13 +2325,13 @@ export default function AttendanceLogs() {
       </div>
 
       {selectedLog && (() => {
-        const activeLog = logs.find((l) => 
+        const activeLog = logs.find((l) =>
           String(l.id) === String(selectedLog.id) ||
           (l.name && selectedLog.name && String(l.name).trim().toLowerCase() === String(selectedLog.name).trim().toLowerCase())
         ) || selectedLog;
         const {
           segments,
-          workingMinutes, 
+          workingMinutes,
           breakMinutes,
         } = getLogDetails(activeLog);
 
@@ -2431,7 +2426,7 @@ export default function AttendanceLogs() {
                       No timeline data available
                     </p>
                   )}
-                </div> 
+                </div>
               </div>
             </div>
           </div>

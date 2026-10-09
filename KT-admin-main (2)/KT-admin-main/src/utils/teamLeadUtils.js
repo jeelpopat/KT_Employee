@@ -96,7 +96,6 @@ export const getLoggedInUserIdentifiers = (currentUser) => {
           'user',
           'admin',
           'hr',
-          'intern',
           'team lead',
           'team leader',
           'unknown',
@@ -310,7 +309,6 @@ export const extractAssignedTeamEmployees = (myTeams, usersMap = {}) => {
   myTeams.forEach((team) => {
     const pool = [
       ...(Array.isArray(team.employees) ? team.employees : []),
-      ...(Array.isArray(team.interns) ? team.interns : []),
       ...(Array.isArray(team.teamMembers) ? team.teamMembers : []),
       ...(Array.isArray(team.members) ? team.members : []),
     ];

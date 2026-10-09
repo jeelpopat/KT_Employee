@@ -98,7 +98,6 @@ export const getLoggedInUserIdentifiers = (currentUser) => {
           'user',
           'admin',
           'hr',
-          'intern',
           'team lead',
           'team leader',
           'unknown',
@@ -321,7 +320,6 @@ export const extractAssignedTeamEmployees = (myTeams, usersMap = {}) => {
   myTeams.forEach((team) => {
     const pool = [
       ...(Array.isArray(team.employees) ? team.employees : []),
-      ...(Array.isArray(team.interns) ? team.interns : []),
       ...(Array.isArray(team.teamMembers) ? team.teamMembers : []),
       ...(Array.isArray(team.members) ? team.members : []),
     ];
@@ -505,12 +503,9 @@ export const isProjectAssignedToLead = (project, userIdent) => {
     if (leadMatch) return true;
   }
 
-  // 7. Check if TL is listed in employees or interns array
+  // 7. Check if TL is listed in employees array
   if (Array.isArray(project.employees)) {
     if (project.employees.some((e) => matchEntity(e))) return true;
-  }
-  if (Array.isArray(project.interns)) {
-    if (project.interns.some((i) => matchEntity(i))) return true;
   }
 
   return false;

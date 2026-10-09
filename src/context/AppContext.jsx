@@ -50,7 +50,7 @@ export const getRealAuthUserId = (u) => {
 };
 
 // Validates if the given role is allowed to access the panel
-// Allowed: admin, employee, team_leader (team lead), hr, intern
+// Allowed: admin, employee, team_leader (team lead), hr
 // Unauthorized: account, ca (and any other unpermitted role)
 export const isRoleAllowed = (role) => {
   if (!role) return false;
@@ -76,8 +76,7 @@ export const isRoleAllowed = (role) => {
     r === 'team leader' ||
     r === 'tl' ||
     r === 'hr' ||
-    r === 'hr manager' ||
-    r === 'intern'
+    r === 'hr manager'
   );
 };
 
@@ -166,15 +165,12 @@ export const deriveUserRole = (u) => {
     return 'hr';
   }
 
-  // 3. Check for Intern
+  // 3. Check for Trainee (mapped to standard Employee)
   if (
-    roleStr === 'intern' ||
-    roleStr.includes('intern') ||
     roleStr.includes('trainee') ||
-    designationStr.includes('intern') ||
     designationStr.includes('trainee')
   ) {
-    return 'intern';
+    return 'employee';
   }
 
   // 4. Check for Admin (strictly verified by Admin email OR explicit Admin role string - NEVER loose isAdmin flag)
@@ -385,8 +381,7 @@ export const AppProvider = ({ children }) => {
         initialRole === 'account' ? 'Accountant' :
           initialRole === 'ca' ? 'Chartered Accountant (CA)' :
             initialRole === 'hr' ? 'HR Manager' :
-              initialRole === 'team_leader' ? 'Team Leader' :
-                initialRole === 'intern' ? 'Intern' : 'Employee'
+              initialRole === 'team_leader' ? 'Team Leader' : 'Employee'
     };
   });
 
@@ -411,7 +406,7 @@ export const AppProvider = ({ children }) => {
     if (userRole === 'hr' && currentTab !== 'admin-screenshots' && currentTab !== 'admin-leave-requests') {
       setCurrentTabState('admin-leave-requests');
     }
-  }, [userRole]);
+  }, [userRole, currentTab]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -563,7 +558,7 @@ export const AppProvider = ({ children }) => {
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
   // Activity Tracking: Listen to mouse movers, cursor movements, clicks, keyboard presses, scroll, touch, and tab focus
-  const isEmployeeOrTL = userRole === 'employee' || userRole === 'team_leader' || userRole === 'intern';
+  const isEmployeeOrTL = userRole === 'employee' || userRole === 'team_leader';
   // INACTIVITY THRESHOLD: 60 seconds (5 Minute) for Testing
   const INACTIVITY_THRESHOLD_SECONDS = 300;
 
@@ -891,7 +886,7 @@ export const AppProvider = ({ children }) => {
     // deviceInfo: Auto-detected workstation telemetry string
     const devInfo = getDeviceInfoString();
 
-    // Determine Employee Position: TL, EMP, HR, ADMIN, INTERN
+    // Determine Employee Position: TL, EMP, HR, ADMIN
     const isTLUser =
       userRole === 'team_leader' ||
       user?.isTeamLeader === true ||
@@ -907,9 +902,7 @@ export const AppProvider = ({ children }) => {
         ? { short: 'ADMIN', label: 'Administrator' }
         : userRole === 'hr'
           ? { short: 'HR', label: 'HR Manager' }
-          : userRole === 'intern'
-            ? { short: 'INTERN', label: 'Intern' }
-            : deriveEmployeePosition({ ...user, employeeName: empName }, user?.employee || {});
+          : deriveEmployeePosition({ ...user, employeeName: empName }, user?.employee || {});
 
     const metadata = {
       userId: effectiveUserId,
@@ -1583,16 +1576,13 @@ export const AppProvider = ({ children }) => {
         determinedRole = 'hr';
         if (!resolvedRoleName) resolvedRoleName = 'HR Manager';
       }
-      // 3. Intern Detection
+      // 3. Trainee Detection (treated as standard Employee)
       else if (
-        normalizedRoleName === 'intern' ||
-        normalizedRoleName.includes('intern') ||
         normalizedRoleName.includes('trainee') ||
-        designationStr.includes('intern') ||
         designationStr.includes('trainee')
       ) {
-        determinedRole = 'intern';
-        if (!resolvedRoleName) resolvedRoleName = 'Intern';
+        determinedRole = 'employee';
+        if (!resolvedRoleName) resolvedRoleName = 'Employee';
       }
       // 4. Admin Detection (strictly verified by email or explicit admin role string - NEVER loose isAdmin flag)
       else if (
@@ -1682,16 +1672,6 @@ export const AppProvider = ({ children }) => {
             'view_salary',
             'view_holidays'
           ];
-        } else if (determinedRole === 'intern') {
-          permissions = [
-            'view_dashboard',
-            'view_my_tasks',
-            'view_learning_hub',
-            'view_internship_progress',
-            'view_attendance',
-            'apply_leave',
-            'submit_daily_report'
-          ];
         } else {
           permissions = [
             'view_dashboard',
@@ -1722,7 +1702,7 @@ export const AppProvider = ({ children }) => {
       });
       setRolePermissions(permissions);
       if (determinedRole === 'hr') {
-        setCurrentTabState('admin-screenshots');
+        setCurrentTabState('admin-leave-requests');
       } else if (determinedRole === 'admin') {
         setCurrentTabState('admin-dashboard');
       } else {
@@ -1736,7 +1716,7 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem('user_role', fallback);
       localStorage.setItem('active_role', fallback);
       if (fallback === 'hr') {
-        setCurrentTabState('admin-screenshots');
+        setCurrentTabState('admin-leave-requests');
       } else if (fallback === 'admin') {
         setCurrentTabState('admin-dashboard');
       } else {
@@ -1762,12 +1742,11 @@ export const AppProvider = ({ children }) => {
       ca: 'Chartered Accountant (CA)',
       hr: 'HR Manager',
       team_leader: 'Team Leader',
-      intern: 'Intern',
       employee: 'Employee'
     };
     setRoleDetails({ roleName: roleLabels[newRole] || 'Employee' });
     if (newRole === 'hr') {
-      setCurrentTabState('admin-screenshots');
+      setCurrentTabState('admin-leave-requests');
     } else if (newRole === 'admin') {
       setCurrentTabState('admin-dashboard');
     } else {
@@ -1907,15 +1886,14 @@ export const AppProvider = ({ children }) => {
         setRoleDetails({
           roleName: determined === 'admin' ? 'Administrator' :
             determined === 'team_leader' ? 'Team Leader' :
-              determined === 'hr' ? 'HR Manager' :
-                determined === 'intern' ? 'Intern' : 'Employee'
+              determined === 'hr' ? 'HR Manager' : 'Employee'
         });
       }
     }
 
     // Direct user to appropriate landing view strictly as per role
     if (determined === 'hr') {
-      setCurrentTabState('admin-screenshots');
+      setCurrentTabState('admin-leave-requests');
     } else if (determined === 'admin') {
       setCurrentTabState('admin-dashboard');
     } else {
