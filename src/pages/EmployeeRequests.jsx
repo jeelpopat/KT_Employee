@@ -22,7 +22,10 @@ import {
   AlertCircle,
   X,
   ShieldCheck,
-  Plus
+  Plus,
+  Crown,
+  Landmark,
+  UserCheck
 } from 'lucide-react';
 import api from '../api/axios';
 import { isFinanceOrExcludedUser } from '../utils/roleFilters';
@@ -46,13 +49,17 @@ const EmployeeRequests = () => {
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [loadingFY, setLoadingFY] = useState(false);
-  const [metaError, setMetaError] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [selectedFinancialYearId, setSelectedFinancialYearId] = useState('');
   const [submittingApproval, setSubmittingApproval] = useState(false);
   const [approvalError, setApprovalError] = useState('');
   const [successNotification, setSuccessNotification] = useState('');
+
+  // ================= TEAM LEAD STATE =================
+  const [teamLeads, setTeamLeads] = useState([]);
+  const [loadingTeamLeads, setLoadingTeamLeads] = useState(false);
+  const [selectedTeamLeadId, setSelectedTeamLeadId] = useState('');
 
   // Add Company modal state
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
@@ -62,8 +69,6 @@ const EmployeeRequests = () => {
   const [newCompanyCity, setNewCompanyCity] = useState('');
   const [addingCompany, setAddingCompany] = useState(false);
   const [addCompanyError, setAddCompanyError] = useState('');
-
-  const loadingMeta = loadingCompanies || loadingBranches || loadingFY;
 
   // Fetch users from API
   const fetchUsers = async () => {
@@ -107,7 +112,6 @@ const EmployeeRequests = () => {
   // 1. Fetch Companies: GET https://kt-backend-yzr4.onrender.com/api/company/
   const fetchCompanies = async () => {
     setLoadingCompanies(true);
-    setMetaError('');
     try {
       let companyList = [];
       const token = getAuthToken();
@@ -311,9 +315,132 @@ const EmployeeRequests = () => {
     }
   };
 
-  // Initial load of metadata: fetch companies, and if available, initial branches & FY
+  // Fetch Available Team Leads from live roster and directory
+  const fetchTeamLeads = async () => {
+    setLoadingTeamLeads(true);
+    try {
+      const token = getAuthToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      };
+
+      const leads = [];
+
+      // 1. Fetch from /api/employee/list
+      try {
+        const empRes = await api.get('/api/employee/list', { headers });
+        const empList = empRes.data?.employees || empRes.data?.data || (Array.isArray(empRes.data) ? empRes.data : []);
+        const employeeTLs = (empList || []).filter(emp => {
+          if (!emp || isFinanceOrExcludedUser(emp)) return false;
+          const role = String(emp.role || emp.designation || '').toLowerCase().trim();
+          return emp.isTeamLead === true || role === 'team lead' || role === 'team_leader' || role === 'tl' || role.includes('lead');
+        });
+        leads.push(...employeeTLs);
+      } catch (err) {
+        console.warn('Could not fetch employees for TLs:', err?.message);
+      }
+
+      // 2. Fetch from /api/users/all
+      try {
+        const usersRes = await api.get('/api/users/all', { headers });
+        const allUsers = usersRes.data?.users || usersRes.data?.data || (Array.isArray(usersRes.data) ? usersRes.data : []);
+        const userTLs = (allUsers || []).filter(u => {
+          if (!u || isFinanceOrExcludedUser(u)) return false;
+          const role = String(u.role || '').toLowerCase().trim();
+          const desig = String(u.designation?.designationName || u.designation?.name || u.designation || '').toLowerCase().trim();
+          return (
+            u.isTeamLead === true ||
+            u.isTeamLeader === true ||
+            role === 'team lead' ||
+            role === 'team_leader' ||
+            role === 'team leader' ||
+            role === 'tl' ||
+            role.includes('team lead') ||
+            role.includes('lead') ||
+            desig.includes('team lead') ||
+            desig.includes('team leader')
+          );
+        });
+        leads.push(...userTLs);
+      } catch (err) {
+        console.warn('Could not fetch users for TLs:', err?.message);
+      }
+
+      // 3. Known fallback Team Leads (ensures TL list is never blank)
+      const fallbackTLs = [
+        {
+          _id: '6ac87e3da005958c1a3d16eb',
+          userId: '6ac87e3da005958c1a3d16eb',
+          name: 'Bhavya',
+          fullName: 'Bhavya',
+          email: 'bhavya.kevlon@gmail.com',
+          role: 'team lead',
+          department: 'Mobile Development',
+          designation: 'Mobile App Developer / Team Lead'
+        },
+        {
+          _id: '6ac7c4b2a005958c1a3cf956',
+          userId: '6ac7c4b2a005958c1a3cf956',
+          name: 'Harsh Kothari',
+          fullName: 'Harsh Kothari',
+          email: 'harsh.kothari@kevalon.in',
+          role: 'team lead',
+          department: 'Design',
+          designation: 'Graphic Designer / Team Lead'
+        }
+      ];
+      leads.push(...fallbackTLs);
+
+      // Deduplicate leads by identifier or normalized name
+      const seen = new Set();
+      const uniqueLeads = [];
+      for (const item of leads) {
+        if (!item) continue;
+        const id = String(item._id || item.id || item.userId || item.email || '').toLowerCase().trim();
+        const normName = String(item.name || item.fullName || '').toLowerCase().trim();
+        const key = id || normName;
+        if (!key || seen.has(key) || (normName && seen.has(normName))) continue;
+        seen.add(key);
+        if (normName) seen.add(normName);
+
+        const cleanName = item.name || item.fullName || 'Team Lead';
+        const cleanRole = item.role || 'team lead';
+        const cleanDesig = typeof item.designation === 'object'
+          ? (item.designation?.designationName || item.designation?.name || '')
+          : (item.designation || '');
+
+        uniqueLeads.push({
+          ...item,
+          _id: String(item._id || item.id || item.userId),
+          id: String(item._id || item.id || item.userId),
+          userId: String(item.userId || item._id || item.id),
+          name: cleanName,
+          fullName: cleanName,
+          email: item.email || '',
+          role: cleanRole,
+          department: item.department || 'Development',
+          designation: cleanDesig || 'Team Lead'
+        });
+      }
+
+      setTeamLeads(uniqueLeads);
+      try {
+        localStorage.setItem('kt_team_leads', JSON.stringify(uniqueLeads));
+      } catch {}
+      return uniqueLeads;
+    } catch (err) {
+      console.error('Failed to load team leads:', err);
+      return [];
+    } finally {
+      setLoadingTeamLeads(false);
+    }
+  };
+
+  // Initial load of metadata: fetch companies, initial branches, FY & team leads
   const fetchApprovalMetadata = async () => {
     try {
+      await fetchTeamLeads();
       const compList = await fetchCompanies();
       if (compList && compList.length > 0) {
         const firstCompId = compList[0]._id || compList[0].id;
@@ -376,18 +503,144 @@ const EmployeeRequests = () => {
     return fId;
   };
 
+  // Resolver for Assigned Team Lead (Live and Local fallback)
+  const getAssignedTeamLead = (userObj) => {
+    if (!userObj) return null;
+    const userId = String(getUserIdentifier(userObj, 0));
+
+    // 1. Direct user properties
+    if (userObj.teamLeadName) {
+      return {
+        id: userObj.teamLeadId || userObj.teamLead || 'tl',
+        name: userObj.teamLeadName,
+        email: userObj.teamLeadEmail || ''
+      };
+    }
+
+    const candidateTlId = userObj.teamLeadId || userObj.teamLead || userObj.assignedTL || userObj.teamLeader;
+    if (candidateTlId) {
+      const match = teamLeads.find(tl =>
+        String(tl._id) === String(candidateTlId) ||
+        String(tl.userId) === String(candidateTlId) ||
+        String(tl.id) === String(candidateTlId)
+      );
+      if (match) {
+        return {
+          id: candidateTlId,
+          name: match.name || match.fullName,
+          email: match.email || '',
+          department: match.department,
+          designation: match.designation
+        };
+      }
+      if (typeof candidateTlId === 'object' && candidateTlId.name) {
+        return candidateTlId;
+      }
+      if (typeof candidateTlId === 'string' && !candidateTlId.match(/^[0-9a-fA-F]{24}$/)) {
+        return { id: candidateTlId, name: candidateTlId };
+      }
+    }
+
+    // 2. Check localStorage 'kt_user_assigned_tl'
+    try {
+      const savedUserTL = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
+      if (savedUserTL[userId]) {
+        return savedUserTL[userId];
+      }
+      if (userObj._id && savedUserTL[String(userObj._id)]) {
+        return savedUserTL[String(userObj._id)];
+      }
+    } catch {}
+
+    // 3. Check localStorage 'teamLeadAssignedEmployees'
+    try {
+      const assignments = JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}');
+      for (const [tlId, empIds] of Object.entries(assignments)) {
+        if (Array.isArray(empIds) && empIds.some(eId => String(eId) === userId || String(eId) === String(userObj._id))) {
+          const match = teamLeads.find(tl => String(tl._id) === String(tlId) || String(tl.userId) === String(tlId));
+          return {
+            id: tlId,
+            name: match ? (match.name || match.fullName) : 'Team Lead',
+            email: match?.email || ''
+          };
+        }
+      }
+    } catch {}
+
+    return null;
+  };
+
+  // Resolver for Employee Bank Details (Live and Local fallback)
+  const getUserBankDetails = (userObj) => {
+    if (!userObj) return null;
+    const userId = String(getUserIdentifier(userObj, 0));
+
+    // 1. Direct user properties
+    if (userObj.bankName || userObj.accountNumber || userObj.bankAccount || userObj.bankAccountNumber) {
+      return {
+        bankName: userObj.bankName || 'Bank Account',
+        accountNumber: userObj.accountNumber || userObj.bankAccount || userObj.bankAccountNumber || '',
+        ifscCode: userObj.ifscCode || userObj.IFSC || '',
+        accountHolderName: userObj.accountHolderName || userObj.name || '',
+        bankBranch: userObj.bankBranch || 'Main Branch',
+        upiId: userObj.upiId || userObj.upiID || userObj.upi || '',
+        isBankDetailGiven: true
+      };
+    }
+
+    if (userObj.bankDetails && typeof userObj.bankDetails === 'object') {
+      const b = userObj.bankDetails;
+      if (b.bankName || b.accountNumber || b.bankAccountNumber) {
+        return {
+          bankName: b.bankName || 'Bank Account',
+          accountNumber: b.accountNumber || b.bankAccountNumber || b.bankAccount || '',
+          ifscCode: b.ifscCode || b.IFSC || '',
+          accountHolderName: b.accountHolderName || userObj.name || '',
+          bankBranch: b.bankBranch || 'Main Branch',
+          upiId: b.upiId || b.upiID || b.upi || '',
+          isBankDetailGiven: true
+        };
+      }
+    }
+
+    // 2. Check localStorage 'kt_employee_bank_details'
+    try {
+      const savedBank = JSON.parse(localStorage.getItem('kt_employee_bank_details') || '{}');
+      if (savedBank[userId]) {
+        return savedBank[userId];
+      }
+      if (userObj._id && savedBank[String(userObj._id)]) {
+        return savedBank[String(userObj._id)];
+      }
+    } catch {}
+
+    return null;
+  };
+
   // ================= OPEN APPROVAL MODAL =================
   const handleApproveClick = async (user) => {
     setApprovalError('');
     setApprovingUser(user);
 
-    // 1. Ensure companies are loaded
+    // 1. Ensure Team Leads are loaded and pre-fill existing TL if available
+    let currentTLs = teamLeads;
+    if (!currentTLs || currentTLs.length === 0) {
+      currentTLs = await fetchTeamLeads();
+    }
+    const existingTL = getAssignedTeamLead(user);
+    if (existingTL?.id && currentTLs.some(t => String(t._id || t.userId || t.id) === String(existingTL.id))) {
+      setSelectedTeamLeadId(String(existingTL.id));
+    } else {
+      setSelectedTeamLeadId('');
+    }
+
+    // 2. Ensure companies are loaded
     let currentCompanies = companies;
     if (!currentCompanies || currentCompanies.length === 0) {
       currentCompanies = await fetchCompanies();
     }
 
-    // 2. Identify default companyId from user object or first company
+    // 4. Identify default companyId from user object or first company
     const userCompId = typeof user?.companyId === 'object' ? (user?.companyId?._id || user?.companyId?.id) : user?.companyId;
     const defaultCompanyId = (userCompId && currentCompanies.some(c => String(c._id || c.id) === String(userCompId)))
       ? userCompId
@@ -395,7 +648,7 @@ const EmployeeRequests = () => {
 
     setSelectedCompanyId(defaultCompanyId);
 
-    // 3. Fetch branches for the selected company: GET /api/branch?companyId=$companyId
+    // 5. Fetch branches for the selected company: GET /api/branch?companyId=$companyId
     const bList = await fetchBranches(defaultCompanyId);
     const userBranchId = typeof user?.branchId === 'object' ? (user?.branchId?._id || user?.branchId?.id) : user?.branchId;
     const defaultBranchId = (userBranchId && bList.some(b => String(b._id || b.id) === String(userBranchId)))
@@ -404,7 +657,7 @@ const EmployeeRequests = () => {
 
     setSelectedBranchId(defaultBranchId);
 
-    // 4. Fetch financial years for the branch: GET /api/financial-year?branchId=:id
+    // 6. Fetch financial years for the branch: GET /api/financial-year?branchId=:id
     let defaultFyId = '';
     if (defaultBranchId) {
       const fyList = await fetchFinancialYears(defaultBranchId, defaultCompanyId);
@@ -458,11 +711,18 @@ const EmployeeRequests = () => {
     }
   };
 
-  // ================= SUBMIT APPROVAL WITH COMPANY, BRANCH & FINANCIAL YEAR =================
+  // ================= SUBMIT APPROVAL WITH TL ASSIGNMENT & ORGANIZATION =================
   const submitApproval = async (e) => {
     if (e) e.preventDefault();
     if (!approvingUser) return;
 
+    // 1. Mandatory Team Lead Validation ("note every employee must have TL")
+    if (!selectedTeamLeadId) {
+      setApprovalError('Please assign a Team Lead (TL). Every employee must have an assigned Team Lead.');
+      return;
+    }
+
+    // 2. Mandatory Organization Details Validation
     if (!selectedCompanyId) {
       setApprovalError('Please select a Company Name.');
       return;
@@ -480,6 +740,16 @@ const EmployeeRequests = () => {
     setSubmittingApproval(true);
     setApprovalError('');
 
+    // Find selected Team Lead record
+    const selectedTL = teamLeads.find(t =>
+      String(t._id) === String(selectedTeamLeadId) ||
+      String(t.userId) === String(selectedTeamLeadId) ||
+      String(t.id) === String(selectedTeamLeadId)
+    );
+    const tlNameVal = selectedTL ? (selectedTL.name || selectedTL.fullName || 'Team Lead') : 'Team Lead';
+    const tlEmailVal = selectedTL?.email || '';
+
+    // Organization entity labels
     const matchedComp = companies.find(c => String(c._id || c.id) === String(selectedCompanyId));
     const matchedBranch = branches.find(b => String(b._id || b.id) === String(selectedBranchId));
     const companyNameVal = matchedComp?.companyName || matchedComp?.name || 'KEVALON Technology';
@@ -487,11 +757,32 @@ const EmployeeRequests = () => {
     const matchedFy = financialYears.find(f => String(f._id || f.id) === String(selectedFinancialYearId));
     const fyLabelVal = matchedFy?.yearLabel || matchedFy?.name || '2026-2027';
 
+    // Preserve existing bank details if already associated with employee
+    const existingBank = getUserBankDetails(approvingUser);
+    const bankData = (existingBank?.bankName || approvingUser?.bankName) ? {
+      bankName: existingBank?.bankName || approvingUser?.bankName || '',
+      bankBranch: existingBank?.bankBranch || approvingUser?.bankBranch || 'Main Branch',
+      accountHolderName: existingBank?.accountHolderName || approvingUser?.accountHolderName || approvingUser?.name || '',
+      bankAccount: existingBank?.accountNumber || approvingUser?.accountNumber || approvingUser?.bankAccount || '',
+      bankAccountNumber: existingBank?.accountNumber || approvingUser?.accountNumber || approvingUser?.bankAccount || '',
+      accountNumber: existingBank?.accountNumber || approvingUser?.accountNumber || approvingUser?.bankAccount || '',
+      IFSC: existingBank?.ifscCode || approvingUser?.ifscCode || approvingUser?.IFSC || '',
+      ifscCode: existingBank?.ifscCode || approvingUser?.ifscCode || approvingUser?.IFSC || '',
+      upiId: existingBank?.upiId || approvingUser?.upiId || null,
+      upiID: existingBank?.upiId || approvingUser?.upiId || null,
+      upi: existingBank?.upiId || approvingUser?.upiId || null,
+      isBankDetailGiven: true,
+      bankDetailGiven: true,
+      bankDetailsGiven: true,
+      isBankDetailsGiven: true
+    } : {};
+
     const payload = {
       id: userId,
       userId,
       _id: userId,
       email: approvingUser?.email,
+      // Organization Assignment
       companyId: selectedCompanyId,
       company: selectedCompanyId,
       companyName: companyNameVal,
@@ -502,9 +793,20 @@ const EmployeeRequests = () => {
       financialYear: selectedFinancialYearId,
       financialYearLabel: fyLabelVal,
       yearLabel: fyLabelVal,
+      // Approval Status
       isApproved: true,
       approved: true,
-      status: 'approved'
+      status: 'approved',
+      // Assigned Team Lead Details
+      teamLead: selectedTeamLeadId,
+      teamLeadId: selectedTeamLeadId,
+      assignedTL: selectedTeamLeadId,
+      teamLeader: selectedTeamLeadId,
+      teamLeadName: tlNameVal,
+      teamLeadEmail: tlEmailVal,
+      // Bank & Payout Details (if previously recorded)
+      ...bankData,
+      ...(Object.keys(bankData).length > 0 ? { bankDetails: { ...bankData } } : {})
     };
 
     try {
@@ -541,11 +843,80 @@ const EmployeeRequests = () => {
         }
       }
 
+      // 2. Notify team lead create-team endpoint for linkage
+      try {
+        const token = getAuthToken();
+        await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            teamLead: selectedTeamLeadId,
+            employees: [userId]
+          })
+        }).catch(() => {});
+      } catch {}
+
       if (isSuccess) {
         const resolvedCompName = resData?.data?.companyName || companyNameVal;
         const resolvedBranchName = resData?.data?.branchName || branchNameVal;
 
-        // Update user locally
+        // Persist TL assignment in localStorage for seamless cross-panel continuity
+        try {
+          const currentAssignments = JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}');
+          const existingList = currentAssignments[selectedTeamLeadId] || [];
+          const isUserAlreadyAssigned = (list) => {
+            if (!Array.isArray(list)) return false;
+            return list.some(existingId => {
+              if (String(existingId) === String(userId)) return true;
+              const matched = users.find(u => String(u._id) === String(existingId) || String(u.id) === String(existingId));
+              if (matched) {
+                const sameEmail = matched.email && approvingUser?.email && matched.email.toLowerCase().trim() === approvingUser.email.toLowerCase().trim();
+                const sameCode = matched.employeeID && approvingUser?.employeeID && matched.employeeID === approvingUser.employeeID;
+                if (sameEmail || sameCode) return true;
+              }
+              return false;
+            });
+          };
+
+          if (!isUserAlreadyAssigned(existingList)) {
+            currentAssignments[selectedTeamLeadId] = [...existingList, userId];
+          }
+          if (selectedTL?._id && String(selectedTL._id) !== String(selectedTeamLeadId)) {
+            const altList = currentAssignments[selectedTL._id] || [];
+            if (!isUserAlreadyAssigned(altList)) {
+              currentAssignments[selectedTL._id] = [...altList, userId];
+            }
+          }
+          localStorage.setItem('teamLeadAssignedEmployees', JSON.stringify(currentAssignments));
+          localStorage.setItem('kt_assigned_employees', JSON.stringify(currentAssignments));
+        } catch {}
+
+        // Persist User -> Team Lead mapping
+        try {
+          const currentTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
+          currentTLMap[userId] = {
+            id: selectedTeamLeadId,
+            teamLeadId: selectedTeamLeadId,
+            name: tlNameVal,
+            email: tlEmailVal,
+            assignedAt: new Date().toISOString()
+          };
+          localStorage.setItem('kt_user_assigned_tl', JSON.stringify(currentTLMap));
+        } catch {}
+
+        // Persist User -> Bank Details mapping (if details exist)
+        if (Object.keys(bankData).length > 0) {
+          try {
+            const currentBankMap = JSON.parse(localStorage.getItem('kt_employee_bank_details') || '{}');
+            currentBankMap[userId] = bankData;
+            localStorage.setItem('kt_employee_bank_details', JSON.stringify(currentBankMap));
+          } catch {}
+        }
+
+        // Update user state locally
         setUsers((prevUsers) =>
           prevUsers.map((item, index) => {
             const itemId = getUserIdentifier(item, index);
@@ -562,13 +933,21 @@ const EmployeeRequests = () => {
               branchName: resolvedBranchName,
               financialYearId: selectedFinancialYearId,
               financialYearLabel: fyLabelVal,
-              yearLabel: fyLabelVal
+              yearLabel: fyLabelVal,
+              teamLead: selectedTeamLeadId,
+              teamLeadId: selectedTeamLeadId,
+              assignedTL: selectedTeamLeadId,
+              teamLeader: selectedTeamLeadId,
+              teamLeadName: tlNameVal,
+              teamLeadEmail: tlEmailVal,
+              ...bankData,
+              ...(Object.keys(bankData).length > 0 ? { bankDetails: { ...bankData } } : {})
             };
           })
         );
 
         const approvedName = approvingUser?.name || approvingUser?.fullName || 'Employee';
-        setSuccessNotification(`Approved ${approvedName} and linked to ${resolvedCompName || 'Company'} (${resolvedBranchName || 'Branch'})!`);
+        setSuccessNotification(`Approved ${approvedName} and assigned Team Lead "${tlNameVal}" successfully!`);
         setTimeout(() => setSuccessNotification(''), 4500);
         setApprovingUser(null);
       }
@@ -860,6 +1239,8 @@ const EmployeeRequests = () => {
           const companyDisplay = getCompanyName(user?.companyId, user);
           const branchDisplay = getBranchName(user?.branchId, user);
           const fyDisplay = getFinancialYearName(user?.financialYearId, user);
+          const assignedTL = getAssignedTeamLead(user);
+          const userBank = getUserBankDetails(user);
 
           return (
             <div
@@ -908,6 +1289,40 @@ const EmployeeRequests = () => {
                   </div>
                 </div>
 
+                {/* Team Lead Badge */}
+                {assignedTL ? (
+                  <div className="mt-2.5 flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-50/70 border border-amber-200/80 text-xs text-amber-900">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Crown size={14} className="text-amber-600 shrink-0" />
+                      <span className="font-semibold text-[11px] text-amber-800">Team Lead:</span>
+                      <span className="font-bold text-[11px] truncate text-slate-800">{assignedTL.name}</span>
+                    </div>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 shrink-0">
+                      Assigned TL
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-2.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50/70 border border-rose-200/70 text-[11px] text-rose-700 font-medium">
+                    <AlertCircle size={13} className="shrink-0 text-rose-500" />
+                    <span>TL Not Assigned (Required on approval)</span>
+                  </div>
+                )}
+
+                {/* Bank Details Badge if available */}
+                {userBank && (
+                  <div className="mt-1.5 flex items-center justify-between px-2.5 py-1 rounded-lg bg-emerald-50/70 border border-emerald-200/70 text-[11px] text-emerald-800">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Landmark size={13} className="text-emerald-600 shrink-0" />
+                      <span className="font-medium truncate">{userBank.bankName}</span>
+                    </div>
+                    {userBank.accountNumber && (
+                      <span className="font-mono text-[10px] text-emerald-700 shrink-0">
+                        •••• {userBank.accountNumber.slice(-4)}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Company & Branch Chip if assigned */}
                 {(companyDisplay || branchDisplay) && (
                   <div className="mt-2 p-2 rounded-lg bg-indigo-50/60 border border-indigo-100 text-[11px] flex flex-col gap-1">
@@ -952,6 +1367,27 @@ const EmployeeRequests = () => {
 
                   {isExpanded && (
                     <div className="mt-2 sm:mt-3 space-y-1.5 sm:space-y-2 rounded-lg bg-slate-50/50 p-2 sm:p-3">
+                      {/* Team Lead in details */}
+                      <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
+                        <Crown className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500 shrink-0" />
+                        <span className="text-slate-700 font-medium truncate">
+                          Team Lead: <span className="font-bold text-slate-900">{assignedTL?.name || 'Not Assigned'}</span>
+                        </span>
+                      </div>
+
+                      {/* Bank Details in details */}
+                      {userBank && (
+                        <div className="flex items-start gap-1.5 sm:gap-2 text-[11px] sm:text-sm p-2 rounded-lg bg-emerald-50/60 border border-emerald-100">
+                          <Landmark className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                          <div className="min-w-0 text-slate-700 text-[11px]">
+                            <p className="font-semibold text-slate-900 truncate">{userBank.bankName} {userBank.bankBranch ? `(${userBank.bankBranch})` : ''}</p>
+                            <p className="font-mono text-slate-600">A/C: {userBank.accountNumber} • IFSC: {userBank.ifscCode}</p>
+                            {userBank.accountHolderName && <p className="text-[10px] text-slate-500">Holder: {userBank.accountHolderName}</p>}
+                            {userBank.upiId && <p className="text-[10px] text-indigo-600 font-mono">UPI: {userBank.upiId}</p>}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
                         <Phone className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
                         <span className="text-slate-600 truncate">{phone}</span>
@@ -1073,25 +1509,25 @@ const EmployeeRequests = () => {
       {/* ==================================================== */}
       {approvingUser && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => !submittingApproval && setApprovingUser(null)}
         >
           <div
-            className="relative w-full max-w-lg rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-xl max-h-[92vh] flex flex-col rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
                   <ShieldCheck size={20} />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 leading-tight">
-                    Approve Employee Access
+                    Approve Employee & Assign Team Lead
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Assign Company, Branch & Financial Year
+                    Assign Team Lead (TL) & Organization Details
                   </p>
                 </div>
               </div>
@@ -1105,10 +1541,10 @@ const EmployeeRequests = () => {
               </button>
             </div>
 
-            {/* Modal Body */}
-            <form onSubmit={submitApproval} className="p-5 sm:p-6 space-y-4 sm:space-y-5">
+            {/* Modal Body (Scrollable) */}
+            <form onSubmit={submitApproval} className="overflow-y-auto p-4 sm:p-5 space-y-4 flex-1">
               {/* Target Employee Summary Card */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-3">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${getGradientColor(approvingUser?.name)} text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm`}>
                     {getInitials(approvingUser?.name || approvingUser?.fullName)}
@@ -1142,21 +1578,101 @@ const EmployeeRequests = () => {
                 </div>
               )}
 
-              {/* Notice Banner & Metadata Status */}
-              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/60 text-xs text-blue-800 flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2">
-                  <Building2 size={16} className="text-blue-600 shrink-0 mt-0.5" />
-                  <span>
-                    Select the official company entity, branch location, and current financial year to complete this employee&apos;s registration.
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {loadingMeta ? (
-                    <span className="flex items-center gap-1 text-[11px] text-indigo-600 font-medium">
-                      <Loader2 size={13} className="animate-spin" />
-                      <span>Syncing...</span>
+              {/* ==================================================== */}
+              {/* SECTION 1: ASSIGN TEAM LEAD (MANDATORY - BLUE THEME) */}
+              {/* ==================================================== */}
+              <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/90 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded-md bg-blue-100 text-blue-700">
+                      <Crown size={15} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider">
+                        1. Assign Team Lead (TL) <span className="text-rose-500">* Required</span>
+                      </label>
+                      <p className="text-[11px] text-blue-800">
+                        Who is the Team Lead for {approvingUser?.name || 'this employee'}? Every employee must have an assigned TL.
+                      </p>
+                    </div>
+                  </div>
+                  {loadingTeamLeads && (
+                    <span className="flex items-center gap-1 text-[11px] text-blue-700 font-medium">
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Loading TLs...</span>
                     </span>
-                  ) : (
+                  )}
+                </div>
+
+                <div className="relative">
+                  <Crown size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
+                  <select
+                    value={selectedTeamLeadId}
+                    onChange={(e) => {
+                      setSelectedTeamLeadId(e.target.value);
+                      if (approvalError && !selectedTeamLeadId) setApprovalError('');
+                    }}
+                    disabled={submittingApproval || loadingTeamLeads}
+                    className="w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition text-slate-900 font-medium"
+                    required
+                  >
+                    <option value="">-- Select Team Lead for {approvingUser?.name || 'Employee'} (Mandatory) --</option>
+                    {teamLeads.map((tl) => {
+                      const tlId = String(tl._id || tl.id || tl.userId);
+                      const tlName = tl.name || tl.fullName || 'Team Lead';
+                      const desig = tl.designation || tl.department || tl.role || '';
+                      return (
+                        <option key={tlId} value={tlId}>
+                          {tlName} {desig ? `(${desig})` : ''} {tl.email ? `• ${tl.email}` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {selectedTeamLeadId ? (() => {
+                  const currentTL = teamLeads.find(t => String(t._id || t.id || t.userId) === String(selectedTeamLeadId));
+                  if (!currentTL) return null;
+                  return (
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-blue-200 text-xs shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <UserCheck size={14} className="text-blue-600" />
+                        <span className="font-semibold text-slate-800">{currentTL.name || currentTL.fullName}</span>
+                        {currentTL.department && (
+                          <span className="text-[10px] text-slate-500">Dept: {currentTL.department}</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold text-blue-800 uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-200">
+                        {currentTL.designation || 'Team Lead'}
+                      </span>
+                    </div>
+                  );
+                })() : (
+                  <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
+                    <span>* Note: Every employee must have an assigned Team Lead before approval.</span>
+                  </p>
+                )}
+              </div>
+
+              {/* ==================================================== */}
+              {/* SECTION 2: ORGANIZATION DETAILS */}
+              {/* ==================================================== */}
+              <div className="p-3.5 rounded-xl bg-indigo-50/40 border border-indigo-200/70 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded-md bg-indigo-100 text-indigo-700">
+                      <Building2 size={15} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        2. Organization Details <span className="text-rose-500">* Required</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Company entity, branch office & active financial year
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => {
@@ -1168,160 +1684,131 @@ const EmployeeRequests = () => {
                           }
                         }
                       }}
-                      title="Sync latest live data from server"
-                      className="px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-[10px] font-semibold text-blue-700 flex items-center gap-1 cursor-pointer transition"
+                      title="Sync live organization entities"
+                      className="px-2 py-0.5 rounded bg-indigo-100 hover:bg-indigo-200 text-[10px] font-semibold text-indigo-700 flex items-center gap-1 cursor-pointer transition"
                     >
                       <RefreshCw size={11} />
                       <span>Sync Live</span>
                     </button>
-                  )}
-                </div>
-              </div>
-
-              {metaError && (
-                <p className="text-[11px] text-rose-500 italic">
-                  Note: {metaError}
-                </p>
-              )}
-
-              {/* Field 1: Company Name */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Company Name <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {loadingCompanies ? (
-                      <span className="flex items-center gap-1 text-[11px] text-indigo-600 font-medium">
-                        <Loader2 size={12} className="animate-spin text-slate-400" />
-                        <span>Loading...</span>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setShowAddCompanyModal(true)}
-                        className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer transition"
-                        title="Add a new company"
-                      >
-                        <Plus size={13} />
-                        <span>Add Company</span>
-                      </button>
-                    )}
                   </div>
                 </div>
-                <div className="relative">
-                  <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <select
-                    value={selectedCompanyId}
-                    onChange={(e) => handleCompanyChange(e.target.value)}
-                    disabled={submittingApproval || loadingCompanies}
-                    className="w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900"
-                    required
-                  >
-                    <option value="">-- Select Company --</option>
-                    {companies.map((c) => {
-                      const id = c._id || c.id;
-                      const label = c.companyName || c.name || c.title || id;
-                      return (
-                        <option key={id} value={id}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                    <option value="__ADD_NEW__">+ Add New Company...</option>
-                  </select>
-                </div>
-              </div>
 
-              {/* Field 2: Branch */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Branch <span className="text-rose-500">*</span>
-                  </label>
-                  {loadingBranches && (
-                    <span className="flex items-center gap-1 text-[11px] text-indigo-600 font-medium">
-                      <Loader2 size={12} className="animate-spin text-slate-400" />
-                      <span>Loading...</span>
-                    </span>
-                  )}
+                {/* Field 1: Company Name */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-slate-700">
+                      Company Name <span className="text-rose-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCompanyModal(true)}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer transition"
+                      title="Add a new company"
+                    >
+                      <Plus size={13} />
+                      <span>Add Company</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <select
+                      value={selectedCompanyId}
+                      onChange={(e) => handleCompanyChange(e.target.value)}
+                      disabled={submittingApproval || loadingCompanies}
+                      className="w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900"
+                      required
+                    >
+                      <option value="">-- Select Company --</option>
+                      {companies.map((c) => {
+                        const id = c._id || c.id;
+                        const label = c.companyName || c.name || c.title || id;
+                        return (
+                          <option key={id} value={id}>
+                            {label}
+                          </option>
+                        );
+                      })}
+                      <option value="__ADD_NEW__">+ Add New Company...</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="relative">
-                  <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <select
-                    value={selectedBranchId}
-                    onChange={(e) => handleBranchChange(e.target.value)}
-                    disabled={submittingApproval || loadingBranches || !selectedCompanyId}
-                    className="w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900"
-                    required
-                  >
-                    <option value="">
-                      {loadingBranches
-                        ? 'Loading branches...'
-                        : branches.length === 0
-                        ? (selectedCompanyId ? 'No branches available for company' : '-- Select Company First --')
-                        : '-- Select Branch --'}
-                    </option>
-                    {branches.map((b) => {
-                      const id = b._id || b.id;
-                      const label = b.branchName || b.name || b.title || id;
-                      return (
-                        <option key={id} value={id}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              </div>
 
-              {/* Field 3: Financial Year */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    Financial Year <span className="text-rose-500">*</span>
-                  </label>
-                  {loadingFY && (
-                    <span className="flex items-center gap-1 text-[11px] text-indigo-600 font-medium">
-                      <Loader2 size={12} className="animate-spin text-slate-400" />
-                      <span>Loading...</span>
-                    </span>
-                  )}
-                </div>
-                <div className="relative">
-                  <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <select
-                    value={selectedFinancialYearId}
-                    onChange={(e) => setSelectedFinancialYearId(e.target.value)}
-                    disabled={submittingApproval || loadingFY || !selectedBranchId}
-                    className="w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900 font-mono"
-                    required
-                  >
-                    <option value="">
-                      {loadingFY
-                        ? 'Loading financial years...'
-                        : !selectedBranchId
-                        ? '-- Select Branch First --'
-                        : financialYears.length === 0
-                        ? '-- No Financial Years Available --'
-                        : '-- Select Financial Year --'}
-                    </option>
-                    {financialYears.map((fy) => {
-                      const id = fy._id || fy.id;
-                      const label = fy.yearLabel || fy.year || fy.financialYear || fy.name || id;
-                      const isCurrent = fy.status === 'active';
-                      return (
-                        <option key={id} value={id}>
-                          {label}{isCurrent ? ' (Active)' : ''}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Field 2: Branch */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-semibold text-slate-700">
+                      Branch <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <select
+                        value={selectedBranchId}
+                        onChange={(e) => handleBranchChange(e.target.value)}
+                        disabled={submittingApproval || loadingBranches || !selectedCompanyId}
+                        className="w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900"
+                        required
+                      >
+                        <option value="">
+                          {loadingBranches
+                            ? 'Loading branches...'
+                            : branches.length === 0
+                            ? (selectedCompanyId ? 'No branches available' : '-- Select Company First --')
+                            : '-- Select Branch --'}
                         </option>
-                      );
-                    })}
-                  </select>
+                        {branches.map((b) => {
+                          const id = b._id || b.id;
+                          const label = b.branchName || b.name || b.title || id;
+                          return (
+                            <option key={id} value={id}>
+                              {label}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Field 3: Financial Year */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-semibold text-slate-700">
+                      Financial Year <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <select
+                        value={selectedFinancialYearId}
+                        onChange={(e) => setSelectedFinancialYearId(e.target.value)}
+                        disabled={submittingApproval || loadingFY || !selectedBranchId}
+                        className="w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900 font-mono"
+                        required
+                      >
+                        <option value="">
+                          {loadingFY
+                            ? 'Loading FY...'
+                            : !selectedBranchId
+                            ? '-- Select Branch First --'
+                            : financialYears.length === 0
+                            ? '-- No FY Available --'
+                            : '-- Select Financial Year --'}
+                        </option>
+                        {financialYears.map((fy) => {
+                          const id = fy._id || fy.id;
+                          const label = fy.yearLabel || fy.year || fy.financialYear || fy.name || id;
+                          const isCurrent = fy.status === 'active';
+                          return (
+                            <option key={id} value={id}>
+                              {label}{isCurrent ? ' (Active)' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Footer Actions */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setApprovingUser(null)}
@@ -1343,7 +1830,7 @@ const EmployeeRequests = () => {
                   ) : (
                     <>
                       <CheckCircle size={16} />
-                      <span>Confirm & Approve</span>
+                      <span>Confirm & Approve (Assign TL)</span>
                     </>
                   )}
                 </button>
@@ -1518,6 +2005,87 @@ const EmployeeRequests = () => {
 
             {/* Content */}
             <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+              {/* Assigned Team Lead */}
+              {(() => {
+                const suTL = getAssignedTeamLead(selectedUser);
+                return (
+                  <div>
+                    <h3 className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+                      <Crown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
+                      Assigned Team Lead (TL)
+                    </h3>
+                    <div className="mt-2 sm:mt-3">
+                      {suTL ? (
+                        <div className="flex items-center gap-2 sm:gap-3 rounded-lg bg-amber-50/80 px-2 sm:px-3 py-2 border border-amber-200">
+                          <Crown className="h-4 w-4 text-amber-600 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] sm:text-xs text-amber-700">Team Lead</p>
+                            <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                              {suTL.name}
+                            </p>
+                            {suTL.email && <p className="text-[10px] text-slate-500 truncate">{suTL.email}</p>}
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase shrink-0">
+                            Assigned TL
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg bg-rose-50 px-2.5 py-2 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                          <AlertCircle size={14} className="shrink-0 text-rose-500" />
+                          <span>No Team Lead assigned yet (Mandatory on approval)</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Bank & Disbursement Details */}
+              {(() => {
+                const suBank = getUserBankDetails(selectedUser);
+                if (!suBank) return null;
+                return (
+                  <div className="border-t border-slate-200 pt-3 sm:pt-4">
+                    <h3 className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+                      <Landmark className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-600" />
+                      Bank Account Details
+                    </h3>
+                    <div className="mt-2 sm:mt-3 space-y-2 rounded-lg bg-emerald-50/50 p-2.5 sm:p-3 border border-emerald-100">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Bank Name</span>
+                        <span className="font-semibold text-slate-900">{suBank.bankName}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Account Number</span>
+                        <span className="font-mono font-bold text-slate-900">{suBank.accountNumber}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">IFSC Code</span>
+                        <span className="font-mono font-semibold text-indigo-700 uppercase">{suBank.ifscCode}</span>
+                      </div>
+                      {suBank.accountHolderName && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">Account Holder</span>
+                          <span className="font-medium text-slate-800">{suBank.accountHolderName}</span>
+                        </div>
+                      )}
+                      {suBank.bankBranch && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">Branch</span>
+                          <span className="text-slate-700">{suBank.bankBranch}</span>
+                        </div>
+                      )}
+                      {suBank.upiId && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">UPI ID</span>
+                          <span className="font-mono text-emerald-700">{suBank.upiId}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Organization Assignment */}
               {(selectedUser?.companyId || selectedUser?.branchId || selectedUser?.financialYearId) && (
                 <div>

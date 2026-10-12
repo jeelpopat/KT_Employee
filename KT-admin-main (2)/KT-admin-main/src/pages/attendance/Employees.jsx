@@ -184,7 +184,14 @@ export default function Employees() {
   // ROLE BADGE
   // =========================
   const getRoleBadge = (emp) => {
-    if (emp?.isTeamLead || emp?.role === "team lead") {
+    if (typeof emp === 'boolean') {
+      return emp ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200";
+    }
+    const roleLower = String(emp?.role || "").trim().toLowerCase();
+    if (roleLower === "hr") {
+      return "bg-purple-50 text-purple-700 border-purple-200";
+    }
+    if (emp?.isTeamLead || roleLower === "team lead") {
       return "bg-amber-50 text-amber-700 border-amber-200";
     }
 
@@ -208,6 +215,9 @@ export default function Employees() {
       return null;
     }
 
+    const rawRole = String(formData.role || "employee").trim().toLowerCase();
+    const cleanRole = rawRole === "hr" ? "hr" : rawRole === "team lead" || rawRole === "teamlead" ? "team lead" : "employee";
+
     const payload = {
       ...formData,
       name: fullName,
@@ -215,6 +225,7 @@ export default function Employees() {
       firstName: fullName,
       lastName: "",
       address: (formData.address || "").trim(),
+      role: cleanRole,
     };
 
     if (!payload.address) {
@@ -310,7 +321,12 @@ export default function Employees() {
         employee.departmentName ||
         employee.department ||
         "",
-      role: employee.role || (employee.isTeamLead ? "team lead" : "employee"),
+      role: (() => {
+        const r = String(employee.role || "").trim().toLowerCase();
+        if (r === "hr") return "hr";
+        if (r === "team lead" || r === "teamlead" || employee.isTeamLead) return "team lead";
+        return r || "employee";
+      })(),
       dob: employee.dob
         ? String(employee.dob).split("T")[0]
         : employee.dateOfBirth
@@ -715,7 +731,12 @@ export default function Employees() {
                                 emp
                               )}`}
                             >
-                              {emp.isTeamLead || emp.role === "team lead" ? (
+                              {String(emp.role || "").trim().toLowerCase() === "hr" ? (
+                                <>
+                                  <UserCheck className="h-3 w-3 mr-1 text-purple-600" />
+                                  HR
+                                </>
+                              ) : emp.isTeamLead || emp.role === "team lead" ? (
                                 <>
                                   <Crown className="h-3 w-3 mr-1 text-amber-600" />
                                   Team Lead
@@ -843,10 +864,10 @@ export default function Employees() {
 
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium border ${getRoleBadge(
-                              emp.isTeamLead
+                              emp
                             )}`}
                           >
-                            {emp.isTeamLead ? "TL" : "Member"}
+                            {String(emp.role || "").trim().toLowerCase() === "hr" ? "HR" : emp.isTeamLead ? "TL" : "Member"}
                           </span>
                         </div>
                       </div>
@@ -978,10 +999,10 @@ export default function Employees() {
 
                         <span
                           className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium border ${getRoleBadge(
-                            emp.isTeamLead
+                            emp
                           )}`}
                         >
-                          {emp.isTeamLead ? "TL" : "Member"}
+                          {String(emp.role || "").trim().toLowerCase() === "hr" ? "HR" : emp.isTeamLead ? "TL" : "Member"}
                         </span>
                       </div>
                     </div>
@@ -1242,6 +1263,7 @@ export default function Employees() {
                   >
                     <option value="employee">Employee</option>
                     <option value="team lead">Team Lead</option>
+                    <option value="hr">HR</option>
                   </select>
                 </div>
 

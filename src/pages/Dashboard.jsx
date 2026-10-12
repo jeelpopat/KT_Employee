@@ -1,29 +1,13 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Users,
-  UserCheck,
   FolderKanban,
   Briefcase,
-  Calendar,
-  Clock,
   Cake,
-  Sparkles,
   CheckCircle2,
   AlertCircle,
   X,
-  UserX,
-  ChevronRight,
-  Bell,
-  Plus,
-  Edit3,
-  Trash2,
-  CheckCheck,
-  FileText,
-  Activity,
-  UserPlus,
-  ExternalLink
+  UserX
 } from "lucide-react";
 import api from "../api/axios";
 import { useConfirm } from "../components/common/ConfirmDialog";
@@ -46,8 +30,7 @@ const UmbrellaIcon = ({ className = "h-5 w-5" }) => (
 );
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const { confirm, confirmationDialog } = useConfirm();
+  const { confirmationDialog } = useConfirm();
   const [stats, setStats] = useState([
     {
       id: 1,
@@ -79,7 +62,6 @@ export default function Dashboard() {
   const [leaves, setLeaves] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showAbsentModal, setShowAbsentModal] = useState(false);
-  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [leaveRemark, setLeaveRemark] = useState("");
@@ -93,23 +75,8 @@ export default function Dashboard() {
     teamLeadCount: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [announcements, setAnnouncements] = useState([]);
-  const [adminNotifications, setAdminNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notificationTab, setNotificationTab] = useState("unread"); // "unread" | "all" | "read" | "requests" | "announcements"
-  const [showAllAnnouncementsModal, setShowAllAnnouncementsModal] = useState(false);
-  const [showBellDropdown, setShowBellDropdown] = useState(false);
-  const notificationButtonRef = useRef(null);
-  const [notificationPosition, setNotificationPosition] = useState(null);
   const absentCardRef = useRef(null);
   const [absentPosition, setAbsentPosition] = useState(null);
-  // Announcement form state
-  const [announcementForm, setAnnouncementForm] = useState({
-    title: "",
-    message: "",
-    type: "ANNOUNCEMENT"
-  });
-  const [editingAnnouncementId, setEditingAnnouncementId] = useState(null);
 
   const isAutoAbsentTimeReached = () => {
     const now = new Date();
@@ -126,37 +93,11 @@ export default function Dashboard() {
         fetchLeaves(),
         fetchHolidays(),
         fetchAbsentAttendance(),
-        fetchNotificationsFeed(),
       ]);
       setLoading(false);
     };
 
     loadDashboard();
-  }, []);
-
-  useEffect(() => {
-    const openAnnouncement = () => {
-      setAnnouncementForm({ title: "", message: "", type: "ANNOUNCEMENT" });
-      setEditingAnnouncementId(null);
-      setShowAnnouncementModal(true);
-    };
-
-    window.addEventListener("open-announcement", openAnnouncement);
-    return () => window.removeEventListener("open-announcement", openAnnouncement);
-  }, []);
-
-  useEffect(() => {
-    const openNotifications = () => {
-      setNotificationPosition({
-        top: 64,
-        left: 12,
-        width: Math.min(320, window.innerWidth - 24),
-      });
-      setShowBellDropdown(true);
-    };
-
-    window.addEventListener("open-notifications", openNotifications);
-    return () => window.removeEventListener("open-notifications", openNotifications);
   }, []);
 
   useEffect(() => {
@@ -611,220 +552,24 @@ export default function Dashboard() {
     }
   }
 
-  const fetchNotificationsFeed = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const readIds = new Set(JSON.parse(localStorage.getItem("adminReadNotifications") || "[]"));
+  const openAbsentDetails = () => {
+    const cardRect = absentCardRef.current?.getBoundingClientRect();
+    const popupWidth = Math.min(360, window.innerWidth - 24);
+    const isMobile = window.innerWidth < 640;
 
-      let unifiedList = [];
-
-      // 1. Try unified backend endpoint first
-      let backendSucceeded = false;
-      try {
-        const response = await fetch("https://kt-backend-yzr4.onrender.com/api/notification/admin/all", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-            unifiedList = data.data;
-            backendSucceeded = true;
-            if (data.announcements && Array.isArray(data.announcements)) {
-              setAnnouncements(data.announcements);
-            }
-          }
-        }
-      } catch (e) {
-        // fallback to client aggregation
-      }
-
-      // 2. Client-side aggregation if backend admin feed didn't return items
-      if (!backendSucceeded) {
-        // Fetch announcements
-        let announcementsList = [];
-        try {
-          const annRes = await fetch("https://kt-backend-yzr4.onrender.com/api/notification/announcement/all", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const annData = await annRes.json();
-          if (Array.isArray(annData)) {
-            announcementsList = annData;
-          } else if (annData.data && Array.isArray(annData.data)) {
-            announcementsList = annData.data;
-          } else if (annData.announcements && Array.isArray(annData.announcements)) {
-            announcementsList = annData.announcements;
-          }
-        } catch (e) {
-          console.error("Announcement fetch error:", e);
-        }
-
-        const sortedAnn = announcementsList
-          .filter((item) => item && (item.title || item.message))
-          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-
-        setAnnouncements(sortedAnn);
-
-        // Add announcements to unified list
-        sortedAnn.forEach((ann) => {
-          const id = ann._id || ann.id;
-          unifiedList.push({
-            _id: id,
-            id: id,
-            title: ann.title || "Announcement",
-            message: ann.message || "",
-            type: ann.type || "ANNOUNCEMENT",
-            category: "announcement",
-            isRead: readIds.has(id),
-            createdAt: ann.createdAt || new Date(),
-          });
-        });
-
-        // Fetch pending leaves
-        try {
-          const leaveRes = await fetch("https://kt-backend-yzr4.onrender.com/api/leave/all", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const leaveData = await leaveRes.json();
-          const leaveList = Array.isArray(leaveData) ? leaveData : leaveData.data || [];
-          const pendingLeaves = leaveList.filter((l) => (l.status || "").toLowerCase().includes("pending"));
-          pendingLeaves.forEach((l) => {
-            const id = `leave_${l._id || l.id}`;
-            const applicantName = l.employeeName || l.employeeId?.name || "Employee";
-            unifiedList.push({
-              _id: id,
-              id: id,
-              title: "New Leave Application",
-              message: `${applicantName} applied for ${l.leaveType || "Leave"} (${l.totalDays || 1} day(s))`,
-              type: "LEAVE_REQUEST",
-              category: "request",
-              isRead: readIds.has(id),
-              createdAt: l.createdAt || l.startDate || new Date(),
-              link: "/attendance/leave-request",
-            });
-          });
-        } catch (e) {
-          // ignore
-        }
-
-        // Fetch upcoming holidays
-        try {
-          const holRes = await fetch("https://kt-backend-yzr4.onrender.com/api/holiday/current-month");
-          if (holRes.ok) {
-            const holData = await holRes.json();
-            const holList = Array.isArray(holData)
-              ? holData
-              : holData.data || holData.holidays || holData.currentMonthHolidays || [];
-            holList.forEach((h) => {
-              const id = `holiday_${h._id || h.id || h.holidayName}`;
-              unifiedList.push({
-                _id: id,
-                id: id,
-                title: `Upcoming Holiday: ${h.holidayName || h.name || "Holiday"}`,
-                message: `Office Holiday on ${h.holidayDate ? new Date(h.holidayDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "this month"}`,
-                type: "HOLIDAY",
-                category: "announcement",
-                isRead: readIds.has(id),
-                createdAt: h.createdAt || new Date(),
-                link: "/attendance/holidays",
-              });
-            });
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
-
-      // Apply read status from local storage
-      const listWithReadStatus = unifiedList.map((item) => {
-        const itemId = item.id || item._id;
-        return {
-          ...item,
-          isRead: item.isRead || readIds.has(itemId),
-        };
-      });
-
-      // Sort descending
-      listWithReadStatus.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-
-      setAdminNotifications(listWithReadStatus);
-      const unread = listWithReadStatus.filter((n) => !n.isRead).length;
-      setUnreadCount(unread);
-    } catch (error) {
-      console.error("Error in fetchNotificationsFeed:", error);
-    }
-  }, []);
-
-  // Live Real-Time Auto Refresh for Notifications (every 20s & on window focus)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchNotificationsFeed();
-    }, 20000);
-
-    const onFocus = () => {
-      fetchNotificationsFeed();
-    };
-    window.addEventListener("focus", onFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [fetchNotificationsFeed]);
-
-  const fetchAnnouncements = fetchNotificationsFeed;
-
-  const handleMarkAsRead = async (id, e) => {
-    if (e) e.stopPropagation();
-    try {
-      const readIds = new Set(JSON.parse(localStorage.getItem("adminReadNotifications") || "[]"));
-      if (id) readIds.add(id);
-      localStorage.setItem("adminReadNotifications", JSON.stringify(Array.from(readIds)));
-
-      const token = localStorage.getItem("token");
-      if (token && id && !id.startsWith("leave_") && !id.startsWith("holiday_")) {
-        fetch(`https://kt-backend-yzr4.onrender.com/api/notification/read/${id}`, {
-          method: "PUT",
-          headers: { Authorization: `Bearer ${token}` },
-        }).catch(() => { });
-      }
-      setAdminNotifications((prev) =>
-        prev.map((n) => (n.id === id || n._id === id ? { ...n, isRead: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      console.error("Error marking notification as read:", err);
-    }
+    setAbsentPosition({
+      top: isMobile ? "50%" : (cardRect?.bottom || 0) + 8,
+      left: isMobile
+        ? "50%"
+        : Math.min(
+          Math.max(12, cardRect?.left || 12),
+          window.innerWidth - popupWidth - 12
+        ),
+      width: popupWidth,
+      transform: isMobile ? "translate(-50%, -50%)" : "none",
+    });
+    setShowAbsentModal(true);
   };
-
-  const handleMarkAllAsRead = async () => {
-    try {
-      const allIds = adminNotifications.map((n) => n.id || n._id);
-      localStorage.setItem("adminReadNotifications", JSON.stringify(allIds));
-
-      const token = localStorage.getItem("token");
-      if (token) {
-        fetch("https://kt-backend-yzr4.onrender.com/api/notification/read-all", {
-          method: "PUT",
-          headers: { Authorization: `Bearer ${token}` },
-        }).catch(() => { });
-      }
-      setAdminNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-    } catch (err) {
-      console.error("Error marking all read:", err);
-    }
-  };
-
-  const handleNotificationClick = (item) => {
-    if (!item.isRead) {
-      handleMarkAsRead(item.id || item._id);
-    }
-    setShowBellDropdown(false);
-    if (item.link) {
-      navigate(item.link);
-    }
-  };
-
 
   const updateLeaveStatus = async (leaveId, status, remark = "") => {
     try {
@@ -854,91 +599,7 @@ export default function Dashboard() {
     setLeaveRemark("");
   };
 
-  const handleAnnouncementSubmit = async () => {
-    if (!announcementForm.title.trim() || !announcementForm.message.trim()) {
-      alert("Please fill both title and message before posting.");
-      return;
-    }
 
-    try {
-      const token = localStorage.getItem("token");
-      const payload = {
-        title: announcementForm.title.trim(),
-        message: announcementForm.message.trim(),
-        type: announcementForm.type || "ANNOUNCEMENT",
-      };
-
-      const endpoint = editingAnnouncementId
-        ? `https://kt-backend-yzr4.onrender.com/api/notification/announcement/${editingAnnouncementId}`
-        : "https://kt-backend-yzr4.onrender.com/api/notification/announcement/create";
-      const method = editingAnnouncementId ? "PUT" : "POST";
-
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json().catch(() => null);
-      const success = response.ok && (data?.success || data?.message || data?.data);
-      if (success) {
-        setAnnouncementForm({
-          title: "",
-          message: "",
-          type: "ANNOUNCEMENT",
-        });
-        setEditingAnnouncementId(null);
-        setShowAnnouncementModal(false);
-        await fetchNotificationsFeed();
-      } else {
-        alert(data?.message || "Failed to save announcement. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error posting announcement:", error);
-    }
-  };
-
-  const handleAnnouncementEdit = (announcement) => {
-    setAnnouncementForm({
-      title: announcement.title || "",
-      message: announcement.message || "",
-      type: announcement.type || "ANNOUNCEMENT",
-    });
-    setEditingAnnouncementId(announcement._id || announcement.id || null);
-    setShowAnnouncementModal(true);
-  };
-
-  const handleAnnouncementDelete = async (announcementId) => {
-    const confirmed = await confirm({
-      title: "Delete announcement?",
-      message: "Are you sure you want to delete this announcement?",
-      confirmLabel: "Delete",
-    });
-    if (!confirmed) return;
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `https://kt-backend-yzr4.onrender.com/api/notification/announcement/${announcementId}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        await fetchNotificationsFeed();
-      }
-    } catch (error) {
-      console.error("Error deleting announcement:", error);
-    }
-  };
 
   const formatHolidayDate = (dateValue) => {
     if (!dateValue) return "";
@@ -981,20 +642,6 @@ export default function Dashboard() {
     const parsedDate = parseBirthdayDate(dateValue);
     if (!parsedDate) return "";
     return parsedDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-  };
-
-  const formatAnnouncementDate = (dateValue) => {
-    if (!dateValue) return "";
-    const parsedDate = new Date(dateValue);
-    if (Number.isNaN(parsedDate.getTime())) return dateValue;
-    return parsedDate.toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
   };
 
   const isBirthdayInCurrentMonth = (dateValue) => {
@@ -1051,90 +698,7 @@ export default function Dashboard() {
     }
   };
 
-  const toggleNotifications = () => {
-    if (!showBellDropdown && notificationButtonRef.current) {
-      const buttonRect = notificationButtonRef.current.getBoundingClientRect();
-      const dropdownWidth = Math.min(380, window.innerWidth - 24);
-      const isMobile = window.innerWidth < 640;
-      setNotificationPosition({
-        top: buttonRect.bottom + 8,
-        left: isMobile
-          ? 12
-          : Math.max(12, buttonRect.right - dropdownWidth),
-        width: dropdownWidth,
-      });
-    }
-    setShowBellDropdown((visible) => !visible);
-  };
 
-  const openAbsentDetails = () => {
-    const cardRect = absentCardRef.current?.getBoundingClientRect();
-    const popupWidth = Math.min(360, window.innerWidth - 24);
-    const isMobile = window.innerWidth < 640;
-
-    setAbsentPosition({
-      top: isMobile ? "50%" : (cardRect?.bottom || 0) + 8,
-      left: isMobile
-        ? "50%"
-        : Math.min(
-          Math.max(12, cardRect?.left || 12),
-          window.innerWidth - popupWidth - 12
-        ),
-      width: popupWidth,
-      transform: isMobile ? "translate(-50%, -50%)" : "none",
-    });
-    setShowAbsentModal(true);
-  };
-
-  // Filter notifications based on selected tab
-  const unreadList = adminNotifications.filter((n) => !n.isRead);
-  const readList = adminNotifications.filter((n) => n.isRead);
-  const requestsCount = adminNotifications.filter((n) => n.category === "request").length;
-  const announcementsCount = adminNotifications.filter(
-    (n) => n.category === "announcement" || n.type === "ANNOUNCEMENT" || n.type === "HOLIDAY"
-  ).length;
-
-  const filteredNotifications = adminNotifications.filter((n) => {
-    if (notificationTab === "unread") return !n.isRead;
-    if (notificationTab === "read") return n.isRead;
-    if (notificationTab === "requests") return n.category === "request";
-    if (notificationTab === "announcements") return n.category === "announcement" || n.type === "ANNOUNCEMENT" || n.type === "HOLIDAY";
-    return true;
-  });
-
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case "LEAVE_REQUEST":
-        return <Calendar className="h-4 w-4 text-amber-600" />;
-      case "CHECKIN_REQUEST":
-        return <Clock className="h-4 w-4 text-indigo-600" />;
-      case "ADJUSTMENT_REQUEST":
-        return <AlertCircle className="h-4 w-4 text-purple-600" />;
-      case "ANNOUNCEMENT":
-        return <Bell className="h-4 w-4 text-emerald-600" />;
-      case "HOLIDAY":
-        return <Calendar className="h-4 w-4 text-rose-600" />;
-      default:
-        return <Activity className="h-4 w-4 text-blue-600" />;
-    }
-  };
-
-  const getNotificationBg = (type) => {
-    switch (type) {
-      case "LEAVE_REQUEST":
-        return "bg-amber-50 border-amber-200/70";
-      case "CHECKIN_REQUEST":
-        return "bg-indigo-50 border-indigo-200/70";
-      case "ADJUSTMENT_REQUEST":
-        return "bg-purple-50 border-purple-200/70";
-      case "ANNOUNCEMENT":
-        return "bg-emerald-50 border-emerald-200/70";
-      case "HOLIDAY":
-        return "bg-rose-50 border-rose-200/70";
-      default:
-        return "bg-blue-50 border-blue-200/70";
-    }
-  };
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
@@ -1152,253 +716,6 @@ export default function Dashboard() {
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 tracking-tight">
                 Dashboard
               </h1>
-              {/* <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">Overview of organization metrics & daily status</p> */}
-            </div>
-
-            <div className="hidden items-center gap-3 shrink-0 sm:flex">
-              {/* Exact Bell Icon & Dropdown with Real-Time Data */}
-              <div className="relative">
-                <button
-                  type="button"
-                  ref={notificationButtonRef}
-                  onClick={toggleNotifications}
-                  aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-                  aria-expanded={showBellDropdown}
-                  className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-xs hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                >
-                  <Bell className="h-4 w-4" aria-hidden="true" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white ring-2 ring-white animate-pulse">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {showBellDropdown && (
-                  createPortal(
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setShowBellDropdown(false)} />
-                      <div
-                        role="dialog"
-                        aria-label="Notifications"
-                        className="fixed z-50 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-slate-200/90 bg-white text-xs shadow-2xl"
-                        style={notificationPosition || { top: 80, left: 12, width: "calc(100vw - 1.5rem)" }}
-                      >
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/80">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-slate-900 text-sm">Notifications</h3>
-                            {unreadCount > 0 && (
-                              <span className="bg-rose-100 text-rose-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                                {unreadCount} unread
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {unreadCount > 0 && (
-                              <button
-                                type="button"
-                                onClick={handleMarkAllAsRead}
-                                className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors hover:underline"
-                                title="Mark all as read"
-                              >
-                                <CheckCheck className="h-3.5 w-3.5" /> Mark all read
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowBellDropdown(false);
-                                setAnnouncementForm({ title: "", message: "", type: "ANNOUNCEMENT" });
-                                setEditingAnnouncementId(null);
-                                setShowAnnouncementModal(true);
-                              }}
-                              className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100"
-                            >
-                              <Plus className="h-3 w-3" /> New
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Filter Tabs */}
-                        <div className="flex items-center border-b border-slate-100 bg-white px-2 pt-1 gap-1 text-[11px] overflow-x-auto no-scrollbar">
-                          <button
-                            type="button"
-                            onClick={() => setNotificationTab("unread")}
-                            className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 ${notificationTab === "unread"
-                              ? "border-indigo-600 text-indigo-600 bg-indigo-50/40"
-                              : "border-transparent text-slate-500 hover:text-slate-700"
-                              }`}
-                          >
-                            Unread ({unreadList.length})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNotificationTab("all")}
-                            className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 ${notificationTab === "all"
-                              ? "border-indigo-600 text-indigo-600 bg-indigo-50/40"
-                              : "border-transparent text-slate-500 hover:text-slate-700"
-                              }`}
-                          >
-                            All ({adminNotifications.length})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNotificationTab("read")}
-                            className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 ${notificationTab === "read"
-                              ? "border-indigo-600 text-indigo-600 bg-indigo-50/40"
-                              : "border-transparent text-slate-500 hover:text-slate-700"
-                              }`}
-                          >
-                            Read ({readList.length})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNotificationTab("requests")}
-                            className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 ${notificationTab === "requests"
-                              ? "border-indigo-600 text-indigo-600 bg-indigo-50/40"
-                              : "border-transparent text-slate-500 hover:text-slate-700"
-                              }`}
-                          >
-                            Requests ({requestsCount})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNotificationTab("announcements")}
-                            className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 ${notificationTab === "announcements"
-                              ? "border-indigo-600 text-indigo-600 bg-indigo-50/40"
-                              : "border-transparent text-slate-500 hover:text-slate-700"
-                              }`}
-                          >
-                            Announcements ({announcementsCount})
-                          </button>
-                        </div>
-
-                        {/* Items List */}
-                        <div className="max-h-80 overflow-y-auto divide-y divide-slate-100/80">
-                          {filteredNotifications.length === 0 ? (
-                            <div className="p-6 text-center text-slate-400">
-                              {notificationTab === "unread" ? (
-                                <>
-                                  <CheckCircle2 className="h-8 w-8 mx-auto mb-1.5 text-emerald-500 opacity-80" />
-                                  <p className="font-semibold text-slate-700 text-xs">All Caught Up!</p>
-                                  <p className="text-[10px] text-slate-400 mt-0.5">No unread notifications at the moment.</p>
-                                </>
-                              ) : (
-                                <>
-                                  <Bell className="h-8 w-8 mx-auto mb-1.5 text-slate-300 opacity-60" />
-                                  <p className="font-medium text-slate-600 text-xs">No notifications in this tab</p>
-                                </>
-                              )}
-                            </div>
-                          ) : (
-                            filteredNotifications.slice(0, 20).map((item, idx) => (
-                              <div
-                                key={item._id || item.id || idx}
-                                onClick={() => handleNotificationClick(item)}
-                                className={`p-3 transition-colors flex items-start gap-2.5 cursor-pointer group ${!item.isRead ? "bg-indigo-50/30 hover:bg-indigo-50/60" : "hover:bg-slate-50 opacity-80"
-                                  }`}
-                              >
-                                <div
-                                  className={`p-1.5 rounded-lg border shrink-0 mt-0.5 ${getNotificationBg(item.type)}`}
-                                >
-                                  {getNotificationIcon(item.type)}
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <p className={`truncate text-xs ${!item.isRead ? "font-semibold text-slate-900" : "font-medium text-slate-600"}`}>
-                                      {item.title}
-                                    </p>
-                                    {!item.isRead && (
-                                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 shrink-0" />
-                                    )}
-                                  </div>
-                                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
-                                    {item.message}
-                                  </p>
-                                  <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
-                                    <span>{formatAnnouncementDate(item.createdAt)}</span>
-                                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      {item.category === "announcement" && (
-                                        <>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleAnnouncementEdit(item);
-                                            }}
-                                            className="p-0.5 text-slate-400 hover:text-slate-700"
-                                          >
-                                            <Edit3 className="h-3 w-3" />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleAnnouncementDelete(item._id || item.id);
-                                            }}
-                                            className="p-0.5 text-slate-400 hover:text-rose-600"
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </button>
-                                        </>
-                                      )}
-                                      {item.link && (
-                                        <span className="text-indigo-600 font-medium flex items-center gap-0.5 text-[10px]">
-                                          Open <ExternalLink className="h-2.5 w-2.5" />
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 bg-slate-50/50">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowBellDropdown(false);
-                              setShowAllAnnouncementsModal(true);
-                            }}
-                            className="text-[11px] font-medium text-slate-600 hover:text-indigo-600 transition-colors"
-                          >
-                            View all Announcements
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowBellDropdown(false);
-                              navigate("/attendance/leave-request");
-                            }}
-                            className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5"
-                          >
-                            All Requests &rarr;
-                          </button>
-                        </div>
-                      </div>
-                    </>,
-                    document.body
-                  )
-                )}
-              </div>
-
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAnnouncementForm({ title: "", message: "", type: "ANNOUNCEMENT" });
-                  setEditingAnnouncementId(null);
-                  setShowAnnouncementModal(true);
-                }}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 h-10 rounded-lg text-xs sm:text-sm font-medium shadow-xs transition-colors cursor-pointer"
-              >
-                <Plus className="h-4 w-4" /> Post Announcement
-              </button>
             </div>
           </div>
 
@@ -1592,80 +909,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Announcement Modal */}
-          {showAnnouncementModal && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-              <div
-                className="w-full rounded-xl border border-slate-200/90 bg-white shadow-xl overflow-hidden"
-                style={{
-                  width: "100%",
-                  maxWidth: "28rem",
-                }}
-              >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-                  <h3 className="text-xs font-semibold text-slate-900">
-                    {editingAnnouncementId ? "Edit Announcement" : "Post Announcement"}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAnnouncementModal(false);
-                      setAnnouncementForm({ title: "", message: "", type: "ANNOUNCEMENT" });
-                      setEditingAnnouncementId(null);
-                    }}
-                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
 
-                <div className="p-4 space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Title</label>
-                    <input
-                      type="text"
-                      placeholder="Enter title"
-                      value={announcementForm.title}
-                      onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
-                      className="w-full px-3 py-1.5 text-xs border border-slate-200/90 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Message</label>
-                    <textarea
-                      placeholder="Enter message..."
-                      value={announcementForm.message}
-                      onChange={(e) => setAnnouncementForm({ ...announcementForm, message: e.target.value })}
-                      rows="3"
-                      className="w-full px-3 py-1.5 text-xs border border-slate-200/90 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all resize-none"
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAnnouncementForm({ title: "", message: "", type: "ANNOUNCEMENT" });
-                        setShowAnnouncementModal(false);
-                      }}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAnnouncementSubmit}
-                      disabled={!announcementForm.title.trim() || !announcementForm.message.trim()}
-                      className="px-4 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-xs"
-                    >
-                      {editingAnnouncementId ? "Update" : "Post"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Absent Drawer */}
           {showAbsentModal && (
@@ -1826,67 +1070,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* View All Announcements Modal */}
-          {showAllAnnouncementsModal && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-              <div className="bg-white w-full max-w-xl rounded-xl shadow-xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[80vh]">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-                  <h3 className="text-xs font-semibold text-slate-900">All Announcements</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowAllAnnouncementsModal(false)}
-                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
 
-                <div className="p-4 overflow-y-auto space-y-3 flex-1">
-                  {announcements.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
-                      No announcements
-                    </div>
-                  ) : (
-                    announcements.map((announcement, index) => (
-                      <div key={announcement._id || index} className="p-3 rounded-lg bg-slate-50/60 border border-slate-100">
-                        <div className="flex items-start justify-between gap-3">
-                          <h4 className="text-xs font-semibold text-slate-900">{announcement.title}</h4>
-                          <span className="text-[10px] text-slate-400 shrink-0">
-                            {formatAnnouncementDate(announcement.createdAt)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 mt-1">{announcement.message}</p>
-                        <div className="mt-2.5 flex items-center justify-end gap-2 border-t border-slate-200/60 pt-1.5">
-                          <button
-                            onClick={() => handleAnnouncementEdit(announcement)}
-                            className="flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-slate-900"
-                          >
-                            <Edit3 className="h-3 w-3" /> Edit
-                          </button>
-                          <button
-                            onClick={() => handleAnnouncementDelete(announcement._id || announcement.id)}
-                            className="flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700"
-                          >
-                            <Trash2 className="h-3 w-3" /> Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowAllAnnouncementsModal(false)}
-                    className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors shadow-xs"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

@@ -1,8 +1,98 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../utils/roleFilters";
+import { isFinanceOrExcludedUser } from "../utils/roleFilters";
 
 const BASE_URL = "https://kt-backend-yzr4.onrender.com/api";
+
+// Helper to match an employee across any identifier: _id, userId, userID, employeeID, employeeCode, uniqueID, email
+const findEmployeeByIdOrUser = (empOrId, empList = []) => {
+  if (!empOrId) return null;
+  if (typeof empOrId === 'object' && empOrId._id && empList.some(e => String(e._id) === String(empOrId._id))) {
+    return empList.find(e => String(e._id) === String(empOrId._id));
+  }
+  const target = (typeof empOrId === 'object' ? (empOrId._id || empOrId.id || empOrId.userId || empOrId.userID || empOrId.employeeId || empOrId.employeeID || empOrId.email) : empOrId);
+  if (!target) return null;
+  const targetStr = String(target).toLowerCase().trim();
+
+  return empList.find((e) => {
+    if (!e) return false;
+    const ids = [
+      e._id,
+      e.id,
+      e.userId,
+      e.userID,
+      e.employeeId,
+      e.employeeID,
+      e.employeeCode,
+      e.uniqueID,
+      e.user?._id,
+      e.user?.id
+    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+    if (ids.includes(targetStr)) return true;
+
+    if (targetStr.includes('@')) {
+      const eEmail = (e.email || e.user?.email || '').toLowerCase().trim();
+      if (eEmail && eEmail === targetStr) return true;
+    }
+    return false;
+  });
+};
+
+// Generate canonical uniqueness key for an employee (email, employeeCode, or id)
+const getCanonicalEmployeeKey = (empOrId, empList = []) => {
+  if (!empOrId) return null;
+  const matched = findEmployeeByIdOrUser(empOrId, empList);
+  if (matched) {
+    const email = (matched.email || matched.user?.email || '').toLowerCase().trim();
+    if (email && email.includes('@')) return `email:${email}`;
+    const empCode = (matched.employeeID || matched.employeeCode || matched.uniqueID || '').trim().toLowerCase();
+    if (empCode) return `code:${empCode}`;
+    const id = matched._id || matched.id;
+    if (id) return `id:${String(id).toLowerCase().trim()}`;
+    const name = (matched.name || matched.fullName || '').toLowerCase().trim();
+    if (name) return `name:${name}`;
+  }
+
+  if (typeof empOrId === 'object') {
+    const email = (empOrId.email || empOrId.user?.email || '').toLowerCase().trim();
+    if (email && email.includes('@')) return `email:${email}`;
+    const empCode = (empOrId.employeeID || empOrId.employeeCode || empOrId.uniqueID || '').trim().toLowerCase();
+    if (empCode) return `code:${empCode}`;
+    const id = empOrId._id || empOrId.id;
+    if (id) return `id:${String(id).toLowerCase().trim()}`;
+    const name = (empOrId.name || empOrId.fullName || '').toLowerCase().trim();
+    if (name) return `name:${name}`;
+  }
+
+  return `raw:${String(empOrId).toLowerCase().trim()}`;
+};
+
+// Deduplicate any employee list (raw IDs or objects) to guarantee each individual person is counted and listed at most once
+const getDistinctAssignedEmployees = (rawList = [], empList = []) => {
+  if (!Array.isArray(rawList) || rawList.length === 0) return [];
+
+  const seenKeys = new Set();
+  const distinctEmployees = [];
+
+  rawList.forEach((item) => {
+    if (!item) return;
+    const key = getCanonicalEmployeeKey(item, empList);
+    if (!key || seenKeys.has(key)) return;
+    seenKeys.add(key);
+
+    const matchedEmp = findEmployeeByIdOrUser(item, empList);
+    if (matchedEmp) {
+      distinctEmployees.push(matchedEmp);
+    } else if (typeof item === 'object') {
+      distinctEmployees.push(item);
+    } else {
+      distinctEmployees.push({ _id: String(item), id: String(item), name: 'Employee' });
+    }
+  });
+
+  return distinctEmployees;
+};
 
 // Modal Component for Assignments
 const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, departmentName }) => {
@@ -11,9 +101,10 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
 
   useEffect(() => {
     if (lead && isOpen) {
-      setSelectedEmployees(lead.assignedEmployees || []);
+      const distinct = getDistinctAssignedEmployees(lead.assignedEmployees || [], employees);
+      setSelectedEmployees(distinct.map(e => String(e._id)));
     }
-  }, [lead, isOpen]);
+  }, [lead, isOpen, employees]);
 
   // Helper to check if a person matches the current Team Lead
   const isCurrentLead = (person) => {
@@ -74,33 +165,51 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
     return idMatch || emailMatch || nameMatch;
   };
 
-  // Available Employees: Purely employees (NOT team lead, NOT admin, NOT finance, NOT current lead)
-  const availableEmployees = (employees || []).filter((emp) => {
-    if (isCurrentLead(emp)) return false;
-    if (isFinanceOrExcludedUser(emp)) return false;
-    const role = (emp.role || emp.designation || '').toLowerCase().trim();
-    const isTeamLead = role.includes('lead') || emp.isTeamLead === true;
-    const isAdmin = role.includes('admin');
-    return !isTeamLead && !isAdmin;
-  });
+  // Available Employees: Purely employees (NOT team lead, NOT admin, NOT finance, NOT current lead) - Deduplicated
+  const availableEmployees = getDistinctAssignedEmployees(
+    (employees || []).filter((emp) => {
+      if (isCurrentLead(emp)) return false;
+      if (isFinanceOrExcludedUser(emp)) return false;
+      const role = (emp.role || emp.designation || '').toLowerCase().trim();
+      const isTeamLead = role.includes('lead') || emp.isTeamLead === true;
+      const isAdmin = role.includes('admin');
+      return !isTeamLead && !isAdmin;
+    }),
+    employees
+  );
+
+  const isEmployeeChecked = (emp) => {
+    const empKey = getCanonicalEmployeeKey(emp, employees);
+    return selectedEmployees.some(id => getCanonicalEmployeeKey(id, employees) === empKey);
+  };
 
   const handleEmployeeToggle = (employeeId) => {
-    setSelectedEmployees(prev =>
-      prev.includes(employeeId)
-        ? prev.filter(id => id !== employeeId)
-        : [...prev, employeeId]
-    );
+    const empKey = getCanonicalEmployeeKey(employeeId, employees);
+    const matched = findEmployeeByIdOrUser(employeeId, employees);
+    const canonicalId = matched ? String(matched._id) : String(employeeId);
+
+    setSelectedEmployees(prev => {
+      const exists = prev.some(id => getCanonicalEmployeeKey(id, employees) === empKey);
+      if (exists) {
+        return prev.filter(id => getCanonicalEmployeeKey(id, employees) !== empKey);
+      } else {
+        return [...prev, canonicalId];
+      }
+    });
   };
 
   const handleSave = async () => {
-    if (selectedEmployees.length === 0) {
+    const distinct = getDistinctAssignedEmployees(selectedEmployees, employees);
+    const distinctIds = distinct.map(emp => String(emp._id));
+
+    if (distinctIds.length === 0) {
       alert("Please select at least one employee.");
       return;
     }
 
     setSaving(true);
     await onSave({
-      employeeIds: selectedEmployees,
+      employeeIds: distinctIds,
       leadId: lead._id
     });
     setSaving(false);
@@ -108,7 +217,7 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
   };
 
   const selectAll = () => {
-    setSelectedEmployees(availableEmployees.map(emp => emp._id));
+    setSelectedEmployees(availableEmployees.map(emp => String(emp._id)));
   };
 
   const deselectAll = () => {
@@ -196,7 +305,7 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
                   >
                     <input
                       type="checkbox"
-                      checked={selectedEmployees.includes(employee._id)}
+                      checked={isEmployeeChecked(employee)}
                       onChange={() => handleEmployeeToggle(employee._id)}
                       className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
@@ -769,7 +878,8 @@ const getDesignation = (lead) => {
           const existing = mergedLeads[existingIdx];
           const empsA = getAssignedEmployeeIds(existing);
           const empsB = getAssignedEmployeeIds(normalizedLead);
-          existing.assignedEmployees = [...new Set([...empsA, ...empsB])];
+          const distinctCombined = getDistinctAssignedEmployees([...empsA, ...empsB], fetchedEmployees);
+          existing.assignedEmployees = distinctCombined.map(e => String(e._id));
           if (!existing.rawTeamDocId) existing.rawTeamDocId = apiLead._id;
         } else {
           mergedLeads.push(normalizedLead);
@@ -806,13 +916,15 @@ const getDesignation = (lead) => {
 
         const savedEmps = allAssociatedIds.flatMap(id => savedEmployeeAssignments[id] || []);
 
-        const mergedLiveEmployees = [...new Set([...apiEmployees, ...directlyAssignedEmployees, ...savedEmps])];
+        const mergedLiveEmployees = [...apiEmployees, ...directlyAssignedEmployees, ...savedEmps];
+        const distinctAssigned = getDistinctAssignedEmployees(mergedLiveEmployees, fetchedEmployees);
+        const distinctIds = distinctAssigned.map(e => String(e._id));
 
-        // Store under lead._id and all associated IDs so lookups always find them
+        // Store under lead._id and all associated IDs so lookups always find clean deduplicated IDs
         allAssociatedIds.forEach(id => {
-          employeeAssignments[id] = mergedLiveEmployees;
+          employeeAssignments[id] = distinctIds;
         });
-        employeeAssignments[leadId] = mergedLiveEmployees;
+        employeeAssignments[leadId] = distinctIds;
       });
 
       setAssignedEmployees(employeeAssignments);
@@ -843,8 +955,9 @@ const getDesignation = (lead) => {
         if (!name || name === "Unnamed" || name === "No Name" || name === "Unknown Employee" || name === "Unknown User") return false;
         return true;
       });
-      setEmployees(validEmployees);
-      return validEmployees;
+      const distinctEmployeesList = getDistinctAssignedEmployees(validEmployees, validEmployees);
+      setEmployees(distinctEmployeesList);
+      return distinctEmployeesList;
     } catch (error) {
       console.log("Could not fetch employees:", error);
       setEmployees([]);
@@ -866,9 +979,11 @@ const getDesignation = (lead) => {
 
   // Modal Handlers
   const handleOpenModal = (lead) => {
+    const rawAssigned = assignedEmployees[lead._id] || lead.assignedEmployees || [];
+    const distinctAssigned = getDistinctAssignedEmployees(rawAssigned, employees);
     const leadWithAssignments = {
       ...lead,
-      assignedEmployees: assignedEmployees[lead._id] || []
+      assignedEmployees: distinctAssigned.map(e => String(e._id))
     };
     setSelectedLead(leadWithAssignments);
     setModalOpen(true);
@@ -892,23 +1007,12 @@ const getDesignation = (lead) => {
         'Content-Type': 'application/json'
       };
   
-      const employeeIds = [];
-      for (const rawId of data.employeeIds) {
-        const employee = employees.find(emp => 
-          String(emp._id) === String(rawId) || 
-          (emp.userID && String(emp.userID) === String(rawId))
-        );
-        
-        if (employee) {
-          employeeIds.push(String(employee._id));
-        } else {
-          employeeIds.push(String(rawId));
-        }
-      }
+      const distinct = getDistinctAssignedEmployees(data.employeeIds || [], employees);
+      const cleanEmployeeIds = distinct.map(e => String(e._id));
   
       const payload = {
         teamLead: data.leadId,
-        employees: employeeIds
+        employees: cleanEmployeeIds
       };
 
       console.log('Sending payload:', payload);
@@ -930,12 +1034,12 @@ const getDesignation = (lead) => {
       // Always persist in assignedEmployees and localStorage for seamless continuity
       setAssignedEmployees(prev => ({
         ...prev,
-        [data.leadId]: data.employeeIds
+        [data.leadId]: cleanEmployeeIds
       }));
 
       persistEmployeeAssignments({
         ...assignedEmployees,
-        [data.leadId]: data.employeeIds
+        [data.leadId]: cleanEmployeeIds
       });
 
       alert("Assignments saved successfully!");
@@ -1045,8 +1149,9 @@ const getDesignation = (lead) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
           {teamLeads.map((lead, index) => {
-            const selectedEmployees = assignedEmployees[lead._id] || [];
-            const totalAssignments = selectedEmployees.length;
+            const rawAssigned = assignedEmployees[lead._id] || lead.assignedEmployees || [];
+            const assignedList = getDistinctAssignedEmployees(rawAssigned, employees);
+            const totalAssignments = assignedList.length;
             const leadName = getUserName(lead);
             const leadEmail = getUserEmail(lead);
             const departmentName = getDepartment(lead, employees);
@@ -1097,7 +1202,7 @@ const getDesignation = (lead) => {
                     <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
                       <div className="text-center border-r border-gray-200">
                         <p className="text-xs text-gray-500 font-medium">Employees</p>
-                        <p className="text-lg font-bold text-purple-600">{selectedEmployees.length}</p>
+                        <p className="text-lg font-bold text-purple-600">{totalAssignments}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-xs text-gray-500 font-medium">Total</p>
@@ -1128,18 +1233,12 @@ const getDesignation = (lead) => {
                       <div className="mt-4 pt-3 border-t border-gray-200">
                         <p className="text-xs text-gray-500 font-medium mb-2">Team Members</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {selectedEmployees.slice(0, 6).map((employeeId) => {
-                            const employee = employees.find(e => 
-                              String(e._id) === String(employeeId) || 
-                              (e.userID && String(e.userID) === String(employeeId))
-                            );
-                            return employee ? (
-                              <span key={employeeId} className="inline-flex items-center px-2.5 py-1 bg-purple-100 text-purple-800 text-xs rounded-full border border-purple-200">
-                                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1.5"></span>
-                                {getEmployeeDisplayName(employee)}
-                              </span>
-                            ) : null;
-                          })}
+                          {assignedList.slice(0, 6).map((emp) => (
+                            <span key={emp._id || emp.email || emp.name} className="inline-flex items-center px-2.5 py-1 bg-purple-100 text-purple-800 text-xs rounded-full border border-purple-200">
+                              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1.5"></span>
+                              {getEmployeeDisplayName(emp)}
+                            </span>
+                          ))}
                           {totalAssignments > 6 && (
                             <span className="inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-full border border-gray-200">
                               +{totalAssignments - 6} more

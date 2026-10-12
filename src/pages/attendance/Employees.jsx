@@ -44,6 +44,7 @@ export default function Employees() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterRole, setFilterRole] = useState("all");
   const [toast, setToast] = useState({ message: "", type: "success" });
 
   const showToast = (message, type = "success") => {
@@ -193,7 +194,11 @@ export default function Employees() {
   // ROLE BADGE
   // =========================
   const getRoleBadge = (emp) => {
-    if (emp?.isTeamLead || emp?.role === "team lead") {
+    const roleLower = String(emp?.role || "").trim().toLowerCase();
+    if (roleLower === "hr") {
+      return "bg-purple-50 text-purple-700 border-purple-200";
+    }
+    if (emp?.isTeamLead || roleLower === "team lead") {
       return "bg-amber-50 text-amber-700 border-amber-200";
     }
 
@@ -217,6 +222,9 @@ export default function Employees() {
       return null;
     }
 
+    const rawRole = String(formData.role || "employee").trim().toLowerCase();
+    const cleanRole = rawRole === "hr" ? "hr" : rawRole === "team lead" || rawRole === "teamlead" ? "team lead" : "employee";
+
     const payload = {
       ...formData,
       name: fullName,
@@ -224,6 +232,7 @@ export default function Employees() {
       firstName: fullName,
       lastName: "",
       address: (formData.address || "").trim(),
+      role: cleanRole,
     };
 
     if (!payload.address) {
@@ -319,7 +328,12 @@ export default function Employees() {
         employee.departmentName ||
         employee.department ||
         "",
-      role: employee.role || (employee.isTeamLead ? "team lead" : "employee"),
+      role: (() => {
+        const r = String(employee.role || "").trim().toLowerCase();
+        if (r === "hr") return "hr";
+        if (r === "team lead" || r === "teamlead" || employee.isTeamLead) return "team lead";
+        return r || "employee";
+      })(),
       dob: employee.dob
         ? String(employee.dob).split("T")[0]
         : employee.dateOfBirth
@@ -485,7 +499,17 @@ export default function Employees() {
     const matchesStatus =
       filterStatus === "all" || emp.employeeStatus === filterStatus;
 
-    return matchesSearch && matchesStatus;
+    const empRole = String(emp.role || "").trim().toLowerCase();
+    const isEmpTL = emp.isTeamLead || empRole === "team lead" || empRole === "teamlead";
+    const isEmpHR = empRole === "hr";
+
+    const matchesRole =
+      filterRole === "all" ||
+      (filterRole === "hr" && isEmpHR) ||
+      (filterRole === "team lead" && isEmpTL) ||
+      (filterRole === "employee" && !isEmpHR && !isEmpTL);
+
+    return matchesSearch && matchesStatus && matchesRole;
   });
 
   return (
@@ -606,6 +630,23 @@ export default function Employees() {
                     <option value="all">All Status</option>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
+                    Role
+                  </label>
+
+                  <select
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="employee">Employee</option>
+                    <option value="team lead">Team Lead</option>
+                    <option value="hr">HR</option>
                   </select>
                 </div>
               </div>
@@ -732,7 +773,12 @@ export default function Employees() {
                         {/* ROLE (CLEAN UNBOXED WITH ICON) */}
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                            {emp.isTeamLead || emp.role === "team lead" ? (
+                            {String(emp.role || "").trim().toLowerCase() === "hr" ? (
+                              <>
+                                <UserCheck className="h-3.5 w-3.5 text-purple-600" />
+                                <span className="text-purple-700 font-semibold">HR</span>
+                              </>
+                            ) : emp.isTeamLead || emp.role === "team lead" ? (
                               <>
                                 <Crown className="h-3.5 w-3.5 text-amber-500" />
                                 <span className="text-amber-700 font-semibold">Team Lead</span>
@@ -862,7 +908,12 @@ export default function Employees() {
                         </span>
 
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
-                          {emp.isTeamLead || emp.role === "team lead" ? (
+                          {String(emp.role || "").trim().toLowerCase() === "hr" ? (
+                            <>
+                              <UserCheck className="h-3 w-3 text-purple-600" />
+                              <span className="text-purple-700 font-semibold">HR</span>
+                            </>
+                          ) : emp.isTeamLead || emp.role === "team lead" ? (
                             <>
                               <Crown className="h-3 w-3 text-amber-500" />
                               <span className="text-amber-700 font-semibold">TL</span>
@@ -1003,7 +1054,12 @@ export default function Employees() {
                       </span>
 
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500">
-                        {emp.isTeamLead || emp.role === "team lead" ? (
+                        {String(emp.role || "").trim().toLowerCase() === "hr" ? (
+                          <>
+                            <UserCheck className="h-2.5 w-2.5 text-purple-600" />
+                            <span className="text-purple-700 font-semibold">HR</span>
+                          </>
+                        ) : emp.isTeamLead || emp.role === "team lead" ? (
                           <>
                             <Crown className="h-2.5 w-2.5 text-amber-500" />
                             <span className="text-amber-700 font-semibold">TL</span>
@@ -1260,6 +1316,7 @@ export default function Employees() {
                   >
                     <option value="employee">Employee</option>
                     <option value="team lead">Team Lead</option>
+                    <option value="hr">HR</option>
                   </select>
                 </div>
 

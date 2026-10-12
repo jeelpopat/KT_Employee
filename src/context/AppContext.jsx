@@ -122,6 +122,25 @@ export const deriveUserRole = (u) => {
   const nameStr = (u.name || u.fullName || u.employee?.name || u.employee?.fullName || '').toLowerCase().trim();
 
   // 1. Check for Team Leader first (so TL is never misclassified)
+  // 1. Check for HR (role "hr" or HR indicators checked first)
+  if (
+    roleStr === 'hr' ||
+    roleStr === 'hr manager' ||
+    roleStr === 'human resource' ||
+    roleStr === 'human resources' ||
+    roleStr === 'hr executive' ||
+    roleStr === 'hr admin' ||
+    roleStr.startsWith('hr') ||
+    /\bhr\b/i.test(roleStr) ||
+    /\bhr\b/i.test(designationStr) ||
+    departmentStr === 'hr' ||
+    departmentStr === 'human resource' ||
+    departmentStr === 'human resources'
+  ) {
+    return 'hr';
+  }
+
+  // 2. Check for Team Leader
   if (
     roleStr === 'team_leader' ||
     roleStr === 'team lead' ||
@@ -145,24 +164,6 @@ export const deriveUserRole = (u) => {
     nameStr.includes('kuresh')
   ) {
     return 'team_leader';
-  }
-
-  // 2. Check for HR (before admin so HR department/user is never misclassified as admin)
-  if (
-    roleStr === 'hr' ||
-    roleStr === 'hr manager' ||
-    roleStr === 'human resource' ||
-    roleStr === 'human resources' ||
-    roleStr === 'hr executive' ||
-    roleStr === 'hr admin' ||
-    roleStr.startsWith('hr') ||
-    /\bhr\b/i.test(roleStr) ||
-    /\bhr\b/i.test(designationStr) ||
-    departmentStr === 'hr' ||
-    departmentStr === 'human resource' ||
-    departmentStr === 'human resources'
-  ) {
-    return 'hr';
   }
 
   // 3. Check for Trainee (mapped to standard Employee)
@@ -389,24 +390,13 @@ export const AppProvider = ({ children }) => {
   const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [currentTab, setCurrentTabState] = useState(() => {
     const role = localStorage.getItem('active_role') || localStorage.getItem('user_role');
-    if (role === 'hr') return 'admin-leave-requests';
-    if (role === 'admin') return 'admin-dashboard';
+    if (role === 'hr' || role === 'admin') return 'admin-dashboard';
     return 'dashboard';
   });
 
   const setCurrentTab = useCallback((tab) => {
-    if (userRole === 'hr' && tab !== 'admin-screenshots' && tab !== 'admin-leave-requests') {
-      setCurrentTabState('admin-leave-requests');
-      return;
-    }
     setCurrentTabState(tab);
-  }, [userRole]);
-
-  useEffect(() => {
-    if (userRole === 'hr' && currentTab !== 'admin-screenshots' && currentTab !== 'admin-leave-requests') {
-      setCurrentTabState('admin-leave-requests');
-    }
-  }, [userRole, currentTab]);
+  }, []);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -1532,8 +1522,26 @@ export const AppProvider = ({ children }) => {
 
       let determinedRole = 'employee';
 
-      // 1. Team Leader Detection (check first so TL is never misclassified)
+      // 1. HR Detection (explicit role "hr" or HR indicators checked first)
       if (
+        normalizedRoleName === 'hr' ||
+        normalizedRoleName === 'hr manager' ||
+        normalizedRoleName === 'human resource' ||
+        normalizedRoleName === 'human resources' ||
+        normalizedRoleName === 'hr executive' ||
+        normalizedRoleName === 'hr admin' ||
+        normalizedRoleName.startsWith('hr') ||
+        /\bhr\b/i.test(normalizedRoleName) ||
+        /\bhr\b/i.test(designationStr) ||
+        departmentStr === 'hr' ||
+        departmentStr === 'human resource' ||
+        departmentStr === 'human resources'
+      ) {
+        determinedRole = 'hr';
+        if (!resolvedRoleName) resolvedRoleName = 'HR Manager';
+      }
+      // 2. Team Leader Detection
+      else if (
         normalizedRoleName === 'team_leader' ||
         normalizedRoleName === 'team lead' ||
         normalizedRoleName === 'team leader' ||
@@ -1557,24 +1565,6 @@ export const AppProvider = ({ children }) => {
         if (!resolvedRoleName || resolvedRoleName.toLowerCase() === 'employee') {
           resolvedRoleName = 'Team Leader';
         }
-      }
-      // 2. HR Detection (check before admin so HR is never misclassified as admin)
-      else if (
-        normalizedRoleName === 'hr' ||
-        normalizedRoleName === 'hr manager' ||
-        normalizedRoleName === 'human resource' ||
-        normalizedRoleName === 'human resources' ||
-        normalizedRoleName === 'hr executive' ||
-        normalizedRoleName === 'hr admin' ||
-        normalizedRoleName.startsWith('hr') ||
-        /\bhr\b/i.test(normalizedRoleName) ||
-        /\bhr\b/i.test(designationStr) ||
-        departmentStr === 'hr' ||
-        departmentStr === 'human resource' ||
-        departmentStr === 'human resources'
-      ) {
-        determinedRole = 'hr';
-        if (!resolvedRoleName) resolvedRoleName = 'HR Manager';
       }
       // 3. Trainee Detection (treated as standard Employee)
       else if (
@@ -1650,14 +1640,22 @@ export const AppProvider = ({ children }) => {
             'view_dashboard',
             'manage_monitoring',
             'view_screenshots',
+            'manage_employees',
             'view_employees',
             'manage_team_leaves',
+            'manage_checkin_requests',
+            'manage_attendance_logs',
+            'manage_adjustments',
+            'manage_holidays',
             'view_attendance',
             'view_salary',
             'view_performance',
             'view_holidays',
             'view_profile',
-            'view_reports'
+            'view_reports',
+            'manage_applications',
+            'manage_positions',
+            'manage_contacts'
           ];
         } else if (determinedRole === 'team_leader') {
           permissions = [
@@ -1701,9 +1699,7 @@ export const AppProvider = ({ children }) => {
         )
       });
       setRolePermissions(permissions);
-      if (determinedRole === 'hr') {
-        setCurrentTabState('admin-leave-requests');
-      } else if (determinedRole === 'admin') {
+      if (determinedRole === 'hr' || determinedRole === 'admin') {
         setCurrentTabState('admin-dashboard');
       } else {
         setCurrentTabState('dashboard');
@@ -1715,9 +1711,7 @@ export const AppProvider = ({ children }) => {
       setUserRole(fallback);
       localStorage.setItem('user_role', fallback);
       localStorage.setItem('active_role', fallback);
-      if (fallback === 'hr') {
-        setCurrentTabState('admin-leave-requests');
-      } else if (fallback === 'admin') {
+      if (fallback === 'hr' || fallback === 'admin') {
         setCurrentTabState('admin-dashboard');
       } else {
         setCurrentTabState('dashboard');
@@ -1745,9 +1739,7 @@ export const AppProvider = ({ children }) => {
       employee: 'Employee'
     };
     setRoleDetails({ roleName: roleLabels[newRole] || 'Employee' });
-    if (newRole === 'hr') {
-      setCurrentTabState('admin-leave-requests');
-    } else if (newRole === 'admin') {
+    if (newRole === 'hr' || newRole === 'admin') {
       setCurrentTabState('admin-dashboard');
     } else {
       setCurrentTabState('dashboard');
@@ -1892,9 +1884,7 @@ export const AppProvider = ({ children }) => {
     }
 
     // Direct user to appropriate landing view strictly as per role
-    if (determined === 'hr') {
-      setCurrentTabState('admin-leave-requests');
-    } else if (determined === 'admin') {
+    if (determined === 'hr' || determined === 'admin') {
       setCurrentTabState('admin-dashboard');
     } else {
       setCurrentTabState('dashboard');

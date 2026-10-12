@@ -19,11 +19,6 @@ export const Sidebar = ({ onSignOut }) => {
   const navigate = useNavigate();
 
   const handleNavClick = (tab) => {
-    if (userRole === 'hr' && tab !== 'admin-screenshots' && tab !== 'admin-leave-requests') {
-      setCurrentTab('admin-leave-requests');
-      setIsMobileSidebarOpen(false);
-      return;
-    }
     setCurrentTab(tab);
     if (tabToPath && tabToPath[tab]) {
       navigate(tabToPath[tab]);
@@ -87,15 +82,49 @@ export const Sidebar = ({ onSignOut }) => {
 
   const HR_SECTIONS = [
     {
-      title: "Leave Approvals",
+      title: "Overview",
       items: [
-        { tab: 'admin-leave-requests', label: 'Leave Requests', icon: CalendarDays }
+        { tab: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { tab: 'admin-performance', label: 'Performance', icon: Award },
       ]
     },
     {
-      title: "Monitoring",
+      title: "Attendance & Leaves",
       items: [
-        { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: Camera }
+        { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: FileText },
+        { tab: 'admin-checkin-requests', label: 'Check-In Requests', icon: Clock },
+        { tab: 'admin-leave-requests', label: 'Leave Requests', icon: CalendarX },
+        { tab: 'admin-adjustments', label: 'Adjustments', icon: Settings },
+        { tab: 'admin-holidays', label: 'Holidays & Events', icon: Umbrella },
+      ]
+    },
+    {
+      title: "People & Organization",
+      items: [
+        { tab: 'admin-employees', label: 'Employees', icon: Users },
+        { tab: 'admin-employee-requests', label: 'Employee Requests', icon: UserCheck },
+        { tab: 'admin-members', label: 'Team Members', icon: Users },
+        { tab: 'salary', label: 'Salary & Payroll', icon: Wallet },
+      ]
+    },
+    {
+      title: "Monitoring & Security",
+      items: [
+        { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: Camera },
+      ]
+    },
+    {
+      title: "Recruitment & Hiring",
+      items: [
+        { tab: 'admin-applications', label: 'Applications', icon: FileText },
+        { tab: 'admin-positions', label: 'Positions', icon: Briefcase },
+        { tab: 'admin-contacts', label: 'Contacts', icon: Users },
+      ]
+    },
+    {
+      title: "Account",
+      items: [
+        { tab: 'profile', label: 'Profile', icon: User },
       ]
     }
   ];

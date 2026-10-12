@@ -2,10 +2,6 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useConfirm } from "../components/common/ConfirmDialog";
 import {
   BarChart3,
-  Users,
-  TrendingUp,
-  UserCheck,
-  Clock,
   FileText,
   Plus,
   Search,
@@ -32,11 +28,105 @@ const DEPARTMENTS = [
   "HR"
 ];
 
+// Storage keys for cross-role persistence and sync
+const PERF_CACHE_KEY = "kt_performance_all_records";
+const PERF_STORE_KEY = "kt_performance_records_store";
+
+// Helper to identify and purge any dummy/synthetic performance records
+const isDummyPerformanceRecord = (p) => {
+  if (!p) return true;
+  const id = String(p._id || p.id || "");
+  if (
+    id.startsWith("perf-auto-") ||
+    id.startsWith("perf-baseline-") ||
+    id.startsWith("perf-dummy-")
+  ) {
+    return true;
+  }
+  return false;
+};
+
+// Retrieve all stored & synchronized performances (ONLY real reviews, no dummy data)
+const getStoredPerformances = () => {
+  try {
+    const rawStore = localStorage.getItem(PERF_STORE_KEY);
+    const rawCache = localStorage.getItem(PERF_CACHE_KEY);
+
+    let storeList = rawStore ? JSON.parse(rawStore) : [];
+    let cacheList = rawCache ? JSON.parse(rawCache) : [];
+
+    if (!Array.isArray(storeList)) storeList = [];
+    if (!Array.isArray(cacheList)) cacheList = [];
+
+    // Filter out any dummy/synthetic records
+    const cleanStore = storeList.filter((p) => !isDummyPerformanceRecord(p));
+    const cleanCache = cacheList.filter((p) => !isDummyPerformanceRecord(p));
+
+    // Persist cleaned stores if dummy data was purged
+    if (cleanStore.length !== storeList.length || cleanCache.length !== cacheList.length) {
+      try {
+        localStorage.setItem(PERF_STORE_KEY, JSON.stringify(cleanStore));
+        localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(cleanCache));
+      } catch { }
+    }
+
+    const mergedMap = new Map();
+    [...cleanStore, ...cleanCache].forEach((p) => {
+      if (!p || isDummyPerformanceRecord(p)) return;
+      const key = String(p._id || `${p.employeeEmail || p.employeeName || 'emp'}-${p.createdAt || ''}`);
+      mergedMap.set(key, p);
+    });
+
+    return Array.from(mergedMap.values());
+  } catch {
+    return [];
+  }
+};
+
+const saveToPersistentStore = (newRecord) => {
+  try {
+    const existing = getStoredPerformances();
+    const key = String(newRecord._id || `${newRecord.employeeID || newRecord.employeeEmail || 'emp'}-${newRecord.createdAt || ''}`);
+    const updated = [newRecord, ...existing.filter((p) => String(p._id || `${p.employeeID || p.employeeEmail || 'emp'}-${p.createdAt || ''}`) !== key)];
+    localStorage.setItem(PERF_STORE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return [];
+  }
+};
+
+const updateInPersistentStore = (updatedRecord) => {
+  try {
+    const existing = getStoredPerformances();
+    const id = String(updatedRecord._id);
+    const updated = existing.map((p) => (String(p._id) === id ? { ...p, ...updatedRecord } : p));
+    localStorage.setItem(PERF_STORE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return [];
+  }
+};
+
+const deleteFromPersistentStore = (perfId) => {
+  try {
+    const existing = getStoredPerformances();
+    const id = String(perfId);
+    const updated = existing.filter((p) => String(p._id) !== id);
+    localStorage.setItem(PERF_STORE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return [];
+  }
+};
+
 const Performance = () => {
   const { user, userRole } = useApp();
   const normalizedRole = String(userRole || deriveUserRole(user) || "").toLowerCase().trim();
   const isAdmin = normalizedRole === "admin";
   const isTL = normalizedRole === "teamlead" || normalizedRole === "team_lead" || normalizedRole === "tl";
+
+  // Team Lead view scope: 'my' (own performance) vs 'team' (team members)
+  const [tlViewScope, setTlViewScope] = useState("my");
 
   const { confirm, confirmationDialog } = useConfirm();
   const headers = useMemo(() => {
@@ -72,45 +162,119 @@ const Performance = () => {
   });
 
   // ============================================================
-  // FETCH ALL PERFORMANCES (LIVE API)
+  // FETCH ALL PERFORMANCES (LIVE API + SYNCHRONIZED STORAGE)
   // ============================================================
   const fetchAllPerformances = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/performance/all",
-        { headers }
-      );
+      if (isAdmin) {
+        // Admin: Call live GET /api/performance/all (Admin role has full clearance)
+        const response = await fetch(
+          "https://kt-backend-yzr4.onrender.com/api/performance/all",
+          { headers }
+        );
 
-      if (response.ok) {
-        const data = await response.json();
-        const rawPerfs = Array.isArray(data.data)
-          ? data.data
-          : Array.isArray(data.performances)
-            ? data.performances
-            : Array.isArray(data)
-              ? data
-              : [];
+        if (response.ok) {
+          const data = await response.json();
+          const rawPerfs = Array.isArray(data.data)
+            ? data.data
+            : Array.isArray(data.performances)
+              ? data.performances
+              : Array.isArray(data)
+                ? data
+                : [];
 
-        const filteredPerfs = rawPerfs.filter((perf) => {
-          if (!perf) return false;
-          if (isFinanceOrExcludedUser(perf)) return false;
-          if (perf.employeeID && isFinanceOrExcludedUser(perf.employeeID)) return false;
-          if (perf.employee && isFinanceOrExcludedUser(perf.employee)) return false;
-          return true;
-        });
+          const filteredPerfs = rawPerfs.filter((perf) => {
+            if (!perf || isDummyPerformanceRecord(perf)) return false;
+            if (isFinanceOrExcludedUser(perf)) return false;
+            if (perf.employeeID && isFinanceOrExcludedUser(perf.employeeID)) return false;
+            if (perf.employee && isFinanceOrExcludedUser(perf.employee)) return false;
+            return true;
+          });
 
-        setPerformances(filteredPerfs);
+          // Save real live records to localStorage for cross-session & employee sync
+          try {
+            localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(filteredPerfs));
+            localStorage.setItem(PERF_STORE_KEY, JSON.stringify(filteredPerfs));
+          } catch { }
+
+          setPerformances(filteredPerfs);
+          return;
+        } else {
+          // If admin fetch failed, fall back to clean stored performances
+          const stored = getStoredPerformances();
+          setPerformances(stored);
+          return;
+        }
       } else {
-        setPerformances([]);
+        // ============================================================
+        // EMPLOYEE & TEAM LEAD:
+        // Attempt candidate user endpoints or load from real stored records
+        // ============================================================
+        const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").trim();
+        let fetchedData = null;
+
+        if (myId) {
+          const candidateEndpoints = [
+            `https://kt-backend-yzr4.onrender.com/api/performance/user/${myId}`,
+            `https://kt-backend-yzr4.onrender.com/api/performance/employee/${myId}`,
+            `https://kt-backend-yzr4.onrender.com/api/performance/${myId}`,
+            "https://kt-backend-yzr4.onrender.com/api/performance/my"
+          ];
+
+          for (const ep of candidateEndpoints) {
+            try {
+              const res = await fetch(ep, { headers });
+              if (res.ok) {
+                const json = await res.json();
+                const list = Array.isArray(json.data)
+                  ? json.data
+                  : Array.isArray(json.performances)
+                    ? json.performances
+                    : Array.isArray(json)
+                      ? json
+                      : (json && typeof json === "object" && (json._id || json.performancePercentage))
+                        ? [json]
+                        : [];
+                const cleanList = list.filter((p) => !isDummyPerformanceRecord(p));
+                if (cleanList.length > 0) {
+                  fetchedData = cleanList;
+                  break;
+                }
+              }
+            } catch {
+              // Ignore candidate endpoint failure
+            }
+          }
+        }
+
+        // Get synchronized real records from persistent storage
+        const stored = getStoredPerformances();
+        let allAvailable = [...stored];
+        if (fetchedData && fetchedData.length > 0) {
+          const mergedMap = new Map();
+          allAvailable.forEach((p) => {
+            if (p && !isDummyPerformanceRecord(p)) mergedMap.set(String(p._id || `${p.employeeEmail}-${p.createdAt}`), p);
+          });
+          fetchedData.forEach((p) => {
+            if (p && !isDummyPerformanceRecord(p)) mergedMap.set(String(p._id || `${p.employeeEmail}-${p.createdAt}`), p);
+          });
+          allAvailable = Array.from(mergedMap.values());
+          try {
+            localStorage.setItem(PERF_STORE_KEY, JSON.stringify(allAvailable));
+          } catch { }
+        }
+
+        setPerformances(allAvailable);
       }
     } catch (err) {
       console.error("Backend performance fetch error:", err);
-      setPerformances([]);
+      const stored = getStoredPerformances();
+      setPerformances(stored);
     } finally {
       setLoading(false);
     }
-  }, [headers]);
+  }, [headers, isAdmin, user]);
 
   // ============================================================
   // FETCH REAL EMPLOYEES (ONLY LIVE USERS, NO DUMMY DATA)
@@ -355,19 +519,22 @@ const Performance = () => {
   const isMyRecord = useCallback((perf) => {
     if (!perf) return false;
     const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").toLowerCase().trim();
+    const myUniqueId = String(user?.uniqueID || user?.employeeID || user?.uniqueId || user?.empId || "").toLowerCase().trim();
     const myEmail = String(user?.email || "").toLowerCase().trim();
     const myName = String(user?.name || user?.fullName || "").toLowerCase().trim();
 
-    // 1. Check ID match
+    // 1. Check ID / UniqueID match
     const perfEmpId = String(
-      (typeof perf.employeeID === "object" ? (perf.employeeID?._id || perf.employeeID?.id || perf.employeeID?.userId) : perf.employeeID) ||
-      (typeof perf.employee === "object" ? (perf.employee?._id || perf.employee?.id || perf.employee?.userId) : perf.employee) ||
+      (typeof perf.employeeID === "object" ? (perf.employeeID?._id || perf.employeeID?.id || perf.employeeID?.userId || perf.employeeID?.uniqueID) : perf.employeeID) ||
+      (typeof perf.employee === "object" ? (perf.employee?._id || perf.employee?.id || perf.employee?.userId || perf.employee?.uniqueID) : perf.employee) ||
       perf.employeeId ||
       perf.userId ||
+      perf.uniqueID ||
       ""
     ).toLowerCase().trim();
 
-    if (myId && perfEmpId && myId === perfEmpId) return true;
+    if (myId && perfEmpId && (myId === perfEmpId || perfEmpId.includes(myId) || myId.includes(perfEmpId))) return true;
+    if (myUniqueId && perfEmpId && (myUniqueId === perfEmpId || perfEmpId.includes(myUniqueId))) return true;
 
     // 2. Check Email match
     const perfEmail = String(
@@ -395,13 +562,16 @@ const Performance = () => {
     return false;
   }, [user]);
 
-  // Role-isolated performances: Admin sees all; Employee and TL see ONLY their own records
+  // Role-isolated performances: Admin sees all; TL can toggle personal vs team; Employee sees their records
   const myPerformances = useMemo(() => {
     if (isAdmin) {
       return performances;
     }
+    if (isTL && tlViewScope === "team") {
+      return performances;
+    }
     return performances.filter(isMyRecord);
-  }, [performances, isAdmin, isMyRecord]);
+  }, [performances, isAdmin, isTL, tlViewScope, isMyRecord]);
 
   // ============================================================
   // PERFORMANCE METRICS CALCULATION (PURELY DYNAMIC)
@@ -628,6 +798,15 @@ const Performance = () => {
           throw new Error(errData.message || "Failed to update performance record");
         }
 
+        const updatedData = {
+          ...editingRecord,
+          remarks: modalForm.remarks,
+          performancePercentage: pct,
+          percentage: pct,
+          department: modalForm.department
+        };
+        updateInPersistentStore(updatedData);
+
         showNotification("Performance record updated successfully!", "success");
         setIsEditModalOpen(false);
         setEditingRecord(null);
@@ -653,6 +832,27 @@ const Performance = () => {
         if (!response.ok) {
           throw new Error(data.message || "Failed to submit performance record");
         }
+
+        const selectedEmp = employees.find((e) => String(e._id) === String(modalForm.employeeID));
+        const createdRecord = data.data || data.performance || {
+          _id: data.id || data._id || `perf-${Date.now()}`,
+          employeeID: {
+            _id: modalForm.employeeID,
+            name: selectedEmp?.name || "Employee",
+            fullName: selectedEmp?.name || "Employee",
+            email: selectedEmp?.email || "",
+            department: modalForm.department || "Development",
+            role: selectedEmp?.role || "employee"
+          },
+          employeeName: selectedEmp?.name || "Employee",
+          employeeEmail: selectedEmp?.email || "",
+          department: modalForm.department || "Development",
+          performancePercentage: pct,
+          percentage: pct,
+          remarks: modalForm.remarks || "",
+          createdAt: new Date().toISOString()
+        };
+        saveToPersistentStore(createdRecord);
 
         showNotification("Performance submitted successfully!", "success");
         setIsAddModalOpen(false);
@@ -694,6 +894,7 @@ const Performance = () => {
         throw new Error("Failed to delete performance");
       }
 
+      deleteFromPersistentStore(perf._id);
       showNotification(`Performance record for ${employeeName} deleted successfully!`, "success");
       await fetchAllPerformances();
     } catch (err) {
@@ -834,18 +1035,49 @@ const Performance = () => {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                {isAdmin ? "Performance History" : "My Performance History"}
+                {isAdmin
+                  ? "Performance History"
+                  : isTL && tlViewScope === "team"
+                    ? "Team Performance History"
+                    : "My Performance History"}
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 {isAdmin
                   ? "View and manage employee performance records"
-                  : "Personal performance evaluations and review remarks"}
+                  : isTL && tlViewScope === "team"
+                    ? "Performance evaluations and review remarks for your team members"
+                    : "Personal performance evaluations and review remarks"}
               </p>
             </div>
           </div>
 
-          {isAdmin && (
-            <div className="flex items-center gap-2.5 self-end sm:self-auto">
+          <div className="flex items-center gap-2.5 self-end sm:self-auto">
+            {isTL && (
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setTlViewScope("my")}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${tlViewScope === "my"
+                      ? "bg-white text-indigo-600 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                    }`}
+                >
+                  My Performance
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTlViewScope("team")}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${tlViewScope === "team"
+                      ? "bg-white text-indigo-600 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                    }`}
+                >
+                  Team Members
+                </button>
+              </div>
+            )}
+
+            {isAdmin && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
@@ -854,8 +1086,8 @@ const Performance = () => {
                 <Plus size={15} />
                 <span>Add Performance</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Filter Toolbar: Search, Dept, Status, Month/Year */}

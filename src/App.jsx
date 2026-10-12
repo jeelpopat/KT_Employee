@@ -57,27 +57,14 @@ const MainLayout = ({ handleSignOut }) => {
   const { currentTab, userRole, setCurrentTab, isRoleAllowed: roleCheck } = useApp();
   const location = useLocation();
 
-  // If user is HR, ensure active tab is one of their allowed tabs
-  useEffect(() => {
-    if (userRole === 'hr' && currentTab !== 'admin-screenshots' && currentTab !== 'admin-leave-requests') {
-      setCurrentTab('admin-leave-requests');
-    }
-  }, [userRole, currentTab, setCurrentTab]);
-
   // Synchronize URL route with currentTab
   useEffect(() => {
     const path = location.pathname;
     const mapped = pathToTab[path];
     if (mapped && mapped !== currentTab) {
-      if (userRole === 'hr') {
-        if (mapped === 'admin-leave-requests' || mapped === 'admin-screenshots') {
-          setCurrentTab(mapped);
-        } else {
-          setCurrentTab('admin-leave-requests');
-        }
-      } else if (userRole === 'admin' && (mapped === 'dashboard' || path === '/')) {
+      if ((userRole === 'admin' || userRole === 'hr') && (mapped === 'dashboard' || path === '/')) {
         setCurrentTab('admin-dashboard');
-      } else if (userRole !== 'admin' && (mapped === 'admin-dashboard' || path === '/admin' || path === '/admin/dashboard')) {
+      } else if (userRole !== 'admin' && userRole !== 'hr' && (mapped === 'admin-dashboard' || path === '/admin' || path === '/admin/dashboard')) {
         setCurrentTab('dashboard');
       } else {
         setCurrentTab(mapped);
@@ -114,13 +101,6 @@ const MainLayout = ({ handleSignOut }) => {
   }
 
   const renderActiveTab = () => {
-    // HR portal includes Leave Requests and Screenshot Monitoring
-    if (userRole === 'hr') {
-      if (currentTab === 'admin-screenshots') {
-        return <AdminScreenshotPortal />;
-      }
-      return <AdminLeaveRequestsView />;
-    }
 
     switch (currentTab) {
       // Admin Specific Modules
@@ -145,7 +125,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'admin-contacts': return <AdminContactsView />;
 
       // Existing Modules
-      case 'dashboard': return userRole === 'admin' ? <AdminDashboardView /> : <DashboardView />;
+      case 'dashboard': return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;
       case 'attendance': return <AttendanceView />;
       case 'daily-report': return <DailyReportView />;
       case 'tasks': return <TaskManagementView />;
@@ -159,17 +139,17 @@ const MainLayout = ({ handleSignOut }) => {
       case 'admin-performance':
       case 'performance': return <AdminPerformanceView />;
       case 'projects': return <ProjectView />;
-      case 'holiday': return userRole === 'admin' ? <AdminHolidaysView /> : <HolidayCalendarView />;
-      case 'team-members': return userRole === 'admin' ? <AdminMembersView /> : <TeamMembersView />;
-      case 'employees': return userRole === 'admin' ? <AdminEmployeesView /> : <EmployeesView />;
+      case 'holiday': return (userRole === 'admin' || userRole === 'hr') ? <AdminHolidaysView /> : <HolidayCalendarView />;
+      case 'team-members': return (userRole === 'admin' || userRole === 'hr') ? <AdminMembersView /> : <TeamMembersView />;
+      case 'employees': return (userRole === 'admin' || userRole === 'hr') ? <AdminEmployeesView /> : <EmployeesView />;
       case 'learning-hub': return <LearningHubView />;
       case 'documents': return <DocumentsView />;
       case 'daily-follow-up': return <DailyFollowUpView />;
       case 'team-tasks': return <AdminTeamTasksView />;
-      case 'team-leaves': return userRole === 'admin' ? <AdminLeaveRequestsView /> : <TeamLeaveManagementView />;
+      case 'team-leaves': return (userRole === 'admin' || userRole === 'hr') ? <AdminLeaveRequestsView /> : <TeamLeaveManagementView />;
       case 'report': return <ReportView />;
 
-      default: return userRole === 'admin' ? <AdminDashboardView /> : <DashboardView />;
+      default: return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;
     }
   };
 

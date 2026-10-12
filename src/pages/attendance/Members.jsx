@@ -439,10 +439,12 @@ const fetchAllMembers = async () => {
           .trim();
 
         const roleType =
-          role === 'teamlead' ||
-          role === 'team lead' ||
-          role === 'team_lead' ||
-          role === 'tl'
+          role === 'hr'
+            ? 'hr'
+            : role === 'teamlead' ||
+              role === 'team lead' ||
+              role === 'team_lead' ||
+              role === 'tl'
             ? 'tl'
             : 'employee';
 
@@ -464,7 +466,9 @@ const fetchAllMembers = async () => {
         // DESIGNATION
         // --------------------------------------
         let designation =
-          roleType === 'tl'
+          roleType === 'hr'
+            ? 'HR'
+            : roleType === 'tl'
             ? 'Team Lead'
             : 'Employee';
 
@@ -940,6 +944,7 @@ const fetchAllMembers = async () => {
 
   const getRoleLabel = (role) => {
     const labels = {
+      'hr': 'HR',
       'tl': 'Team Leads',
       'employee': 'Employees',
       'all': 'All Roles'
@@ -949,6 +954,7 @@ const fetchAllMembers = async () => {
 
   const getRoleIcon = (roleType) => {
     const icons = {
+      'hr': <BadgeCheck className="w-3.5 h-3.5" />,
       'tl': <Star className="w-3.5 h-3.5" />,
       'employee': <Building2 className="w-3.5 h-3.5" />
     };
@@ -957,6 +963,7 @@ const fetchAllMembers = async () => {
 
   const getRoleBadgeStyle = (roleType) => {
     const styles = {
+      'hr': 'bg-purple-50 text-purple-700 border-purple-300',
       'tl': 'bg-amber-50 text-amber-700 border-amber-300',
       'employee': 'bg-blue-50 text-blue-700 border-blue-300'
     };
@@ -1010,6 +1017,24 @@ const fetchAllMembers = async () => {
               selectedRole === 'tl' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
             }`}>
               {members.filter(m => m.roleType === 'tl').length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedRole('hr')}
+            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              selectedRole === 'hr'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'bg-purple-50 text-purple-700 hover:bg-purple-100/80 border border-purple-200/80 shadow-xs'
+            }`}
+          >
+            <BadgeCheck className="w-3.5 h-3.5" />
+            <span>HR</span>
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+              selectedRole === 'hr' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+            }`}>
+              {members.filter(m => m.roleType === 'hr').length}
             </span>
           </button>
 
