@@ -3,14 +3,45 @@ import { useConfirm } from '../../components/common/ConfirmDialog';
 
 const API_BASE = 'https://kt-backend-yzr4.onrender.com/api/holiday';
 
-const normalizeHoliday = (holiday) => {
-  let dateStr = holiday.holidayDate || holiday.date || '';
-  if (dateStr.length >= 10) {
-    dateStr = dateStr.slice(0, 10);
+const toStandardDateString = (input) => {
+  if (!input) return '';
+  const str = String(input).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
   }
+  if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+    return str.slice(0, 10);
+  }
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return str.slice(0, 10);
+};
+
+const parseHolidayDate = (dateStr) => {
+  if (!dateStr) return null;
+  const parts = String(dateStr).split('-');
+  if (parts.length >= 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2].slice(0, 2), 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return new Date(y, m, d);
+    }
+  }
+  const fallback = new Date(dateStr);
+  return isNaN(fallback.getTime()) ? null : fallback;
+};
+
+const normalizeHoliday = (holiday) => {
+  const rawDate = holiday.holidayDate || holiday.date || '';
   return {
-    id: holiday._id || holiday.id,
-    date: dateStr,
+    id: holiday._id || holiday.id || String(Math.random()),
+    date: toStandardDateString(rawDate),
     title: holiday.holidayName || holiday.title || holiday.name || '',
   };
 };
@@ -36,6 +67,7 @@ export default function Holidays() {
   const [view, setView] = useState('calendar');
   const [showModal, setShowModal] = useState(false);
   const titleInputRef = useRef(null);
+  const dateInputRef = useRef(null);
 
   const fetchHolidays = async () => {
     setLoading(true);
@@ -73,11 +105,45 @@ export default function Holidays() {
     if (shouldClose) setShowModal(false);
   };
 
+  const handleOpenDatePicker = () => {
+    try {
+      if (dateInputRef.current) {
+        if (typeof dateInputRef.current.showPicker === 'function') {
+          dateInputRef.current.showPicker();
+        } else {
+          dateInputRef.current.focus();
+        }
+      }
+    } catch {
+      dateInputRef.current?.focus();
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showModal) {
+        resetForm();
+      }
+    };
+    if (showModal) {
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showModal]);
+
   const openAddHolidayModal = (selectedDate = '') => {
     resetForm(false);
-    if (selectedDate) setDate(selectedDate); 
+    if (selectedDate) {
+      setDate(toStandardDateString(selectedDate));
+    }
     setShowModal(true);
-    setTimeout(() => titleInputRef.current?.focus(), 50);
+    setTimeout(() => {
+      titleInputRef.current?.focus();
+    }, 50);
   };
  
   const handleSubmit = async (e) => { 
@@ -139,10 +205,13 @@ export default function Holidays() {
 
   const handleEdit = (holiday) => {
     setEditingId(holiday.id);
-    setDate(holiday.date);
+    setDate(toStandardDateString(holiday.date));
     setTitle(holiday.title);
+    setError('');
     setShowModal(true);
-    setTimeout(() => titleInputRef.current?.focus(), 50);
+    setTimeout(() => {
+      titleInputRef.current?.focus();
+    }, 50);
   };
 
   const handleDelete = async (id) => {
@@ -484,96 +553,6 @@ export default function Holidays() {
     );
   };
 
-  const HolidayModal = () => {
-    if (!showModal) return null;
-
-    return (
-      <div className="fixed inset-0 z-50 overflow-y-auto">
-        <div className="flex items-center justify-center min-h-screen px-3 sm:px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-          <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div className="absolute inset-0 bg-slate-900/75" onClick={resetForm}></div>
-          </div>
-
-          <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-          <div className="inline-block align-bottom bg-white text-left shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full w-full max-w-md border border-slate-200/80 rounded-xl overflow-hidden">
-            <div className="bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-4 sm:pb-6">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-                  {editingId ? 'Edit Holiday' : 'Add New Holiday'}
-                </h3>
-                <button
-                  onClick={resetForm}
-                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {error && (
-                <div className="mb-3 sm:mb-4 border border-red-300 bg-red-50 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-xs sm:text-sm text-red-700">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1 sm:mb-1.5">Select Date</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full border border-slate-300 p-2 sm:p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-lg bg-white text-slate-900 transition-all"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1 sm:mb-1.5">Holiday Title</label>
-                  <input
-                    ref={titleInputRef}
-                    type="text"
-                    placeholder="e.g. Diwali, Christmas..."
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && title.trim()) {
-                        e.preventDefault();
-                        handleSubmit(e);
-                      }
-                    }}
-                    className="w-full border border-slate-300 p-2 sm:p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-lg bg-white text-slate-900 transition-all"
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 sm:pt-4">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 sm:py-3 px-4 text-sm rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 sm:py-3 px-4 text-sm rounded-lg disabled:cursor-not-allowed disabled:opacity-70 transition-colors"
-                  >
-                    {isSubmitting ? 'Saving...' : editingId ? 'Update Holiday' : 'Add Holiday'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {confirmationDialog}
@@ -652,19 +631,18 @@ export default function Holidays() {
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       {sortedHolidays.map((holiday) => {
-                        const [hYear, hMonth, hDay] = holiday.date.split('-').map(Number);
-                        const holidayDate = new Date(hYear, hMonth - 1, hDay);
-                        const isWeekend = holidayDate.getDay() === 0 || isSecondOrFourthSaturday(holidayDate);
+                        const holidayDate = parseHolidayDate(holiday.date);
+                        const isWeekend = holidayDate ? (holidayDate.getDay() === 0 || isSecondOrFourthSaturday(holidayDate)) : false;
                         return (
                           <tr key={holiday.id} className={`${isWeekend ? 'bg-slate-100' : 'hover:bg-slate-50'} transition-colors`}>
                             <td className="px-3 sm:px-4 py-2.5 font-medium text-slate-900 whitespace-nowrap text-[11px] sm:text-sm">
-                              {holiday.date
+                              {holidayDate
                                 ? holidayDate.toLocaleDateString('en-US', {
                                     day: '2-digit',
                                     month: 'short',
                                     year: 'numeric',
                                   })
-                                : '-'}
+                                : holiday.date || '-'}
                             </td>
                             <td className="px-3 sm:px-4 py-2.5">
                               <span className="inline-flex items-center gap-2">
@@ -711,7 +689,136 @@ export default function Holidays() {
         </div>
       </div>
 
-      <HolidayModal />
+      {/* Add / Edit Holiday Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          {/* Backdrop: placed BEHIND modal dialog */}
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-fade-in"
+            onClick={resetForm}
+          />
+
+          {/* Modal Dialog Container: centered, placed ABOVE backdrop */}
+          <div className="flex min-h-full items-center justify-center p-3 sm:p-4 text-center">
+            <div
+              className="relative bg-white text-left shadow-2xl rounded-2xl border border-slate-200/90 w-full max-w-md overflow-hidden z-10 my-8 transition-all"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 sm:p-6 bg-white">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4 sm:mb-5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 text-lg shadow-2xs">
+                      📅
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                        {editingId ? 'Edit Holiday' : 'Add New Holiday'}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {editingId ? 'Update holiday details and date' : 'Schedule a new office closure date'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                    title="Close modal"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="mb-4 border border-rose-200 bg-rose-50 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-rose-700 font-medium flex items-center gap-2">
+                    <svg className="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs sm:text-sm font-semibold text-slate-700">
+                        Select Date <span className="text-rose-500">*</span>
+                      </label>
+                      {date && (
+                        <span className="text-2xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                          {parseHolidayDate(date)?.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        ref={dateInputRef}
+                        type="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="w-full border border-slate-300 pl-3.5 pr-10 py-2.5 text-sm rounded-xl bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer shadow-2xs [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        required
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-2xs text-slate-400">
+                      Click anywhere on the box to select date
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
+                      Holiday Title <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      ref={titleInputRef}
+                      type="text"
+                      placeholder="e.g. Diwali, Christmas..."
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && title.trim()) {
+                          e.preventDefault();
+                          handleSubmit(e);
+                        }
+                      }}
+                      className="w-full border border-slate-300 px-3.5 py-2.5 text-sm rounded-xl bg-white text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-2xs"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-3">
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 px-4 text-sm rounded-xl transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 text-sm rounded-xl disabled:cursor-not-allowed disabled:opacity-70 transition-colors shadow-xs hover:shadow cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting && (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      )}
+                      <span>{isSubmitting ? 'Saving...' : editingId ? 'Update Holiday' : 'Add Holiday'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

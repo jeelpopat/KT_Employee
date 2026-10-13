@@ -95,14 +95,27 @@ const getDistinctAssignedEmployees = (rawList = [], empList = []) => {
 };
 
 // Modal Component for Assignments
-const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, departmentName }) => {
+const AssignmentModal = ({
+  isOpen,
+  onClose,
+  lead,
+  employees = [],
+  teamLeads = [],
+  assignedEmployees = {},
+  onSave,
+  departmentName,
+}) => {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState("all"); // 'all' | 'available' | 'current' | 'other'
 
   useEffect(() => {
     if (lead && isOpen) {
       const distinct = getDistinctAssignedEmployees(lead.assignedEmployees || [], employees);
-      setSelectedEmployees(distinct.map(e => String(e._id)));
+      setSelectedEmployees(distinct.map((e) => String(e._id)));
+      setSearchQuery("");
+      setFilterType("all");
     }
   }, [lead, isOpen, employees]);
 
@@ -120,7 +133,7 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
       lead.teamLead?.userId,
       lead.teamLead?.employeeId,
       lead.user?._id,
-    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+    ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
 
     const personIds = [
       person._id,
@@ -129,18 +142,18 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
       person.userID,
       person.employeeId,
       person.employeeID,
-    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+    ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
 
     const leadEmails = [
       lead.email,
       lead.teamLead?.email,
       lead.user?.email,
-    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+    ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
 
     const personEmails = [
       person.email,
       person.user?.email,
-    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+    ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
 
     const leadNames = [
       lead.name,
@@ -149,20 +162,71 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
       lead.teamLead?.name,
       lead.teamLead?.firstName ? `${lead.teamLead.firstName} ${lead.teamLead.lastName || ''}`.trim() : null,
       lead.user?.name,
-    ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
+    ].filter(Boolean).map((x) => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
 
     const personNames = [
       person.name,
       person.fullName,
       person.firstName ? `${person.firstName} ${person.lastName || ''}`.trim() : null,
       person.user?.name,
-    ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
+    ].filter(Boolean).map((x) => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
 
-    const idMatch = personIds.some(id => leadIds.includes(id));
-    const emailMatch = personEmails.length > 0 && leadEmails.length > 0 && personEmails.some(e => leadEmails.includes(e));
-    const nameMatch = personNames.length > 0 && leadNames.length > 0 && personNames.some(n => leadNames.includes(n));
+    const idMatch = personIds.some((id) => leadIds.includes(id));
+    const emailMatch = personEmails.length > 0 && leadEmails.length > 0 && personEmails.some((e) => leadEmails.includes(e));
+    const nameMatch = personNames.length > 0 && leadNames.length > 0 && personNames.some((n) => leadNames.includes(n));
 
     return idMatch || emailMatch || nameMatch;
+  };
+
+  // Helper to check which Team Lead an employee is currently assigned to
+  const getAssignedLeadInfo = (person) => {
+    if (!person) return null;
+    const empKey = getCanonicalEmployeeKey(person, employees);
+    if (!empKey) return null;
+
+    const currentLeadAssociatedIds = [
+      lead?._id,
+      lead?.id,
+      lead?.teamLeadId,
+      lead?.userId,
+      lead?.employeeId,
+      lead?.rawTeamDocId,
+      lead?.teamLead?._id,
+      lead?.teamLead?.userId,
+      lead?.teamLead?.employeeId,
+    ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
+
+    for (const tl of (teamLeads || [])) {
+      const tlIds = [
+        tl._id,
+        tl.id,
+        tl.teamLeadId,
+        tl.userId,
+        tl.employeeId,
+        tl.rawTeamDocId,
+        tl.teamLead?._id,
+        tl.teamLead?.userId,
+        tl.teamLead?.employeeId,
+      ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
+
+      const isThisLead = isCurrentLead(tl) || tlIds.some((id) => currentLeadAssociatedIds.includes(id));
+
+      const assignedList = [
+        ...(assignedEmployees[tl._id] || []),
+        ...(tl.assignedEmployees || []),
+        ...tlIds.flatMap((id) => assignedEmployees[id] || [])
+      ];
+
+      const isAssigned = assignedList.some((id) => getCanonicalEmployeeKey(id, employees) === empKey);
+      if (isAssigned) {
+        return {
+          lead: tl,
+          isCurrentLead: isThisLead,
+          leadName: tl.name || tl.fullName || tl.teamLead?.name || tl.firstName || "Team Lead"
+        };
+      }
+    }
+    return null;
   };
 
   // Available Employees: Purely employees (NOT team lead, NOT admin, NOT finance, NOT current lead) - Deduplicated
@@ -180,7 +244,7 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
 
   const isEmployeeChecked = (emp) => {
     const empKey = getCanonicalEmployeeKey(emp, employees);
-    return selectedEmployees.some(id => getCanonicalEmployeeKey(id, employees) === empKey);
+    return selectedEmployees.some((id) => getCanonicalEmployeeKey(id, employees) === empKey);
   };
 
   const handleEmployeeToggle = (employeeId) => {
@@ -188,19 +252,39 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
     const matched = findEmployeeByIdOrUser(employeeId, employees);
     const canonicalId = matched ? String(matched._id) : String(employeeId);
 
-    setSelectedEmployees(prev => {
-      const exists = prev.some(id => getCanonicalEmployeeKey(id, employees) === empKey);
-      if (exists) {
-        return prev.filter(id => getCanonicalEmployeeKey(id, employees) !== empKey);
-      } else {
-        return [...prev, canonicalId];
+    const isCurrentlyChecked = selectedEmployees.some((id) => getCanonicalEmployeeKey(id, employees) === empKey);
+
+    if (isCurrentlyChecked) {
+      // Unchecking is always allowed
+      setSelectedEmployees((prev) => prev.filter((id) => getCanonicalEmployeeKey(id, employees) !== empKey));
+      return;
+    }
+
+    // Checking: enforce "every employee max have 1 TL"
+    const leadInfo = getAssignedLeadInfo(matched || employeeId);
+    if (leadInfo && !leadInfo.isCurrentLead) {
+      const empName = getDisplayName(matched || employeeId, 'employee');
+      const otherLeadName = leadInfo.leadName;
+      const currentLeadName = lead?.name || lead?.fullName || "this Team Lead";
+
+      const confirmTransfer = window.confirm(
+        `"${empName}" is currently assigned to Team Lead "${otherLeadName}".\n\n` +
+        `Rule: Every employee can have a maximum of 1 Team Lead (not more than 1 TL).\n\n` +
+        `Do you want to reassign "${empName}" to "${currentLeadName}"?\n` +
+        `(They will be moved to this Team Lead and removed from "${otherLeadName}")`
+      );
+
+      if (!confirmTransfer) {
+        return;
       }
-    });
+    }
+
+    setSelectedEmployees((prev) => [...prev, canonicalId]);
   };
 
   const handleSave = async () => {
     const distinct = getDistinctAssignedEmployees(selectedEmployees, employees);
-    const distinctIds = distinct.map(emp => String(emp._id));
+    const distinctIds = distinct.map((emp) => String(emp._id));
 
     if (distinctIds.length === 0) {
       alert("Please select at least one employee.");
@@ -216,8 +300,25 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
     onClose();
   };
 
+  const getEmployeeAssignmentStatus = (emp) => {
+    const isChecked = isEmployeeChecked(emp);
+    if (isChecked) {
+      return { status: 'current', label: 'Current Team' };
+    }
+    const leadInfo = getAssignedLeadInfo(emp);
+    if (leadInfo && !leadInfo.isCurrentLead) {
+      return { status: 'other', label: `TL: ${leadInfo.leadName}`, leadInfo };
+    }
+    return { status: 'available', label: 'Available' };
+  };
+
   const selectAll = () => {
-    setSelectedEmployees(availableEmployees.map(emp => String(emp._id)));
+    // Only select employees who are Available or already on Current Team
+    const safeEmployees = availableEmployees.filter((emp) => {
+      const { status } = getEmployeeAssignmentStatus(emp);
+      return status === 'available' || status === 'current';
+    });
+    setSelectedEmployees(safeEmployees.map((emp) => String(emp._id)));
   };
 
   const deselectAll = () => {
@@ -231,132 +332,272 @@ const AssignmentModal = ({ isOpen, onClose, lead, employees = [], onSave, depart
     return person.name || person.fullName || person.firstName || person.email || "Unnamed";
   };
 
+  // Filter & Search Logic
+  const filteredEmployees = availableEmployees.filter((emp) => {
+    const name = getDisplayName(emp, 'employee').toLowerCase();
+    const email = (emp.email || '').toLowerCase();
+    const code = (emp.employeeID || emp.employeeCode || '').toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+
+    if (q && !name.includes(q) && !email.includes(q) && !code.includes(q)) {
+      return false;
+    }
+
+    const { status } = getEmployeeAssignmentStatus(emp);
+    if (filterType === 'available') {
+      return status === 'available';
+    }
+    if (filterType === 'current') {
+      return status === 'current';
+    }
+    if (filterType === 'other') {
+      return status === 'other';
+    }
+    return true;
+  });
+
+  const unassignedCount = availableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'available').length;
+  const currentTeamCount = availableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'current').length;
+  const otherTLCount = availableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'other').length;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div 
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       ></div>
 
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-xl border border-slate-200/80 shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden">
+      <div className="flex min-h-full items-center justify-center p-3 sm:p-4">
+        <div className="relative bg-white rounded-2xl border border-slate-200/80 shadow-2xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4.5 text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="bg-white/20 p-2 rounded-lg">
+                <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-xs">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Assign Team Members</h2>
-                  <p className="text-blue-100 text-sm">
-                    Team Lead: {lead?.name || lead?.firstName || "Unnamed"}
+                  <h2 className="text-lg font-bold text-white">Assign Team Members</h2>
+                  <p className="text-blue-100 text-xs mt-0.5">
+                    Team Lead: <span className="font-semibold text-white">{lead?.name || lead?.firstName || "Unnamed"}</span>
                     {departmentName && departmentName !== "Unknown Department" && (
-                      <span className="ml-2">• Dept: {departmentName}</span>
+                      <span className="ml-2 bg-white/20 px-2 py-0.5 rounded-md font-medium">Dept: {departmentName}</span>
                     )}
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="text-white hover:bg-white/20 rounded-lg p-1.5 transition-colors"
+                className="text-white hover:bg-white/20 rounded-xl p-1.5 transition-colors cursor-pointer"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
           </div>
 
+          {/* Policy Banner */}
+          <div className="bg-indigo-50/90 border-b border-indigo-100 px-6 py-2.5 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-1.5 text-indigo-900 font-medium">
+              <span className="text-sm">🛡️</span>
+              <span><strong>1 TL Limit:</strong> Each employee max have 1 Team Lead.</span>
+            </div>
+            <span className="text-2xs bg-indigo-200/80 text-indigo-900 font-bold px-2 py-0.5 rounded-full">
+              Selected: {selectedEmployees.length}
+            </span>
+          </div>
+
           {/* Body */}
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-sm text-gray-500">
-                {availableEmployees.length} employees available
-              </span>
-              <div className="space-x-2">
+          <div className="p-5 sm:p-6 flex-1 flex flex-col min-h-0 overflow-hidden space-y-3">
+            {/* Search Bar */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name, email, or employee code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800 placeholder-slate-400"
+              />
+              <svg className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchQuery && (
                 <button
-                  onClick={selectAll}
-                  className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 hover:bg-purple-50 rounded transition-colors"
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
-                  Select All
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Filter Tabs & Quick Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg text-2xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setFilterType('all')}
+                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                    filterType === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({availableEmployees.length})
                 </button>
                 <button
+                  type="button"
+                  onClick={() => setFilterType('available')}
+                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                    filterType === 'available' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Unassigned ({unassignedCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterType('current')}
+                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                    filterType === 'current' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  This Team ({currentTeamCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterType('other')}
+                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                    filterType === 'other' ? 'bg-white text-amber-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Other TL ({otherTLCount})
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="text-2xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                  title="Select all unassigned employees and current team members"
+                >
+                  Select Available
+                </button>
+                <button
+                  type="button"
                   onClick={deselectAll}
-                  className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 hover:bg-red-50 rounded transition-colors"
+                  className="text-2xs text-rose-600 hover:text-rose-800 font-semibold px-2 py-1 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                 >
                   Deselect All
                 </button>
               </div>
             </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-1">
-              {availableEmployees.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">
-                  No employees available
-                </p>
+            {/* Scrollable Employee List */}
+            <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[300px]">
+              {filteredEmployees.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <p className="text-sm font-semibold">No employees match this filter</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Try clearing your search query or switching filters.</p>
+                </div>
               ) : (
-                availableEmployees.map((employee) => (
-                  <label
-                    key={employee._id}
-                    className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isEmployeeChecked(employee)}
-                      onChange={() => handleEmployeeToggle(employee._id)}
-                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        {getDisplayName(employee, 'employee')}
-                      </p>
-                      {employee.email && (
-                        <p className="text-xs text-gray-500 truncate">
-                          {employee.email}
-                        </p>
-                      )}
-                    </div>
-                    {employee.employeeID && (
-                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                        {employee.employeeID}
-                      </span>
-                    )}
-                  </label>
-                ))
+                filteredEmployees.map((employee) => {
+                  const statusInfo = getEmployeeAssignmentStatus(employee);
+                  const isChecked = statusInfo.status === 'current';
+                  const isOtherLead = statusInfo.status === 'other';
+
+                  return (
+                    <label
+                      key={employee._id}
+                      className={`flex items-center gap-3 p-2.5 sm:p-3 rounded-xl cursor-pointer transition-all border ${
+                        isChecked
+                          ? 'bg-purple-50/60 border-purple-200/90 shadow-xs'
+                          : isOtherLead
+                            ? 'bg-slate-50/50 hover:bg-amber-50/40 border-slate-200/80 hover:border-amber-200'
+                            : 'bg-white hover:bg-slate-50 border-slate-200/70 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleEmployeeToggle(employee._id)}
+                        className="w-4 h-4 text-purple-600 border-slate-300 rounded focus:ring-purple-500 cursor-pointer"
+                      />
+
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-100 to-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0 border border-slate-200/60">
+                        {(getDisplayName(employee, 'employee') || 'E').charAt(0).toUpperCase()}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
+                            {getDisplayName(employee, 'employee')}
+                          </p>
+                          {employee.employeeID && (
+                            <span className="text-2xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60 shrink-0">
+                              {employee.employeeID}
+                            </span>
+                          )}
+                        </div>
+                        {employee.email && (
+                          <p className="text-2xs text-slate-500 truncate">
+                            {employee.email}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Status Badges */}
+                      <div className="shrink-0 flex items-center">
+                        {statusInfo.status === 'current' ? (
+                          <span className="text-2xs font-bold bg-purple-100 text-purple-800 border border-purple-200/80 px-2 py-0.5 rounded-full">
+                            Current Team
+                          </span>
+                        ) : statusInfo.status === 'other' ? (
+                          <span
+                            className="text-2xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full"
+                            title={`Assigned to ${statusInfo.leadInfo?.leadName}. Click to reassign.`}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        ) : (
+                          <span className="text-2xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            Available
+                          </span>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })
               )}
             </div>
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={`px-6 py-2 text-sm font-medium text-white rounded-lg transition-all shadow-md bg-purple-600 hover:bg-purple-700 ${
-                saving ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              {saving ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </span>
-              ) : (
-                `Save Assignments`
-              )}
-            </button>
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+            <span className="text-xs font-medium text-slate-500">
+              {selectedEmployees.length} employee{selectedEmployees.length === 1 ? '' : 's'} assigned to {lead?.name || 'this TL'}
+            </span>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200/70 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className={`px-5 py-2 text-xs font-semibold text-white rounded-xl shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all cursor-pointer ${
+                  saving ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {saving ? "Saving..." : `Save Assignments (${selectedEmployees.length})`}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -615,6 +856,56 @@ const getDesignation = (lead) => {
     }
   };
 
+  // Helper to check if two lead records represent the same individual
+  const isSameLead = (leadA, leadB) => {
+    if (!leadA || !leadB) return false;
+
+    const idsA = [
+      leadA._id,
+      leadA.id,
+      leadA.teamLeadId,
+      leadA.userId,
+      leadA.employeeId,
+      leadA.rawTeamDocId,
+      leadA.teamLead?._id,
+      leadA.teamLead?.userId,
+      leadA.teamLead?.employeeId,
+      leadA.user?._id,
+      typeof leadA.teamLead === 'string' ? leadA.teamLead : null
+    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+    const idsB = [
+      leadB._id,
+      leadB.id,
+      leadB.teamLeadId,
+      leadB.userId,
+      leadB.employeeId,
+      leadB.rawTeamDocId,
+      leadB.teamLead?._id,
+      leadB.teamLead?.userId,
+      leadB.teamLead?.employeeId,
+      leadB.user?._id,
+      typeof leadB.teamLead === 'string' ? leadB.teamLead : null
+    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+    if (idsA.some(id => idsB.includes(id))) return true;
+
+    const emailA = (getUserEmail(leadA) || '').toLowerCase().trim();
+    const emailB = (getUserEmail(leadB) || '').toLowerCase().trim();
+    if (emailA && emailB && emailA !== 'n/a' && emailA.includes('@') && emailA === emailB) {
+      return true;
+    }
+
+    const nameA = (getUserName(leadA) || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const nameB = (getUserName(leadB) || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const invalidNames = ['unnamed', 'no name', 'unknown employee', 'unknown user', 'n/a', ''];
+    if (nameA && nameB && !invalidNames.includes(nameA) && nameA === nameB) {
+      return true;
+    }
+
+    return false;
+  };
+
   // Fetch Functions
   const fetchTeamLeads = async () => {
     try {
@@ -768,56 +1059,6 @@ const getDesignation = (lead) => {
         };
       });
 
-      // Helper to check if two lead records represent the same individual
-      const isSameLead = (leadA, leadB) => {
-        if (!leadA || !leadB) return false;
-
-        const idsA = [
-          leadA._id,
-          leadA.id,
-          leadA.teamLeadId,
-          leadA.userId,
-          leadA.employeeId,
-          leadA.rawTeamDocId,
-          leadA.teamLead?._id,
-          leadA.teamLead?.userId,
-          leadA.teamLead?.employeeId,
-          leadA.user?._id,
-          typeof leadA.teamLead === 'string' ? leadA.teamLead : null
-        ].filter(Boolean).map(x => String(x).toLowerCase().trim());
-
-        const idsB = [
-          leadB._id,
-          leadB.id,
-          leadB.teamLeadId,
-          leadB.userId,
-          leadB.employeeId,
-          leadB.rawTeamDocId,
-          leadB.teamLead?._id,
-          leadB.teamLead?.userId,
-          leadB.teamLead?.employeeId,
-          leadB.user?._id,
-          typeof leadB.teamLead === 'string' ? leadB.teamLead : null
-        ].filter(Boolean).map(x => String(x).toLowerCase().trim());
-
-        if (idsA.some(id => idsB.includes(id))) return true;
-
-        const emailA = (getUserEmail(leadA) || '').toLowerCase().trim();
-        const emailB = (getUserEmail(leadB) || '').toLowerCase().trim();
-        if (emailA && emailB && emailA !== 'n/a' && emailA.includes('@') && emailA === emailB) {
-          return true;
-        }
-
-        const nameA = (getUserName(leadA) || '').toLowerCase().replace(/\s+/g, ' ').trim();
-        const nameB = (getUserName(leadB) || '').toLowerCase().replace(/\s+/g, ' ').trim();
-        const invalidNames = ['unnamed', 'no name', 'unknown employee', 'unknown user', 'n/a', ''];
-        if (nameA && nameB && !invalidNames.includes(nameA) && nameA === nameB) {
-          return true;
-        }
-
-        return false;
-      };
-
       // 1. Start merged leads with the formatted team leads from api/user/all
       const mergedLeads = [...formattedUserTLs];
 
@@ -886,10 +1127,9 @@ const getDesignation = (lead) => {
         }
       });
 
-      setTeamLeads(mergedLeads);
-
       const savedEmployeeAssignments = loadSavedEmployeeAssignments();
       const employeeAssignments = {};
+      const globallyAssignedEmpKeys = new Set();
 
       mergedLeads.forEach((lead) => {
         const leadId = String(lead._id);
@@ -918,7 +1158,40 @@ const getDesignation = (lead) => {
 
         const mergedLiveEmployees = [...apiEmployees, ...directlyAssignedEmployees, ...savedEmps];
         const distinctAssigned = getDistinctAssignedEmployees(mergedLiveEmployees, fetchedEmployees);
-        const distinctIds = distinctAssigned.map(e => String(e._id));
+
+        // Filter out employees who are assigned to a DIFFERENT lead in savedEmployeeAssignments
+        // to prevent stale backend data from reclaiming an employee that was transferred
+        const filteredLiveEmployees = distinctAssigned.filter((emp) => {
+          const empKey = getCanonicalEmployeeKey(emp, fetchedEmployees);
+          if (!empKey) return false;
+
+          const isSavedToAnotherLead = Object.entries(savedEmployeeAssignments).some(([otherId, list]) => {
+            if (allAssociatedIds.includes(String(otherId))) return false;
+            if (!Array.isArray(list)) return false;
+            return list.some(item => getCanonicalEmployeeKey(item, fetchedEmployees) === empKey);
+          });
+
+          if (isSavedToAnotherLead) {
+            return false;
+          }
+
+          return true;
+        });
+
+        // Strictly enforce 1 TL per employee across the whole system
+        const singleTlEmployees = filteredLiveEmployees.filter((emp) => {
+          const empKey = getCanonicalEmployeeKey(emp, fetchedEmployees);
+          if (!empKey) return false;
+          if (globallyAssignedEmpKeys.has(empKey)) {
+            // Already claimed by a Team Lead; enforce max 1 TL rule
+            return false;
+          }
+          globallyAssignedEmpKeys.add(empKey);
+          return true;
+        });
+
+        const distinctIds = singleTlEmployees.map(e => String(e._id));
+        lead.assignedEmployees = distinctIds;
 
         // Store under lead._id and all associated IDs so lookups always find clean deduplicated IDs
         allAssociatedIds.forEach(id => {
@@ -927,6 +1200,7 @@ const getDesignation = (lead) => {
         employeeAssignments[leadId] = distinctIds;
       });
 
+      setTeamLeads([...mergedLeads]);
       setAssignedEmployees(employeeAssignments);
       persistEmployeeAssignments(employeeAssignments);
 
@@ -1009,40 +1283,153 @@ const getDesignation = (lead) => {
   
       const distinct = getDistinctAssignedEmployees(data.employeeIds || [], employees);
       const cleanEmployeeIds = distinct.map(e => String(e._id));
-  
+      const targetLeadId = String(data.leadId);
+
+      // Collect canonical keys of employees assigned to this lead
+      const assignedCanonicalKeys = new Set(
+        distinct.map(e => getCanonicalEmployeeKey(e, employees)).filter(Boolean)
+      );
+
+      // Collect all associated IDs for the target lead
+      const targetLeadObj = selectedLead || teamLeads.find(tl => String(tl._id) === targetLeadId);
+      const targetAssociatedIds = targetLeadObj ? [
+        targetLeadObj._id,
+        targetLeadObj.id,
+        targetLeadObj.teamLeadId,
+        targetLeadObj.userId,
+        targetLeadObj.employeeId,
+        targetLeadObj.rawTeamDocId,
+        targetLeadObj.teamLead?._id,
+        targetLeadObj.teamLead?.userId,
+        targetLeadObj.teamLead?.employeeId,
+      ].filter(Boolean).map(String) : [targetLeadId];
+
+      // Identify affected other leads whose employees were transferred to target lead
+      const affectedOtherLeads = [];
+
+      // 1. Update teamLeads state: assign cleanEmployeeIds to target, remove transferred from others
+      const nextTeamLeads = teamLeads.map((tl) => {
+        const isTarget = isSameLead(tl, targetLeadObj) || targetAssociatedIds.includes(String(tl._id));
+
+        if (isTarget) {
+          return {
+            ...tl,
+            assignedEmployees: cleanEmployeeIds
+          };
+        }
+
+        // For all other leads: strictly remove any employee now assigned to targetLead
+        const currentAssigned = tl.assignedEmployees || [];
+        const remainingAssigned = currentAssigned.filter((empRef) => {
+          const empKey = getCanonicalEmployeeKey(empRef, employees);
+          return !assignedCanonicalKeys.has(empKey);
+        });
+
+        if (remainingAssigned.length !== currentAssigned.length) {
+          const distinctRemaining = getDistinctAssignedEmployees(remainingAssigned, employees);
+          affectedOtherLeads.push({
+            lead: tl,
+            remainingEmpIds: distinctRemaining.map((e) => String(e._id))
+          });
+        }
+
+        const distinctRemaining = getDistinctAssignedEmployees(remainingAssigned, employees);
+        return {
+          ...tl,
+          assignedEmployees: distinctRemaining.map((e) => String(e._id))
+        };
+      });
+
+      // 2. Update assignedEmployees mapping
+      const nextAssignedEmployees = { ...assignedEmployees };
+
+      // Update non-target keys by removing reassigned employees
+      Object.keys(nextAssignedEmployees).forEach((key) => {
+        if (!targetAssociatedIds.includes(String(key))) {
+          const list = nextAssignedEmployees[key] || [];
+          nextAssignedEmployees[key] = list.filter((empRef) => {
+            const empKey = getCanonicalEmployeeKey(empRef, employees);
+            return !assignedCanonicalKeys.has(empKey);
+          });
+        }
+      });
+
+      // Set target associated keys to cleanEmployeeIds
+      targetAssociatedIds.forEach((id) => {
+        nextAssignedEmployees[id] = cleanEmployeeIds;
+      });
+      nextAssignedEmployees[targetLeadId] = cleanEmployeeIds;
+
+      // 3. Update localStorage for cross-panel sync
+      persistEmployeeAssignments(nextAssignedEmployees);
+      try {
+        localStorage.setItem('kt_assigned_employees', JSON.stringify(nextAssignedEmployees));
+        
+        // Also sync kt_user_assigned_tl
+        const userTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
+        const targetLeadName = getUserName(targetLeadObj) || 'Team Lead';
+        const targetLeadEmail = getUserEmail(targetLeadObj) || '';
+
+        cleanEmployeeIds.forEach((empId) => {
+          userTLMap[String(empId)] = {
+            id: targetLeadId,
+            name: targetLeadName,
+            email: targetLeadEmail
+          };
+          const matched = findEmployeeByIdOrUser(empId, employees);
+          if (matched?._id) {
+            userTLMap[String(matched._id)] = {
+              id: targetLeadId,
+              name: targetLeadName,
+              email: targetLeadEmail
+            };
+          }
+        });
+        localStorage.setItem('kt_user_assigned_tl', JSON.stringify(userTLMap));
+      } catch (e) {
+        console.warn('Storage sync note:', e);
+      }
+
+      // Update React state immediately
+      setTeamLeads(nextTeamLeads);
+      setAssignedEmployees(nextAssignedEmployees);
+
+      // 4. Save to backend for target lead
       const payload = {
         teamLead: data.leadId,
         employees: cleanEmployeeIds
       };
 
-      console.log('Sending payload:', payload);
-  
       try {
-        const response = await axios.post(
+        await axios.post(
           `${BASE_URL}/teamLead/create-team`,
           payload,
           { headers }
         );
-    
-        if (response.status === 200 || response.status === 201) {
-          await fetchTeamLeads();
-        }
       } catch (backendErr) {
         console.warn('Backend team assign endpoint note (persisting locally):', backendErr?.response?.data || backendErr.message);
       }
 
-      // Always persist in assignedEmployees and localStorage for seamless continuity
-      setAssignedEmployees(prev => ({
-        ...prev,
-        [data.leadId]: cleanEmployeeIds
-      }));
+      // 5. Save updated assignments to backend for any other leads that lost employees
+      for (const affected of affectedOtherLeads) {
+        try {
+          const otherLeadId = affected.lead?.teamLeadId || affected.lead?._id;
+          if (otherLeadId) {
+            await axios.post(
+              `${BASE_URL}/teamLead/create-team`,
+              {
+                teamLead: otherLeadId,
+                employees: affected.remainingEmpIds
+              },
+              { headers }
+            );
+          }
+        } catch (otherErr) {
+          console.warn('Backend update note for reassigned lead:', otherErr?.message);
+        }
+      }
 
-      persistEmployeeAssignments({
-        ...assignedEmployees,
-        [data.leadId]: cleanEmployeeIds
-      });
-
-      alert("Assignments saved successfully!");
+      alert("Assignments saved successfully! Each employee is assigned to at most 1 Team Lead.");
     } catch (error) {
       console.error('Error saving assignments:', error);
       alert(error?.response?.data?.message || 'Failed to save assignments. Please try again.');
@@ -1260,6 +1647,8 @@ const getDesignation = (lead) => {
         onClose={handleCloseModal}
         lead={selectedLead}
         employees={employees}
+        teamLeads={teamLeads}
+        assignedEmployees={assignedEmployees}
         departmentName={selectedLead ? getDepartment(selectedLead, employees) : "Unknown Department"}
         onSave={handleSaveAssignments}
       />

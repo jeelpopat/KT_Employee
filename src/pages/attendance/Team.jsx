@@ -425,7 +425,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     assignedTL: "",
   };
 
-  const [taskForm, setTaskForm] = useState({
+  const defaultTaskForm = {
     projectId: "",
     taskTitle: "",
     description: "",
@@ -438,7 +438,10 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     priority: "medium",
     progress: 0,
     status: "pending",
-  });
+  };
+
+  const [taskForm, setTaskForm] = useState({ ...defaultTaskForm });
+  const [editingTask, setEditingTask] = useState(null);
 
   useEffect(() => {
     fetchProjects();
@@ -1261,7 +1264,14 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       });
     }
   };
+  const closeTaskModal = () => {
+    setShowTaskModal(false);
+    setEditingTask(null);
+    setTaskForm({ ...defaultTaskForm });
+  };
+
   const openAddTask = (projectId = null) => {
+    setEditingTask(null);
     const projId = projectId || selectedProject?._id || "";
     const proj = projects.find(p => isSameId(p._id || p.id, projId));
     const assignedTeamLead = normalizeId(
@@ -1289,6 +1299,48 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     setShowTaskModal(true);
   };
 
+  const openEditTask = (task) => {
+    if (!task) return;
+    setEditingTask(task);
+    const projId = normalizeId(
+      task.projectId?._id || task.projectId?.id || task.projectId || task.project?._id || task.project
+    );
+    const proj = projects.find((p) => isSameId(p._id || p.id, projId));
+
+    setSelectedProject(proj || null);
+    updateProjectTeamMembers(proj);
+
+    const assignedTL = normalizeId(
+      task.assignedTeamLeadUser ||
+      task.assignedTeamLeadEmployee ||
+      task.assignedTeamLead ||
+      proj?.teamLeadUser ||
+      proj?.teamLeadEmployee
+    );
+
+    const assignedEmp = normalizeId(
+      task.assignedEmployee ||
+      task.assignedTo
+    );
+
+    setTaskForm({
+      projectId: projId || "",
+      taskTitle: task.taskTitle || task.title || "",
+      description: task.description || task.taskDescription || "",
+      assignedTeamLead: assignedTL,
+      assignedTo: assignedEmp,
+      assignedEmployee: assignedEmp,
+      assignedBy: normalizeId(task.assignedBy),
+      startDate: task.startDate ? String(task.startDate).split("T")[0] : "",
+      dueDate: task.dueDate ? String(task.dueDate).split("T")[0] : "",
+      priority: task.priority || "medium",
+      progress: Number(task.progress) || 0,
+      status: task.status || "pending",
+    });
+
+    setShowTaskModal(true);
+  };
+
   const toggleProject = (projectId) => {
     setExpandedProjects(prev => ({
       ...prev,
@@ -1303,7 +1355,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       }
     }
   };
-    const addTask = async (e) => {
+  const addTask = async (e) => {
     e.preventDefault();
 
     try {
@@ -1348,7 +1400,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       };
 
       if (!payload.projectId) {
-        alert("Please select a project before adding a task.");
+        alert("Please select a project before saving a task.");
         return;
       }
 
@@ -1358,45 +1410,56 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       }
 
       if (payload.assignedEmployee) {
-        const allowedAssigneeIds = getAvailableTaskAssignees(taskProject).map(normalizeId);
+        const allowedAssigneeIds = getAvailableTaskAssignees(taskProject, editingTask ? payload.assignedEmployee : null).map(normalizeId);
         if (!allowedAssigneeIds.includes(normalizeId(payload.assignedEmployee))) {
           alert("Please assign this task to an employee assigned to the selected project.");
           return;
         }
       }
 
-      try {
-        await axios.post(`${TASK_URL}/create`, payload);
-      } catch (err1) {
-        console.warn("Primary create task failed, trying fallback:", err1.message);
-        await axios.post(`${TASK_PROJECT_MANAGE_URL}/create`, payload);
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      if (editingTask?._id || editingTask?.id) {
+        const taskId = editingTask._id || editingTask.id;
+        try {
+          await axios.put(`${TASK_PROJECT_MANAGE_URL}/update/${taskId}`, payload, { headers });
+        } catch (err1) {
+          try {
+            await axios.put(`${TASK_URL}/update/${taskId}`, payload, { headers });
+          } catch (err2) {
+            try {
+              await axios.put(`${TASK_PROJECT_MANAGE_URL}/${taskId}`, payload, { headers });
+            } catch (err3) {
+              await axios.put(`${TASK_URL}/${taskId}`, payload, { headers });
+            }
+          }
+        }
+        alert("Task updated successfully!");
+      } else {
+        try {
+          await axios.post(`${TASK_URL}/create`, payload, { headers });
+        } catch (err1) {
+          console.warn("Primary create task failed, trying fallback:", err1.message);
+          await axios.post(`${TASK_PROJECT_MANAGE_URL}/create`, payload, { headers });
+        }
+        alert("Task created successfully!");
       }
 
-      await fetchTasks();
+      const updatedTasks = await fetchTasks();
+      if (selectedTaskDetails && editingTask && isSameId(selectedTaskDetails._id, editingTask._id)) {
+        const fresh = updatedTasks.find(t => isSameId(t._id, editingTask._id));
+        if (fresh) setSelectedTaskDetails(fresh);
+      }
       
-      setShowTaskModal(false);
-      setTaskForm({
-        projectId: "",
-        taskTitle: "",
-        description: "",
-        assignedTeamLead: "",
-        assignedTo: "",
-        assignedEmployee: "",
-        assignedBy: "",
-        startDate: "",
-        dueDate: "",
-        priority: "medium",
-        progress: 0,
-        status: "pending",
-      });
-      alert("Task created successfully!");
+      closeTaskModal();
     } catch (error) {
-      console.error("Task create error:", error);
-      alert("Task creation failed: " + (error?.response?.data?.message || error?.message || "Unknown error"));
+      console.error("Task save error:", error);
+      alert(`Task ${editingTask ? "update" : "creation"} failed: ` + (error?.response?.data?.message || error?.message || "Unknown error"));
     }
   };
 
-    const handleStatusChange = async (taskId, newStatus) => {
+  const handleStatusChange = async (taskId, newStatus) => {
     try {
       try {
         await axios.put(`${TASK_URL}/status/${taskId}`, { status: newStatus });
@@ -1424,9 +1487,48 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         await axios.delete(`${TASK_PROJECT_MANAGE_URL}/delete/${taskId}`);
       }
       await fetchTasks(selectedProject?._id || null);
+      if (selectedTaskDetails && isSameId(selectedTaskDetails._id, taskId)) {
+        setSelectedTaskDetails(null);
+      }
     } catch (error) {
       console.error("Failed to delete task:", error);
       alert("Failed to delete task");
+    }
+  };
+
+  const handleDeleteProject = async (projectId) => {
+    if (!projectId) return;
+    const targetProject = projects.find((p) => isSameId(p._id || p.id, projectId));
+    const confirmed = await confirm({
+      title: "Delete Project?",
+      message: `Are you sure you want to delete project "${targetProject?.projectName || "this project"}"? All associated tasks will be affected.`,
+      confirmLabel: "Delete Project",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      try {
+        await axios.delete(`${BASE_URL}/delete/${projectId}`, { headers });
+      } catch (err1) {
+        console.warn("Primary delete project failed, trying fallback:", err1.message);
+        await axios.delete(`${BASE_URL}/${projectId}`, { headers });
+      }
+
+      if (isSameId(selectedProject?._id, projectId)) {
+        setSelectedProject(null);
+      }
+
+      await fetchProjects();
+      await fetchTasks();
+      alert("Project deleted successfully.");
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      const msg = error?.response?.data?.message || error?.message || "Failed to delete project";
+      alert(`Failed to delete project: ${msg}`);
     }
   };
 
@@ -1536,8 +1638,14 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     }
   };
 
-  const getAvailableTaskAssignees = (project = selectedProject) => {
-    const projectEmployees = Array.isArray(project?.employees) ? project.employees : [];
+  const getAvailableTaskAssignees = (project = selectedProject, extraAssigneeId = null) => {
+    const projectEmployees = Array.isArray(project?.employees) ? [...project.employees] : [];
+    if (extraAssigneeId) {
+      const extraIdStr = normalizeId(extraAssigneeId);
+      if (extraIdStr && !projectEmployees.some((e) => isSameId(e, extraIdStr))) {
+        projectEmployees.push(extraAssigneeId);
+      }
+    }
 
     return projectEmployees
       .map((employee) => {
@@ -2012,10 +2120,23 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                 e.stopPropagation();
                                 openEditProject(project);
                               }}
-                              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl transition-all text-xs font-semibold flex items-center gap-1.5"
+                              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl transition-all text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                             >
                               <Edit2 className="w-3.5 h-3.5 text-slate-500" />
                               Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteProject(project._id);
+                              }}
+                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl transition-all text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              title="Delete Project"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                              Delete
                             </button>
                           </div>
                         </div>
@@ -2165,8 +2286,20 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
                                       <button
                                         type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openEditTask(task);
+                                        }}
+                                        className="text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 p-1.5 rounded-lg transition-colors cursor-pointer"
+                                        title="Edit Task"
+                                      >
+                                        <Edit2 className="w-4 h-4" />
+                                      </button>
+
+                                      <button
+                                        type="button"
                                         onClick={(e) => { e.stopPropagation(); handleDeleteTask(task._id); }}
-                                        className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 p-1.5 rounded-lg transition-colors"
+                                        className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 p-1.5 rounded-lg transition-colors cursor-pointer"
                                         title="Delete Task"
                                       >
                                         <Trash2 className="w-4 h-4" />
@@ -2923,14 +3056,29 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 <button
                   type="button"
                   onClick={closeProjectModal}
-                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200"
+                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer"
                 >
                   Cancel
                 </button>
 
+                {selectedProject && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const idToDelete = selectedProject._id;
+                      closeProjectModal();
+                      handleDeleteProject(idToDelete);
+                    }}
+                    className="w-full sm:w-auto px-4 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                    Delete Project
+                  </button>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
                 >
                   {selectedProject ? "Update Project" : "Create Project"}
                 </button>
@@ -2946,7 +3094,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       {showTaskModal && (
         <div
           className="team-drawer-backdrop fixed inset-0 z-[10000] bg-slate-950/40 backdrop-blur-[2px]"
-          onClick={() => setShowTaskModal(false)}
+          onClick={closeTaskModal}
         >
           <div
             className="team-drawer-panel ml-auto flex h-full w-full max-w-xl flex-col bg-white shadow-2xl"
@@ -2957,15 +3105,19 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 <div>
                   <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900">
                     <ListTodo className="w-5 h-5 text-emerald-600" />
-                    Create Task
+                    {editingTask ? "Edit Task" : "Create Task"}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-500">Choose a project, assign ownership, and set the deadline.</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {editingTask
+                      ? "Update task details, assignment, schedule, and progress."
+                      : "Choose a project, assign ownership, and set the deadline."}
+                  </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowTaskModal(false)}
+                  onClick={closeTaskModal}
                   aria-label="Close task form"
-                  className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                  className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -3082,11 +3234,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     <option value="">
                       {!taskForm.projectId
                         ? "Select a project first"
-                        : getAvailableTaskAssignees().length === 0
+                        : getAvailableTaskAssignees(selectedProject, taskForm.assignedEmployee).length === 0
                           ? "No employees assigned to this project"
                           : "Select Employee"}
                     </option>
-                    {getAvailableTaskAssignees().map((member) => (
+                    {getAvailableTaskAssignees(selectedProject, taskForm.assignedEmployee).map((member) => (
                       <option key={normalizeId(member)} value={normalizeId(member)}>
                         {getUserName(member)}
                       </option>
@@ -3187,12 +3339,19 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 </section>
               </div>
 
-              <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 sm:px-7">
+              <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 sm:px-7 flex flex-col-reverse sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={closeTaskModal}
+                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
-                  className="w-full rounded-lg bg-emerald-600 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                  className="w-full sm:flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 py-3 font-semibold text-white shadow-sm transition-colors cursor-pointer"
                 >
-                  Create Task
+                  {editingTask ? "Update Task" : "Create Task"}
                 </button>
               </div>
             </form>
@@ -3446,11 +3605,37 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+            <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const taskToEdit = selectedTaskDetails;
+                    setSelectedTaskDetails(null);
+                    openEditTask(taskToEdit);
+                  }}
+                  className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 rounded-xl transition-all text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-amber-600" />
+                  Edit Task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const taskIdToDelete = selectedTaskDetails._id || selectedTaskDetails.id;
+                    setSelectedTaskDetails(null);
+                    handleDeleteTask(taskIdToDelete);
+                  }}
+                  className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl transition-all text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  Delete Task
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedTaskDetails(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl text-xs transition-colors"
+                className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer shadow-xs text-center"
               >
                 Close
               </button>
