@@ -542,3 +542,41 @@ export const isAdminRole = (role, user = null) => {
   return normalized === 'admin';
 };
 
+/**
+ * Checks whether role corresponds to an Employee (requires an assigned TL)
+ */
+export const isEmployeeRole = (role, user = null) => {
+  const normalized = String(role || '').toLowerCase().trim();
+  if (normalized === 'admin' || normalized === 'hr') return false;
+  if (isTeamLeadRole(role, user)) return false;
+  return true;
+};
+
+/**
+ * Fetches the assigned Team Lead for the currently authenticated employee
+ * GET https://kt-backend-yzr4.onrender.com/api/auth/team-lead
+ */
+export const fetchEmployeeTeamLead = async () => {
+  try {
+    const res = await api.get('/api/auth/team-lead');
+    const data = res.data?.data?.teamLead || res.data?.teamLead || (res.data?.success && res.data?.data) || null;
+    if (data && typeof data === 'object') {
+      const hasIdentity = Boolean(
+        data.name ||
+        data.userId ||
+        data.employeeId ||
+        data.email ||
+        data._id ||
+        data.id ||
+        data.employeeID ||
+        data.uniqueID
+      );
+      if (hasIdentity) return data;
+    }
+    return null;
+  } catch (err) {
+    console.warn("Notice fetching employee team lead:", err.response?.data?.message || err.message);
+    return null;
+  }
+};
+

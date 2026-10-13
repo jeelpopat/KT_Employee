@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, CheckCircle2, Clock, XCircle, 
-  Paperclip, Search, Info, Calendar, FileText, Loader2, RefreshCw, AlertCircle
+  Paperclip, Search, Info, Calendar, FileText, Loader2, RefreshCw, AlertCircle, AlertTriangle, UserX, UserCheck
 } from 'lucide-react';
 import api from '../../api/axios.js'; 
-import { useApp } from '../../context/AppContext.jsx';
+import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
+import { isEmployeeRole, fetchEmployeeTeamLead } from '../../utils/teamLeadUtils.js';
 
 export const LeaveManagementView = () => {
   const { user, userRole } = useApp();
+
+  // --- States for Assigned Team Lead ---
+  const [teamLead, setTeamLead] = useState(null);
+  const [isTlLoading, setIsTlLoading] = useState(true);
 
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [leaveBalance, setLeaveBalance] = useState({ 
@@ -335,6 +340,17 @@ export const LeaveManagementView = () => {
       } catch (holErr) {
         console.warn('Holiday fetch notice:', holErr.message);
       }
+
+      // 3. Fetch employee's assigned Team Lead
+      setIsTlLoading(true);
+      try {
+        const tl = await fetchEmployeeTeamLead();
+        setTeamLead(tl);
+      } catch {
+        setTeamLead(null);
+      } finally {
+        setIsTlLoading(false);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -346,6 +362,11 @@ export const LeaveManagementView = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Determine if this user is a regular employee who requires an assigned Team Lead
+  const currentRole = userRole || deriveUserRole(user);
+  const isEmployee = isEmployeeRole(currentRole, user);
+  const hasNoAssignedTL = isEmployee && !isTlLoading && !teamLead;
 
   // Force endDate to equal startDate if Half Day is selected
   useEffect(() => {
@@ -393,6 +414,11 @@ export const LeaveManagementView = () => {
   });
 
   const handleOpenModal = () => {
+    if (hasNoAssignedTL) {
+      setFormError('Please connect to Admin or HR to assign a Team Lead. Without an assigned Team Lead, you cannot apply for leave.');
+      setIsModalOpen(true);
+      return;
+    }
     setLeaveType('full_day');
     setIsHalfDay(false);
     setHalfDayType('first-half');
@@ -407,6 +433,11 @@ export const LeaveManagementView = () => {
     e.preventDefault();
     setFormError('');
     setSuccessMsg('');
+
+    if (hasNoAssignedTL) {
+      setFormError('Please connect to Admin or HR to assign a Team Lead. Without an assigned Team Lead, you cannot apply for leave.');
+      return;
+    }
 
     if (startDate < minAllowedDate) {
       setFormError('Policy Notice: Leave must be applied at least 2 days in advance.');
@@ -574,7 +605,7 @@ export const LeaveManagementView = () => {
       {/* Action buttons aligned to the top-right */}
       <div>
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h2 className="text-xl font-bold text-slate-900">Leave Management</h2>
               <p className="text-xs sm:text-sm text-slate-500">Apply for leave, track requests, and check quotas</p>
@@ -593,13 +624,51 @@ export const LeaveManagementView = () => {
               <button
                 type="button"
                 onClick={handleOpenModal}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer"
+                disabled={hasNoAssignedTL}
+                title={hasNoAssignedTL ? 'Connect to Admin or HR to assign a Team Lead before applying for leave' : undefined}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Plus size={14} />
-                Apply Leave
+                {hasNoAssignedTL ? 'Apply Blocked (No TL)' : 'Apply Leave'}
               </button>
             </div>
           </div>
+
+          {/* Warning if employee has no assigned TL */}
+          {hasNoAssignedTL && (
+            <div className="p-4 rounded-xl border border-amber-300 bg-amber-50/90 text-amber-900 shadow-xs flex items-start gap-3">
+              <div className="p-2 bg-amber-100 border border-amber-300/70 text-amber-800 rounded-lg shrink-0 mt-0.5">
+                <UserX size={18} />
+              </div>
+              <div className="flex-1 text-xs sm:text-sm">
+                <h4 className="font-bold text-amber-950 text-sm tracking-tight mb-1">
+                  No Team Lead Assigned
+                </h4>
+                <p className="text-amber-800 leading-relaxed">
+                  Please connect to Admin or HR to assign a Team Lead. Without an assigned Team Lead, you cannot apply for leave or submit daily reports.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Assigned Team Lead badge if present */}
+          {teamLead && (
+            <div className="px-3.5 py-2.5 rounded-lg border border-slate-200 bg-slate-50/80 text-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">
+                  <UserCheck size={12} />
+                </div>
+                <span className="text-slate-500 font-medium">Assigned Team Lead:</span>
+                <span className="font-semibold text-slate-900">{teamLead.name || 'Team Lead'}</span>
+                {teamLead.email && <span className="text-slate-400 font-mono hidden sm:inline">({teamLead.email})</span>}
+              </div>
+              {teamLead.designation && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
+                  {teamLead.designation}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -821,6 +890,30 @@ export const LeaveManagementView = () => {
                 </div>
               )}
 
+              {/* Warning if employee has no assigned TL */}
+              {hasNoAssignedTL && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 font-medium text-xs flex items-start gap-2">
+                  <UserX size={16} className="shrink-0 mt-0.5 text-amber-700" />
+                  <span>Please connect to Admin or HR to assign a Team Lead. Without an assigned Team Lead, you cannot apply for leave.</span>
+                </div>
+              )}
+
+              {/* Routing to assigned TL info */}
+              {teamLead && (
+                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <UserCheck size={14} className="text-indigo-600 shrink-0" />
+                    <span className="text-slate-500">Routing to TL:</span>
+                    <span className="font-semibold text-slate-900">{teamLead.name}</span>
+                  </div>
+                  {teamLead.designation && (
+                    <span className="text-[10px] font-semibold text-indigo-700 uppercase bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded">
+                      {teamLead.designation}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Leave Type Selector (Strictly enum: ["full_day", "half_day"]) */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-2">
@@ -1024,11 +1117,11 @@ export const LeaveManagementView = () => {
                 </button>
                 <button 
                   type="submit" 
-                  disabled={isSubmitting || calculatedDays === 0}
+                  disabled={isSubmitting || calculatedDays === 0 || hasNoAssignedTL}
                   className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-                  Submit Application
+                  {hasNoAssignedTL ? 'Application Blocked (No TL)' : 'Submit Application'}
                 </button>
               </div>
 

@@ -1767,19 +1767,37 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     );
 
     return dailyReports.filter((r) => {
+      // 1. Report authored by current TL themselves
+      const empId = String(r.employeeId?._id || r.employeeId?.id || (typeof r.employeeId === 'string' ? r.employeeId : '')).toLowerCase().trim();
+      const empEmail = String(r.employeeId?.email || r.employeeEmail || '').toLowerCase().trim();
+      if ((empId && userIdentifiers.ids.has(empId)) || (empEmail && userIdentifiers.emails.has(empEmail))) return true;
+
+      // 2. Report linked to an accessible project
       const pId = String(r.projectId?._id || r.projectId?.id || (typeof r.projectId === 'string' ? r.projectId : '')).toLowerCase().trim();
       if (pId && accessibleProjectIds.has(pId)) return true;
       const pName = String(r.projectId?.projectName || r.projectId?.name || r.projectName || '').toLowerCase().trim();
       if (pName && accessibleProjectNames.has(pName)) return true;
       if (Array.isArray(r.taskReferences)) {
-        return r.taskReferences.some((ref) => {
+        const matchesTaskRef = r.taskReferences.some((ref) => {
           const refPId = String(ref?.projectId || '').toLowerCase().trim();
           return refPId && accessibleProjectIds.has(refPId);
         });
+        if (matchesTaskRef) return true;
       }
+
+      // 3. Report authored by team member in one of the TL's projects
+      const isMember = accessibleProjects.some(p => 
+        Array.isArray(p.employees) && p.employees.some(e => {
+          const eId = String(e._id || e.id || e.userID || '').toLowerCase().trim();
+          const eEmail = String(e.email || '').toLowerCase().trim();
+          return (eId && empId && eId === empId) || (eEmail && empEmail && eEmail === empEmail);
+        })
+      );
+      if (isMember) return true;
+
       return false;
     });
-  }, [dailyReports, accessibleProjects, isTL]);
+  }, [dailyReports, accessibleProjects, isTL, userIdentifiers]);
 
   // Filter projects by search query, status, and priority
   const filteredProjects = accessibleProjects.filter((project) => {
@@ -2521,7 +2539,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
                   >
                     <option value="all">All Projects</option>
-                    {Array.from(new Set(accessibleDailyReports.map(r => r.projectId?.projectName || r.projectId?.name || r.projectName).filter(Boolean))).map((p) => (
+                    {Array.from(new Set(accessibleDailyReports.map(r => r.projectId?.projectName || r.projectId?.name || r.projectName || r.remarks || 'Other').filter(Boolean))).map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
@@ -2569,13 +2587,13 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 const filtered = accessibleDailyReports.filter((report) => {
                   const empName = (report.employeeId?.name || report.employeeName || report.name || '').toLowerCase();
                   const empEmail = (report.employeeId?.email || report.email || '').toLowerCase();
-                  const projName = (report.projectId?.projectName || report.projectId?.name || report.projectName || '').toLowerCase();
+                  const projName = (report.projectId?.projectName || report.projectId?.name || report.projectName || report.remarks || 'Other').toLowerCase();
                   const work = (report.todaysWork || report.workUpdate || report.description || '').toLowerCase();
                   const tomorrow = (report.tomorrowPlan || report.tomorrow_plan || '').toLowerCase();
 
                   const matchesQuery = !q || empName.includes(q) || empEmail.includes(q) || projName.includes(q) || work.includes(q) || tomorrow.includes(q);
 
-                  const rawProj = report.projectId?.projectName || report.projectId?.name || report.projectName || '';
+                  const rawProj = report.projectId?.projectName || report.projectId?.name || report.projectName || report.remarks || 'Other';
                   const matchesProject = dailyProjectFilter === 'all' || rawProj === dailyProjectFilter;
 
                   const rawEmp = report.employeeId?.name || report.employeeName || (typeof report.employeeId === 'string' ? report.employeeId : '');
@@ -2621,7 +2639,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                           const empName = report.employeeId?.name || report.employeeName || report.name || "Employee";
                           const empEmail = report.employeeId?.email || report.email || "";
                           const empRole = report.employeeId?.role || report.role || "EMP";
-                          const projName = report.projectId?.projectName || report.projectId?.name || report.projectName || "General Project";
+                          const projName = report.projectId?.projectName || report.projectId?.name || report.projectName || report.remarks || "Other";
                           
                           let rDate = 'N/A';
                           let rTime = '';
@@ -3702,7 +3720,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Project</span>
                   <p className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg mt-1 w-fit truncate max-w-full">
-                    {selectedDailyReportModal.projectId?.projectName || selectedDailyReportModal.projectId?.name || selectedDailyReportModal.projectName || 'General Project'}
+                    {selectedDailyReportModal.projectId?.projectName || selectedDailyReportModal.projectId?.name || selectedDailyReportModal.projectName || selectedDailyReportModal.remarks || 'Other'}
                   </p>
                 </div>
               </div>

@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Plus, Trash2, Save, Send, Search, Clock, CheckCircle2, PauseCircle, Loader2, RefreshCw
+  FileText, Plus, Trash2, Save, Send, Search, Clock, CheckCircle2, PauseCircle, Loader2, RefreshCw, AlertTriangle, UserX, UserCheck
 } from 'lucide-react';
 import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
 import { 
   getLoggedInUserIdentifiers, 
   isProjectAssignedToLead, 
-  isTeamLeadRole 
+  isTeamLeadRole,
+  isEmployeeRole,
+  fetchEmployeeTeamLead
 } from '../../utils/teamLeadUtils.js';
 
 export const DailyReportView = () => {
   const { user } = useApp();
   
+  // --- States for Assigned Team Lead ---
+  const [teamLead, setTeamLead] = useState(null);
+  const [isTlLoading, setIsTlLoading] = useState(true);
+
   // --- States for Dropdowns (Assigned Meta) ---
   const [assignedProjects, setAssignedProjects] = useState([]);
   const [assignedTasks, setAssignedTasks] = useState([]);
@@ -30,6 +36,7 @@ export const DailyReportView = () => {
   const getEmptyRow = () => ({
     id: `row-${Date.now()}-${Math.random()}`,
     projectId: '',
+    customProjectName: '',
     taskId: '', // Maps to taskReferences array
     hoursWorked: 8,
     todaysWork: '',
@@ -147,7 +154,7 @@ export const DailyReportView = () => {
     try {
       const userId = user?._id || user?.id || user?.employeeId || user?.employee?._id;
       
-      // Clean up any legacy dummy cache from localStorage to prevent "General Project" automatic rows
+      // Clean up any legacy dummy cache from localStorage to prevent automatic rows
       if (userId) {
         try {
           localStorage.removeItem(`daily_reports_${userId}`);
@@ -214,14 +221,32 @@ export const DailyReportView = () => {
     }
   };
 
+  const fetchAssignedTeamLead = async () => {
+    setIsTlLoading(true);
+    try {
+      const tl = await fetchEmployeeTeamLead();
+      setTeamLead(tl);
+    } catch {
+      setTeamLead(null);
+    } finally {
+      setIsTlLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchAssignedMeta();
     fetchHistory();
+    fetchAssignedTeamLead();
   }, [user]);
+
+  // Determine if this user is a regular employee who requires an assigned Team Lead
+  const userRole = deriveUserRole(user);
+  const isEmployee = isEmployeeRole(userRole, user);
+  const hasNoAssignedTL = isEmployee && !isTlLoading && !teamLead;
 
   // --- Helpers ---
   const getTasksForProject = (projectId) => {
-    if (!projectId) return [];
+    if (!projectId || projectId === 'other') return [];
     return assignedTasks.filter(t => 
       (typeof t.projectId === 'object' ? t.projectId?._id === projectId : t.projectId === projectId) || 
       t.project?._id === projectId
@@ -229,7 +254,7 @@ export const DailyReportView = () => {
   };
 
   const getProjectName = (report) => {
-    if (!report) return 'General Project';
+    if (!report) return 'Other';
     if (report.project?.name) return report.project.name;
     if (report.project?.projectName) return report.project.projectName;
     if (report.projectName) return report.projectName;
@@ -241,11 +266,15 @@ export const DailyReportView = () => {
 
     const pId = typeof pObj === 'object' ? pObj?._id : (pObj || report.project);
     if (pId) {
-      const match = assignedProjects.find(p => String(p._id) === String(pId) || String(p.id) === String(pId));
+      const pIdStr = String(pId);
+      if (pIdStr === '000000000000000000000002') return report.remarks || 'Other';
+      const match = assignedProjects.find(p => String(p._id) === pIdStr || String(p.id) === pIdStr);
       if (match) return match.name || match.projectName || 'Project';
-      return `Project (${String(pId).slice(-4)})`;
+      return `Project (${pIdStr.slice(-4)})`;
     }
-    return 'General Project';
+
+    if (report.remarks) return report.remarks;
+    return 'Other';
   };
 
   const formatReportDate = (val) => {
@@ -266,6 +295,9 @@ export const DailyReportView = () => {
         // Reset task if project changes
         if (field === 'projectId') {
           updated.taskId = ''; 
+          if (value !== 'other') {
+            updated.customProjectName = '';
+          }
         }
         return updated;
       }
@@ -287,11 +319,29 @@ export const DailyReportView = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormMsg({ type: '', text: '' });
+
+    if (hasNoAssignedTL) {
+      setFormMsg({ 
+        type: 'error', 
+        text: 'Please connect to Admin or HR to assign a Team Lead. Without an assigned Team Lead, you cannot submit daily reports.' 
+      });
+      return;
+    }
     
-    // Basic Validation: check required fields (projectId, todaysWork, hoursWorked)
-    const isValid = taskRows.every(row => row.projectId && row.todaysWork.trim() && row.hoursWorked > 0);
+    // Basic Validation: check required fields (projectId, custom name if Other, todaysWork, hoursWorked)
+    const isValid = taskRows.every(row => {
+      const hasProj = Boolean(row.projectId);
+      const hasCustomIfOther = row.projectId !== 'other' || Boolean(row.customProjectName?.trim());
+      const hasWork = Boolean(row.todaysWork && row.todaysWork.trim());
+      const hasHours = Boolean(row.hoursWorked && Number(row.hoursWorked) > 0);
+      return hasProj && hasCustomIfOther && hasWork && hasHours;
+    });
+
     if (!isValid) {
-      setFormMsg({ type: 'error', text: 'Please fill in all required fields (Project, Today\'s Work, and Hours) for all entries.' });
+      setFormMsg({ 
+        type: 'error', 
+        text: 'Please fill in all required fields (Project, Today\'s Work, and Hours). If "Other" is chosen, please specify the project name.' 
+      });
       return;
     }
 
@@ -302,15 +352,31 @@ export const DailyReportView = () => {
       const createdReports = [];
 
       for (const row of taskRows) {
+        const isOther = row.projectId === 'other';
+
+        let projName = '';
+        let targetProjId = row.projectId;
+
+        if (isOther) {
+          projName = row.customProjectName?.trim() || 'Other';
+          targetProjId = '000000000000000000000002';
+        } else {
+          const match = assignedProjects.find(p => String(p._id) === String(row.projectId));
+          projName = match?.projectName || match?.name || 'Project';
+        }
+
         const payload = {
           employeeId: userId,
-          projectId: row.projectId,
+          projectId: targetProjId,
+          projectName: projName,
+          remarks: projName,
           todaysWork: row.todaysWork,
           hoursWorked: Number(row.hoursWorked),
           pendingWork: row.pendingWork || '',
           tomorrowPlan: row.tomorrowPlan || '',
           issuesFaced: row.issuesFaced || '',
-          taskReferences: row.taskId ? [row.taskId] : []
+          taskReferences: (!isOther && row.taskId) ? [row.taskId] : [],
+          submit: true
         };
 
         try {
@@ -364,9 +430,15 @@ export const DailyReportView = () => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || workText.includes(q) || planText.includes(q) || projName.includes(q);
 
+    if (!matchesSearch) return false;
+
+    if (selectedProjectFilter === 'all') return true;
+    if (selectedProjectFilter === 'other') {
+      return projName.includes('other') || String(rep.projectId) === '000000000000000000000002';
+    }
+
     const rawProjId = typeof rep.projectId === 'object' ? rep.projectId?._id : (rep.projectId || rep.project?._id || rep.project);
-    const matchesProj = selectedProjectFilter === 'all' || String(rawProjId) === String(selectedProjectFilter);
-    return matchesSearch && matchesProj;
+    return String(rawProjId) === String(selectedProjectFilter);
   });
 
   return (
@@ -386,6 +458,42 @@ export const DailyReportView = () => {
             </div>
           </div>
         </div>
+
+        {/* Warning if employee has no assigned TL */}
+        {hasNoAssignedTL && (
+          <div className="mb-5 p-4 rounded-xl border border-amber-300 bg-amber-50/90 text-amber-900 shadow-xs flex items-start gap-3">
+            <div className="p-2 bg-amber-100 border border-amber-300/70 text-amber-800 rounded-lg shrink-0 mt-0.5">
+              <UserX size={18} />
+            </div>
+            <div className="flex-1 text-xs sm:text-sm">
+              <h4 className="font-bold text-amber-950 text-sm tracking-tight mb-1">
+                No Team Lead Assigned
+              </h4>
+              <p className="text-amber-800 leading-relaxed">
+                Please connect to Admin or HR to assign a Team Lead. Without an assigned Team Lead, you cannot submit daily reports.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Assigned Team Lead badge if present */}
+        {teamLead && (
+          <div className="mb-4 px-3.5 py-2.5 rounded-lg border border-slate-200 bg-slate-50/80 text-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">
+                <UserCheck size={12} />
+              </div>
+              <span className="text-slate-500 font-medium">Assigned Team Lead:</span>
+              <span className="font-semibold text-slate-900">{teamLead.name || 'Team Lead'}</span>
+              {teamLead.email && <span className="text-slate-400 font-mono hidden sm:inline">({teamLead.email})</span>}
+            </div>
+            {teamLead.designation && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
+                {teamLead.designation}
+              </span>
+            )}
+          </div>
+        )}
 
         {formMsg.text && (
           <div className={`mb-5 p-3 rounded-md text-sm font-medium border ${formMsg.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
@@ -424,7 +532,7 @@ export const DailyReportView = () => {
                     {/* Project */}
                     <div className="md:col-span-4">
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                        Assigned Project *
+                        Project / Category *
                       </label>
                       <select 
                         value={row.projectId}
@@ -433,10 +541,28 @@ export const DailyReportView = () => {
                         required
                       >
                         <option value="">Select Project</option>
-                        {assignedProjects.map(p => (
-                          <option key={p._id} value={p._id}>{p.projectName || p.name || 'Project'}</option>
-                        ))}
+                        <option value="other">Other</option>
+                        {assignedProjects.length > 0 && (
+                          <optgroup label="Assigned Projects">
+                            {assignedProjects.map(p => (
+                              <option key={p._id} value={p._id}>{p.projectName || p.name || 'Project'}</option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
+
+                      {row.projectId === 'other' && (
+                        <div className="mt-2.5">
+                          <input 
+                            type="text"
+                            placeholder="Specify project or activity name *"
+                            value={row.customProjectName || ''}
+                            onChange={e => handleRowChange(row.id, 'customProjectName', e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-white border border-indigo-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                            required
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Task Reference */}
@@ -447,9 +573,14 @@ export const DailyReportView = () => {
                       <select 
                         value={row.taskId}
                         onChange={e => handleRowChange(row.id, 'taskId', e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                        disabled={row.projectId === 'other'}
+                        className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                       >
-                        <option value="">No task linked</option>
+                        <option value="">
+                          {row.projectId === 'other' 
+                            ? 'No task linked (Other)' 
+                            : 'No task linked'}
+                        </option>
                         {availableTasks.map(t => (
                           <option key={t._id} value={t._id}>{t.taskTitle || t.title}</option>
                         ))}
@@ -545,11 +676,12 @@ export const DailyReportView = () => {
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <button 
                 type="submit" 
-                disabled={isSubmitting || isMetaLoading || assignedProjects.length === 0}
-                className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                disabled={isSubmitting || isMetaLoading || isTlLoading || hasNoAssignedTL}
+                title={hasNoAssignedTL ? 'Connect to Admin or HR to assign a Team Lead before submitting' : undefined}
+                className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} 
-                {isSubmitting ? 'Submitting...' : 'Submit Report'}
+                {isSubmitting ? 'Submitting...' : hasNoAssignedTL ? 'Submit Blocked (No TL Assigned)' : 'Submit Report'}
               </button>
             </div>
           </div>
@@ -587,6 +719,7 @@ export const DailyReportView = () => {
               className="w-full sm:w-auto px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
             >
               <option value="all">All Projects</option>
+              <option value="other">Other</option>
               {assignedProjects.map(p => (
                 <option key={p._id} value={p._id}>{p.projectName || p.name || 'Project'}</option>
               ))}
