@@ -33,8 +33,8 @@ export const PerformanceView = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch logged-in user's performance using GET /api/performance/:id
-  const fetchMyPerformance = async () => {
-    setIsLoading(true);
+  const fetchMyPerformance = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       const uEmail = (user?.email || '').toLowerCase().trim();
       const uName = (user?.name || '').toLowerCase().trim();
@@ -119,12 +119,32 @@ export const PerformanceView = () => {
     } catch (err) {
       console.error('My Performance fetch error:', err);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMyPerformance();
+    fetchMyPerformance(false);
+
+    // Silent background auto-refresh every 12 seconds
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchMyPerformance(true);
+    }, 12000);
+
+    const handleFocus = () => fetchMyPerformance(true);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchMyPerformance(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [user]);
 
   const score = Number(performanceData?.performancePercentage ?? 0);
@@ -264,149 +284,169 @@ export const TeamMembersView = () => {
   const [search, setSearch] = useState('');
   const [userProjects, setUserProjects] = useState([]);
 
-  useEffect(() => {
-    const fetchMyProjectTeam = async () => {
-      setIsLoading(true);
-      try {
-        const userEmail = (user?.email || user?.user?.email || '').toLowerCase().trim();
-        const userId = String(user?._id || user?.id || user?.employee?._id || user?.employeeId || '');
+  const fetchMyProjectTeam = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
+    try {
+      const userEmail = (user?.email || user?.user?.email || '').toLowerCase().trim();
+      const userId = String(user?._id || user?.id || user?.employee?._id || user?.employeeId || '');
 
-        // 1. Fetch live projects and tasks
-        const [projRes, taskRes] = await Promise.allSettled([
-          api.get('/api/projectManage/project/all'),
-          api.get('/api/task/all')
-        ]);
+      // 1. Fetch live projects and tasks
+      const [projRes, taskRes] = await Promise.allSettled([
+        api.get('/api/projectManage/project/all'),
+        api.get('/api/task/all')
+      ]);
 
-        const projects = projRes.status === 'fulfilled' && Array.isArray(projRes.value.data?.data)
-          ? projRes.value.data.data
-          : [];
+      const projects = projRes.status === 'fulfilled' && Array.isArray(projRes.value.data?.data)
+        ? projRes.value.data.data
+        : [];
 
-        const tasks = taskRes.status === 'fulfilled' && Array.isArray(taskRes.value.data?.data)
-          ? taskRes.value.data.data
-          : [];
+      const tasks = taskRes.status === 'fulfilled' && Array.isArray(taskRes.value.data?.data)
+        ? taskRes.value.data.data
+        : [];
 
-        if (projects.length === 0) {
-          setMembers([]);
-          setUserProjects([]);
-          return;
-        }
-
-        // 2. Determine which projects the current user belongs to
-        const memberMap = new Map();
-        const myProjectsList = [];
-
-        await Promise.all(
-          projects.map(async (p) => {
-            let pMembers = null;
-            const hasEmbeddedMembers = Boolean(
-              p.teamLeadUser || p.teamLeadEmployee ||
-              (Array.isArray(p.employees) && p.employees.length > 0)
-            );
-            if (!hasEmbeddedMembers && p._id) {
-              try {
-                const memRes = await api.get(`/api/projectManage/project/members/${p._id}`);
-                if (memRes.data?.success && memRes.data?.data) {
-                  pMembers = memRes.data.data;
-                }
-              } catch (e) {
-                // Ignore failure for individual project
-              }
-            }
-
-            // Check if CURRENT USER is assigned to this project
-            const tlUser = pMembers?.teamLeadUser || p.teamLeadUser;
-            const tlEmp = pMembers?.teamLeadEmployee || p.teamLeadEmployee;
-            const emps = [...(pMembers?.employees || []), ...(p.employees || [])];
-
-            const isUserLead = (
-              (tlUser?.email && tlUser.email.toLowerCase() === userEmail) ||
-              (tlUser?._id && String(tlUser._id) === userId) ||
-              (tlEmp?.email && tlEmp.email.toLowerCase() === userEmail) ||
-              (tlEmp?._id && String(tlEmp._id) === userId) ||
-              (tlEmp?.id && String(tlEmp.id) === userId)
-            );
-
-            const isUserEmp = emps.some(e =>
-              (e?.email && String(e.email).toLowerCase() === userEmail) ||
-              (e?._id && String(e._id) === userId) ||
-              (e?.id && String(e.id) === userId)
-            );
-
-            // Also check if any task in this project is assigned to user
-            const hasTaskInProject = tasks.some(t => {
-              const tPId = typeof t.projectId === 'object' ? t.projectId?._id : t.projectId;
-              if (String(tPId) !== String(p._id)) return false;
-
-              const aEmpId = typeof t.assignedEmployee === 'object' ? t.assignedEmployee?._id : t.assignedEmployee;
-              const aEmpEmail = typeof t.assignedEmployee === 'object' ? t.assignedEmployee?.email : null;
-
-              return (
-                (aEmpId && String(aEmpId) === userId) ||
-                (aEmpEmail && String(aEmpEmail).toLowerCase() === userEmail)
-              );
-            });
-
-            const isUserInThisProject = isUserLead || isUserEmp || hasTaskInProject;
-
-            // ONLY IF the current user is part of this project, collect team members from it!
-            if (isUserInThisProject) {
-              const pTitle = p.projectName || 'Project';
-              if (!myProjectsList.includes(pTitle)) {
-                myProjectsList.push(pTitle);
-              }
-
-              const addMem = (m, role, isLead) => {
-                if (!m) return;
-                const key = (m.email || m._id || m.id || '').toLowerCase().trim();
-                if (!key) return;
-
-                const isMe = (
-                  (m.email && String(m.email).toLowerCase() === userEmail) ||
-                  (m._id && String(m._id) === userId) ||
-                  (m.id && String(m.id) === userId)
-                );
-
-                const existing = memberMap.get(key);
-                if (existing) {
-                  if (!existing.projects.includes(pTitle)) {
-                    existing.projects.push(pTitle);
-                  }
-                } else {
-                  const name = m.fullName || m.name || (m.firstName ? `${m.firstName} ${m.lastName || ''}`.trim() : (m.email ? m.email.split('@')[0] : 'Team Member'));
-                  memberMap.set(key, {
-                    id: m._id || m.id || key,
-                    name,
-                    email: m.email || '',
-                    employeeID: m.employeeID || '',
-                    role: isLead ? 'Team Leader' : (role || 'Employee'),
-                    status: 'Online',
-                    isLead,
-                    isMe,
-                    projects: [pTitle]
-                  });
-                }
-              };
-
-              // Add Team Leader
-              const leadObj = tlEmp || tlUser;
-              if (leadObj) addMem(leadObj, 'Team Leader', true);
-
-              // Add Employees
-              emps.forEach(e => addMem(e, 'Employee', false));
-            }
-          })
-        );
-
-        setUserProjects(myProjectsList);
-        setMembers(Array.from(memberMap.values()));
-      } catch (err) {
-        console.error("Failed to load project team members:", err);
-      } finally {
-        setIsLoading(false);
+      if (projects.length === 0) {
+        setMembers([]);
+        setUserProjects([]);
+        return;
       }
+
+      // 2. Determine which projects the current user belongs to
+      const memberMap = new Map();
+      const myProjectsList = [];
+
+      await Promise.all(
+        projects.map(async (p) => {
+          let pMembers = null;
+          const hasEmbeddedMembers = Boolean(
+            p.teamLeadUser || p.teamLeadEmployee ||
+            (Array.isArray(p.employees) && p.employees.length > 0)
+          );
+          if (!hasEmbeddedMembers && p._id) {
+            try {
+              const memRes = await api.get(`/api/projectManage/project/members/${p._id}`);
+              if (memRes.data?.success && memRes.data?.data) {
+                pMembers = memRes.data.data;
+              }
+            } catch (e) {
+              // Ignore failure for individual project
+            }
+          }
+
+          // Check if CURRENT USER is assigned to this project
+          const tlUser = pMembers?.teamLeadUser || p.teamLeadUser;
+          const tlEmp = pMembers?.teamLeadEmployee || p.teamLeadEmployee;
+          const emps = [...(pMembers?.employees || []), ...(p.employees || [])];
+
+          const isUserLead = (
+            (tlUser?.email && tlUser.email.toLowerCase() === userEmail) ||
+            (tlUser?._id && String(tlUser._id) === userId) ||
+            (tlEmp?.email && tlEmp.email.toLowerCase() === userEmail) ||
+            (tlEmp?._id && String(tlEmp._id) === userId) ||
+            (tlEmp?.id && String(tlEmp.id) === userId)
+          );
+
+          const isUserEmp = emps.some(e =>
+            (e?.email && String(e.email).toLowerCase() === userEmail) ||
+            (e?._id && String(e._id) === userId) ||
+            (e?.id && String(e.id) === userId)
+          );
+
+          // Also check if any task in this project is assigned to user
+          const hasTaskInProject = tasks.some(t => {
+            const tPId = typeof t.projectId === 'object' ? t.projectId?._id : t.projectId;
+            if (String(tPId) !== String(p._id)) return false;
+
+            const aEmpId = typeof t.assignedEmployee === 'object' ? t.assignedEmployee?._id : t.assignedEmployee;
+            const aEmpEmail = typeof t.assignedEmployee === 'object' ? t.assignedEmployee?.email : null;
+
+            return (
+              (aEmpId && String(aEmpId) === userId) ||
+              (aEmpEmail && String(aEmpEmail).toLowerCase() === userEmail)
+            );
+          });
+
+          const isUserInThisProject = isUserLead || isUserEmp || hasTaskInProject;
+
+          // ONLY IF the current user is part of this project, collect team members from it!
+          if (isUserInThisProject) {
+            const pTitle = p.projectName || 'Project';
+            if (!myProjectsList.includes(pTitle)) {
+              myProjectsList.push(pTitle);
+            }
+
+            const addMem = (m, role, isLead) => {
+              if (!m) return;
+              const key = (m.email || m._id || m.id || '').toLowerCase().trim();
+              if (!key) return;
+
+              const isMe = (
+                (m.email && String(m.email).toLowerCase() === userEmail) ||
+                (m._id && String(m._id) === userId) ||
+                (m.id && String(m.id) === userId)
+              );
+
+              const existing = memberMap.get(key);
+              if (existing) {
+                if (!existing.projects.includes(pTitle)) {
+                  existing.projects.push(pTitle);
+                }
+              } else {
+                const name = m.fullName || m.name || (m.firstName ? `${m.firstName} ${m.lastName || ''}`.trim() : (m.email ? m.email.split('@')[0] : 'Team Member'));
+                memberMap.set(key, {
+                  id: m._id || m.id || key,
+                  name,
+                  email: m.email || '',
+                  employeeID: m.employeeID || '',
+                  role: isLead ? 'Team Leader' : (role || 'Employee'),
+                  status: 'Online',
+                  isLead,
+                  isMe,
+                  projects: [pTitle]
+                });
+              }
+            };
+
+            // Add Team Leader
+            const leadObj = tlEmp || tlUser;
+            if (leadObj) addMem(leadObj, 'Team Leader', true);
+
+            // Add Employees
+            emps.forEach(e => addMem(e, 'Employee', false));
+          }
+        })
+      );
+
+      setUserProjects(myProjectsList);
+      setMembers(Array.from(memberMap.values()));
+    } catch (err) {
+      console.error("Failed to load project team members:", err);
+    } finally {
+      if (!isSilent) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyProjectTeam(false);
+
+    // Silent background auto-refresh every 12 seconds
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchMyProjectTeam(true);
+    }, 12000);
+
+    const handleFocus = () => fetchMyProjectTeam(true);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchMyProjectTeam(true);
     };
 
-    fetchMyProjectTeam();
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [user]);
 
   const filteredMembers = members.filter(m => {
@@ -1144,8 +1184,8 @@ export const TeamTaskManagementView = () => {
   };
 
   // Fetch live tasks, projects, and users
-  const fetchAllData = async () => {
-    setIsLoading(true);
+  const fetchAllData = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       // 1. Fetch tasks: GET /api/projectManage/task/all with fallback to /api/task/all
       let loadedTasks = [];
@@ -1186,13 +1226,40 @@ export const TeamTaskManagementView = () => {
         console.warn('Could not load users for task dropdown:', uErr);
       }
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    fetchAllData(false);
+
+    // Silent background auto-refresh every 10 seconds for Team Tasks
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (!isCreateModalOpen && !editingTask && !deletingTask) {
+        fetchAllData(true);
+      }
+    }, 10000);
+
+    const handleFocus = () => {
+      if (!isCreateModalOpen && !editingTask && !deletingTask) fetchAllData(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !isCreateModalOpen && !editingTask && !deletingTask) {
+        fetchAllData(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isCreateModalOpen, editingTask, deletingTask]);
 
   const normalizeStatus = (status = '') => {
     const s = String(status || '').toLowerCase().trim().replace(/[- ]/g, '_');
@@ -2056,8 +2123,8 @@ export const TeamLeaveManagementView = () => {
   };
 
   // Fetch Live Leaves and User Directory with Team Scope filter
-  const fetchLeaves = async () => {
-    setIsLoading(true);
+  const fetchLeaves = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       // 1. Fetch Users directory and Teams collection simultaneously
       let uMap = {};
@@ -2109,13 +2176,40 @@ export const TeamLeaveManagementView = () => {
       const myTeamLeaves = allLeavesList.filter(l => isLeaveOfAssignedTeam(l, teamScope, uMap));
       setLeaves(myTeamLeaves);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLeaves();
-  }, [user]);
+    fetchLeaves(false);
+
+    // Silent background auto-refresh every 10 seconds for real-time leave requests from team members
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (!actionModal) {
+        fetchLeaves(true);
+      }
+    }, 10000);
+
+    const handleFocus = () => {
+      if (!actionModal) fetchLeaves(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !actionModal) {
+        fetchLeaves(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user, actionModal]);
 
   // APPROVE LEAVE: PUT /api/leave/teamlead/approve or /api/leave/teamlead-approval with status: 'approved'
   // When TL approves, it goes to HR for approval!

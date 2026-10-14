@@ -478,7 +478,39 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     fetchUsers();
     fetchTeamLeadOptions();
     fetchTasks();
-  }, []);
+
+    // Silent background auto-refresh every 10 seconds for real-time projects and tasks
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (!showProjectModal && !showTaskModal && !editingTask) {
+        fetchProjects(true);
+        fetchTasks(selectedProject?._id || null);
+      }
+    }, 10000);
+
+    const handleFocus = () => {
+      if (!showProjectModal && !showTaskModal && !editingTask) {
+        fetchProjects(true);
+        fetchTasks(selectedProject?._id || null);
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !showProjectModal && !showTaskModal && !editingTask) {
+        fetchProjects(true);
+        fetchTasks(selectedProject?._id || null);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [showProjectModal, showTaskModal, editingTask, selectedProject]);
 
   // Function to fetch daily updates for a task using https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list
   const fetchTaskUpdates = async (taskId) => {
@@ -1064,9 +1096,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     });
   };
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const res = await axios.get(`${BASE_URL}/all`);
       const projectData = res.data.data || res.data.projects || res.data;
       
@@ -1088,9 +1120,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       setProjects(sortByNewest(processedProjects || []));
     } catch (error) {
       console.error("Fetch Projects Error:", error);
-      setProjects([]);
+      if (!isSilent) setProjects([]);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 

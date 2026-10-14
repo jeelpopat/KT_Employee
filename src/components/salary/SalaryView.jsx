@@ -500,9 +500,9 @@ export const SalaryView = () => {
   };
 
   // Master refresh function
-  const loadData = async (isManual = false) => {
+  const loadData = async (isManual = false, isSilent = false) => {
     if (isManual) setIsRefreshing(true);
-    else setIsLoading(true);
+    else if (!isSilent) setIsLoading(true);
 
     try {
       const staffList = await fetchStaffList();
@@ -521,14 +521,43 @@ export const SalaryView = () => {
         ]);
       }
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
       setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-  }, [myMongoUserId, isAdmin]);
+    loadData(false, false);
+
+    // Silent background auto-refresh every 15 seconds
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (!isStructureModalOpen && !isProcessModalOpen && !isUpdatePayrollModalOpen) {
+        loadData(false, true);
+      }
+    }, 15000);
+
+    const handleFocus = () => {
+      if (!isStructureModalOpen && !isProcessModalOpen && !isUpdatePayrollModalOpen) {
+        loadData(false, true);
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !isStructureModalOpen && !isProcessModalOpen && !isUpdatePayrollModalOpen) {
+        loadData(false, true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [myMongoUserId, isAdmin, isStructureModalOpen, isProcessModalOpen, isUpdatePayrollModalOpen]);
 
   // ==========================================
   // 2. ADMIN ACTIONS: CREATE / EDIT SALARY STRUCTURE

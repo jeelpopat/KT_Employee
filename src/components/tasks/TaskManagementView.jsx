@@ -72,8 +72,8 @@ export const TaskManagementView = () => {
   };
 
   // Fetch Live Tasks for current employee: GET /api/task/employee/:employeeId
-  const fetchTasks = async () => {
-    setIsLoading(true);
+  const fetchTasks = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       const empId = user?.employee?._id || user?._id || user?.id || user?.profile?._id || user?.employeeId;
       let tasksData = [];
@@ -110,13 +110,40 @@ export const TaskManagementView = () => {
     } catch (error) {
       console.error("Failed to fetch my tasks:", error);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTasks();
-  }, [user]);
+    fetchTasks(false);
+
+    // Silent background auto-refresh every 10 seconds for real-time task updates from TL
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (!isUpdating) {
+        fetchTasks(true);
+      }
+    }, 10000);
+
+    const handleFocus = () => {
+      if (!isUpdating) fetchTasks(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !isUpdating) {
+        fetchTasks(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user, isUpdating]);
 
   // Handle Drag-and-Drop or Dropdown Status Updates
   const handleUpdateTaskStatus = async (taskId, newStatus) => {

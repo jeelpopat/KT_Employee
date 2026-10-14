@@ -35,71 +35,91 @@ export const HolidayCalendarView = () => {
   ];
 
   // Fetch holidays from backend API and combine with defaults
+  const fetchHolidays = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
+    try {
+      const res = await api.get(`/api/holiday/all?year=${currentYear}`);
+      const apiHolidays = res.data?.holidays || res.data?.data || [];
+
+      const formattedApi = apiHolidays.map((item) => {
+        const dateStr = (item.holidayDate || item.date || '').split('T')[0];
+        const rawName = item.holidayName || item.name || 'Holiday';
+
+        let derivedType = 'public';
+        const lowerName = rawName.toLowerCase();
+        if (lowerName.includes('sunday')) {
+          derivedType = 'sunday';
+        } else if (lowerName.includes('saturday')) {
+          derivedType = 'saturday';
+        } else if (
+          lowerName.includes('diwali') ||
+          lowerName.includes('holi') ||
+          lowerName.includes('raksha') ||
+          lowerName.includes('eid') ||
+          lowerName.includes('christmas') ||
+          lowerName.includes('navratri') ||
+          lowerName.includes('dussehra') ||
+          lowerName.includes('visarjan') ||
+          lowerName.includes('ganesh') ||
+          lowerName.includes('sankranti')
+        ) {
+          derivedType = 'festival';
+        } else {
+          derivedType = 'public';
+        }
+
+        return {
+          id: item._id || `${dateStr}-${rawName}`,
+          name: rawName,
+          date: dateStr,
+          type: derivedType,
+          description: item.description || (derivedType === 'festival' ? 'Festival Celebration' : 'Public Holiday'),
+          isBackend: true
+        };
+      });
+
+      // Merge: avoid duplicating same date and name
+      const combined = [...defaultHolidayList];
+      formattedApi.forEach((apiItem) => {
+        const exists = combined.some(
+          (c) => c.date === apiItem.date && c.name.toLowerCase() === apiItem.name.toLowerCase()
+        );
+        if (!exists) {
+          combined.push(apiItem);
+        }
+      });
+
+      setHolidays(combined);
+    } catch (err) {
+      console.warn('Using default holiday database due to network/api response:', err);
+      setHolidays(defaultHolidayList);
+    } finally {
+      if (!isSilent) setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchHolidays = async () => {
-      setIsLoading(true);
-      try {
-        const res = await api.get(`/api/holiday/all?year=${currentYear}`);
-        const apiHolidays = res.data?.holidays || res.data?.data || [];
+    fetchHolidays(false);
 
-        const formattedApi = apiHolidays.map((item) => {
-          const dateStr = (item.holidayDate || item.date || '').split('T')[0];
-          const rawName = item.holidayName || item.name || 'Holiday';
+    // Silent background auto-refresh every 30 seconds for holidays calendar
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchHolidays(true);
+    }, 30000);
 
-          let derivedType = 'public';
-          const lowerName = rawName.toLowerCase();
-          if (lowerName.includes('sunday')) {
-            derivedType = 'sunday';
-          } else if (lowerName.includes('saturday')) {
-            derivedType = 'saturday';
-          } else if (
-            lowerName.includes('diwali') ||
-            lowerName.includes('holi') ||
-            lowerName.includes('raksha') ||
-            lowerName.includes('eid') ||
-            lowerName.includes('christmas') ||
-            lowerName.includes('navratri') ||
-            lowerName.includes('dussehra') ||
-            lowerName.includes('visarjan') ||
-            lowerName.includes('ganesh') ||
-            lowerName.includes('sankranti')
-          ) {
-            derivedType = 'festival';
-          } else {
-            derivedType = 'public';
-          }
-
-          return {
-            id: item._id || `${dateStr}-${rawName}`,
-            name: rawName,
-            date: dateStr,
-            type: derivedType,
-            description: item.description || (derivedType === 'festival' ? 'Festival Celebration' : 'Public Holiday'),
-            isBackend: true
-          };
-        });
-
-        // Merge: avoid duplicating same date and name
-        const combined = [...defaultHolidayList];
-        formattedApi.forEach((apiItem) => {
-          const exists = combined.some(
-            (c) => c.date === apiItem.date && c.name.toLowerCase() === apiItem.name.toLowerCase()
-          );
-          if (!exists) {
-            combined.push(apiItem);
-          }
-        });
-
-        setHolidays(combined);
-      } catch (err) {
-        console.warn('Using default holiday database due to network/api response:', err);
-        setHolidays(defaultHolidayList);
-      } finally {
-        setIsLoading(false);
-      }
+    const handleFocus = () => fetchHolidays(true);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchHolidays(true);
     };
 
-    fetchHolidays();
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [currentYear]);
 
   // Calendar Helpers (MON to SUN)

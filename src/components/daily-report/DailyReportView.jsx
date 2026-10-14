@@ -52,8 +52,8 @@ export const DailyReportView = () => {
   const [selectedProjectFilter, setSelectedProjectFilter] = useState('all');
 
   // --- Data Fetching ---
-  const fetchAssignedMeta = async () => {
-    setIsMetaLoading(true);
+  const fetchAssignedMeta = async (isSilent = false) => {
+    if (!isSilent) setIsMetaLoading(true);
     try {
       let projs = [];
       let tsks = [];
@@ -139,18 +139,18 @@ export const DailyReportView = () => {
       setAssignedTasks(tsks);
 
       // Initialize row with first project if available
-      if (projs.length > 0) {
+      if (!isSilent && projs.length > 0) {
         setTaskRows(prev => prev.map(r => r.projectId ? r : { ...r, projectId: projs[0]._id }));
       }
     } catch (error) {
       console.error("Failed to load assigned projects/tasks:", error);
     } finally {
-      setIsMetaLoading(false);
+      if (!isSilent) setIsMetaLoading(false);
     }
   };
 
-  const fetchHistory = async () => {
-    setIsHistoryLoading(true);
+  const fetchHistory = async (isSilent = false) => {
+    if (!isSilent) setIsHistoryLoading(true);
     try {
       const userId = user?._id || user?.id || user?.employeeId || user?.employee?._id;
       
@@ -217,7 +217,7 @@ export const DailyReportView = () => {
     } catch (error) {
       console.error("Failed to load report history:", error);
     } finally {
-      setIsHistoryLoading(false);
+      if (!isSilent) setIsHistoryLoading(false);
     }
   };
 
@@ -234,9 +234,37 @@ export const DailyReportView = () => {
   };
 
   useEffect(() => {
-    fetchAssignedMeta();
-    fetchHistory();
+    fetchAssignedMeta(false);
+    fetchHistory(false);
     fetchAssignedTeamLead();
+
+    // Silent background auto-refresh every 12 seconds for reports history and assigned projects/tasks
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchHistory(true);
+      fetchAssignedMeta(true);
+    }, 12000);
+
+    const handleFocus = () => {
+      fetchHistory(true);
+      fetchAssignedMeta(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchHistory(true);
+        fetchAssignedMeta(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [user]);
 
   // Determine if this user is a regular employee who requires an assigned Team Lead

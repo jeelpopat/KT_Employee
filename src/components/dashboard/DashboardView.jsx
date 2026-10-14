@@ -1001,22 +1001,35 @@ export const DashboardView = () => {
     return () => window.removeEventListener('kt_profile_photo_updated', handlePhotoUpdated);
   }, [fetchFullDashboard]);
 
-  // --- Lightweight Auto-refresh interval (ONLY syncs today's attendance status) ---
+  // --- Auto-refresh interval & focus listeners for Employee and TL Dashboard ---
   useEffect(() => {
-    const interval = setInterval(() => {
-      // 1. Don't poll if browser tab is hidden / minimized
+    const refreshDashboardSilently = () => {
       if (typeof document !== 'undefined' && document.hidden) return;
+      const targetId = actualUserIdRef.current || user?.employee?._id || user?._id || user?.id || user?.user?._id;
+      if (targetId) {
+        fetchFullDashboard(targetId);
+      }
+    };
 
-      // 2. Don't poll if employee is checked out or not checked in
-      const status = attendanceStatusRef.current;
-      if (status === 'checked_out' || status === 'not_checked_in') return;
+    // Auto-refresh every 12 seconds silently in the background
+    const interval = setInterval(refreshDashboardSilently, 12000);
 
-      // 3. Only sync today's attendance (1 single lightweight request)
-      fetchTodayAttendance(actualUserIdRef.current);
-    }, 30000);
+    const handleFocus = () => refreshDashboardSilently();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshDashboardSilently();
+      }
+    };
 
-    return () => clearInterval(interval);
-  }, [fetchTodayAttendance]);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [fetchFullDashboard, user]);
 
   // --- Auto Check-Out Monitor: If employee has not checked out until 11:59 PM, auto check out time 7:00 PM at that day ---
   useEffect(() => {

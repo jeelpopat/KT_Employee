@@ -47,8 +47,8 @@ export const AttendanceView = () => {
     } catch (e) {}
   }, []);
 
-  const fetchAttendance = async () => {
-    setIsLoading(true);
+  const fetchAttendance = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
 
     try {
       let endpoint = `/api/employee-panel/attendance/timeline`;
@@ -204,12 +204,32 @@ export const AttendanceView = () => {
       console.error("Failed to fetch timeline attendance:", error);
       setAttendanceRecords([]);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAttendance();
+    fetchAttendance(false);
+
+    // Silent background auto-refresh every 12 seconds
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchAttendance(true);
+    }, 12000);
+
+    const handleFocus = () => fetchAttendance(true);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchAttendance(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [activeFilterTab, selectedMonthStr]);
 
   const filteredRecords = attendanceRecords.filter(record => {

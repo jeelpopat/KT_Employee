@@ -45,13 +45,13 @@ export const DailyFollowUpView = () => {
   }, [user]);
 
   // Fetch Live Data using GET /api/dailyUpdate/list?teamLeadId=<TL_USER_ID>
-  const loadData = async (isManualRefresh = false) => {
+  const loadData = async (isManualRefresh = false, isSilent = false) => {
     if (isManualRefresh) {
       setIsRefreshing(true);
-    } else {
+    } else if (!isSilent) {
       setIsLoading(true);
     }
-    setFetchError(null);
+    if (!isSilent) setFetchError(null);
 
     try {
       const endpoint = tlUserId 
@@ -84,7 +84,7 @@ export const DailyFollowUpView = () => {
         setDailyUpdates(list);
       } else {
         console.warn(`GET ${endpoint} failed:`, updatesRes.reason);
-        setFetchError('Failed to fetch daily updates for team leader.');
+        if (!isSilent) setFetchError('Failed to fetch daily updates for team leader.');
       }
 
       // 2. Process Users List for Profile/Designation enrichment
@@ -94,15 +94,35 @@ export const DailyFollowUpView = () => {
       }
     } catch (err) {
       console.error('Error fetching team daily updates:', err);
-      setFetchError('Could not connect to live backend.');
+      if (!isSilent) setFetchError('Could not connect to live backend.');
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
       setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(false, false);
+
+    // Silent background auto-refresh every 10 seconds for real-time team daily updates
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadData(false, true);
+    }, 10000);
+
+    const handleFocus = () => loadData(false, true);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadData(false, true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [tlUserId]);
 
   // Map users by ID for quick O(1) profile lookup

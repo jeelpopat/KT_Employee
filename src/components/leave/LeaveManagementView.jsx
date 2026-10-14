@@ -234,9 +234,9 @@ export const LeaveManagementView = () => {
   };
 
   // Fetch Live Leave & Holiday Data with resilient fallback extraction
-  const fetchData = async (showLoadingSpinner = true) => {
+  const fetchData = async (showLoadingSpinner = true, isSilent = false) => {
     if (showLoadingSpinner) setIsLoading(true);
-    setIsRefreshing(true);
+    if (!isSilent) setIsRefreshing(true);
     try {
       // 0. Fetch Users directory for seamless employee ID mapping
       const usersMap = {};
@@ -360,7 +360,27 @@ export const LeaveManagementView = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true, false);
+
+    // Silent background auto-refresh every 10 seconds for real-time leave status updates (e.g. TL/HR approvals)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchData(false, true);
+    }, 10000);
+
+    const handleFocus = () => fetchData(false, true);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchData(false, true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Determine if this user is a regular employee who requires an assigned Team Lead

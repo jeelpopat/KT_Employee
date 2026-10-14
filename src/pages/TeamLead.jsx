@@ -907,15 +907,15 @@ const getDesignation = (lead) => {
   };
 
   // Fetch Functions
-  const fetchTeamLeads = async () => {
+  const fetchTeamLeads = async (isSilent = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (!isSilent) setLoading(true);
+      if (!isSilent) setError(null);
 
       const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       if (!token) {
-        setError("Authentication required. Please login.");
-        setLoading(false);
+        if (!isSilent) setError("Authentication required. Please login.");
+        if (!isSilent) setLoading(false);
         return;
       }
   
@@ -1208,7 +1208,7 @@ const getDesignation = (lead) => {
       console.error("Error fetching team leads:", error);
       handleError(error);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -1437,8 +1437,35 @@ const getDesignation = (lead) => {
   };
 
   useEffect(() => {
-    fetchTeamLeads();
-  }, []);
+    fetchTeamLeads(false);
+
+    // Silent background auto-refresh every 12 seconds for real-time team assignments & updates
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (!modalOpen) {
+        fetchTeamLeads(true);
+      }
+    }, 12000);
+
+    const handleFocus = () => {
+      if (!modalOpen) fetchTeamLeads(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !modalOpen) {
+        fetchTeamLeads(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [modalOpen]);
 
   const userRole = getUserRole();
   const isAdmin = userRole === 'admin';
