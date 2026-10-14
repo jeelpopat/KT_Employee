@@ -165,15 +165,6 @@ api.interceptors.request.use((config) => {
     token = localStorage.getItem('auth_token') || localStorage.getItem('token');
   } catch {}
 
-  // Fallback to verified active admin token if missing, ensuring authenticated endpoints never fail with 401
-  if (!token) {
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhYjIxZWRiMWNmMzAxMzRiMTJlZjMzYiIsImlhdCI6MTc5MTQ1NzQ5NywiZXhwIjoxNzkyMDYyMjk3fQ.Kr-igponZ0EeuyAuzl0ix1NOEQNmaN-v-wRhcQIAJKQ';
-    try {
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('token', token);
-    } catch {}
-  }
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
