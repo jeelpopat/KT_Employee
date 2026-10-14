@@ -1759,7 +1759,7 @@ export const AppProvider = ({ children }) => {
           const validation = await validateUserSession();
           if (!isMounted) return;
 
-          if (!validation.isValid) {
+          if (!validation.isValid && validation.shouldLogout) {
             console.warn('Initial session validation failed in context:', validation.reason);
             await performAutoCheckout(token);
             clearAuth();

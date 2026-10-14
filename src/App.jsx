@@ -218,7 +218,15 @@ export default function App() {
 
     const verifySessionOnMount = async () => {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-      if (!token || isTokenExpired(token)) {
+      if (!token) {
+        if (isMounted) {
+          setIsAuthenticated(false);
+          setIsCheckingAuth(false);
+        }
+        return;
+      }
+
+      if (isTokenExpired(token)) {
         if (isMounted) {
           await performAutoCheckout(token);
           clearAuth();
@@ -234,18 +242,19 @@ export default function App() {
 
         if (result.isValid) {
           setIsAuthenticated(true);
-        } else {
+        } else if (result.shouldLogout) {
           console.warn('Session verification rejected on refresh:', result.reason);
           await performAutoCheckout(token);
           clearAuth();
           setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(true);
         }
       } catch (err) {
-        console.error('Session verification error on refresh:', err);
+        console.warn('Session verification notice on refresh:', err);
+        // On network or unexpected error, do NOT checkout or logout
         if (isMounted) {
-          await performAutoCheckout(token);
-          clearAuth();
-          setIsAuthenticated(false);
+          setIsAuthenticated(true);
         }
       } finally {
         if (isMounted) {

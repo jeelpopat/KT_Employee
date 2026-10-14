@@ -31,13 +31,13 @@ export const decodeToken = (token) => {
  * @returns {boolean}
  */
 export const isTokenExpired = (token) => {
-  if (!token) return true;
+  if (!token || typeof token !== "string" || !token.trim()) return true;
   const decoded = decodeToken(token);
-  if (!decoded) return true; // If corrupted or invalid format, treat as expired
-  if (!decoded.exp) return false; // If no exp field, cannot determine expiry
-  
-  const currentTime = Math.floor(Date.now() / 1000);
-  return decoded.exp <= currentTime;
+  if (decoded && typeof decoded.exp === "number") {
+    const currentTime = Math.floor(Date.now() / 1000);
+    return decoded.exp <= currentTime;
+  }
+  return false;
 };
 
 /**
@@ -169,8 +169,8 @@ export const isRoleAllowed = (role) => {
 /**
  * Authoritatively derives user role from server profile payload
  */
-export const deriveUserRoleFromData = (u, raw) => {
-  if (!u && !raw) return "";
+export const deriveUserRoleFromData = (u, raw, authToken, fallbackStoredRole) => {
+  if (!u && !raw) return fallbackStoredRole ? normalizeRole(fallbackStoredRole) : "";
 
   const candidate = u || raw || {};
   const emp = candidate.employee || (raw && raw.employee) || {};
@@ -185,6 +185,15 @@ export const deriveUserRoleFromData = (u, raw) => {
 
   if (email === "harsh@kevalontechnology.in") return "admin";
   if (email === "kureshpoonawala384@gmail.com" || email === "hetvi.kevalon@gmail.com") return "team_leader";
+
+  // Check token claims if available
+  if (authToken) {
+    const tokenPayload = decodeToken(authToken);
+    if (tokenPayload) {
+      const tRole = normalizeRole(tokenPayload.role || tokenPayload.roleName || tokenPayload.userRole);
+      if (tRole && ["admin", "team_leader", "hr"].includes(tRole)) return tRole;
+    }
+  }
 
   const roleVal = (
     candidate.role?.roleName ||
@@ -257,7 +266,13 @@ export const deriveUserRoleFromData = (u, raw) => {
     return "employee";
   }
 
-  return normalizeRole(roleVal) || "employee";
+  const norm = normalizeRole(roleVal);
+  if (norm) return norm;
+
+  // If no explicit role was identified in server payload, preserve stored role (e.g. admin or team_leader)
+  if (fallbackStoredRole) return normalizeRole(fallbackStoredRole);
+
+  return "";
 };
 
 /**
@@ -266,34 +281,67 @@ export const deriveUserRoleFromData = (u, raw) => {
  * - Checks if user exists in DB
  * - Checks if user is ACTIVE (not inactive, not blocked, not terminated)
  * - Checks if user has the SAME ROLE as stored (detects role changes / demotions / promotions)
- * If any check fails, automatically runs auto-checkout, clears session, and returns isValid: false.
+ * ONLY runs auto-checkout if user is genuinely unavailable (deleted/401/404/inactive) or role mismatch!
  */
 export const validateUserSession = async () => {
   const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
   const storedRole = localStorage.getItem("user_role") || localStorage.getItem("active_role");
 
-  // 1. Missing or expired token
-  if (!token || isTokenExpired(token)) {
+  // 1. Missing token
+  if (!token) {
+    return { isValid: false, shouldLogout: true, reason: "No authentication token" };
+  }
+
+  // Check specifically for expired JWT exp
+  if (isTokenExpired(token)) {
+    console.warn("Session token expired. Triggering auto-checkout.");
     await performAutoCheckout(token);
     clearAuth();
-    return { isValid: false, reason: "No token or token expired" };
+    return { isValid: false, shouldLogout: true, reason: "Session expired" };
   }
 
   // 2. Fetch live profile directly from server
   try {
-    const response = await fetch("https://kt-backend-yzr4.onrender.com/api/users/profile", {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      }
-    });
+    let response;
+    try {
+      response = await fetch("https://kt-backend-yzr4.onrender.com/api/users/profile", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+    } catch (netErr) {
+      console.warn("Session check network notice:", netErr?.message);
+      // Network or temporary timeout error: user is STILL valid. DO NOT check out or logout!
+      return { isValid: true, isNetworkDegraded: true };
+    }
 
-    if (!response.ok) {
-      console.warn(`Profile validation failed: Server returned ${response.status}`);
+    // 2a. If server returned 401 Unauthorized or 404 Not Found: User is genuinely NOT AVAILABLE
+    if (response.status === 401 || response.status === 404) {
+      console.warn(`User session invalid/not found: Server returned ${response.status}. Triggering auto-checkout.`);
       await performAutoCheckout(token);
       clearAuth();
-      return { isValid: false, reason: `Profile API error: ${response.status}` };
+      return { isValid: false, shouldLogout: true, reason: `User not available (${response.status})` };
+    }
+
+    // 2b. If server returned 403 Forbidden: User account access denied
+    if (response.status === 403) {
+      console.warn("User account access forbidden (403). Triggering auto-checkout.");
+      await performAutoCheckout(token);
+      clearAuth();
+      return { isValid: false, shouldLogout: true, reason: "Access forbidden (403)" };
+    }
+
+    // 2c. If server returned 5xx (Internal Server Error): Temporary backend issue. DO NOT check out!
+    if (response.status >= 500) {
+      console.warn(`Backend server temporary error: ${response.status}. Preserving current session.`);
+      return { isValid: true, isServerDegraded: true };
+    }
+
+    if (!response.ok) {
+      console.warn(`Profile validation notice: HTTP ${response.status}. Preserving session.`);
+      return { isValid: true };
     }
 
     const result = await response.json();
@@ -301,13 +349,11 @@ export const validateUserSession = async () => {
     const userObj = raw?.user || result?.user || raw?.profile || result?.profile || raw;
 
     if (!userObj || (!userObj._id && !userObj.id && !userObj.email)) {
-      console.warn("Invalid user object in profile response");
-      await performAutoCheckout(token);
-      clearAuth();
-      return { isValid: false, reason: "User object invalid" };
+      // Body did not contain expected user object; do not logout if local token is present
+      return { isValid: true };
     }
 
-    // 3. Check if user is ACTIVE
+    // 3. Check if user is ACTIVE (not inactive, not blocked, not terminated)
     const isInactive = (
       userObj.isActive === false ||
       userObj.status === "inactive" ||
@@ -327,54 +373,80 @@ export const validateUserSession = async () => {
       console.warn("User account is inactive or blocked. Triggering auto-checkout and logout.");
       await performAutoCheckout(token);
       clearAuth();
-      return { isValid: false, reason: "User account is inactive or blocked" };
+      return { isValid: false, shouldLogout: true, reason: "User account is inactive or blocked" };
     }
 
     // 4. Derive live role and check permission
-    const liveRole = deriveUserRoleFromData(userObj, raw);
-    if (!liveRole || !isRoleAllowed(liveRole)) {
+    let liveRole = deriveUserRoleFromData(userObj, raw, token, storedRole);
+
+    // If role is a MongoDB ObjectId on the user record, query /api/role to look it up
+    const rawRoleId = userObj.role?._id || (typeof userObj.role === 'string' && /^[0-9a-fA-F]{24}$/.test(userObj.role) ? userObj.role : '') ||
+      userObj.employee?.role?._id || (typeof userObj.employee?.role === 'string' && /^[0-9a-fA-F]{24}$/.test(userObj.employee?.role) ? userObj.employee?.role : '');
+
+    if ((!liveRole || liveRole === 'employee') && rawRoleId && /^[0-9a-fA-F]{24}$/.test(String(rawRoleId).trim())) {
+      try {
+        const roleRes = await fetch("https://kt-backend-yzr4.onrender.com/api/role", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (roleRes.ok) {
+          const rData = await roleRes.json();
+          const rList = rData.data || rData.roles || (Array.isArray(rData) ? rData : []);
+          const matched = rList.find(r => r._id === rawRoleId || r.id === rawRoleId);
+          if (matched) {
+            const matchedName = matched.roleName || matched.name || matched.title;
+            if (matchedName) {
+              liveRole = normalizeRole(matchedName);
+            }
+          }
+        }
+      } catch (e) { }
+    }
+
+    if (!liveRole && storedRole) {
+      liveRole = normalizeRole(storedRole);
+    }
+
+    // 4b. Reject unauthorized roles (e.g. account, ca)
+    if (liveRole && !isRoleAllowed(liveRole)) {
       console.warn(`Unauthorized role session detected (${liveRole}). Triggering auto-checkout and logout.`);
       await performAutoCheckout(token);
       clearAuth();
-      return { isValid: false, reason: `Unauthorized role: ${liveRole}` };
+      return { isValid: false, shouldLogout: true, reason: `Unauthorized role: ${liveRole}` };
     }
 
-    // 5. Enforce SAME ROLE check
-    if (storedRole) {
+    // 5. Enforce SAME ROLE check: Only trigger if both are definitively known and DIFFERENT
+    if (storedRole && liveRole) {
       const normStored = normalizeRole(storedRole);
       const normLive = normalizeRole(liveRole);
-      if (normStored !== normLive) {
+      if (normStored && normLive && normStored !== normLive) {
         console.warn(`Role mismatch detected: Stored [${normStored}] !== Live [${normLive}]. Triggering auto-checkout and logout.`);
         await performAutoCheckout(token);
         clearAuth();
-        return { isValid: false, reason: `Role changed from ${normStored} to ${normLive}` };
+        return { isValid: false, shouldLogout: true, reason: `Role changed from ${normStored} to ${normLive}` };
       }
     }
 
-    // Session is valid, active, and has same role! Cache authoritative profile
+    // Session is fully valid, active, and has same role! Cache authoritative profile
     try {
       localStorage.setItem("auth_user", JSON.stringify(userObj));
       localStorage.setItem("user", JSON.stringify(userObj));
-      localStorage.setItem("active_role", normalizeRole(liveRole));
-      localStorage.setItem("user_role", normalizeRole(liveRole));
+      if (liveRole) {
+        localStorage.setItem("active_role", normalizeRole(liveRole));
+        localStorage.setItem("user_role", normalizeRole(liveRole));
+      }
       localStorage.setItem("isAuthenticated", "true");
     } catch (e) { }
 
     return {
       isValid: true,
       user: userObj,
-      role: normalizeRole(liveRole),
+      role: liveRole || normalizeRole(storedRole) || "employee",
       fullData: raw
     };
   } catch (err) {
-    console.error("Session verification network error:", err);
-    // If the client device is strictly offline, do not kick out if local token is still unexpired
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      return { isValid: true, isOffline: true };
-    }
-    await performAutoCheckout(token);
-    clearAuth();
-    return { isValid: false, reason: err.message };
+    console.warn("Session verification exception:", err);
+    // On unexpected error, do NOT checkout or logout
+    return { isValid: true, isErrorIgnored: true };
   }
 };
 
