@@ -1058,7 +1058,7 @@ export const ProfileView = () => {
     );
   }
 
-  const fullName = name || resolveEmployeeName(profileData) || resolveEmployeeName(contextUser) || 'Employee';
+  const fullName = name || resolveEmployeeName(profileData) || resolveEmployeeName(contextUser) || (contextUser?.email ? contextUser.email.split('@')[0] : '') || '';
   const employeeId = emp.employeeID || prof.uniqueID || profileData?.employeeID || 'N/A';
   const designation = emp.designation || prof.designation || contextUser?.designation || profileData?.designation || 'N/A';
   const department = emp.department || prof.department || contextUser?.department || profileData?.department || 'N/A';

@@ -27,7 +27,7 @@ import {
   FolderOpen,
   FileText
 } from 'lucide-react';
-import { isFinanceOrExcludedUser } from '../../utils/roleFilters';
+import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from '../../utils/roleFilters';
 
 const avatarColors = [
   'from-indigo-500 to-indigo-600',
@@ -390,19 +390,11 @@ const fetchAllMembers = async () => {
     // ==========================================
     const allMembers = usersList
       .filter((user) => {
-        if (!user) return false;
-        if (isFinanceOrExcludedUser(user)) return false;
+        if (!user || isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return false;
 
         const name = user.name || user.fullName || [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
         const email = user.email || '';
-        if (
-          !name ||
-          name === "Unnamed" ||
-          name === "No Name" ||
-          name === "Unknown Employee" ||
-          name === "Unknown User" ||
-          name === "N/A"
-        ) {
+        if (!name || isUnknownEmployeeOrUser(name)) {
           return false;
         }
 
@@ -1370,7 +1362,7 @@ const fetchAllMembers = async () => {
                                 {project.resolvedEmployees.map((emp) => (
                                   <span key={emp?.id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-medium border border-blue-200">
                                     <Building2 className="w-2.5 h-2.5" />
-                                    {emp?.name || 'Employee'}
+                                    {emp?.name || (emp?.email ? emp.email.split('@')[0] : 'Member')}
                                   </span>
                                 ))}
                               </div>

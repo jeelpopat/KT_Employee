@@ -30,7 +30,12 @@ import {
   Layers
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
-import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../../utils/roleFilters";
+import {
+  isFinanceOrExcludedUser,
+  filterOutFinanceUsers,
+  filterOutUnknownUsers,
+  isUnknownEmployeeOrUser
+} from "../../utils/roleFilters";
 import { useApp, deriveUserRole } from "../../context/AppContext";
 import { 
   getLoggedInUserIdentifiers, 
@@ -365,15 +370,15 @@ export default function Team() {
   const [dailyEmployeeFilter, setDailyEmployeeFilter] = useState("all");
   const [selectedDailyReportModal, setSelectedDailyReportModal] = useState(null);
 
-  const fetchAllDailyReports = async () => {
-    setIsDailyReportsLoading(true);
+  const fetchAllDailyReports = async (isSilent = false) => {
+    if (!isSilent) setIsDailyReportsLoading(true);
     try {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await axios.get("https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list", { headers });
       const list = res.data?.data || res.data?.reports || (Array.isArray(res.data) ? res.data : []);
       if (Array.isArray(list)) {
-        const valid = list.filter(r => r && (r.todaysWork || r.workUpdate || r.description));
+        const valid = list.filter(r => r && (r.todaysWork || r.workUpdate || r.description) && !isUnknownEmployeeOrUser(r));
         valid.sort((a, b) => {
           const dateA = new Date(a.createdAt || a.date || a.reportDate || 0).getTime();
           const dateB = new Date(b.createdAt || b.date || b.reportDate || 0).getTime();
@@ -384,12 +389,36 @@ export default function Team() {
     } catch (err) {
       console.error("Failed to fetch daily reports from /api/dailyUpdate/list:", err);
     } finally {
-      setIsDailyReportsLoading(false);
+      if (!isSilent) setIsDailyReportsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAllDailyReports();
+    fetchAllDailyReports(false);
+
+    // Silent background auto-refresh every 10s for new daily work updates
+    const interval = setInterval(() => {
+      fetchAllDailyReports(true);
+    }, 10000);
+
+    const handleFocus = () => {
+      fetchAllDailyReports(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchAllDailyReports(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
   
 const [projectTeamMembers, setProjectTeamMembers] = useState({
@@ -730,7 +759,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       const res = await axios.get(EMPLOYEE_URL);
       const empData = res.data.data || res.data.employees || res.data || [];
       const list = Array.isArray(empData) ? empData : [];
-      setEmployees(filterOutFinanceUsers(list));
+      setEmployees(filterOutUnknownUsers(filterOutFinanceUsers(list)));
     } catch (error) {
       console.error("Employees fetch error:", error);
       setEmployees([]);
@@ -742,7 +771,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       const res = await axios.get(USER_URL);
       const userData = res.data.data || res.data.users || res.data || [];
       const list = Array.isArray(userData) ? userData : [];
-      setUsers(filterOutFinanceUsers(list));
+      setUsers(filterOutUnknownUsers(filterOutFinanceUsers(list)));
     } catch (error) {
       console.error("Users fetch error:", error);
       setUsers([]);
@@ -1758,7 +1787,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
   // Daily work reports accessible to current user (scoped to assigned projects for TL)
   const accessibleDailyReports = useMemo(() => {
-    if (!isTL) return dailyReports;
+    const list = dailyReports.filter((r) => !isUnknownEmployeeOrUser(r));
+    if (!isTL) return list;
     const accessibleProjectNames = new Set(
       accessibleProjects.map((p) => (p.projectName || '').toLowerCase().trim()).filter(Boolean)
     );
@@ -3708,7 +3738,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-slate-800 truncate">
-                        {selectedDailyReportModal.employeeId?.name || selectedDailyReportModal.employeeName || selectedDailyReportModal.name || 'Employee'}
+                        {selectedDailyReportModal.employeeId?.name || selectedDailyReportModal.employeeName || selectedDailyReportModal.name || (selectedDailyReportModal.employeeId?.email ? selectedDailyReportModal.employeeId.email.split('@')[0] : 'User')}
                       </p>
                       <p className="text-[10px] text-slate-400 truncate">
                         {selectedDailyReportModal.employeeId?.email || selectedDailyReportModal.email || ''}

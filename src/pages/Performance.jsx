@@ -16,7 +16,12 @@ import {
   RefreshCw,
   Award
 } from "lucide-react";
-import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../utils/roleFilters";
+import {
+  isFinanceOrExcludedUser,
+  filterOutFinanceUsers,
+  isUnknownEmployeeOrUser,
+  filterOutUnknownUsers
+} from "../utils/roleFilters";
 import { useApp, deriveUserRole, getRealAuthUserId } from "../context/AppContext.jsx";
 
 const DEPARTMENTS = [
@@ -35,6 +40,7 @@ const PERF_STORE_KEY = "kt_performance_records_store";
 // Helper to identify and purge any dummy/synthetic performance records
 const isDummyPerformanceRecord = (p) => {
   if (!p) return true;
+  if (isUnknownEmployeeOrUser(p)) return true;
   const id = String(p._id || p.id || "");
   if (
     id.startsWith("perf-auto-") ||
@@ -164,8 +170,8 @@ const Performance = () => {
   // ============================================================
   // FETCH ALL PERFORMANCES (LIVE API + SYNCHRONIZED STORAGE)
   // ============================================================
-  const fetchAllPerformances = useCallback(async () => {
-    setLoading(true);
+  const fetchAllPerformances = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       if (isAdmin) {
         // Admin: Call live GET /api/performance/all (Admin role has full clearance)
@@ -185,10 +191,10 @@ const Performance = () => {
                 : [];
 
           const filteredPerfs = rawPerfs.filter((perf) => {
-            if (!perf || isDummyPerformanceRecord(perf)) return false;
+            if (!perf || isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf)) return false;
             if (isFinanceOrExcludedUser(perf)) return false;
-            if (perf.employeeID && isFinanceOrExcludedUser(perf.employeeID)) return false;
-            if (perf.employee && isFinanceOrExcludedUser(perf.employee)) return false;
+            if (perf.employeeID && (isFinanceOrExcludedUser(perf.employeeID) || isUnknownEmployeeOrUser(perf.employeeID))) return false;
+            if (perf.employee && (isFinanceOrExcludedUser(perf.employee) || isUnknownEmployeeOrUser(perf.employee))) return false;
             return true;
           });
 
@@ -272,7 +278,7 @@ const Performance = () => {
       const stored = getStoredPerformances();
       setPerformances(stored);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [headers, isAdmin, user]);
 
@@ -294,15 +300,15 @@ const Performance = () => {
       else if (Array.isArray(data.data)) rawList = data.data;
       else if (Array.isArray(data.users)) rawList = data.users;
 
-      // Filter out finance and admin users using official utility
-      const validEmployees = filterOutFinanceUsers(rawList);
+      // Filter out finance and admin users and unknown employees using official utility
+      const validEmployees = filterOutUnknownUsers(filterOutFinanceUsers(rawList));
 
       // Clean & deduplicate by email / ID
       const seen = new Set();
       const cleanEmployees = [];
 
       for (const emp of validEmployees) {
-        if (!emp) continue;
+        if (!emp || isUnknownEmployeeOrUser(emp)) continue;
         const id = String(emp._id || emp.id || emp.userId || "");
         const email = String(emp.email || emp.employeeEmail || "").toLowerCase().trim();
         const key = email || id;
@@ -338,7 +344,32 @@ const Performance = () => {
     if (isAdmin) {
       fetchEmployees();
     }
-    fetchAllPerformances();
+    fetchAllPerformances(false);
+
+    // Silent background auto-refresh every 10s for new performance reviews
+    const interval = setInterval(() => {
+      fetchAllPerformances(true);
+      if (isAdmin) fetchEmployees();
+    }, 10000);
+
+    const handleFocus = () => {
+      fetchAllPerformances(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchAllPerformances(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [isAdmin, fetchAllPerformances, fetchEmployees]);
 
   useEffect(() => {
@@ -356,15 +387,18 @@ const Performance = () => {
 
   // Helper to extract employee display name
   const getEmployeeDisplayName = (perf) => {
-    if (!perf) return "Unknown Employee";
+    if (!perf || isUnknownEmployeeOrUser(perf)) return "";
 
     if (perf.employeeID && typeof perf.employeeID === "object") {
       const emp = perf.employeeID;
-      if (emp.name) return emp.name;
-      if (emp.fullName) return emp.fullName;
-      if (emp.firstName && emp.lastName) return `${emp.firstName} ${emp.lastName}`.trim();
-      if (emp.firstName) return emp.firstName;
-      if (emp.displayName) return emp.displayName;
+      if (emp.name && !isUnknownEmployeeOrUser(emp.name)) return emp.name;
+      if (emp.fullName && !isUnknownEmployeeOrUser(emp.fullName)) return emp.fullName;
+      if (emp.firstName && emp.lastName) {
+        const full = `${emp.firstName} ${emp.lastName}`.trim();
+        if (!isUnknownEmployeeOrUser(full)) return full;
+      }
+      if (emp.firstName && !isUnknownEmployeeOrUser(emp.firstName)) return emp.firstName;
+      if (emp.displayName && !isUnknownEmployeeOrUser(emp.displayName)) return emp.displayName;
     }
 
     const candidates = [
@@ -378,12 +412,12 @@ const Performance = () => {
     ];
 
     for (const val of candidates) {
-      if (typeof val === "string" && val.trim()) {
+      if (typeof val === "string" && val.trim() && !isUnknownEmployeeOrUser(val)) {
         return val.trim();
       }
     }
 
-    return "Unknown Employee";
+    return "";
   };
 
   // Helper to extract employee email
@@ -564,13 +598,16 @@ const Performance = () => {
 
   // Role-isolated performances: Admin sees all; TL can toggle personal vs team; Employee sees their records
   const myPerformances = useMemo(() => {
+    const cleanList = performances.filter(
+      (p) => !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p)
+    );
     if (isAdmin) {
-      return performances;
+      return cleanList;
     }
     if (isTL && tlViewScope === "team") {
-      return performances;
+      return cleanList;
     }
-    return performances.filter(isMyRecord);
+    return cleanList.filter(isMyRecord);
   }, [performances, isAdmin, isTL, tlViewScope, isMyRecord]);
 
   // ============================================================
@@ -682,7 +719,10 @@ const Performance = () => {
   // ============================================================
   const filteredPerformances = useMemo(() => {
     return myPerformances.filter((perf) => {
-      const name = getEmployeeDisplayName(perf).toLowerCase();
+      if (!perf || isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf)) return false;
+      const rawName = getEmployeeDisplayName(perf);
+      if (!rawName || isUnknownEmployeeOrUser(rawName)) return false;
+      const name = rawName.toLowerCase();
       const email = getEmployeeEmail(perf).toLowerCase();
       const dept = getDepartment(perf).toLowerCase();
       const remarks = String(perf.remarks || "").toLowerCase();

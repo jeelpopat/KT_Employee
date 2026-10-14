@@ -109,7 +109,7 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="employee@kevalon.com"
+            placeholder="name@kevalon.com"
             leftIcon={Mail}
             required
           />

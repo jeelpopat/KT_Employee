@@ -28,7 +28,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import api from '../api/axios';
-import { isFinanceOrExcludedUser } from '../utils/roleFilters';
+import { isFinanceOrExcludedUser, filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../utils/roleFilters';
 
 const EmployeeRequests = () => {
   const [users, setUsers] = useState([]);
@@ -71,26 +71,33 @@ const EmployeeRequests = () => {
   const [addCompanyError, setAddCompanyError] = useState('');
 
   // Fetch users from API
-  const fetchUsers = async () => {
+  const fetchUsers = async (isSilent = false) => {
     try {
-      setLoading(true);
-      setError('');
+      if (!isSilent) {
+        setLoading(true);
+        setError('');
+      }
       let userList = [];
+      const freshUrl = `https://kt-backend-yzr4.onrender.com/api/users/all?_t=${Date.now()}`;
       try {
-        const res = await api.get('/api/users/all');
+        const res = await api.get(`/api/users/all?_t=${Date.now()}`);
         userList = Array.isArray(res.data) ? res.data : res.data?.users || res.data?.data || [];
       } catch {
         // Fallback to direct fetch
-        const response = await fetch('https://kt-backend-yzr4.onrender.com/api/users/all');
+        const response = await fetch(freshUrl);
         if (!response.ok) throw new Error('Failed to fetch users');
         const data = await response.json();
         userList = Array.isArray(data) ? data : data?.users || data?.data || [];
       }
-      setUsers(userList);
+      setUsers(filterOutUnknownUsers(userList));
     } catch (err) {
-      setError(err.message || 'Something went wrong while loading users');
+      if (!isSilent) {
+        setError(err.message || 'Something went wrong while loading users');
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -475,8 +482,32 @@ const EmployeeRequests = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(false);
     fetchApprovalMetadata();
+
+    // Silent auto-refresh every 8s for new employee join requests
+    const interval = setInterval(() => {
+      fetchUsers(true);
+    }, 8000);
+
+    const handleFocus = () => {
+      fetchUsers(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchUsers(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   const getUserIdentifier = (user, fallbackIndex) => {
@@ -959,7 +990,7 @@ const EmployeeRequests = () => {
           })
         );
 
-        const approvedName = approvingUser?.name || approvingUser?.fullName || 'Employee';
+        const approvedName = approvingUser?.name || approvingUser?.fullName || (approvingUser?.email ? approvingUser.email.split('@')[0] : 'User');
         const successMsg = tlNameVal
           ? `Approved ${approvedName} and assigned Team Lead "${tlNameVal}" successfully!`
           : `Approved ${approvedName} successfully!`;
@@ -1086,7 +1117,7 @@ const EmployeeRequests = () => {
 
   const filteredUsers = users
     .filter(user => {
-      if (isFinanceOrExcludedUser(user)) return false;
+      if (isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return false;
 
       const searchMatch = user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||

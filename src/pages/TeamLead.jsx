@@ -87,7 +87,7 @@ const getDistinctAssignedEmployees = (rawList = [], empList = []) => {
     } else if (typeof item === 'object') {
       distinctEmployees.push(item);
     } else {
-      distinctEmployees.push({ _id: String(item), id: String(item), name: 'Employee' });
+      distinctEmployees.push({ _id: String(item), id: String(item), name: '' });
     }
   });
 

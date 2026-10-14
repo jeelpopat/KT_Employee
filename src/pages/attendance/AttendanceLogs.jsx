@@ -16,8 +16,11 @@ import {
   LogIn,
   LogOut,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { isFinanceOrExcludedUser } from '../../utils/roleFilters';
+import {
+  isFinanceOrExcludedUser,
+  isUnknownEmployeeOrUser,
+  filterOutUnknownUsers
+} from '../../utils/roleFilters';
 
 const ATTENDANCE_URL =
   'https://kt-backend-yzr4.onrender.com/api/attendance/admin/all';
@@ -930,11 +933,13 @@ export default function AttendanceLogs() {
      FETCH ATTENDANCE
   ========================================================= */
   const fetchAttendanceLogs = async (
-    date = selectedDate
+    date = selectedDate,
+    isSilent = false
   ) => {
-    setLoading(true);
-
-    setError('');
+    if (!isSilent) {
+      setLoading(true);
+      setError('');
+    }
 
     try {
       if (!token) {
@@ -949,11 +954,20 @@ export default function AttendanceLogs() {
         'Content-Type': 'application/json',
       };
 
-      // 1. Fetch attendance records for selected date
+      // 1. Fetch attendance records for selected date (with cache busting)
       let attendanceItems = [];
       try {
-        const url = `${ATTENDANCE_URL}?date=${encodeURIComponent(date)}`;
-        const response = await fetch(url, { method: 'GET', headers });
+        const url = `${ATTENDANCE_URL}?date=${encodeURIComponent(date)}&_t=${Date.now()}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            ...headers,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+          cache: 'no-store',
+        });
         if (response.ok) {
           const data = await response.json();
           attendanceItems = normalizeLogs(data);
@@ -965,10 +979,10 @@ export default function AttendanceLogs() {
       // Map attendance items by User Mongo ID
       const attendanceMap = new Map();
       attendanceItems.forEach((item) => {
-        if (!item || isFinanceOrExcludedUser(item)) return;
-        if (item.user && isFinanceOrExcludedUser(item.user)) return;
-        if (item.employee && isFinanceOrExcludedUser(item.employee)) return;
-        if (item.userId && isFinanceOrExcludedUser(item.userId)) return;
+        if (!item || isFinanceOrExcludedUser(item) || isUnknownEmployeeOrUser(item)) return;
+        if (item.user && (isFinanceOrExcludedUser(item.user) || isUnknownEmployeeOrUser(item.user))) return;
+        if (item.employee && (isFinanceOrExcludedUser(item.employee) || isUnknownEmployeeOrUser(item.employee))) return;
+        if (item.userId && (isFinanceOrExcludedUser(item.userId) || isUnknownEmployeeOrUser(item.userId))) return;
 
         const uId =
           item?.employee?._id ||
@@ -989,7 +1003,7 @@ export default function AttendanceLogs() {
           const usersData = await usersRes.json();
           const usersList = usersData.users || usersData.data || [];
           usersList.forEach((user) => {
-            if (!user || !user._id || isFinanceOrExcludedUser(user)) return;
+            if (!user || !user._id || isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return;
 
             const uIdKey = String(user._id);
             if (!attendanceMap.has(uIdKey)) {
@@ -1079,6 +1093,7 @@ export default function AttendanceLogs() {
           };
 
           historyList.forEach((adj) => {
+            if (!adj || isUnknownEmployeeOrUser(adj) || isUnknownEmployeeOrUser(adj.employeeName)) return;
             const adjDateStr = getIstDateString(adj.date);
             if (adjDateStr === date) {
               const matchedKey = findMatchingKey(adj.employeeId, adj.employeeName);
@@ -1150,6 +1165,7 @@ export default function AttendanceLogs() {
       try {
         const localAdjustments = JSON.parse(localStorage.getItem("attendance_adjustments") || "[]");
         localAdjustments.forEach((adj) => {
+          if (!adj || isUnknownEmployeeOrUser(adj) || isUnknownEmployeeOrUser(adj.employeeName)) return;
           if (adj.date === date && adj.employeeId) {
             const uIdKey = String(adj.employeeId);
             const existing = attendanceMap.get(uIdKey) || {
@@ -1205,16 +1221,18 @@ export default function AttendanceLogs() {
         console.warn("Local adjustments merge error:", lErr);
       }
 
-      // Filter out admin & finance users from attendance logs list
+      // Filter out admin & finance users and unknown employees from attendance logs list
       const combinedLogs = Array.from(attendanceMap.values()).filter((item) => {
-        if (!item || isFinanceOrExcludedUser(item)) return false;
-        if (item.user && isFinanceOrExcludedUser(item.user)) return false;
-        if (item.employee && isFinanceOrExcludedUser(item.employee)) return false;
-        if (item.userId && isFinanceOrExcludedUser(item.userId)) return false;
+        if (!item || isFinanceOrExcludedUser(item) || isUnknownEmployeeOrUser(item)) return false;
+        if (item.user && (isFinanceOrExcludedUser(item.user) || isUnknownEmployeeOrUser(item.user))) return false;
+        if (item.employee && (isFinanceOrExcludedUser(item.employee) || isUnknownEmployeeOrUser(item.employee))) return false;
+        if (item.userId && (isFinanceOrExcludedUser(item.userId) || isUnknownEmployeeOrUser(item.userId))) return false;
         return true;
       });
 
-      const mappedLogs = combinedLogs.map(mapLog);
+      const mappedLogs = combinedLogs
+        .map(mapLog)
+        .filter((log) => log && log.name && !isUnknownEmployeeOrUser(log.name));
 
       setLogs(mappedLogs);
     } catch (err) {
@@ -1223,11 +1241,15 @@ export default function AttendanceLogs() {
         err
       );
 
-      setError(
-        'Unable to load attendance logs.'
-      );
+      if (!isSilent) {
+        setError(
+          'Unable to load attendance logs.'
+        );
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -1235,18 +1257,38 @@ export default function AttendanceLogs() {
      DATE CHANGE FETCH
   ========================================================= */
   useEffect(() => {
-    fetchAttendanceLogs(selectedDate);
+    fetchAttendanceLogs(selectedDate, false);
+
+    // Silent background auto-refresh every 10s for new attendance logs and status changes
+    const interval = setInterval(() => {
+      fetchAttendanceLogs(selectedDate, true);
+    }, 10000);
 
     const handleAdjustmentUpdate = () => {
-      fetchAttendanceLogs(selectedDate);
+      fetchAttendanceLogs(selectedDate, true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchAttendanceLogs(selectedDate, true);
+      }
     };
 
     window.addEventListener("attendanceAdjusted", handleAdjustmentUpdate);
+    window.addEventListener("attendance_adjusted", handleAdjustmentUpdate);
+    window.addEventListener("attendance_updated", handleAdjustmentUpdate);
     window.addEventListener("storage", handleAdjustmentUpdate);
+    window.addEventListener("focus", handleAdjustmentUpdate);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      clearInterval(interval);
       window.removeEventListener("attendanceAdjusted", handleAdjustmentUpdate);
+      window.removeEventListener("attendance_adjusted", handleAdjustmentUpdate);
+      window.removeEventListener("attendance_updated", handleAdjustmentUpdate);
       window.removeEventListener("storage", handleAdjustmentUpdate);
+      window.removeEventListener("focus", handleAdjustmentUpdate);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);

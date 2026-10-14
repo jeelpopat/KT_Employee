@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import api, { clearApiCache } from '../api/axios.js';
+import { validateUserSession, performAutoCheckout, clearAuth, normalizeRole } from '../utils/auth.js';
 
 import {
   getMonitoringSettings,
@@ -82,7 +83,7 @@ export const isRoleAllowed = (role) => {
 
 // Helper to determine exact user role from authenticated profile data
 export const deriveUserRole = (u) => {
-  if (!u) return 'employee';
+  if (!u) return '';
 
   const roleStr = (
     u.role?.roleName ||
@@ -353,7 +354,7 @@ export const AppProvider = ({ children }) => {
 
   const [userRole, setUserRole] = useState(() => {
     const activeRole = localStorage.getItem('active_role') || localStorage.getItem('user_role');
-    if (activeRole && isRoleAllowed(activeRole)) return activeRole;
+    if (activeRole && isRoleAllowed(activeRole)) return normalizeRole(activeRole);
     const stored = localStorage.getItem('auth_user');
     if (stored) {
       try {
@@ -362,27 +363,28 @@ export const AppProvider = ({ children }) => {
         if (isRoleAllowed(derived)) return derived;
       } catch (e) { }
     }
-    return 'employee';
+    return '';
   });
 
   const [roleDetails, setRoleDetails] = useState(() => {
     const initialRole = (() => {
       const activeRole = localStorage.getItem('active_role') || localStorage.getItem('user_role');
-      if (activeRole) return activeRole;
+      if (activeRole) return normalizeRole(activeRole);
       const stored = localStorage.getItem('auth_user');
       if (stored) {
         try {
           return deriveUserRole(JSON.parse(stored));
         } catch (e) { }
       }
-      return 'employee';
+      return '';
     })();
     return {
       roleName: initialRole === 'admin' ? 'Administrator' :
         initialRole === 'account' ? 'Accountant' :
           initialRole === 'ca' ? 'Chartered Accountant (CA)' :
             initialRole === 'hr' ? 'HR Manager' :
-              initialRole === 'team_leader' ? 'Team Leader' : 'Employee'
+              initialRole === 'team_leader' ? 'Team Leader' :
+                initialRole === 'employee' ? 'Employee' : ''
     };
   });
 
@@ -668,7 +670,7 @@ export const AppProvider = ({ children }) => {
     // Record Event for HR/Admin
     const newInactivityEvent = {
       id: `ina-${Date.now()}`,
-      employeeName: user?.name || (userRole === 'team_leader' ? 'Team Leader' : 'Employee'),
+      employeeName: user?.name || user?.fullName || (user?.email ? user.email.split('@')[0] : 'User'),
       employeeId: user?.employeeId || user?.id || 'EMP',
       date: new Date().toISOString().split('T')[0],
       startTime: timeStr,
@@ -684,7 +686,7 @@ export const AppProvider = ({ children }) => {
     const newNotif = {
       id: `notif-ina-${Date.now()}`,
       title: '⚠️ 1-Minute Inactivity Alert',
-      message: `No mouse or keyboard activity detected for ${user?.name || (userRole === 'team_leader' ? 'Team Leader' : 'Employee')} for 1 continuous minute. Status: Waiting for Response.`,
+      message: `No mouse or keyboard activity detected for ${user?.name || user?.fullName || (user?.email ? user.email.split('@')[0] : 'User')} for 1 continuous minute. Status: Waiting for Response.`,
       time: 'Just now',
       isRead: false,
       type: 'system'
@@ -759,7 +761,7 @@ export const AppProvider = ({ children }) => {
     const newNotif = {
       id: `notif-${Date.now()}`,
       title: 'Activity Confirmed',
-      message: `${user?.name || 'Employee'} confirmed active work. Resumed tracking.`,
+      message: `${user?.name || user?.fullName || (user?.email ? user.email.split('@')[0] : 'User')} confirmed active work. Resumed tracking.`,
       time: 'Just now',
       isRead: false,
       type: 'attendance'
@@ -846,7 +848,7 @@ export const AppProvider = ({ children }) => {
 
     const resolvedEmp = extractEmployeeDetails(mergedUser);
     const effectiveUserId = getRealAuthUserId(mergedUser);
-    const empName = resolvedEmp.name || 'Employee';
+    const empName = resolvedEmp.name || resolveEmployeeName(mergedUser) || (mergedUser?.email ? mergedUser.email.split('@')[0] : 'User');
     const empId = resolvedEmp.employeeId || (effectiveUserId !== '65f100000000000000008492' ? effectiveUserId : 'EMP');
     const empRole = resolvedEmp.designation || 'Team Member';
     const nowObj = new Date();
@@ -1748,51 +1750,48 @@ export const AppProvider = ({ children }) => {
 
   // Sync role and fresh user profile on initial mount
   useEffect(() => {
+    let isMounted = true;
+
     const initRoleAndUser = async () => {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       if (token) {
         try {
-          const pData = await fetchLiveUserProfile();
-          if (pData) {
+          const validation = await validateUserSession();
+          if (!isMounted) return;
+
+          if (!validation.isValid) {
+            console.warn('Initial session validation failed in context:', validation.reason);
+            await performAutoCheckout(token);
+            clearAuth();
+            setUser(null);
+            setUserRole('');
+            window.location.href = '/';
+            return;
+          }
+
+          if (validation.user) {
+            const pData = validation.user;
             const resolved = resolveEmployeeName(pData);
             if (resolved) {
               pData.name = resolved;
               pData.fullName = resolved;
             }
-            const determined = await resolveRole(pData);
-            if (!isRoleAllowed(determined)) {
-              console.warn(`Unauthorized role session detected (${determined}). Clearing auth session.`);
-              localStorage.removeItem('auth_token');
-              localStorage.removeItem('auth_user');
-              localStorage.removeItem('active_role');
-              localStorage.removeItem('user_role');
-              setUser(null);
-              window.location.reload();
-              return;
-            }
             setUser(pData);
-            localStorage.setItem('auth_user', JSON.stringify(pData));
-            return;
+            if (validation.role) {
+              setUserRole(validation.role);
+            }
           }
         } catch (e) {
-          console.warn('Error fetching initial profile:', e);
-        }
-      }
-      if (user) {
-        const determined = await resolveRole(user);
-        if (!isRoleAllowed(determined)) {
-          console.warn(`Unauthorized role session detected (${determined}). Clearing auth session.`);
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('auth_user');
-          localStorage.removeItem('active_role');
-          localStorage.removeItem('user_role');
-          setUser(null);
-          window.location.reload();
+          console.warn('Error validating initial profile in context:', e);
         }
       }
     };
 
     initRoleAndUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const loginUser = async (userData, token) => {
@@ -1935,21 +1934,14 @@ export const AppProvider = ({ children }) => {
 
   const logoutUser = () => {
     setUser(null);
-    setUserRole('employee');
+    setUserRole('');
     setCurrentTabState('dashboard');
-    setRoleDetails({ roleName: 'Employee' });
+    setRoleDetails({ roleName: '' });
     setRolePermissions([]);
     if (typeof clearApiCache === 'function') {
       clearApiCache();
     }
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('auth_user');
-    localStorage.removeItem('user');
-    localStorage.removeItem('active_role');
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('kt_employee_full_name');
+    clearAuth();
   };
 
   return (

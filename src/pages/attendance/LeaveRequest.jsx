@@ -17,7 +17,7 @@ import {
   User,
   ShieldCheck,
 } from "lucide-react";
-import { isFinanceOrExcludedUser } from "../../utils/roleFilters";
+import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
 import {
   getLoggedInUserIdentifiers,
   fetchTeamsList,
@@ -301,10 +301,12 @@ export default function LeaveRequest() {
   // FETCH LEAVES
   // ==========================================================
 
-  const fetchLeaves = async () => {
+  const fetchLeaves = async (isSilent = false) => {
     try {
-      setLoading(true);
-      setError("");
+      if (!isSilent) {
+        setLoading(true);
+        setError("");
+      }
 
       const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
 
@@ -378,28 +380,12 @@ export default function LeaveRequest() {
               ? leave.employeeId
               : leave?.employee || leave?.user || leave?.userId;
 
-          if (employee && isFinanceOrExcludedUser(employee)) return false;
-
-          if (!employee || Object.keys(employee).length === 0) {
-            const fallbackName = leave?.name || leave?.employeeName;
-            if (
-              !fallbackName ||
-              fallbackName === "Unknown Employee" ||
-              fallbackName === "Unknown User" ||
-              fallbackName === "Unknown"
-            ) {
-              return false;
-            }
-          }
+          if (!leave || isFinanceOrExcludedUser(leave) || isUnknownEmployeeOrUser(leave)) return false;
+          if (employee && (isFinanceOrExcludedUser(employee) || isUnknownEmployeeOrUser(employee))) return false;
 
           const employeeName = getEmployeeName(employee, leave);
 
-          if (
-            !employeeName ||
-            employeeName === "Unknown Employee" ||
-            employeeName === "Unknown User" ||
-            employeeName === "Unknown"
-          ) {
+          if (!employeeName || isUnknownEmployeeOrUser(employeeName)) {
             return false;
           }
 
@@ -598,14 +584,17 @@ export default function LeaveRequest() {
     } catch (error) {
       console.error("FETCH LEAVES ERROR:", error);
 
-      setError(
-        error?.message ||
-        "Failed to load leave requests."
-      );
-
-      setRequests([]);
+      if (!isSilent) {
+        setError(
+          error?.message ||
+          "Failed to load leave requests."
+        );
+        setRequests([]);
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -640,7 +629,31 @@ export default function LeaveRequest() {
 
   useEffect(() => {
     getCurrentUser();
-    fetchLeaves();
+    fetchLeaves(false);
+
+    // Silent auto-refresh every 8s for new leave requests
+    const interval = setInterval(() => {
+      fetchLeaves(true);
+    }, 8000);
+
+    const handleFocus = () => {
+      fetchLeaves(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchLeaves(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   useEffect(() => {

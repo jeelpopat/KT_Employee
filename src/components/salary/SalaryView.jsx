@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import api, { invalidateCache } from '../../api/axios.js';
 import { useApp, deriveUserRole, getRealAuthUserId, resolveEmployeeName } from '../../context/AppContext.jsx';
+import { filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
 
 // Currency Formatter (Indian Rupee)
 const formatINR = (val) => {
@@ -315,7 +316,7 @@ export const SalaryView = () => {
     try {
       const res = await api.get('/api/users/all');
       const list = res.data?.users || res.data?.data || res.data || [];
-      const staffArray = Array.isArray(list) ? list : [];
+      const staffArray = (Array.isArray(list) ? list : []).filter(u => !isUnknownEmployeeOrUser(u));
       setCompanyStaff(staffArray);
       return staffArray;
     } catch (err) {
@@ -358,7 +359,7 @@ export const SalaryView = () => {
             role: item.role || 'employee'
           }
         };
-      });
+      }).filter((item) => !isUnknownEmployeeOrUser(item.userObj) && !isUnknownEmployeeOrUser(item));
 
       enriched.sort((a, b) => {
         if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
@@ -417,7 +418,7 @@ export const SalaryView = () => {
             role: item.role || item.employeeId?.role || item.userId?.role || 'employee'
           }
         };
-      });
+      }).filter((item) => !isUnknownEmployeeOrUser(item.userObj) && !isUnknownEmployeeOrUser(item));
 
       enriched.sort((a, b) => {
         const yearDiff = (Number(b.year) || 0) - (Number(a.year) || 0);

@@ -7,7 +7,7 @@ import {
   RotateCcw,
   Clock,
 } from "lucide-react";
-import { isFinanceOrExcludedUser } from "../../utils/roleFilters";
+import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
 
 export default function Adjustments() {
   // ============================================================
@@ -363,7 +363,7 @@ export default function Adjustments() {
             const usersData = await usersRes.json();
             const usersList = usersData.users || usersData.data || [];
             usersList.forEach((user) => {
-              if (!user || !user._id || isFinanceOrExcludedUser(user)) return;
+              if (!user || !user._id || isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return;
               const name =
                 user.name ||
                 `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
@@ -390,7 +390,7 @@ export default function Adjustments() {
             const empData = await empRes.json();
             const empList = empData.employees || empData.data || [];
             empList.forEach((emp) => {
-              if (!emp || isFinanceOrExcludedUser(emp)) return;
+              if (!emp || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return;
               const userIdKey = emp.userID
                 ? String(emp.userID)
                 : emp._id
@@ -447,7 +447,7 @@ export default function Adjustments() {
               const emp =
                 item.userId || item.employeeId || item.employee || {};
 
-              if (!emp || !emp._id || isFinanceOrExcludedUser(emp)) return;
+              if (!emp || !emp._id || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return;
               const key = String(emp._id);
 
               if (!employeeMap.has(key)) {
@@ -471,7 +471,7 @@ export default function Adjustments() {
 
         const employeeList = Array.from(employeeMap.values())
           .filter((emp) => {
-            if (isFinanceOrExcludedUser(emp)) return false;
+            if (isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
             const role = (emp.roleType || "").toLowerCase().trim();
             const id = (emp.employeeId || "").toUpperCase().trim();
             return role !== "admin" && !id.startsWith("ADMIN");
@@ -584,7 +584,11 @@ export default function Adjustments() {
         }
       });
 
-      setRecentAdjustments(Array.from(uniqueMap.values()).slice(0, 10));
+      setRecentAdjustments(
+        Array.from(uniqueMap.values())
+          .filter((item) => !isUnknownEmployeeOrUser(item) && !isUnknownEmployeeOrUser(item.employeeName))
+          .slice(0, 10)
+      );
     } catch (error) {
       console.error("Error fetching adjustments:", error);
     } finally {
@@ -2787,7 +2791,7 @@ export default function Adjustments() {
               recentAdjustments
                 .filter((item) => {
                   const resolvedName = item.employeeName || getEmployeeName(item.employeeId);
-                  return resolvedName && resolvedName !== "Unknown Employee" && resolvedName !== "Unknown User";
+                  return !isUnknownEmployeeOrUser(resolvedName) && !isUnknownEmployeeOrUser(item);
                 })
                 .map((item) => {
                   const resolvedName = item.employeeName || getEmployeeName(item.employeeId);

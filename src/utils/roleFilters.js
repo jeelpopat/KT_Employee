@@ -113,3 +113,72 @@ export const filterOutFinanceUsers = (list) => {
   if (!Array.isArray(list)) return [];
   return list.filter((item) => !isFinanceOrExcludedUser(item));
 };
+
+/**
+ * Checks if a user, employee, or record has an unknown / dummy employee name.
+ */
+export const isUnknownEmployeeOrUser = (entity) => {
+  if (!entity) return true;
+
+  let rawName = '';
+  if (typeof entity === 'string') {
+    rawName = entity;
+  } else if (typeof entity === 'object') {
+    rawName =
+      entity.employeeName ||
+      entity.name ||
+      entity.fullName ||
+      entity.displayName ||
+      entity.username ||
+      entity.userName ||
+      entity.employee?.name ||
+      entity.employee?.fullName ||
+      entity.employee?.displayName ||
+      entity.user?.name ||
+      entity.user?.fullName ||
+      entity.user?.displayName ||
+      entity.userId?.name ||
+      entity.userId?.fullName ||
+      entity.employeeID?.name ||
+      entity.employeeID?.fullName ||
+      entity.employeeId?.name ||
+      entity.employeeId?.fullName ||
+      entity.userObj?.name ||
+      entity.assignedEmployee?.name ||
+      (entity.firstName ? `${entity.firstName} ${entity.lastName || ''}`.trim() : '') ||
+      '';
+  }
+
+  const clean = String(rawName).trim().toLowerCase();
+  if (!clean) return true;
+
+  const invalidNames = [
+    'unknown employee',
+    'unknown user',
+    'unknown',
+    'unnamed',
+    'unnamed employee',
+    'unnamed user',
+    'no name',
+    'n/a',
+    'undefined',
+    'null',
+    'none',
+    '—',
+    '-'
+  ];
+
+  if (invalidNames.includes(clean)) return true;
+  if (clean.includes('unknown employee') || clean.includes('unknown user')) return true;
+  if (clean.startsWith('unknown ') || clean.startsWith('unnamed ')) return true;
+
+  return false;
+};
+
+/**
+ * Filters an array of records to remove any with unknown / unnamed employees.
+ */
+export const filterOutUnknownUsers = (list) => {
+  if (!Array.isArray(list)) return [];
+  return list.filter((item) => !isUnknownEmployeeOrUser(item));
+};

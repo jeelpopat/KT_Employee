@@ -19,7 +19,12 @@ import {
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
-import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../../utils/roleFilters";
+import {
+  isFinanceOrExcludedUser,
+  filterOutFinanceUsers,
+  filterOutUnknownUsers,
+  isUnknownEmployeeOrUser
+} from "../../utils/roleFilters";
 
 const API_BASE = "https://kt-backend-yzr4.onrender.com/api";
 
@@ -66,7 +71,31 @@ export default function Employees() {
   // FETCH EMPLOYEES
   // =========================
   useEffect(() => {
-    fetchEmployees();
+    fetchEmployees(false);
+
+    // Silent background auto-refresh every 10s for new employees
+    const interval = setInterval(() => {
+      fetchEmployees(true);
+    }, 10000);
+
+    const handleFocus = () => {
+      fetchEmployees(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchEmployees(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -92,9 +121,9 @@ export default function Employees() {
     };
   }, [showModal]);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
 
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
@@ -110,14 +139,14 @@ export default function Employees() {
       const data = await res.json();
 
       if (data.success) {
-        setEmployees(filterOutFinanceUsers(data.employees || []));
+        setEmployees(filterOutUnknownUsers(filterOutFinanceUsers(data.employees || [])));
       } else {
         console.error(data.message || "Failed to fetch employees");
       }
     } catch (error) {
       console.error("Fetch employees error:", error);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -485,7 +514,7 @@ export default function Employees() {
   // FILTER
   // =========================
   const filteredEmployees = employees.filter((emp) => {
-    if (isFinanceOrExcludedUser(emp)) return false;
+    if (isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
     const fullName = `${emp.firstName || ""} ${emp.lastName || ""
       }`.toLowerCase();
 

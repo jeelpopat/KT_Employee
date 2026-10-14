@@ -6,6 +6,7 @@ import {
   ChevronRight, Sparkles, Database, Layers, Eye
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
+import { isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
 import { 
   getMonitoringSettings, 
   updateMonitoringSettings, 
@@ -502,11 +503,11 @@ export const AdminScreenshotPortal = () => {
     const map = new Map();
     // Prepend context screenshots (newest first)
     (contextScreenshots || []).forEach(s => {
-      if (s && s.id) map.set(s.id, s);
+      if (s && s.id && !isUnknownEmployeeOrUser(s) && !isUnknownEmployeeOrUser(s.employeeName)) map.set(s.id, s);
     });
     // Add remote screenshots from backend
     (remoteScreenshots || []).forEach(s => {
-      if (s && s.id && !map.has(s.id)) {
+      if (s && s.id && !map.has(s.id) && !isUnknownEmployeeOrUser(s) && !isUnknownEmployeeOrUser(s.employeeName)) {
         map.set(s.id, s);
       }
     });
@@ -522,6 +523,7 @@ export const AdminScreenshotPortal = () => {
     const list = new Map();
     allScreenshots.forEach(s => {
       const empInfo = getRecordEmployeeInfo(s);
+      if (isUnknownEmployeeOrUser(empInfo.name)) return;
       const screenshotDocId = String(s._id || s.id || '');
       
       const rawUserId = s.userId?._id || s.userId?.id || (typeof s.userId === 'string' ? s.userId : '') ||

@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
+import { validateUserSession, performAutoCheckout, clearAuth, isTokenExpired } from './utils/auth.js';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
@@ -182,36 +183,24 @@ const MainLayout = ({ handleSignOut }) => {
 };
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+  const [isCheckingAuth, setIsCheckingAuth] = useState(() => {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-    const storedRole = localStorage.getItem('user_role') || localStorage.getItem('active_role');
-    if (storedRole && !isRoleAllowed(storedRole)) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('auth_user');
-      localStorage.removeItem('user');
-      localStorage.removeItem('active_role');
-      localStorage.removeItem('user_role');
+    if (!token || isTokenExpired(token)) {
+      clearAuth();
       return false;
     }
-    const storedUser = localStorage.getItem('auth_user') || localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        const derived = deriveUserRole(parsed);
-        if (!isRoleAllowed(derived)) {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('token');
-          localStorage.removeItem('auth_user');
-          localStorage.removeItem('user');
-          localStorage.removeItem('active_role');
-          localStorage.removeItem('user_role');
-          return false;
-        }
-      } catch (e) { }
-    }
-    return !!token;
+    return true;
   });
+
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) {
+      return false;
+    }
+    // Must be verified by backend before allowing entry; prevents dummy auto-login
+    return false;
+  });
+
   const [authView, setAuthView] = useState(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.toLowerCase();
@@ -223,6 +212,65 @@ export default function App() {
     return 'login';
   });
 
+  // Verify user validity, active status, and same role on every page refresh
+  useEffect(() => {
+    let isMounted = true;
+
+    const verifySessionOnMount = async () => {
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      if (!token || isTokenExpired(token)) {
+        if (isMounted) {
+          await performAutoCheckout(token);
+          clearAuth();
+          setIsAuthenticated(false);
+          setIsCheckingAuth(false);
+        }
+        return;
+      }
+
+      try {
+        const result = await validateUserSession();
+        if (!isMounted) return;
+
+        if (result.isValid) {
+          setIsAuthenticated(true);
+        } else {
+          console.warn('Session verification rejected on refresh:', result.reason);
+          await performAutoCheckout(token);
+          clearAuth();
+          setIsAuthenticated(false);
+        }
+      } catch (err) {
+        console.error('Session verification error on refresh:', err);
+        if (isMounted) {
+          await performAutoCheckout(token);
+          clearAuth();
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (isMounted) {
+          setIsCheckingAuth(false);
+        }
+      }
+    };
+
+    verifySessionOnMount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Global auth logout listener
+  useEffect(() => {
+    const handleAuthLogout = () => {
+      setIsAuthenticated(false);
+      setIsCheckingAuth(false);
+    };
+    window.addEventListener('auth-logout', handleAuthLogout);
+    return () => window.removeEventListener('auth-logout', handleAuthLogout);
+  }, []);
+
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('dark');
@@ -231,12 +279,14 @@ export default function App() {
 
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
+    setIsCheckingAuth(false);
     setAuthView('login');
   };
 
   const handleSignOut = async () => {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     try {
+      await performAutoCheckout(token);
       if (token) {
         await fetch('https://kt-backend-yzr4.onrender.com/api/users/logout', {
           method: 'POST',
@@ -249,18 +299,21 @@ export default function App() {
     } catch (e) {
       console.warn('Logout notification error:', e);
     } finally {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('auth_user');
-      localStorage.removeItem('user');
-      localStorage.removeItem('active_role');
-      localStorage.removeItem('user_role');
-      localStorage.removeItem('kt_employee_full_name');
+      clearAuth();
       setIsAuthenticated(false);
+      setIsCheckingAuth(false);
       window.location.href = '/';
     }
   };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 font-sans">
+        <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p className="text-xs font-semibold text-slate-500 tracking-tight">Verifying session...</p>
+      </div>
+    );
+  }
 
   return (
     <AppProvider>

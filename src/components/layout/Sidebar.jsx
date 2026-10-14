@@ -299,12 +299,14 @@ export const Sidebar = ({ onSignOut }) => {
             <div className="min-w-0">
               <span className="text-[10px] uppercase font-semibold text-slate-400 block tracking-wider leading-none mb-1">Role</span>
               <span className="text-xs font-semibold text-indigo-700 truncate block">
-                {roleLabels[userRole] || 'Employee'}
+                {roleLabels[userRole] || (userRole ? userRole.toUpperCase() : '')}
               </span>
             </div>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 uppercase font-mono">
-              {userRole === 'admin' ? 'ADMIN' : userRole === 'team_leader' ? 'TL' : userRole === 'hr' ? 'HR' : 'EMP'}
-            </span>
+            {userRole && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 uppercase font-mono">
+                {userRole === 'admin' ? 'ADMIN' : userRole === 'team_leader' ? 'TL' : userRole === 'hr' ? 'HR' : 'EMP'}
+              </span>
+            )}
           </div>
 
           <button

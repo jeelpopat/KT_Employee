@@ -608,14 +608,14 @@ export const Header = ({ onSignOut }) => {
     );
   };
 
-  const displayName = resolveEmployeeName(headerProfileData) || resolveEmployeeName(user) || 'Employee';
+  const displayName = resolveEmployeeName(headerProfileData) || resolveEmployeeName(user) || (user?.email ? user.email.split('@')[0] : '') || '';
   const displayEmail =
     user?.email ||
     user?.employee?.email ||
     user?.profile?.email ||
     headerProfileData?.email ||
     headerProfileData?.employee?.email ||
-    'employee@kevalon.com';
+    '';
   const displayPhoto = extractPhoto(user) || extractPhoto(headerProfileData);
   const [headerImgError, setHeaderImgError] = useState(false);
 

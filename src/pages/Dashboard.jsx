@@ -11,7 +11,12 @@ import {
 } from "lucide-react";
 import api from "../api/axios";
 import { useConfirm } from "../components/common/ConfirmDialog";
-import { isFinanceOrExcludedUser, filterOutFinanceUsers } from "../utils/roleFilters";
+import {
+  isFinanceOrExcludedUser,
+  filterOutFinanceUsers,
+  filterOutUnknownUsers,
+  isUnknownEmployeeOrUser
+} from "../utils/roleFilters";
 
 const UmbrellaIcon = ({ className = "h-5 w-5" }) => (
   <svg
@@ -101,17 +106,37 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!isAutoAbsentTimeReached()) return;
-
-    fetchAbsentAttendance();
-
+    // Background polling every 12s to automatically reflect new attendances, leaves, and employee registrations
     const intervalId = setInterval(() => {
-      if (isAutoAbsentTimeReached()) {
-        fetchAbsentAttendance();
-      }
-    }, 60000);
+      fetchAbsentAttendance();
+      fetchLeaves();
+      fetchUsers();
+    }, 12000);
 
-    return () => clearInterval(intervalId);
+    const handleFocus = () => {
+      fetchAbsentAttendance();
+      fetchLeaves();
+      fetchUsers();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchAbsentAttendance();
+        fetchLeaves();
+        fetchUsers();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("attendance_updated", handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("attendance_updated", handleFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -160,14 +185,14 @@ export default function Dashboard() {
         employees = employeeData.employees;
       }
 
-      const filteredEmployees = filterOutFinanceUsers(employees);
+      const filteredEmployees = filterOutUnknownUsers(filterOutFinanceUsers(employees));
       const employeeCount = filteredEmployees.length;
 
       // Fetch users for birthdays
       const usersResponse = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all");
       const usersData = await usersResponse.json();
       const users = usersData.users || usersData.data || [];
-      const filteredUsers = filterOutFinanceUsers(users);
+      const filteredUsers = filterOutUnknownUsers(filterOutFinanceUsers(users));
 
       const formattedBirthdays = filteredUsers
         .map((user) => ({
@@ -303,9 +328,9 @@ export default function Dashboard() {
       let leaveArray = Array.isArray(data) ? data : data.leaves || data.data || [];
 
       const hrApprovedLeaves = leaveArray.filter((leave) => {
-        if (!leave) return false;
+        if (!leave || isUnknownEmployeeOrUser(leave)) return false;
         if (isFinanceOrExcludedUser(leave)) return false;
-        if (leave.employeeId && isFinanceOrExcludedUser(leave.employeeId)) return false;
+        if (leave.employeeId && (isFinanceOrExcludedUser(leave.employeeId) || isUnknownEmployeeOrUser(leave.employeeId))) return false;
         return leave.hrStatus?.toLowerCase() === "approved";
       });
       setLeaves(hrApprovedLeaves);
@@ -461,9 +486,15 @@ export default function Dashboard() {
 
       // Fetch absent records from the dedicated API
       const absentResponse = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/attendance/absent/all",
+        `https://kt-backend-yzr4.onrender.com/api/attendance/absent/all?_t=${Date.now()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+          cache: "no-store",
         }
       );
 
@@ -476,11 +507,10 @@ export default function Dashboard() {
 
       const normalizedAbsent = absentRecordsList
         .filter((record) => {
-          if (!record) return false;
-          if (isFinanceOrExcludedUser(record)) return false;
-          if (record.user && isFinanceOrExcludedUser(record.user)) return false;
-          if (record.employee && isFinanceOrExcludedUser(record.employee)) return false;
-          if (record.userId && isFinanceOrExcludedUser(record.userId)) return false;
+          if (!record || isFinanceOrExcludedUser(record) || isUnknownEmployeeOrUser(record)) return false;
+          if (record.user && (isFinanceOrExcludedUser(record.user) || isUnknownEmployeeOrUser(record.user))) return false;
+          if (record.employee && (isFinanceOrExcludedUser(record.employee) || isUnknownEmployeeOrUser(record.employee))) return false;
+          if (record.userId && (isFinanceOrExcludedUser(record.userId) || isUnknownEmployeeOrUser(record.userId))) return false;
           return true;
         })
         .map((record, index) => ({
@@ -492,20 +522,25 @@ export default function Dashboard() {
 
       setAbsentRecords(normalizedAbsent);
 
-      // Fetch present records
-      const attendanceResponse = await fetch("https://kt-backend-yzr4.onrender.com/api/attendance/admin/all", {
-        headers: { Authorization: `Bearer ${token}` },
+      // Fetch present records (with cache-busting)
+      const attendanceResponse = await fetch(`https://kt-backend-yzr4.onrender.com/api/attendance/admin/all?_t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+        cache: "no-store",
       });
       const attendanceData = await attendanceResponse.json();
       const attendanceList = normalizeAttendanceRecords(attendanceData);
 
       const todayKey = getLocalDateKey(new Date());
       const todayPresent = attendanceList.filter((record) => {
-        if (!record) return false;
-        if (isFinanceOrExcludedUser(record)) return false;
-        if (record.user && isFinanceOrExcludedUser(record.user)) return false;
-        if (record.employee && isFinanceOrExcludedUser(record.employee)) return false;
-        if (record.userId && isFinanceOrExcludedUser(record.userId)) return false;
+        if (!record || isFinanceOrExcludedUser(record) || isUnknownEmployeeOrUser(record)) return false;
+        if (record.user && (isFinanceOrExcludedUser(record.user) || isUnknownEmployeeOrUser(record.user))) return false;
+        if (record.employee && (isFinanceOrExcludedUser(record.employee) || isUnknownEmployeeOrUser(record.employee))) return false;
+        if (record.userId && (isFinanceOrExcludedUser(record.userId) || isUnknownEmployeeOrUser(record.userId))) return false;
 
         const recordDate = getLocalDateKey(getAttendanceDate(record));
         return getAttendanceStatus(record) === "present" && (!recordDate || recordDate === todayKey);
@@ -526,11 +561,10 @@ export default function Dashboard() {
 
         const todayKey = getLocalDateKey(new Date());
         const filteredAttendance = attendanceData.filter((record) => {
-          if (!record) return false;
-          if (isFinanceOrExcludedUser(record)) return false;
-          if (record.user && isFinanceOrExcludedUser(record.user)) return false;
-          if (record.employee && isFinanceOrExcludedUser(record.employee)) return false;
-          if (record.userId && isFinanceOrExcludedUser(record.userId)) return false;
+          if (!record || isFinanceOrExcludedUser(record) || isUnknownEmployeeOrUser(record)) return false;
+          if (record.user && (isFinanceOrExcludedUser(record.user) || isUnknownEmployeeOrUser(record.user))) return false;
+          if (record.employee && (isFinanceOrExcludedUser(record.employee) || isUnknownEmployeeOrUser(record.employee))) return false;
+          if (record.userId && (isFinanceOrExcludedUser(record.userId) || isUnknownEmployeeOrUser(record.userId))) return false;
           return true;
         });
 

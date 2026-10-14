@@ -75,7 +75,7 @@ function Login({ setIsAuthenticated }) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@kevalon.com"
+            placeholder="name@kevalon.com"
             leftIcon={Mail}
             required
           />

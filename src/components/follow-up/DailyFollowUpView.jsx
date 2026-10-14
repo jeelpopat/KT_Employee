@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
+import { isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
 
 export const DailyFollowUpView = () => {
   const { user } = useApp();
@@ -189,8 +190,8 @@ export const DailyFollowUpView = () => {
 
   // Filter updates: strictly exclude current TL's own reports, and apply search query if provided
   const filteredUpdates = useMemo(() => {
-    // 1. Exclude the logged-in TL's own daily reports
-    const teamOnlyUpdates = dailyUpdates.filter(item => !isCurrentUserReport(item));
+    // 1. Exclude the logged-in TL's own daily reports and unknown employees
+    const teamOnlyUpdates = dailyUpdates.filter(item => !isCurrentUserReport(item) && !isUnknownEmployeeOrUser(item));
 
     if (!searchQuery.trim()) return teamOnlyUpdates;
 
@@ -211,8 +212,11 @@ export const DailyFollowUpView = () => {
     const groups = {};
 
     filteredUpdates.forEach(update => {
-      // Extra safety check: skip if this is current TL
-      if (isCurrentUserReport(update)) return;
+      // Extra safety check: skip if this is current TL or unknown employee
+      if (isCurrentUserReport(update) || isUnknownEmployeeOrUser(update)) return;
+
+      const empName = update.employeeId?.name || u?.name || '';
+      if (!empName || isUnknownEmployeeOrUser(empName)) return;
 
       const empId = update.employeeId?._id || update.employeeId?.id || update.employeeId?.name || update.employeeId || 'unknown';
       const u = userMap[empId] || userMap[update.employeeId?.name?.toLowerCase()?.trim()];

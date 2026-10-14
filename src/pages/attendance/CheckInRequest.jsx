@@ -5,29 +5,106 @@ import {
   XCircle,
   Search,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import Modal from "../../components/common/Modal";
-import { isFinanceOrExcludedUser } from "../../utils/roleFilters";
+import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
+import { useApp } from "../../context/AppContext";
 
-const getLoggedInAdminId = () => {
+// Validate 24-character hexadecimal MongoDB ObjectId
+const isValidObjectId = (id) => typeof id === "string" && /^[0-9a-fA-F]{24}$/.test(id.trim());
+
+// Safe JWT parser with proper base64url padding and Unicode decoding
+const parseJwtPayload = (token) => {
+  if (!token || typeof token !== "string" || !token.includes(".")) return null;
   try {
-    const stored = localStorage.getItem("auth_user") || localStorage.getItem("user");
-    if (stored) {
-      const u = JSON.parse(stored);
-      if (u._id || u.id || u.userId) return u._id || u.id || u.userId;
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = base64.length % 4;
+    const padded = pad ? base64 + "=".repeat(4 - pad) : base64;
+    const jsonStr = decodeURIComponent(
+      atob(padded)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonStr);
+  } catch (e1) {
+    try {
+      const parts = token.split(".");
+      return JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    } catch (e2) {
+      return null;
     }
-    const tok = localStorage.getItem("auth_token") || localStorage.getItem("token");
-    if (tok) {
-      const parts = tok.split(".");
-      if (parts.length >= 2) {
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-        if (payload._id || payload.userId || payload.id || payload.sub) {
-          return payload._id || payload.userId || payload.id || payload.sub;
-        }
+  }
+};
+
+// Recursively inspect candidate objects for a valid MongoDB ObjectId
+const extractIdFromObject = (obj) => {
+  if (!obj || typeof obj !== "object") return null;
+
+  const candidates = [
+    obj._id,
+    obj.id,
+    obj.userId,
+    obj.userID,
+    obj.user?._id,
+    obj.user?.id,
+    obj.user?.userId,
+    obj.user?.userID,
+    obj.data?._id,
+    obj.data?.id,
+    obj.data?.userId,
+    obj.data?.user?._id,
+    obj.data?.user?.id,
+    obj.profile?._id,
+    obj.profile?.id,
+    obj.employee?._id,
+    obj.employee?.userId,
+    obj.employee?.userID,
+    obj.sub,
+  ];
+
+  for (const c of candidates) {
+    if (isValidObjectId(c)) return String(c).trim();
+  }
+  return null;
+};
+
+// Retrieve authentic dynamic logged-in admin user ID (NEVER static mock IDs)
+const getLoggedInAdminId = (fallbackUser = null) => {
+  // 1. From contextUser passed into function
+  if (fallbackUser) {
+    const fromCtx = extractIdFromObject(fallbackUser);
+    if (fromCtx) return fromCtx;
+  }
+
+  // 2. From localStorage keys: auth_user, user, profile, currentUser
+  const storageKeys = ["auth_user", "user", "profile", "currentUser", "kt_admin_user"];
+  for (const k of storageKeys) {
+    try {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const id = extractIdFromObject(parsed);
+        if (id) return id;
       }
+    } catch {}
+  }
+
+  // 3. From decoded JWT token payload
+  const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+  if (token) {
+    const payload = parseJwtPayload(token);
+    if (payload) {
+      const id = extractIdFromObject(payload);
+      if (id) return id;
     }
-  } catch (e) {}
-  return "6a23b5c49cd1507bfd5e3bcb";
+  }
+
+  return null;
 };
 
 const PENDING_URL =
@@ -142,6 +219,134 @@ const formatCheckInTime = (value) => {
 };
 
 // ============================================================
+// HELPER: EXTRACT ATTENDANCE ID
+// ============================================================
+const extractAttendanceId = (item) => {
+  if (!item) return "";
+  if (typeof item === "string" && isValidObjectId(item)) return item.trim();
+  if (typeof item !== "object") return "";
+
+  const candidates = [
+    item.attendanceId,
+    item.attendance?._id,
+    item.attendance?.id,
+    item._id,
+    item.id,
+    item.attendanceRecordId,
+    item.attendance_id,
+    item.raw?.attendanceId,
+    item.raw?.attendance?._id,
+    item.raw?._id,
+  ];
+
+  for (const c of candidates) {
+    if (isValidObjectId(c)) return String(c).trim();
+  }
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim() && !c.includes("-")) return c.trim();
+  }
+
+  return "";
+};
+
+// ============================================================
+// HELPER: EXTRACT EMPLOYEE USER ID (TARGET USER TO APPROVE/REJECT)
+// ============================================================
+const extractEmployeeUserId = (item, allUsersList = []) => {
+  if (!item) return "";
+
+  // 1. Check direct fields on item and raw item
+  const candidates = [
+    typeof item.userId === "object" ? (item.userId?._id || item.userId?.id) : item.userId,
+    typeof item.user === "object" ? (item.user?._id || item.user?.id) : item.user,
+    typeof item.employeeId === "object" ? (item.employeeId?._id || item.employeeId?.id || item.employeeId?.userId) : item.employeeId,
+    typeof item.employee === "object" ? (item.employee?._id || item.employee?.userId || item.employee?.id) : item.employee,
+    typeof item.attendance === "object" ? (
+      (typeof item.attendance.userId === "object" ? (item.attendance.userId?._id || item.attendance.userId?.id) : item.attendance.userId) ||
+      (typeof item.attendance.user === "object" ? (item.attendance.user?._id || item.attendance.user?.id) : item.attendance.user) ||
+      (typeof item.attendance.employeeId === "object" ? (item.attendance.employeeId?._id || item.attendance.employeeId?.id) : item.attendance.employeeId)
+    ) : null,
+    item.raw ? (
+      (typeof item.raw.userId === "object" ? (item.raw.userId?._id || item.raw.userId?.id) : item.raw.userId) ||
+      (typeof item.raw.user === "object" ? (item.raw.user?._id || item.raw.user?.id) : item.raw.user) ||
+      (typeof item.raw.employeeId === "object" ? (item.raw.employeeId?._id || item.raw.employeeId?.id || item.raw.employeeId?.userId) : item.raw.employeeId) ||
+      (typeof item.raw.employee === "object" ? (item.raw.employee?._id || item.raw.employee?.userId || item.raw.employee?.id) : item.raw.employee)
+    ) : null,
+    item.employeeUserId,
+    item.userID,
+    item.targetUserId,
+  ];
+
+  for (const c of candidates) {
+    if (isValidObjectId(c)) return String(c).trim();
+  }
+
+  // 2. If not a valid 24-character ObjectId, match from allUsersList (by email, name, uniqueID)
+  if (Array.isArray(allUsersList) && allUsersList.length > 0) {
+    const itemEmail = String(
+      item.email ||
+      item.userId?.email ||
+      item.user?.email ||
+      item.employee?.email ||
+      item.employeeId?.email ||
+      item.raw?.email ||
+      item.raw?.userId?.email ||
+      ""
+    ).toLowerCase().trim();
+
+    if (itemEmail) {
+      const match = allUsersList.find(
+        (u) => u.email && u.email.toLowerCase().trim() === itemEmail
+      );
+      if (match && isValidObjectId(match._id)) return String(match._id).trim();
+    }
+
+    const itemName = String(
+      item.employeeName ||
+      item.name ||
+      item.userId?.name ||
+      item.user?.name ||
+      item.employee?.name ||
+      item.raw?.employeeName ||
+      item.raw?.name ||
+      ""
+    ).toLowerCase().trim();
+
+    if (itemName && itemName !== "unknown employee" && itemName !== "unknown user" && itemName !== "unknown") {
+      const match = allUsersList.find(
+        (u) => u.name && u.name.toLowerCase().trim() === itemName
+      );
+      if (match && isValidObjectId(match._id)) return String(match._id).trim();
+    }
+
+    const itemEmpId = String(
+      item.uniqueID ||
+      item.employeeID ||
+      item.userId?.employeeID ||
+      item.userId?.uniqueID ||
+      item.raw?.uniqueID ||
+      item.raw?.employeeID ||
+      ""
+    ).toLowerCase().trim();
+
+    if (itemEmpId) {
+      const match = allUsersList.find(
+        (u) => (u.uniqueID && u.uniqueID.toLowerCase().trim() === itemEmpId) ||
+               (u.employeeID && u.employeeID.toLowerCase().trim() === itemEmpId)
+      );
+      if (match && isValidObjectId(match._id)) return String(match._id).trim();
+    }
+  }
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+
+  return "";
+};
+
+// ============================================================
 // MAP BACKEND REQUEST
 // ============================================================
 const mapRequest = (item, index) => {
@@ -160,23 +365,37 @@ const mapRequest = (item, index) => {
     item.requestedAt ||
     "N/A";
 
+  const attendanceId = extractAttendanceId(item);
+  const employeeUserId = extractEmployeeUserId(item);
+
   return {
+    raw: item,
     id:
+      attendanceId ||
       item._id ||
       item.id ||
       `${item.date || item.requestedTime || Date.now()}-${index}`,
+
+    attendanceId: attendanceId || item._id || item.id || "",
+
+    userId: employeeUserId,
+    employeeUserId: employeeUserId,
 
     name:
       item.employeeName ||
       item.name ||
       item.userId?.name ||
+      item.user?.name ||
       item.employee?.name ||
+      item.employeeId?.name ||
       "Unknown Employee",
 
     role:
       item.role ||
       item.userId?.role ||
+      item.user?.role ||
       item.employee?.role ||
+      item.employeeId?.role ||
       "Employee",
 
     requestedTime: formatCheckInTime(actualCheckInTime),
@@ -205,13 +424,17 @@ const mapRequest = (item, index) => {
     email:
       item.email ||
       item.userId?.email ||
+      item.user?.email ||
       item.employee?.email ||
+      item.employeeId?.email ||
       "",
 
     department:
       item.department ||
       item.userId?.department ||
+      item.user?.department ||
       item.employee?.department ||
+      item.employeeId?.department ||
       "",
 
     isLate:
@@ -236,6 +459,10 @@ const mapRequest = (item, index) => {
 };
 
 export default function CheckInRequest() {
+  const { user: contextUser } = useApp();
+  const [adminApproverId, setAdminApproverId] = useState(() => getLoggedInAdminId(contextUser));
+  const [allUsers, setAllUsers] = useState([]);
+
   const [requests, setRequests] = useState([]);
 
   // Initial page loading
@@ -255,24 +482,109 @@ export default function CheckInRequest() {
 
   const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
+  // Dynamically resolve authentic live Admin / Approver MongoDB ID and all users
+  useEffect(() => {
+    let isMounted = true;
+    const resolveLiveAdminId = async () => {
+      // 1. Initial resolution from memory / storage
+      const initialId = getLoggedInAdminId(contextUser);
+      if (initialId && isMounted) {
+        setAdminApproverId(initialId);
+      }
+
+      const tok = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const headers = {
+        "Content-Type": "application/json",
+        ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
+      };
+
+      // 2. Query live /api/users/profile
+      try {
+        const pRes = await fetch("https://kt-backend-yzr4.onrender.com/api/users/profile", { headers });
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          const pId = extractIdFromObject(pData);
+          if (pId && isMounted) {
+            setAdminApproverId(pId);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch /api/users/profile for approver ID:", err?.message);
+      }
+
+      // 3. Query /api/users/all for user list and approver fallback
+      try {
+        const uRes = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all", { headers });
+        if (uRes.ok) {
+          const uData = await uRes.json();
+          const list = uData?.users || uData?.data || (Array.isArray(uData) ? uData : []);
+
+          if (isMounted && Array.isArray(list)) {
+            setAllUsers(list);
+          }
+
+          let currentEmail = null;
+          try {
+            const rawUser = JSON.parse(localStorage.getItem("auth_user") || localStorage.getItem("user") || "{}");
+            currentEmail = rawUser?.email || rawUser?.user?.email || null;
+          } catch {}
+
+          let matched = null;
+          if (currentEmail) {
+            matched = list.find((u) => u.email && u.email.toLowerCase() === currentEmail.toLowerCase());
+          }
+          if (!matched) {
+            matched = list.find((u) => {
+              const r = String(u.role || "").toLowerCase().trim();
+              return r === "admin" || r === "hr";
+            });
+          }
+
+          if (matched && isMounted) {
+            const mId = extractIdFromObject(matched);
+            if (mId) {
+              setAdminApproverId(mId);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch /api/users/all for approver ID:", err?.message);
+      }
+    };
+
+    resolveLiveAdminId();
+    return () => {
+      isMounted = false;
+    };
+  }, [contextUser]);
+
   // ============================================================
   // FETCH PENDING REQUESTS
   // ============================================================
-  const fetchPendingRequests = async () => {
-    setLoading(true);
-    setError("");
+  const fetchPendingRequests = async (isSilent = false) => {
+    if (!isSilent) {
+      setLoading(true);
+      setError("");
+    }
 
     try {
       if (!token) {
-        setError("Please login first.");
+        if (!isSilent) setError("Please login first.");
         return;
       }
 
-      const res = await fetch(PENDING_URL, {
+      // Add cache-busting timestamp to bypass browser/proxy caching
+      const freshUrl = `${PENDING_URL}${PENDING_URL.includes("?") ? "&" : "?"}_t=${Date.now()}`;
+
+      const res = await fetch(freshUrl, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
         },
+        cache: "no-store",
       });
 
       if (!res.ok) {
@@ -287,88 +599,92 @@ export default function CheckInRequest() {
 
       const mappedRequests = normalized
         .filter((item) => {
-          if (!item) return false;
-          if (isFinanceOrExcludedUser(item)) return false;
-          if (item.userId && isFinanceOrExcludedUser(item.userId)) return false;
-          if (item.employee && isFinanceOrExcludedUser(item.employee)) return false;
+          if (!item || isFinanceOrExcludedUser(item) || isUnknownEmployeeOrUser(item)) return false;
+          if (item.userId && (isFinanceOrExcludedUser(item.userId) || isUnknownEmployeeOrUser(item.userId))) return false;
+          if (item.employee && (isFinanceOrExcludedUser(item.employee) || isUnknownEmployeeOrUser(item.employee))) return false;
 
           const name =
             item.employeeName ||
             item.name ||
             item.userId?.name ||
+            item.user?.name ||
             item.employee?.name;
-          if (
-            !name ||
-            name === "Unknown Employee" ||
-            name === "Unknown User" ||
-            name === "Unknown"
-          ) {
+          if (!name || isUnknownEmployeeOrUser(name)) {
             return false;
           }
           return true;
         })
         .map(mapRequest);
 
-      // ========================================================
-      // Preserve already processed requests
-      // ========================================================
-      setRequests((prevRequests) => {
-        const processedItems =
-          prevRequests.filter(
-            (item) =>
-              item.approvalStatus !== "pending"
-          );
-
-        // Replace current pending records with fresh
-        // backend records so updated checkInTimeDisplay
-        // is immediately reflected.
-        const pendingItems =
-          mappedRequests.filter(
-            (newItem) =>
-              newItem.approvalStatus === "pending"
-          );
-
-        return [
-          ...processedItems,
-          ...pendingItems,
-        ];
-      });
+      // Directly sync with live backend data so new entries show immediately and deleted records disappear
+      setRequests(mappedRequests);
     } catch (err) {
       console.error(
         "Fetch Pending Requests Error:",
         err
       );
 
-      setError(
-        "Unable to load pending requests."
-      );
+      if (!isSilent) {
+        setError(
+          "Unable to load pending requests."
+        );
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   };
 
   // ============================================================
-  // INITIAL LOAD + AUTO REFRESH
+  // INITIAL LOAD + PROPER SILENT AUTO REFRESH + FOCUS REVALIDATION
   // ============================================================
   useEffect(() => {
-    fetchPendingRequests();
+    fetchPendingRequests(false);
 
+    // Fast 6-second silent background poll for immediate new requests
     const interval = setInterval(() => {
-      fetchPendingRequests();
-    }, 15000);
+      fetchPendingRequests(true);
+    }, 6000);
 
-    return () => clearInterval(interval);
+    // Immediately revalidate whenever admin returns to the tab
+    const handleFocus = () => {
+      fetchPendingRequests(true);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchPendingRequests(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("attendance_updated", handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("attendance_updated", handleFocus);
+    };
   }, []);
 
   // ============================================================
   // APPROVE / REJECT
   // ============================================================
   const handleAction = async (
-    id,
+    target,
     type,
     reason = ""
   ) => {
-    setActioningId(id);
+    const reqObj =
+      typeof target === "object" && target !== null
+        ? target
+        : requests.find((r) => r.id === target || r.attendanceId === target || r._id === target) || {};
+
+    const targetActionId = reqObj.id || (typeof target === "string" ? target : "");
+    setActioningId(targetActionId);
     setError("");
 
     const updatedStatus =
@@ -382,34 +698,122 @@ export default function CheckInRequest() {
         return;
       }
 
+      // 1. Resolve authentic Admin / HR approver ID (who is taking action)
+      let effectiveAdminId = adminApproverId || getLoggedInAdminId(contextUser);
+      if (!effectiveAdminId) {
+        try {
+          const pRes = await fetch("https://kt-backend-yzr4.onrender.com/api/users/profile", {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            }
+          });
+          if (pRes.ok) {
+            const pData = await pRes.json();
+            effectiveAdminId = extractIdFromObject(pData);
+            if (effectiveAdminId) setAdminApproverId(effectiveAdminId);
+          }
+        } catch {}
+
+        if (!effectiveAdminId) {
+          try {
+            const uRes = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all", {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              }
+            });
+            if (uRes.ok) {
+              const uData = await uRes.json();
+              const list = uData?.users || uData?.data || (Array.isArray(uData) ? uData : []);
+              if (Array.isArray(list)) setAllUsers(list);
+              let currentEmail = null;
+              try {
+                const rawUser = JSON.parse(localStorage.getItem("auth_user") || localStorage.getItem("user") || "{}");
+                currentEmail = rawUser?.email || rawUser?.user?.email || null;
+              } catch {}
+              let matched = currentEmail ? list.find((u) => u.email && u.email.toLowerCase() === currentEmail.toLowerCase()) : null;
+              if (!matched) {
+                matched = list.find((u) => {
+                  const r = String(u.role || "").toLowerCase().trim();
+                  return r === "admin" || r === "hr";
+                });
+              }
+              if (matched) {
+                effectiveAdminId = extractIdFromObject(matched);
+                if (effectiveAdminId) setAdminApproverId(effectiveAdminId);
+              }
+            }
+          } catch {}
+        }
+      }
+
+      if (!effectiveAdminId) {
+        throw new Error("Could not determine dynamic Admin/HR Approver ID. Please sign in again.");
+      }
+
+      // 2. Resolve target employee user ID (whose check-in is being approved/rejected)
+      const targetUserId =
+        extractEmployeeUserId(reqObj, allUsers) ||
+        extractEmployeeUserId(reqObj.raw, allUsers) ||
+        reqObj.userId ||
+        reqObj.employeeUserId ||
+        "";
+
+      // 3. Resolve target attendance document ID
+      const targetAttendanceId =
+        reqObj.attendanceId ||
+        extractAttendanceId(reqObj.raw) ||
+        (isValidObjectId(reqObj.id) ? reqObj.id : null) ||
+        extractAttendanceId(reqObj) ||
+        (typeof target === "string" ? target : "");
+
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+
       // ========================================================
       // APPROVE
       // ========================================================
       if (type === "approve") {
-        const response = await fetch(
-          APPROVE_URL,
-          {
-            method: "PUT",
+        const approvePayload = {
+          attendanceId: targetAttendanceId,
+          id: targetAttendanceId,
+          userId: targetUserId || undefined, // Target employee ID
+          approvedBy: effectiveAdminId,     // Admin / HR ID
+          approverId: effectiveAdminId,     // Admin / HR ID
+        };
 
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+        let response = await fetch(APPROVE_URL, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(approvePayload),
+        });
 
-            body: JSON.stringify({
-              approvedBy: getLoggedInAdminId(),
-              attendanceId: id,
-            }),
+        // Fallback to POST if PUT returned 404
+        if (response.status === 404) {
+          try {
+            const postResponse = await fetch(APPROVE_URL, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(approvePayload),
+            });
+            if (postResponse.ok || postResponse.status !== 404) {
+              response = postResponse;
+            }
+          } catch (postErr) {
+            console.warn("POST fallback failed:", postErr);
           }
-        );
+        }
 
-        const responseData =
-          await response.json();
+        const responseData = await response.json().catch(() => ({}));
 
         if (!response.ok) {
           throw new Error(
             responseData?.message ||
-              "Failed to approve attendance"
+            responseData?.error ||
+            "Failed to approve attendance"
           );
         }
 
@@ -418,42 +822,27 @@ export default function CheckInRequest() {
         // ======================================================
         setRequests((prevRequests) =>
           prevRequests.map((req) =>
-            req.id === id
+            req.id === targetActionId || req.attendanceId === targetAttendanceId
               ? {
                   ...req,
-                  approvalStatus:
-                    "approved",
-
-                  // Keep actual employee
-                  // check-in time
+                  approvalStatus: "approved",
                   checkInTime:
-                    responseData?.data
-                      ?.checkInTime ||
+                    responseData?.data?.checkInTime ||
                     req.checkInTime,
-
                   checkInTimeDisplay:
-                    responseData?.data
-                      ?.checkInTimeDisplay ||
+                    responseData?.data?.checkInTimeDisplay ||
                     req.checkInTimeDisplay,
-
                   checkInTimeFullDisplay:
-                    responseData?.data
-                      ?.checkInTimeFullDisplay ||
+                    responseData?.data?.checkInTimeFullDisplay ||
                     req.checkInTimeFullDisplay,
-
                   requestedTime:
-                    responseData?.data
-                      ?.checkInTimeDisplay ||
+                    responseData?.data?.checkInTimeDisplay ||
                     req.requestedTime,
-
                   status:
-                    responseData?.data
-                      ?.status ||
+                    responseData?.data?.status ||
                     req.status,
-
                   isLate:
-                    responseData?.data
-                      ?.isLate ??
+                    responseData?.data?.isLate ??
                     req.isLate,
                 }
               : req
@@ -465,30 +854,45 @@ export default function CheckInRequest() {
       // REJECT
       // ========================================================
       if (type === "reject") {
-        const response = await fetch(
-          REJECT_URL,
-          {
-            method: "PUT",
+        const rejectPayload = {
+          attendanceId: targetAttendanceId,
+          id: targetAttendanceId,
+          userId: targetUserId || undefined, // Target employee ID
+          reason: reason || "Attendance rejected by admin",
+          approvedBy: effectiveAdminId,     // Admin / HR ID
+          rejectedBy: effectiveAdminId,     // Admin / HR ID
+          approverId: effectiveAdminId,     // Admin / HR ID
+        };
 
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+        let response = await fetch(REJECT_URL, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(rejectPayload),
+        });
 
-            body: JSON.stringify({
-              attendanceId: id,
-              reason,
-            }),
+        // Fallback to POST if PUT returned 404
+        if (response.status === 404) {
+          try {
+            const postResponse = await fetch(REJECT_URL, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(rejectPayload),
+            });
+            if (postResponse.ok || postResponse.status !== 404) {
+              response = postResponse;
+            }
+          } catch (postErr) {
+            console.warn("POST fallback failed:", postErr);
           }
-        );
+        }
 
-        const responseData =
-          await response.json();
+        const responseData = await response.json().catch(() => ({}));
 
         if (!response.ok) {
           throw new Error(
             responseData?.message ||
-              "Failed to reject attendance"
+            responseData?.error ||
+            "Failed to reject attendance"
           );
         }
 
@@ -497,11 +901,11 @@ export default function CheckInRequest() {
         // ======================================================
         setRequests((prevRequests) =>
           prevRequests.map((req) =>
-            req.id === id
+            req.id === targetActionId || req.attendanceId === targetAttendanceId
               ? {
                   ...req,
-                  approvalStatus:
-                    "rejected",
+                  approvalStatus: "rejected",
+                  rejectionReason: reason || req.rejectionReason,
                 }
               : req
           )
@@ -556,7 +960,7 @@ export default function CheckInRequest() {
     }
 
     handleAction(
-      rejectingRequest.id,
+      rejectingRequest,
       "reject",
       reason
     );
@@ -696,6 +1100,17 @@ export default function CheckInRequest() {
               {pendingCount} Pending
             </span>
           </div>
+
+          {/* Refresh Button */}
+          <button
+            onClick={() => fetchPendingRequests()}
+            disabled={loading}
+            title="Refresh from Database"
+            className="h-10 px-3 py-1 bg-white border border-slate-200/80 rounded-lg shadow-xs text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 text-slate-600 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
         </div>
       </div>
 
@@ -1036,7 +1451,7 @@ export default function CheckInRequest() {
                                 }
                                 onClick={() =>
                                   handleAction(
-                                    req.id,
+                                    req,
                                     "approve"
                                   )
                                 }
@@ -1184,7 +1599,7 @@ export default function CheckInRequest() {
                           }
                           onClick={() =>
                             handleAction(
-                              req.id,
+                              req,
                               "approve"
                             )
                           }
