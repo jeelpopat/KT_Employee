@@ -11,6 +11,67 @@ export const TOTAL_SHIFT_MINUTES = 540;
  */
 export const isTodayDate = (dateVal) => {
   if (!dateVal) return false;
+  if (typeof dateVal === 'string') {
+    const trimmed = dateVal.trim();
+    if (!trimmed || trimmed === '--:--' || trimmed === 'null' || trimmed === 'undefined' || trimmed === '00:00:00' || trimmed === '00:00') return false;
+
+    // 1. If it's a time string (e.g. "10:19 AM", "11:13 am", "10:42:00")
+    if (/^\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?$/i.test(trimmed)) {
+      return true; // Time-only punch value belongs to today's active attendance session
+    }
+
+    // 2. If it's an ISO string or contains time (e.g. "2026-10-14T18:30:00.000Z" or "2026-10-15 17:20:00")
+    // Parse using new Date() so that timezone conversion to local time (e.g. IST) is performed correctly!
+    if (trimmed.includes('T') || trimmed.includes(':') || trimmed.includes('Z')) {
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) {
+        const now = new Date();
+        // Check if matching today in local time
+        if (
+          d.getFullYear() === now.getFullYear() &&
+          d.getMonth() === now.getMonth() &&
+          d.getDate() === now.getDate()
+        ) {
+          return true;
+        }
+        // Also check if matching today in UTC date (in case server or client is in UTC)
+        const todayIso = now.toISOString().split('T')[0];
+        const dIso = d.toISOString().split('T')[0];
+        if (todayIso === dIso) {
+          return true;
+        }
+      }
+    }
+
+    // 3. Pure date string YYYY-MM-DD or YYYY/MM/DD (without time component)
+    const ymdMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10) - 1;
+      const day = parseInt(ymdMatch[3], 10);
+      const now = new Date();
+      return (
+        now.getFullYear() === year &&
+        now.getMonth() === month &&
+        now.getDate() === day
+      );
+    }
+
+    // 4. Pure date string DD-MM-YYYY or DD/MM/YYYY (without time component)
+    const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10) - 1;
+      const year = parseInt(dmyMatch[3], 10);
+      const now = new Date();
+      return (
+        now.getDate() === day &&
+        now.getMonth() === month &&
+        now.getFullYear() === year
+      );
+    }
+  }
+
   const d = new Date(dateVal);
   if (isNaN(d.getTime())) return false;
   const now = new Date();
@@ -22,9 +83,8 @@ export const isTodayDate = (dateVal) => {
     return true;
   }
   const todayIso = now.toISOString().split('T')[0];
-  const todayLocal = now.toLocaleDateString('en-CA');
-  const dStr = typeof dateVal === 'string' ? dateVal : d.toISOString();
-  return dStr.startsWith(todayIso) || dStr.startsWith(todayLocal);
+  const dIso = d.toISOString().split('T')[0];
+  return todayIso === dIso;
 };
 
 /**
@@ -48,8 +108,23 @@ export const formatISOToLocalTime = (isoStr) => {
   if (!isoStr || isoStr === '--:--' || isoStr === 'null' || isoStr === 'undefined' || isoStr === '00:00:00' || isoStr === '00:00') {
     return '--:--';
   }
-  if (typeof isoStr === 'string' && (isoStr.includes('AM') || isoStr.includes('PM'))) {
-    return isoStr;
+  if (typeof isoStr === 'string') {
+    const trimmed = isoStr.trim();
+    const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?$/i);
+    if (timeMatch) {
+      let hrs = parseInt(timeMatch[1], 10);
+      const mins = timeMatch[2];
+      let ampm = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
+      if (!ampm) {
+        ampm = hrs >= 12 ? 'PM' : 'AM';
+        if (hrs > 12) hrs -= 12;
+        if (hrs === 0) hrs = 12;
+      } else {
+        if (hrs > 12) hrs -= 12;
+        if (hrs === 0) hrs = 12;
+      }
+      return `${String(hrs).padStart(2, '0')}:${mins} ${ampm}`;
+    }
   }
   const date = new Date(isoStr);
   if (!isNaN(date.getTime())) {
@@ -182,7 +257,7 @@ export const normalizeAttendanceRecord = (record) => {
 
   const now = new Date();
   const recDateStr = record.date || record.checkInTime || record.createdAt;
-  const isToday = isTodayDate(recDateStr);
+  const isToday = isTodayDate(record.date) || isTodayDate(record.checkInTime) || isTodayDate(record.createdAt) || isTodayDate(recDateStr);
 
   const rawCheckIn = record.checkInTime || record.inTime || record.checkIn;
   const statusStr = String(record.status || '').toLowerCase().trim();
@@ -229,9 +304,11 @@ export const normalizeAttendanceRecord = (record) => {
   );
 
   // Auto check-out condition:
-  // - If past day: 11:59 PM has already passed.
-  // - If today: current time >= 23:59.
-  const isPast1159PM = !isToday || (now.getHours() === 23 && now.getMinutes() >= 59);
+  // - Strictly past day: midnight has already elapsed.
+  // - Strictly today: current time >= 23:59 (11:59 PM).
+  // If employee is actively working today before 11:59 PM, auto check-out MUST NOT trigger!
+  const isPast = !isToday && (isPastDate(record.date) || isPastDate(record.createdAt) || isPastDate(recDateStr));
+  const isPast1159PM = isPast || (isToday && now.getHours() === 23 && now.getMinutes() >= 59);
 
   if (hasCheckIn && !hasExistingCheckOut && isPast1159PM) {
     let baseDate = new Date(recDateStr || Date.now());
@@ -362,17 +439,64 @@ export const computeNineHourTimeline = ({
   isCheckedIn = false,
   isCheckedOut = false,
   isRejected = false,
+  isPending = false,
   breaks = []
 }) => {
   const TOTAL_MINUTES = TOTAL_SHIFT_MINUTES; // 540 minutes = 9 hours
 
   let startMinutes = parseTimeToMinutes(checkInTime);
 
+  // If no check-in time parsed yet, inspect earliest active segment from backend
+  if (startMinutes === null && Array.isArray(timelineSegments) && timelineSegments.length > 0) {
+    const activeSegs = timelineSegments.filter(s => s.type === 'blue' || s.type === 'yellow');
+    if (activeSegs.length > 0) {
+      let minFrom = Infinity;
+      activeSegs.forEach(s => {
+        const localFrom = convertUTCMinutesToLocal(s.fromMinutes);
+        if (localFrom < minFrom) minFrom = localFrom;
+      });
+      if (minFrom !== Infinity) startMinutes = minFrom;
+    }
+  }
+
+  // If startMinutes is still null, check localStorage for authentic saved check-in time string
+  if (startMinutes === null && typeof window !== 'undefined' && window.localStorage) {
+    const savedIn = localStorage.getItem('kt_check_in_time_str');
+    const savedMins = parseTimeToMinutes(savedIn);
+    if (savedMins !== null) {
+      startMinutes = savedMins;
+    }
+  }
+
   // If rejected by admin: shift was NOT approved/active. Do not draw working time segments or continue progress!
   if (isRejected) {
     if (startMinutes === null) {
-      startMinutes = 540; // 09:00 AM default
+      return {
+        startMinutes: null,
+        endMinutes: null,
+        midMinutes: null,
+        startTimeStr: '--:--',
+        midTimeStr: '--:--',
+        endTimeStr: '--:--',
+        breakStartTime: '',
+        displaySegments: [],
+        statusMarkers: [
+          {
+            id: 'marker-checkin-rejected',
+            type: 'check_in',
+            label: 'Check In (Rejected)',
+            timeStr: '--:--',
+            minutes: 0,
+            percent: 0,
+            color: '#EF4444',
+            badgeClass: 'bg-red-500/10 text-red-500 border-red-500/30',
+            dotClass: 'bg-red-500'
+          }
+        ],
+        hasCheckedIn: false
+      };
     }
+
     const endMinutes = startMinutes + TOTAL_MINUTES;
     const midMinutes = startMinutes + 270;
 
@@ -384,9 +508,9 @@ export const computeNineHourTimeline = ({
       timeStr: formatMinutesToTimeStr(startMinutes),
       minutes: startMinutes,
       percent: 0,
-      color: '#10B981',
-      badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
-      dotClass: 'bg-emerald-500'
+      color: '#EF4444',
+      badgeClass: 'bg-red-500/10 text-red-500 border-red-500/30',
+      dotClass: 'bg-red-500'
     });
 
     statusMarkers.push({
@@ -415,27 +539,96 @@ export const computeNineHourTimeline = ({
     };
   }
 
-  // If no check-in time parsed yet, inspect earliest active segment from backend
-  if (startMinutes === null && Array.isArray(timelineSegments) && timelineSegments.length > 0) {
-    const activeSegs = timelineSegments.filter(s => s.type === 'blue' || s.type === 'yellow');
-    if (activeSegs.length > 0) {
-      let minFrom = Infinity;
-      activeSegs.forEach(s => {
-        const localFrom = convertUTCMinutesToLocal(s.fromMinutes);
-        if (localFrom < minFrom) minFrom = localFrom;
-      });
-      if (minFrom !== Infinity) startMinutes = minFrom;
+  // If pending approval by admin: shift is waiting for admin approval. Do not draw working progress!
+  if (isPending) {
+    if (startMinutes === null) {
+      return {
+        startMinutes: null,
+        endMinutes: null,
+        midMinutes: null,
+        startTimeStr: '--:--',
+        midTimeStr: '--:--',
+        endTimeStr: '--:--',
+        breakStartTime: '',
+        displaySegments: [],
+        statusMarkers: [
+          {
+            id: 'marker-checkin-pending',
+            type: 'check_in',
+            label: 'Check In (Pending)',
+            timeStr: '--:--',
+            minutes: 0,
+            percent: 0,
+            color: '#F59E0B',
+            badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
+            dotClass: 'bg-amber-500'
+          }
+        ],
+        hasCheckedIn: false
+      };
     }
+
+    const endMinutes = startMinutes + TOTAL_MINUTES;
+    const midMinutes = startMinutes + 270;
+
+    const statusMarkers = [];
+    statusMarkers.push({
+      id: 'marker-checkin-pending',
+      type: 'check_in',
+      label: 'Check In (Pending)',
+      timeStr: formatMinutesToTimeStr(startMinutes),
+      minutes: startMinutes,
+      percent: 0,
+      color: '#F59E0B',
+      badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
+      dotClass: 'bg-amber-500'
+    });
+
+    statusMarkers.push({
+      id: 'marker-shiftend',
+      type: 'shift_end',
+      label: '9h End',
+      timeStr: formatMinutesToTimeStr(endMinutes),
+      minutes: endMinutes,
+      percent: 100,
+      color: '#64748B',
+      badgeClass: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+      dotClass: 'bg-slate-500'
+    });
+
+    return {
+      startMinutes,
+      endMinutes,
+      midMinutes,
+      startTimeStr: formatMinutesToTimeStr(startMinutes),
+      midTimeStr: formatMinutesToTimeStr(midMinutes),
+      endTimeStr: formatMinutesToTimeStr(endMinutes),
+      breakStartTime: '',
+      displaySegments: [], // Strictly EMPTY when pending - awaiting admin approval
+      statusMarkers,
+      hasCheckedIn: false
+    };
+  }
+
+  // If employee has NOT checked in yet: strictly return unstarted timeline (no static 09:00 AM fallback)
+  if (startMinutes === null) {
+    return {
+      startMinutes: null,
+      endMinutes: null,
+      midMinutes: null,
+      startTimeStr: '--:--',
+      midTimeStr: '--:--',
+      endTimeStr: '--:--',
+      breakStartTime: '',
+      displaySegments: [],
+      statusMarkers: [],
+      hasCheckedIn: false
+    };
   }
 
   const hasCheckedIn = Boolean(!isRejected && (isCheckedIn || startMinutes !== null));
 
-  // Fallback start time if not checked in: default 9:00 AM (540 minutes from midnight)
-  if (startMinutes === null) {
-    startMinutes = 540; // 09:00 AM default
-  }
-
-  // Exactly 9 hours after check-in
+  // Exactly 9 hours after authentic check-in
   const endMinutes = startMinutes + TOTAL_MINUTES;
   // 4.5 hours midpoint
   const midMinutes = startMinutes + 270;
@@ -859,7 +1052,7 @@ export const computeNineHourTimeline = ({
 
   // Check Out marker
   const parsedCheckOut = parseTimeToMinutes(checkOutTime);
-  if ((isCheckedOut || parsedCheckOut !== null) && parsedCheckOut !== null && parsedCheckOut >= startMinutes) {
+  if (isCheckedOut && parsedCheckOut !== null && parsedCheckOut >= startMinutes) {
     if (!statusMarkers.some(m => m.type === 'check_out')) {
       const outPct = Number((Math.max(0, Math.min(100, ((parsedCheckOut - startMinutes) / TOTAL_MINUTES) * 100))).toFixed(1));
       statusMarkers.push({
@@ -972,7 +1165,7 @@ export const deriveAttendanceStatus = ({
   ) {
     return {
       status: 'rejected',
-      label: 'Rejected',
+      label: 'Rejected from Admin',
       reason: rejectionReason || 'Attendance request rejected by admin',
       badgeClass: 'text-red-700 bg-red-50 border-red-200',
       dotClass: 'bg-red-500'
@@ -989,7 +1182,7 @@ export const deriveAttendanceStatus = ({
   ) {
     return {
       status: 'pending',
-      label: 'Pending Approval',
+      label: 'Pending',
       reason: 'Check-in request pending admin approval',
       badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
       dotClass: 'bg-amber-500'
@@ -1162,8 +1355,8 @@ export const deriveAttendanceStatus = ({
 
 /**
  * Status text and color resolver matching user specification:
- * - isRejected -> 'Rejected' (Red)
- * - isPending -> 'Pending Approval' (Amber)
+ * - isRejected -> 'Rejected from Admin' (Red)
+ * - isPending -> 'Pending' (Amber)
  * - hasCheckedOut -> 'Checked Out' (Slate/muted)
  * - isOnBreak -> 'On Break' (#F59E0B)
  * - hasCheckedIn -> 'Working' (#00E676)
@@ -1172,13 +1365,13 @@ export const deriveAttendanceStatus = ({
 export const getQuickActionStatusConfig = ({ hasCheckedIn, isOnBreak, hasCheckedOut, isRejected = false, isPending = false }) => {
   if (isRejected) {
     return {
-      statusText: 'Rejected',
+      statusText: 'Rejected from Admin',
       badgeColorClass: 'text-red-600 bg-red-500/10 border-red-500/30',
       dotColorClass: 'bg-red-500 animate-pulse'
     };
   } else if (isPending) {
     return {
-      statusText: 'Pending Approval',
+      statusText: 'Pending',
       badgeColorClass: 'text-amber-600 bg-amber-500/10 border-amber-500/30',
       dotColorClass: 'bg-amber-500 animate-pulse'
     };

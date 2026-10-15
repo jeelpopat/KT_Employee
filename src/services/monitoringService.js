@@ -308,12 +308,10 @@ export const deriveEmployeePosition = (raw = {}, emp = {}) => {
     ''
   ).toString().toLowerCase().trim();
 
-  // Known company Team Leaders: Pandya Hetvi, Kuresh Poonawala, etc.
+  // Known company Team Leaders: Pandya Hetvi, etc.
   if (
     nameStr.includes('hetvi') ||
     emailStr.includes('hetvi') ||
-    nameStr.includes('kuresh') ||
-    emailStr.includes('kuresh') ||
     idStr.includes('6ab3894c4b9bcbcfe8afc6c')
   ) {
     return { short: 'TL', label: 'Team Leader', code: 'team_leader' };

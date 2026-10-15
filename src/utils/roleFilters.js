@@ -103,6 +103,35 @@ export const isFinanceOrExcludedUser = (user) => {
     return true;
   }
 
+  // 6. Exclude test & demo accounts (Priya and Kuresh)
+  const candidateEmail = String(
+    target.email ||
+    target.employeeEmail ||
+    target.userEmail ||
+    user.email ||
+    user.employeeEmail ||
+    ''
+  ).toLowerCase().trim();
+
+  const candidateName = String(
+    target.name ||
+    target.employeeName ||
+    target.fullName ||
+    user.name ||
+    user.employeeName ||
+    user.fullName ||
+    ''
+  ).toLowerCase().trim();
+
+  if (
+    candidateName.includes('priya') ||
+    candidateName.includes('kuresh') ||
+    candidateEmail.includes('priya') ||
+    candidateEmail.includes('kuresh')
+  ) {
+    return true;
+  }
+
   return false;
 };
 
@@ -121,6 +150,7 @@ export const isUnknownEmployeeOrUser = (entity) => {
   if (!entity) return true;
 
   let rawName = '';
+  let rawEmail = '';
   if (typeof entity === 'string') {
     rawName = entity;
   } else if (typeof entity === 'object') {
@@ -147,10 +177,32 @@ export const isUnknownEmployeeOrUser = (entity) => {
       entity.assignedEmployee?.name ||
       (entity.firstName ? `${entity.firstName} ${entity.lastName || ''}`.trim() : '') ||
       '';
+
+    rawEmail =
+      entity.email ||
+      entity.employeeEmail ||
+      entity.userEmail ||
+      entity.employee?.email ||
+      entity.user?.email ||
+      entity.userId?.email ||
+      entity.employeeID?.email ||
+      entity.employeeId?.email ||
+      '';
   }
 
   const clean = String(rawName).trim().toLowerCase();
-  if (!clean) return true;
+  const cleanEmail = String(rawEmail).trim().toLowerCase();
+  if (!clean && !cleanEmail) return true;
+
+  // Exclude test & demo users (Priya and Kuresh)
+  if (
+    clean.includes('priya') ||
+    clean.includes('kuresh') ||
+    cleanEmail.includes('priya') ||
+    cleanEmail.includes('kuresh')
+  ) {
+    return true;
+  }
 
   const invalidNames = [
     'unknown employee',

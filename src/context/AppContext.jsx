@@ -160,9 +160,7 @@ export const deriveUserRole = (u) => {
     u.employee?.isTeamLeader === true ||
     u.employee?.isTeamLead === true ||
     emailStr === 'hetvi.kevalon@gmail.com' ||
-    emailStr === 'kureshpoonawala384@gmail.com' ||
-    nameStr.includes('hetvi') ||
-    nameStr.includes('kuresh')
+    nameStr.includes('hetvi')
   ) {
     return 'team_leader';
   }
@@ -1558,10 +1556,8 @@ export const AppProvider = ({ children }) => {
         designationStr.includes('teamlead') ||
         isTLFlag ||
         empIdStr === 'EMP1002' ||
-        candidateEmail === 'kureshpoonawala384@gmail.com' ||
         candidateEmail === 'hetvi.kevalon@gmail.com' ||
-        candidateName.includes('hetvi') ||
-        candidateName.includes('kuresh')
+        candidateName.includes('hetvi')
       ) {
         determinedRole = 'team_leader';
         if (!resolvedRoleName || resolvedRoleName.toLowerCase() === 'employee') {

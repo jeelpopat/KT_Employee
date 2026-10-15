@@ -314,7 +314,8 @@ const mapLog = (item, index) => {
     approvalStatus === 'approved' ||
     rawStatus === 'approved' ||
     rawStatus === 'accepted' ||
-    item?.isApproved === true;
+    item?.isApproved === true ||
+    ['present', 'late', 'on time', 'half day', 'half-day', 'working', 'completed', 'checked_out', 'checked out'].includes(rawStatus);
 
   const approvedCheckIn =
     isApproved || hasCheckIn
@@ -381,7 +382,7 @@ const mapLog = (item, index) => {
     // =======================================================
     breaks: approvedBreaks,
 
-    totalHours: isApproved
+    totalHours: (isApproved || hasCheckIn)
       ? (
         item?.totalWorkTimeDisplay ||
         item?.totalWorkTimeHours ||
@@ -676,9 +677,9 @@ const AttendanceTimeline = ({
     return (
       <div className="w-full bg-gray-100 h-6 rounded-lg flex items-center justify-center text-[10px] text-gray-500">
         {approvalStatus === 'pending'
-          ? 'Waiting for approval'
+          ? 'Pending approval'
           : approvalStatus === 'rejected'
-            ? 'Attendance rejected'
+            ? 'Rejected from Admin'
             : 'No timeline data available'}
       </div>
     );
@@ -976,23 +977,51 @@ export default function AttendanceLogs() {
         console.warn('Attendance logs fetch error:', aErr);
       }
 
-      // Map attendance items by User Mongo ID
+      // Map attendance items by canonical ID and build lookup index for all identifiers
       const attendanceMap = new Map();
+      const userLookupMap = new Map();
+
       attendanceItems.forEach((item) => {
         if (!item || isFinanceOrExcludedUser(item) || isUnknownEmployeeOrUser(item)) return;
         if (item.user && (isFinanceOrExcludedUser(item.user) || isUnknownEmployeeOrUser(item.user))) return;
         if (item.employee && (isFinanceOrExcludedUser(item.employee) || isUnknownEmployeeOrUser(item.employee))) return;
         if (item.userId && (isFinanceOrExcludedUser(item.userId) || isUnknownEmployeeOrUser(item.userId))) return;
 
-        const uId =
-          item?.employee?._id ||
-          item?.user?._id ||
+        const canonicalKey = String(
           item?.userId?._id ||
           item?.userId ||
-          item?._id;
-        if (uId) {
-          attendanceMap.set(String(uId), item);
+          item?.employee?._id ||
+          item?.user?._id ||
+          item?._id
+        );
+
+        if (!attendanceMap.has(canonicalKey)) {
+          attendanceMap.set(canonicalKey, item);
         }
+
+        const candidateKeys = [
+          canonicalKey,
+          item?._id,
+          item?.id,
+          item?.employee?._id,
+          item?.employee?.id,
+          item?.employee?.employeeId,
+          item?.user?._id,
+          item?.user?.id,
+          item?.userId?._id,
+          item?.userId?.id,
+          item?.userId,
+          item?.employeeId,
+          item?.employee?.email,
+          item?.user?.email,
+          item?.email
+        ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+        candidateKeys.forEach(k => {
+          if (!userLookupMap.has(k)) {
+            userLookupMap.set(k, canonicalKey);
+          }
+        });
       });
 
       // 2. Fetch all users from /users/all to guarantee HR, TL, Employee are all in table (Excluding Admin & Finance)
@@ -1005,9 +1034,17 @@ export default function AttendanceLogs() {
           usersList.forEach((user) => {
             if (!user || !user._id || isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return;
 
-            const uIdKey = String(user._id);
-            if (!attendanceMap.has(uIdKey)) {
-              // Add fallback entry for user
+            const userKeys = [
+              user._id,
+              user.id,
+              user.employeeId,
+              user.uniqueID,
+              user.email
+            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+            const matchedCanonical = userKeys.reduce((found, k) => found || userLookupMap.get(k), null);
+            if (!matchedCanonical || !attendanceMap.has(matchedCanonical)) {
+              const uIdKey = String(user._id);
               attendanceMap.set(uIdKey, {
                 _id: user._id,
                 employee: {
@@ -1035,6 +1072,7 @@ export default function AttendanceLogs() {
                 totalBreakTime: 0,
                 breaks: [],
               });
+              userKeys.forEach(k => userLookupMap.set(k, uIdKey));
             }
           });
         }
@@ -1375,6 +1413,28 @@ export default function AttendanceLogs() {
           label: 'On Leave / Absent',
         };
 
+      case 'pending':
+        return {
+          icon: (
+            <Clock
+              className={`${iconClass} text-amber-600`}
+            />
+          ),
+          color: 'amber',
+          label: 'Pending',
+        };
+
+      case 'rejected':
+        return {
+          icon: (
+            <AlertCircle
+              className={`${iconClass} text-red-600`}
+            />
+          ),
+          color: 'red',
+          label: 'Rejected from Admin',
+        };
+
       default:
         return {
           icon: (
@@ -1412,6 +1472,12 @@ export default function AttendanceLogs() {
       case 'on leave':
       case 'absent':
         return 'bg-rose-50 text-rose-700 border-rose-300';
+
+      case 'pending':
+        return 'bg-amber-50 text-amber-700 border-amber-300';
+
+      case 'rejected':
+        return 'bg-red-50 text-red-700 border-red-300';
 
       default:
         return 'bg-gray-50 text-gray-600 border-gray-300';

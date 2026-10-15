@@ -58,6 +58,7 @@ export const DashboardView = () => {
   const [geoError, setGeoError] = useState('');
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [todaySegments, setTodaySegments] = useState([]);
+  const [todayBreaks, setTodayBreaks] = useState([]);
 
   const [attendanceStatus, setAttendanceStatus] = useState('not_checked_in');
   const [actionsAvailable, setActionsAvailable] = useState({
@@ -314,18 +315,21 @@ export const DashboardView = () => {
     }
 
     // Check persistent action flags in localStorage strictly for today
+    const localPending = localStorage.getItem('kt_attendance_pending_' + todayStr) === 'true' || localStorage.getItem('kt_attendance_pending_' + todayLocalStr) === 'true';
+    const localRejected = localStorage.getItem('kt_attendance_rejected_' + todayStr) === 'true' || localStorage.getItem('kt_attendance_rejected_' + todayLocalStr) === 'true';
     const localCheckedIn = localStorage.getItem('kt_checked_in_' + todayStr) === 'true' || localStorage.getItem('kt_checked_in_' + todayLocalStr) === 'true';
     const localCheckedOut = localStorage.getItem('kt_checked_out_' + todayStr) === 'true' || localStorage.getItem('kt_checked_out_' + todayLocalStr) === 'true';
-    const rawCheckIn = ta?.checkInTime || ta?.inTime || ta?.checkIn;
-    const rawCheckOut = ta?.checkOutTime || ta?.outTime || ta?.checkOut;
+    const rawCheckIn = ta?.approvedCheckInTime || ta?.checkInTime || ta?.checkInTimeDisplay || ta?.approvedCheckInTimeDisplay || ta?.inTime || ta?.checkIn || ta?.punchIn;
+    const rawCheckOut = ta?.checkOutTime || ta?.checkOutTimeDisplay || ta?.outTime || ta?.checkOut || ta?.punchOut;
     const statusLower = String(ta?.status || '').toLowerCase().trim();
     const approvalStatusLower = String(ta?.approvalStatus || '').toLowerCase().trim();
     const adminStatusLower = String(ta?.adminStatus || '').toLowerCase().trim();
     const checkInStatusLower = String(ta?.checkInStatus || '').toLowerCase().trim();
-    const rejectionReasonText = ta?.rejectionReason || ta?.rejectReason || '';
+    const rejectionReasonText = ta?.rejectionReason || ta?.rejectReason || localStorage.getItem('kt_rejection_reason_' + todayStr) || '';
 
-    // Admin Rejection Recognition: ONLY when authoritative backend data explicitly states rejection
+    // Admin Rejection Recognition
     const isRejected = Boolean(
+      localRejected ||
       ta?.isRejected === true ||
       statusLower === 'rejected' ||
       statusLower.includes('reject') ||
@@ -337,14 +341,62 @@ export const DashboardView = () => {
       checkInStatusLower.includes('reject')
     );
 
-    // Pending Approval Recognition (strictly when not rejected)
+    const hasValidCheckInTime = Boolean(
+      rawCheckIn &&
+      rawCheckIn !== '--:--' &&
+      rawCheckIn !== 'null' &&
+      rawCheckIn !== 'undefined' &&
+      rawCheckIn !== '00:00:00' &&
+      rawCheckIn !== '00:00' &&
+      rawCheckIn !== ''
+    );
+
+    const isPresentStatus = [
+      'present', 'late', 'half day', 'half-day', 'checked_in', 'checked-in',
+      'checked in', 'working', 'active', 'on_break', 'on-break', 'on break'
+    ].some(s => statusLower === s || statusLower.includes(s));
+
+    const isCheckedOutStatus = [
+      'checked_out', 'checked-out', 'checked out', 'completed'
+    ].some(s => statusLower === s || statusLower.includes(s));
+
+    // Explicit approval recognition
+    const isExplicitlyApproved = Boolean(
+      !isRejected && (
+        ta?.isApproved === true ||
+        approvalStatusLower === 'approved' ||
+        adminStatusLower === 'approved' ||
+        checkInStatusLower === 'approved' ||
+        statusLower === 'approved' ||
+        isPresentStatus ||
+        isCheckedOutStatus
+      )
+    );
+
+    // Explicit pending check
+    const isExplicitlyPending = Boolean(
+      statusLower === 'pending' ||
+      statusLower.includes('pending') ||
+      approvalStatusLower === 'pending' ||
+      approvalStatusLower.includes('pending') ||
+      adminStatusLower === 'pending' ||
+      adminStatusLower.includes('pending') ||
+      checkInStatusLower === 'pending' ||
+      checkInStatusLower.includes('pending') ||
+      ta?.isApproved === false
+    );
+
+    // If server confirms employee is active/working/approved/completed today, purge any stale local pending flag
+    if (isPresentStatus || isCheckedOutStatus || isExplicitlyApproved) {
+      localStorage.removeItem('kt_attendance_pending_' + todayStr);
+      localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
+    }
+
+    // Pending Approval Recognition (strictly when check-in requested and not approved or explicitly pending)
     const isPendingApproval = Boolean(
       !isRejected && (
-        statusLower.includes('pending') ||
-        approvalStatusLower.includes('pending') ||
-        adminStatusLower.includes('pending') ||
-        checkInStatusLower.includes('pending') ||
-        ta?.isApproved === false
+        isExplicitlyPending ||
+        (localPending && !isExplicitlyApproved && !isPresentStatus && !isCheckedOutStatus)
       )
     );
 
@@ -352,31 +404,32 @@ export const DashboardView = () => {
     if (isRejected) {
       localStorage.removeItem('kt_checked_in_' + todayStr);
       localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+      localStorage.removeItem('kt_attendance_pending_' + todayStr);
+      localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
       localStorage.removeItem('kt_on_break_' + todayStr);
       localStorage.removeItem('kt_on_break_' + todayLocalStr);
-    } else {
+      localStorage.setItem('kt_attendance_rejected_' + todayStr, 'true');
+      localStorage.setItem('kt_attendance_rejected_' + todayLocalStr, 'true');
+      if (rejectionReasonText) {
+        localStorage.setItem('kt_rejection_reason_' + todayStr, rejectionReasonText);
+      }
+    } else if (isPendingApproval) {
+      localStorage.removeItem('kt_checked_in_' + todayStr);
+      localStorage.removeItem('kt_checked_in_' + todayLocalStr);
       localStorage.removeItem('kt_attendance_rejected_' + todayStr);
       localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
       localStorage.removeItem('kt_rejection_reason_' + todayStr);
-      localStorage.removeItem('kt_rejection_reason_' + todayLocalStr);
+      localStorage.setItem('kt_attendance_pending_' + todayStr, 'true');
+      localStorage.setItem('kt_attendance_pending_' + todayLocalStr, 'true');
+    } else if (isExplicitlyApproved || localCheckedIn || hasValidCheckInTime) {
+      localStorage.removeItem('kt_attendance_pending_' + todayStr);
+      localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
+      localStorage.removeItem('kt_attendance_rejected_' + todayStr);
+      localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
+      localStorage.removeItem('kt_rejection_reason_' + todayStr);
+      localStorage.setItem('kt_checked_in_' + todayStr, 'true');
+      localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
     }
-
-    const isPresentStatus = [
-      'present', 'late', 'half day', 'half-day', 'checked_in', 'checked-in',
-      'checked in', 'working', 'active', 'on_break', 'on-break', 'on break'
-    ].includes(statusLower);
-
-    const isCheckedOutStatus = [
-      'checked_out', 'checked-out', 'checked out', 'completed'
-    ].includes(statusLower);
-
-    const hasValidCheckInTime = Boolean(
-      rawCheckIn &&
-      rawCheckIn !== '--:--' &&
-      rawCheckIn !== 'null' &&
-      rawCheckIn !== 'undefined' &&
-      rawCheckIn !== ''
-    );
 
     const hasValidCheckOutTime = Boolean(
       rawCheckOut &&
@@ -388,20 +441,27 @@ export const DashboardView = () => {
       rawCheckOut !== ''
     );
 
-    // If backend confirms employee is in active present/working status TODAY, purge any stale checkout flag
-    if (isPresentStatus && !isRejected) {
-      localStorage.removeItem('kt_checked_out_' + todayStr);
-      localStorage.removeItem('kt_checked_out_' + todayLocalStr);
-    }
-
-    // Check-in Recognition (strictly today and strictly NOT rejected)
+    // Check-in Recognition (strictly today, strictly NOT rejected, strictly NOT pending)
     const hasCheckedIn = Boolean(
-      !isRejected && (
-        localCheckedIn ||
+      !isRejected &&
+      !isPendingApproval && (
+        isExplicitlyApproved ||
         hasValidCheckInTime ||
-        (ta && (isPresentStatus || isCheckedOutStatus || ta.isActiveSession === true))
+        localCheckedIn ||
+        isPresentStatus ||
+        isCheckedOutStatus ||
+        ta?.isActiveSession === true
       )
     );
+
+    // If backend confirms employee is checked in without checkout, purge all stale checkout flags
+    if (hasCheckedIn && !isRejected && !isPendingApproval && !hasValidCheckOutTime && !isCheckedOutStatus) {
+      localStorage.removeItem('kt_checked_out_' + todayStr);
+      localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+      localStorage.removeItem('kt_auto_checked_out_' + todayStr);
+      localStorage.removeItem('kt_auto_checked_out_' + todayLocalStr);
+      localStorage.removeItem('kt_check_out_time_str');
+    }
 
     // AUTO CHECK-OUT RULE: 11:59 PM auto check out time 7:00 PM at that day
     const nowClock = new Date();
@@ -418,25 +478,45 @@ export const DashboardView = () => {
     if (shouldAutoCheckOut) {
       localStorage.setItem('kt_checked_out_' + todayStr, 'true');
       localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
-      localStorage.setItem('kt_check_out_time_str', '07:00 PM');
+      const autoEndStr = ta?.officeEndTime ? formatISOToLocalTime(ta.officeEndTime) : (rawCheckOut ? formatISOToLocalTime(rawCheckOut) : formatISOToLocalTime("19:00"));
+      localStorage.setItem('kt_check_out_time_str', autoEndStr);
       localStorage.removeItem('kt_on_break_' + todayStr);
       localStorage.removeItem('kt_on_break_' + todayLocalStr);
     }
 
     // Check-out Recognition
+    // If backend confirms employee is checked in and has NO valid checkout time, trust the backend: NOT checked out!
+    const isBackendConfirmedUncheckedOut = Boolean(
+      hasCheckedIn &&
+      !hasValidCheckOutTime &&
+      !isCheckedOutStatus &&
+      ta?.isAutoCheckedOut !== true
+    );
+
     const hasCheckedOut = Boolean(
       !isRejected &&
-      hasCheckedIn && (
-        localCheckedOut ||
+      hasCheckedIn &&
+      !isBackendConfirmedUncheckedOut && (
         shouldAutoCheckOut ||
         ta?.isAutoCheckedOut === true ||
         isCheckedOutStatus ||
-        (hasValidCheckOutTime && !isPresentStatus && !localOnBreak && statusLower !== 'on_break')
+        (hasValidCheckOutTime && !localOnBreak && statusLower !== 'on_break') ||
+        (localCheckedOut && !ta)
       )
     );
 
     // Break Determination (Robust Multi-Source Check)
-    const breaksList = Array.isArray(ta?.breaks) ? ta.breaks : [];
+    const rawBreaks = Array.isArray(ta?.breaks) ? ta.breaks : (ta?.breaks ? [ta.breaks] : []);
+    const sessionBreaks = Array.isArray(ta?.sessions)
+      ? ta.sessions.filter(s => s.breakStart || s.breakEnd).map(s => ({ startTime: s.breakStart, endTime: s.breakEnd }))
+      : [];
+    const singleBreak = (ta?.breakStart || ta?.breakEnd) ? [{ startTime: ta.breakStart, endTime: ta.breakEnd }] : [];
+
+    const breaksList = [...rawBreaks, ...sessionBreaks, ...singleBreak].map(b => ({
+      startTime: b.startTime || b.breakStart || b.start,
+      endTime: b.endTime || b.breakEnd || b.end
+    })).filter(b => b.startTime || b.endTime);
+
     const yellowSegments = (segments || []).filter(s => s.type === 'yellow');
     const localBreakCount = parseInt(
       localStorage.getItem('kt_break_count_' + todayStr) ||
@@ -482,56 +562,61 @@ export const DashboardView = () => {
       let bInTime = null;
       if (breaksList.length > 0 && breaksList[breaksList.length - 1].startTime) {
         bInTime = formatISOToLocalTime(breaksList[breaksList.length - 1].startTime);
-      } else if (yellowSegments.length > 0) {
-        bInTime = formatMinutesToTimeStr(convertUTCMinutesToLocal(yellowSegments[yellowSegments.length - 1].fromMinutes));
-      } else {
-        bInTime = localStorage.getItem('kt_last_break_in_' + todayStr) || localStorage.getItem('kt_break_in_time_str');
       }
-      setBreakInTimeDisplay(bInTime || '--:--');
+      if ((!bInTime || bInTime === '--:--') && yellowSegments.length > 0) {
+        bInTime = formatMinutesToTimeStr(convertUTCMinutesToLocal(yellowSegments[yellowSegments.length - 1].fromMinutes));
+      }
+      setBreakInTimeDisplay(bInTime || localStorage.getItem('kt_last_break_in_' + todayStr) || localStorage.getItem('kt_break_in_time_str') || '--:--');
       setBreakOutTimeDisplay('--:--');
     } else {
       // NOT ON BREAK: Display previous completed break times if any
+      let bIn = null;
+      let bOut = null;
       if (breaksList.length > 0) {
         const lastB = breaksList[breaksList.length - 1];
-        setBreakInTimeDisplay(formatISOToLocalTime(lastB.startTime));
-        if (lastB.endTime) {
-          setBreakOutTimeDisplay(formatISOToLocalTime(lastB.endTime));
-        } else {
-          setBreakOutTimeDisplay(localStorage.getItem('kt_last_break_out_' + todayStr) || '--:--');
-        }
-      } else if (yellowSegments.length > 0) {
-        const lastSeg = yellowSegments[yellowSegments.length - 1];
-        setBreakInTimeDisplay(formatMinutesToTimeStr(convertUTCMinutesToLocal(lastSeg.fromMinutes)));
-        setBreakOutTimeDisplay(
-          localStorage.getItem('kt_last_break_out_' + todayStr) ||
-          formatMinutesToTimeStr(convertUTCMinutesToLocal(lastSeg.toMinutes))
-        );
-      } else {
-        setBreakInTimeDisplay(localStorage.getItem('kt_last_break_in_' + todayStr) || '--:--');
-        setBreakOutTimeDisplay(localStorage.getItem('kt_last_break_out_' + todayStr) || '--:--');
+        if (lastB.startTime) bIn = formatISOToLocalTime(lastB.startTime);
+        if (lastB.endTime) bOut = formatISOToLocalTime(lastB.endTime);
       }
+      if ((!bIn || bIn === '--:--') && yellowSegments.length > 0) {
+        const lastSeg = yellowSegments[yellowSegments.length - 1];
+        bIn = formatMinutesToTimeStr(convertUTCMinutesToLocal(lastSeg.fromMinutes));
+        if (!bOut || bOut === '--:--') {
+          bOut = formatMinutesToTimeStr(convertUTCMinutesToLocal(lastSeg.toMinutes));
+        }
+      }
+      setBreakInTimeDisplay(bIn || localStorage.getItem('kt_last_break_in_' + todayStr) || '--:--');
+      setBreakOutTimeDisplay(bOut || localStorage.getItem('kt_last_break_out_' + todayStr) || '--:--');
     }
 
     // Format time displays strictly for today
-    if (rawCheckIn) {
-      setCheckInTimeDisplay(formatISOToLocalTime(rawCheckIn));
-    } else if (ta?.checkInTimeDisplay) {
-      setCheckInTimeDisplay(ta.checkInTimeDisplay);
-    } else if (hasCheckedIn) {
-      setCheckInTimeDisplay(localStorage.getItem('kt_check_in_time_str') || '10:00 AM');
+    if (rawCheckIn && hasValidCheckInTime) {
+      const formatted = formatISOToLocalTime(rawCheckIn);
+      setCheckInTimeDisplay(formatted);
+      if (formatted !== '--:--') {
+        localStorage.setItem('kt_check_in_time_str', formatted);
+      }
+    } else if (ta?.checkInTimeDisplay && ta.checkInTimeDisplay !== '--:--') {
+      const formatted = formatISOToLocalTime(ta.checkInTimeDisplay);
+      setCheckInTimeDisplay(formatted);
+      if (formatted !== '--:--') {
+        localStorage.setItem('kt_check_in_time_str', formatted);
+      }
+    } else if (hasCheckedIn || isPendingApproval || localPending) {
+      setCheckInTimeDisplay(localStorage.getItem('kt_check_in_time_str') || '--:--');
     } else {
       setCheckInTimeDisplay('--:--');
     }
 
     if (hasCheckedOut) {
       if (shouldAutoCheckOut || ta?.isAutoCheckedOut) {
-        setCheckOutTimeDisplay('07:00 PM');
+        const autoOut = ta?.officeEndTime ? formatISOToLocalTime(ta.officeEndTime) : (localStorage.getItem('kt_check_out_time_str') || (rawCheckOut ? formatISOToLocalTime(rawCheckOut) : '--:--'));
+        setCheckOutTimeDisplay(autoOut !== '--:--' ? autoOut : '--:--');
       } else if (rawCheckOut && hasValidCheckOutTime) {
         setCheckOutTimeDisplay(formatISOToLocalTime(rawCheckOut));
-      } else if (ta?.checkOutTimeDisplay) {
-        setCheckOutTimeDisplay(ta.checkOutTimeDisplay);
+      } else if (ta?.checkOutTimeDisplay && ta.checkOutTimeDisplay !== '--:--') {
+        setCheckOutTimeDisplay(formatISOToLocalTime(ta.checkOutTimeDisplay));
       } else {
-        setCheckOutTimeDisplay(localStorage.getItem('kt_check_out_time_str') || '07:00 PM');
+        setCheckOutTimeDisplay(localStorage.getItem('kt_check_out_time_str') || '--:--');
       }
     } else {
       setCheckOutTimeDisplay('--:--');
@@ -552,12 +637,18 @@ export const DashboardView = () => {
     }
     setTotalBreakTimeDisplay(`${breakMins}m`);
 
-    const inVal = rawCheckIn || (hasCheckedIn ? localStorage.getItem('kt_check_in_time_str') : null) || '10:00 AM';
+    const inVal = rawCheckIn || (hasCheckedIn ? localStorage.getItem('kt_check_in_time_str') : null) || null;
     const outVal = hasCheckedOut 
-      ? (shouldAutoCheckOut || ta?.isAutoCheckedOut ? '07:00 PM' : (rawCheckOut || localStorage.getItem('kt_check_out_time_str') || '07:00 PM'))
+      ? (rawCheckOut || localStorage.getItem('kt_check_out_time_str') || (ta?.officeEndTime ? formatISOToLocalTime(ta.officeEndTime) : null))
       : null;
 
-    if (!hasCheckedIn || isRejected) {
+    // Prioritize backend-provided totalWorkTimeDisplay or numeric totalWorkTime only when checked out
+    const rawWorkTime = ta?.totalWorkTimeDisplay || ta?.totalWorkTimeHours;
+    if (hasCheckedOut && rawWorkTime && rawWorkTime !== '0h' && rawWorkTime !== '0h 0m') {
+      setTotalWorkTimeDisplay(formatHoursAndMinutes(rawWorkTime));
+    } else if (hasCheckedOut && ta?.totalWorkTime && typeof ta.totalWorkTime === 'number' && ta.totalWorkTime > 0) {
+      setTotalWorkTimeDisplay(formatHoursAndMinutes(ta.totalWorkTime));
+    } else if (!hasCheckedIn || isRejected || !inVal) {
       setTotalWorkTimeDisplay('0h 0m');
     } else {
       setTotalWorkTimeDisplay(formatHoursAndMinutes(calculateWorkingHours(inVal, outVal, breakMins)));
@@ -617,7 +708,7 @@ export const DashboardView = () => {
     let computedActions = {
       canCheckIn: Boolean(!hasCheckedIn && !hasValidCheckInTime && !isPendingApproval && !hasCheckedOut && !isRejected),
       canStartBreak: canTakeBreak,
-      canEndBreak: Boolean(!isRejected && hasCheckedIn && !hasCheckedOut && isOnBreak),
+      canEndBreak: Boolean(!isRejected && !isPendingApproval && hasCheckedIn && !hasCheckedOut && isOnBreak),
       canCheckOut: Boolean(!isRejected && !isPendingApproval && hasCheckedIn && !hasCheckedOut && !isOnBreak)
     };
 
@@ -633,6 +724,7 @@ export const DashboardView = () => {
       setGlobalAttendanceStatus(newStatus);
     }
     setTodaySegments(isRejected ? [] : (segments || []));
+    setTodayBreaks(isRejected ? [] : (breaksList || []));
   }, [setGlobalAttendanceStatus]);
 
   // Lightweight attendance-only query (called on interval and after actions)
@@ -648,52 +740,304 @@ export const DashboardView = () => {
         const todayRes = await api.get('/api/attendance/today', { skipCache: true });
         const tData = todayRes.data?.attendance || todayRes.data?.data?.attendance || todayRes.data?.data || todayRes.data;
         if (tData && (tData.checkInTime || tData.status || tData.approvalStatus || tData.adminStatus || tData._id)) {
-          todayDoc = tData;
+          // Verify that this attendance document is actually for today (and not an old record from yesterday)
+          if (isTodayDate(tData.date) || isTodayDate(tData.checkInTime) || isTodayDate(tData.createdAt) || !tData.date) {
+            todayDoc = tData;
+          }
         }
       } catch (todayErr) {
         console.warn("Authoritative attendance today fetch notice:", todayErr.message);
       }
 
-      // 2. Fetch Timeline - STRICT: TODAY ONLY (returns timeline segments + attendance status)
-      try {
-        const tlRes = await api.get('/api/employee-panel/attendance/timeline?filter=today', { skipCache: true });
-        const tlList = tlRes.data?.data || tlRes.data?.timeline || [];
-        if (Array.isArray(tlList) && tlList.length > 0) {
-          const first = tlList[0];
-          if (isTodayDate(first.date) || isTodayDate(first.checkInTime) || isTodayDate(first.createdAt)) {
-            timelineItem = first;
-            segments = first.timelineSegments || [];
+      // 1b. Fallback: If not found from /api/attendance/today, query /api/employee-panel/dashboard todayAttendance
+      if (!todayDoc) {
+        try {
+          const dashRes = await api.get('/api/employee-panel/dashboard', { skipCache: true });
+          const dAtt = dashRes.data?.data?.todayAttendance || dashRes.data?.todayAttendance;
+          if (dAtt && (dAtt.checkInTime || dAtt.status)) {
+            todayDoc = {
+              ...dAtt,
+              date: dAtt.date || new Date().toISOString().split('T')[0],
+              totalWorkTime: dashRes.data?.data?.statistics?.todayWorkingHours || dAtt.currentWorkingHours || 0
+            };
           }
+        } catch (dErr) {}
+      }
+
+      // 1c. Fallback: If still not found, check /api/attendance/:id if active attendance ID is cached
+      if (!todayDoc) {
+        try {
+          const cachedAttId = localStorage.getItem('kt_current_attendance_id');
+          if (cachedAttId && /^[0-9a-fA-F]{24}$/.test(cachedAttId)) {
+            const attByIdRes = await api.get(`/api/attendance/${cachedAttId}`, { skipCache: true });
+            const attData = attByIdRes.data?.attendance || attByIdRes.data?.data || attByIdRes.data;
+            if (attData && (attData.checkInTime || attData.status)) {
+              if (isTodayDate(attData.date) || isTodayDate(attData.checkInTime) || isTodayDate(attData.createdAt) || !attData.date) {
+                todayDoc = attData;
+              }
+            }
+          }
+        } catch (idErr) {}
+      }
+
+      // 2. Fetch Timeline - Matches AttendanceView.jsx query protocol to reliably retrieve today's record
+      try {
+        let tlList = [];
+        try {
+          const tlRes = await api.get('/api/employee-panel/attendance/timeline?filter=today', { skipCache: true });
+          tlList = tlRes.data?.data || tlRes.data?.timeline || [];
+        } catch (e) {
+          tlList = [];
+        }
+
+        // Find today's record in the returned list
+        let found = Array.isArray(tlList) 
+          ? tlList.find(r => isTodayDate(r.date) || isTodayDate(r.checkInTime) || isTodayDate(r.createdAt))
+          : null;
+
+        // Fallback: If not found with ?filter=today, fetch ?filter=last10days (which is the default in AttendanceView)
+        if (!found) {
+          try {
+            const tlRes10 = await api.get('/api/employee-panel/attendance/timeline?filter=last10days', { skipCache: true });
+            const list10 = tlRes10.data?.data || tlRes10.data?.timeline || [];
+            if (Array.isArray(list10)) {
+              found = list10.find(r => isTodayDate(r.date) || isTodayDate(r.checkInTime) || isTodayDate(r.createdAt));
+            }
+          } catch (e10) {
+            console.warn("Timeline last10days fallback notice:", e10.message);
+          }
+        }
+
+        if (found) {
+          timelineItem = found;
+          segments = found.timelineSegments || [];
         }
       } catch (tlErr) {
         console.warn("Timeline today fetch notice:", tlErr.message);
       }
 
-      // 3. Merge: Prioritize authoritative document fields (status, approvalStatus, adminStatus, rejectionReason)
+      // 3. Query organizational attendance logs (/api/attendance/admin/all) which holds authoritative verified records for today
+      let adminRecord = null;
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayDateStr = `${year}-${month}-${day}`;
+
+        let aList = [];
+        try {
+          const aRes = await api.get(`/api/attendance/admin/all?date=${encodeURIComponent(todayDateStr)}&_t=${Date.now()}`, { skipCache: true });
+          aList = Array.isArray(aRes.data) ? aRes.data : (aRes.data?.data || aRes.data?.attendance || aRes.data?.logs || aRes.data?.records || []);
+        } catch (e1) {
+          try {
+            const aResAll = await api.get('/api/attendance/admin/all', { skipCache: true });
+            aList = Array.isArray(aResAll.data) ? aResAll.data : (aResAll.data?.data || aResAll.data?.attendance || aResAll.data?.logs || aResAll.data?.records || []);
+          } catch (e2) {}
+        }
+
+        if (Array.isArray(aList) && aList.length > 0) {
+          let storedUser = null;
+          try {
+            storedUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
+          } catch (e) {}
+
+          let tokenUserId = null;
+          try {
+            const token = localStorage.getItem('auth_token');
+            if (token && token.includes('.')) {
+              const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+              tokenUserId = payload.id || payload._id || payload.userId;
+            }
+          } catch (e) {}
+
+          const candIds = [
+            resolvedUserId,
+            actualUserIdRef.current,
+            user?._id,
+            user?.id,
+            user?.employeeId,
+            user?.employee?._id,
+            user?.employee?.id,
+            user?.employee?.employeeId,
+            user?.user?._id,
+            user?.user?.id,
+            storedUser?._id,
+            storedUser?.id,
+            storedUser?.employee?._id,
+            storedUser?.employeeId,
+            storedUser?.user?._id,
+            tokenUserId
+          ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+          const candEmails = [
+            user?.email,
+            user?.user?.email,
+            user?.employee?.email,
+            storedUser?.email,
+            storedUser?.user?.email,
+            storedUser?.employee?.email
+          ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+          const candNames = [
+            user?.name,
+            user?.fullName,
+            user?.employeeName,
+            user?.employee?.name,
+            user?.employee?.fullName,
+            user?.user?.name,
+            user?.user?.fullName,
+            storedUser?.name,
+            storedUser?.fullName,
+            storedUser?.employee?.name,
+            storedUser?.employeeName
+          ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
+
+          const matchedAdmin = aList.find(item => {
+            if (!item) return false;
+            // Ensure record is for today
+            const isItemToday = isTodayDate(item.date) || isTodayDate(item.attendanceDate) || isTodayDate(item.createdAt) || isTodayDate(item.checkInTime) || isTodayDate(item.checkIn) || isTodayDate(item.approvedCheckInTime) || !item.date;
+            if (!isItemToday) return false;
+
+            const itemIds = [
+              item._id,
+              item.id,
+              item.employeeId,
+              item.employeeID,
+              item.userId,
+              typeof item.employee === 'object' ? item.employee?._id : item.employee,
+              typeof item.employee === 'object' ? item.employee?.id : null,
+              typeof item.employee === 'object' ? item.employee?.employeeId : null,
+              typeof item.user === 'object' ? item.user?._id : item.user,
+              typeof item.user === 'object' ? item.user?.id : null,
+              typeof item.userId === 'object' ? item.userId?._id : null
+            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+            if (candIds.length > 0 && itemIds.some(id => candIds.includes(id))) return true;
+
+            const itemEmails = [
+              item.email,
+              item.employeeEmail,
+              typeof item.employee === 'object' ? item.employee?.email : null,
+              typeof item.user === 'object' ? item.user?.email : null,
+              typeof item.userId === 'object' ? item.userId?.email : null
+            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+            if (candEmails.length > 0 && itemEmails.some(em => candEmails.includes(em))) return true;
+
+            const itemNames = [
+              item.name,
+              item.employeeName,
+              typeof item.employee === 'object' ? (item.employee?.name || item.employee?.fullName) : null,
+              typeof item.user === 'object' ? (item.user?.name || item.user?.fullName) : null
+            ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
+
+            return candNames.length > 0 && itemNames.some(nm => candNames.some(c => c === nm || c.includes(nm) || nm.includes(c)));
+          });
+
+          if (matchedAdmin) {
+            adminRecord = matchedAdmin;
+          }
+        }
+      } catch (adminErr) {
+        console.warn("Admin all attendance lookup notice:", adminErr.message);
+      }
+
+      // 4. Query /api/attendance/pending ONLY for TODAY'S pending check-in requests
+      let pendingDoc = null;
+      try {
+        const pendRes = await api.get('/api/attendance/pending', { skipCache: true });
+        const pList = pendRes.data?.pendingRequests || pendRes.data?.requests || pendRes.data?.data || pendRes.data?.attendance || (Array.isArray(pendRes.data) ? pendRes.data : []);
+        if (Array.isArray(pList) && pList.length > 0) {
+          const effId = resolvedUserId || actualUserIdRef.current || user?.employee?._id || user?._id || user?.id || user?.user?._id;
+          const effEmail = (user?.email || user?.user?.email || '').toLowerCase().trim();
+          const myPending = pList.find(item => {
+            const isRecToday = isTodayDate(item.date) || isTodayDate(item.checkInTime) || isTodayDate(item.createdAt);
+            if (!isRecToday) return false;
+            const iUserId = item.userId?._id || item.userId?.id || item.userId || item.employee?._id || item.employee || item.employeeId;
+            const iEmail = (item.email || item.userId?.email || item.user?.email || item.employee?.email || '').toLowerCase().trim();
+            return (effId && iUserId && String(iUserId).toLowerCase() === String(effId).toLowerCase()) ||
+                   (effEmail && iEmail && iEmail === effEmail);
+          });
+          if (myPending) {
+            // ONLY consider pending if user does NOT already have an active/present session
+            const hasActiveWork = Boolean(
+              (timelineItem && (['present', 'late', 'half day', 'checked_in', 'working', 'active', 'on_break', 'completed', 'checked_out'].some(s => String(timelineItem.status || '').toLowerCase().includes(s)) || (timelineItem.checkInTime && timelineItem.checkInTime !== '--:--'))) ||
+              (adminRecord && (['present', 'late', 'half day', 'checked_in', 'working', 'active', 'on_break', 'completed', 'checked_out'].some(s => String(adminRecord.status || adminRecord.attendanceStatus || '').toLowerCase().includes(s)) || (adminRecord.checkInTime || adminRecord.approvedCheckInTime || adminRecord.punchIn || adminRecord.checkIn)))
+            );
+            if (!hasActiveWork) {
+              pendingDoc = myPending;
+              if (!todayDoc) todayDoc = {};
+              todayDoc.approvalStatus = 'pending';
+              todayDoc.status = 'pending';
+              if (myPending.checkInTime && !todayDoc.checkInTime) {
+                todayDoc.checkInTime = myPending.checkInTime;
+              }
+            }
+          }
+        }
+      } catch (pendErr) {
+        // Ignored if /api/attendance/pending is restricted or empty
+      }
+
+      // 5. Merge all sources: todayDoc, timelineItem, adminRecord (preserving all break data, times, and segments)
+      const rawBreaks = [
+        ...(Array.isArray(todayDoc?.breaks) && todayDoc.breaks.length > 0 ? todayDoc.breaks : []),
+        ...(Array.isArray(timelineItem?.breaks) && timelineItem.breaks.length > 0 ? timelineItem.breaks : []),
+        ...(Array.isArray(adminRecord?.breaks) && adminRecord.breaks.length > 0 ? adminRecord.breaks : []),
+        ...(todayDoc?.breakStart || todayDoc?.breakEnd ? [{ startTime: todayDoc.breakStart, endTime: todayDoc.breakEnd }] : []),
+        ...(timelineItem?.breakStart || timelineItem?.breakEnd ? [{ startTime: timelineItem.breakStart, endTime: timelineItem.breakEnd }] : []),
+        ...(adminRecord?.breakStart || adminRecord?.breakEnd ? [{ startTime: adminRecord.breakStart, endTime: adminRecord.breakEnd }] : []),
+        ...(Array.isArray(adminRecord?.sessions) ? adminRecord.sessions.filter(s => s.breakStart || s.breakEnd).map(s => ({ startTime: s.breakStart, endTime: s.breakEnd })) : [])
+      ];
+
+      const mergedCheckIn = todayDoc?.approvedCheckInTime || todayDoc?.checkInTime || todayDoc?.checkInTimeDisplay || todayDoc?.approvedCheckInTimeDisplay || timelineItem?.approvedCheckInTime || timelineItem?.checkInTime || timelineItem?.checkInTimeDisplay || adminRecord?.approvedCheckInTime || adminRecord?.checkInTime || adminRecord?.punchIn || adminRecord?.checkIn || todayDoc?.inTime || timelineItem?.inTime;
+
+      // Authoritative null checkout preservation: if todayDoc explicitly has checkOutTime (even if null), honor it!
+      let mergedCheckOut = null;
+      if (todayDoc && Object.prototype.hasOwnProperty.call(todayDoc, 'checkOutTime')) {
+        mergedCheckOut = todayDoc.checkOutTime;
+      } else if (todayDoc && Object.prototype.hasOwnProperty.call(todayDoc, 'checkOutTimeDisplay')) {
+        mergedCheckOut = todayDoc.checkOutTimeDisplay;
+      } else if (timelineItem && Object.prototype.hasOwnProperty.call(timelineItem, 'checkOutTime')) {
+        mergedCheckOut = timelineItem.checkOutTime;
+      } else {
+        mergedCheckOut = adminRecord?.checkOutTime || adminRecord?.punchOut || adminRecord?.checkOut || todayDoc?.outTime || timelineItem?.outTime || null;
+      }
+
+      const mergedStatus = todayDoc?.status || timelineItem?.status || adminRecord?.status || adminRecord?.attendanceStatus;
+
       const mergedSource = {
+        date: todayDoc?.date || timelineItem?.date || adminRecord?.date || new Date().toISOString().split('T')[0],
+        ...(adminRecord || {}),
         ...(timelineItem || {}),
         ...(todayDoc || {}),
-        status: todayDoc?.status || timelineItem?.status,
-        approvalStatus: todayDoc?.approvalStatus || timelineItem?.approvalStatus,
-        adminStatus: todayDoc?.adminStatus || timelineItem?.adminStatus,
-        checkInStatus: todayDoc?.checkInStatus || timelineItem?.checkInStatus,
-        rejectionReason: todayDoc?.rejectionReason || timelineItem?.rejectionReason || todayDoc?.rejectReason || timelineItem?.rejectReason,
-        isRejected: todayDoc?.isRejected ?? timelineItem?.isRejected,
-        isApproved: todayDoc?.isApproved ?? timelineItem?.isApproved,
-        timelineSegments: segments.length > 0 ? segments : (todayDoc?.timelineSegments || [])
+        date: todayDoc?.date || timelineItem?.date || adminRecord?.date || new Date().toISOString().split('T')[0],
+        status: mergedStatus,
+        approvalStatus: todayDoc?.approvalStatus || timelineItem?.approvalStatus || adminRecord?.approvalStatus,
+        adminStatus: todayDoc?.adminStatus || timelineItem?.adminStatus || adminRecord?.adminStatus,
+        checkInStatus: todayDoc?.checkInStatus || timelineItem?.checkInStatus || adminRecord?.checkInStatus,
+        checkInTime: mergedCheckIn,
+        checkOutTime: mergedCheckOut,
+        breaks: rawBreaks,
+        totalBreakTime: todayDoc?.totalBreakTime ?? timelineItem?.totalBreakTime ?? adminRecord?.totalBreakTime ?? adminRecord?.breakDuration,
+        rejectionReason: todayDoc?.rejectionReason || timelineItem?.rejectionReason || adminRecord?.rejectionReason || todayDoc?.rejectReason || timelineItem?.rejectReason,
+        isRejected: todayDoc?.isRejected ?? timelineItem?.isRejected ?? adminRecord?.isRejected,
+        isApproved: todayDoc?.isApproved ?? timelineItem?.isApproved ?? adminRecord?.isApproved,
+        timelineSegments: (segments && segments.length > 0) ? segments : (todayDoc?.timelineSegments || timelineItem?.timelineSegments || adminRecord?.timelineSegments || [])
       };
 
-      if (todayDoc || timelineItem) {
+      if (todayDoc || timelineItem || adminRecord) {
         todayRecord = normalizeAttendanceRecord(mergedSource);
       }
 
-      applyAttendanceState(todayRecord, segments);
+      applyAttendanceState(todayRecord, mergedSource.timelineSegments || []);
       return todayRecord;
     } catch (err) {
       console.error("fetchTodayAttendance failed:", err);
       return null;
     }
-  }, [applyAttendanceState]);
+  }, [applyAttendanceState, user]);
 
   // Core Sync Logic for action callbacks
   const syncDashboardAndAttendance = useCallback(async (resolvedUserId) => {
@@ -948,17 +1292,14 @@ export const DashboardView = () => {
   useEffect(() => {
     let isMounted = true;
     const bootstrapDashboard = async () => {
-      // Purge any stale rejection overrides from localStorage so real data is always loaded
+      // Clean up past days' rejection keys, but preserve today's verified state
       try {
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0];
         const todayLocalStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        localStorage.removeItem('kt_attendance_rejected_' + todayStr);
-        localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
-        localStorage.removeItem('kt_rejection_reason_' + todayStr);
-        localStorage.removeItem('kt_rejection_reason_' + todayLocalStr);
         Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('kt_attendance_rejected_') || key.startsWith('kt_rejection_reason_')) {
+          if ((key.startsWith('kt_attendance_rejected_') || key.startsWith('kt_rejection_reason_')) &&
+              !key.endsWith(todayStr) && !key.endsWith(todayLocalStr)) {
             localStorage.removeItem(key);
           }
         });
@@ -983,6 +1324,7 @@ export const DashboardView = () => {
       if (isMounted) {
         setActualUserId(validUserId);
         actualUserIdRef.current = validUserId;
+        fetchTodayAttendance(validUserId); // Instant attendance fetch
         await fetchFullDashboard(validUserId);
         setIsDataLoading(false);
       }
@@ -990,7 +1332,13 @@ export const DashboardView = () => {
 
     bootstrapDashboard();
     return () => { isMounted = false; };
-  }, [fetchFullDashboard]);
+  }, [fetchFullDashboard, fetchTodayAttendance]);
+
+  // Instant attendance fetch on mount (in parallel with bootstrapDashboard)
+  useEffect(() => {
+    const targetId = user?.employee?._id || user?._id || user?.id || user?.user?._id;
+    fetchTodayAttendance(targetId);
+  }, [fetchTodayAttendance, user]);
 
   // Listen to profile photo updates (from ProfileView or other tabs) to refresh dashboard team on leave
   useEffect(() => {
@@ -1048,13 +1396,14 @@ export const DashboardView = () => {
           localStorage.setItem('kt_auto_checked_out_' + todayStr, 'true');
           localStorage.setItem('kt_checked_out_' + todayStr, 'true');
           localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
-          localStorage.setItem('kt_check_out_time_str', '07:00 PM');
+          const autoEndTimeStr = formatISOToLocalTime("19:00");
+          localStorage.setItem('kt_check_out_time_str', autoEndTimeStr);
           localStorage.removeItem('kt_on_break_' + todayStr);
           localStorage.removeItem('kt_on_break_' + todayLocalStr);
 
           setAttendanceStatus('checked_out');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
-          setCheckOutTimeDisplay('07:00 PM');
+          setCheckOutTimeDisplay(autoEndTimeStr);
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
 
           // Send background check-out to backend
@@ -1255,15 +1604,69 @@ export const DashboardView = () => {
               localStorage.setItem('kt_current_attendance_id', String(newAttId));
             } catch (e) {}
           }
-          localStorage.setItem('kt_checked_in_' + todayStr, 'true');
-          localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
-          localStorage.removeItem('kt_checked_out_' + todayStr);
-          localStorage.removeItem('kt_checked_out_' + todayLocalStr);
-          localStorage.setItem('kt_check_in_time_str', nowLocal);
-          setAttendanceStatus('checked_in');
-          if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
-          setCheckInTimeDisplay(nowLocal);
-          setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
+
+          const attObj = resData?.attendance || resData?.data?.attendance || resData?.data || resData;
+          const attApprv = String(attObj?.approvalStatus || resData?.approvalStatus || '').toLowerCase().trim();
+          const attStat = String(attObj?.status || resData?.status || '').toLowerCase().trim();
+          const attAdmin = String(attObj?.adminStatus || resData?.adminStatus || '').toLowerCase().trim();
+
+          const isExplicitlyApproved = Boolean(
+            attObj?.isApproved === true ||
+            attApprv === 'approved' ||
+            attStat === 'approved' ||
+            attAdmin === 'approved'
+          );
+
+          const isExplicitlyRejected = Boolean(
+            attObj?.isRejected === true ||
+            attApprv.includes('reject') ||
+            attStat.includes('reject') ||
+            attAdmin.includes('reject')
+          );
+
+          // Store authentic dynamic requested check-in time for display
+          const backendCheckInIso = attObj?.approvedCheckInTime || attObj?.checkInTime || attObj?.inTime || attObj?.punchIn;
+          const dynamicCheckInTime = backendCheckInIso ? formatISOToLocalTime(backendCheckInIso) : nowLocal;
+          localStorage.setItem('kt_check_in_time_str', dynamicCheckInTime);
+          setCheckInTimeDisplay(dynamicCheckInTime);
+
+          if (isExplicitlyRejected) {
+            localStorage.removeItem('kt_checked_in_' + todayStr);
+            localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+            localStorage.removeItem('kt_attendance_pending_' + todayStr);
+            localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
+            localStorage.setItem('kt_attendance_rejected_' + todayStr, 'true');
+            localStorage.setItem('kt_attendance_rejected_' + todayLocalStr, 'true');
+            setAttendanceStatus('rejected');
+            if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('rejected');
+            setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
+            setGeoError("Your check-in request was rejected by admin.");
+          } else if (isExplicitlyApproved) {
+            localStorage.removeItem('kt_attendance_pending_' + todayStr);
+            localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
+            localStorage.removeItem('kt_attendance_rejected_' + todayStr);
+            localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
+            localStorage.setItem('kt_checked_in_' + todayStr, 'true');
+            localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
+            localStorage.removeItem('kt_checked_out_' + todayStr);
+            localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+            setAttendanceStatus('checked_in');
+            if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
+            setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
+            setGeoError('');
+          } else {
+            // Check-in request submitted to admin for approval -> status: PENDING
+            localStorage.setItem('kt_attendance_pending_' + todayStr, 'true');
+            localStorage.setItem('kt_attendance_pending_' + todayLocalStr, 'true');
+            localStorage.removeItem('kt_checked_in_' + todayStr);
+            localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+            localStorage.removeItem('kt_checked_out_' + todayStr);
+            localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+            setAttendanceStatus('pending');
+            if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('pending');
+            setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
+            setGeoError("Your check-in request is pending admin approval. Please wait for admin approval.");
+          }
         } else if (actionType === 'break_start') {
           localStorage.setItem('kt_on_break_' + todayStr, 'true');
           localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
@@ -1346,15 +1749,19 @@ export const DashboardView = () => {
         localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
         localStorage.removeItem('kt_checked_out_' + todayStr);
         localStorage.removeItem('kt_checked_out_' + todayLocalStr);
-        if (!localStorage.getItem('kt_check_in_time_str')) {
+        const existingInStr = localStorage.getItem('kt_check_in_time_str');
+        if (!existingInStr || existingInStr === '--:--') {
           localStorage.setItem('kt_check_in_time_str', nowLocal);
+          setCheckInTimeDisplay(nowLocal);
+        } else {
+          setCheckInTimeDisplay(existingInStr);
         }
         setAttendanceStatus('checked_in');
         if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
         const curB = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
         setActionsAvailable({ canCheckIn: false, canStartBreak: curB < 2, canEndBreak: false, canCheckOut: true });
         setGeoError('');
-        await syncDashboardAndAttendance(actualUserId);
+        await syncDashboardAndAttendance(actualUserId || realUserId);
       } else if ((actionType === 'break_start' && isAlreadyOnBreak) || isAlreadyOnBreak) {
         // User is already on break: activate ONLY Break Out
         localStorage.setItem('kt_on_break_' + todayStr, 'true');
@@ -1416,8 +1823,15 @@ export const DashboardView = () => {
         if (isConfirmedRejected) {
           localStorage.removeItem('kt_checked_in_' + todayStr);
           localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+          localStorage.removeItem('kt_attendance_pending_' + todayStr);
+          localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
           localStorage.removeItem('kt_on_break_' + todayStr);
           localStorage.removeItem('kt_on_break_' + todayLocalStr);
+          localStorage.setItem('kt_attendance_rejected_' + todayStr, 'true');
+          localStorage.setItem('kt_attendance_rejected_' + todayLocalStr, 'true');
+          if (rejectReasonMsg) {
+            localStorage.setItem('kt_rejection_reason_' + todayStr, rejectReasonMsg);
+          }
 
           setAttendanceStatus('rejected');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('rejected');
@@ -1429,6 +1843,10 @@ export const DashboardView = () => {
           // Genuinely pending admin approval
           localStorage.setItem('kt_attendance_pending_' + todayStr, 'true');
           localStorage.setItem('kt_attendance_pending_' + todayLocalStr, 'true');
+          localStorage.removeItem('kt_checked_in_' + todayStr);
+          localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+          localStorage.removeItem('kt_attendance_rejected_' + todayStr);
+          localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
           setAttendanceStatus('pending');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('pending');
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
@@ -1509,16 +1927,19 @@ export const DashboardView = () => {
   const isPendingAttendance = attendanceStatus === 'pending' || attendanceEvaluation?.status === 'pending';
 
   // --- Calculate Fixed 9-Hour Timeline Layout ---
+  const isCheckedOut = !isRejectedAttendance && !isPendingAttendance && attendanceStatus === 'checked_out';
   const nineHourTimeline = computeNineHourTimeline({
-    checkInTime: checkInTimeDisplay !== '--:--' ? checkInTimeDisplay : null,
-    checkOutTime: checkOutTimeDisplay !== '--:--' ? checkOutTimeDisplay : null,
+    checkInTime: checkInTimeDisplay !== '--:--' ? checkInTimeDisplay : (localStorage.getItem('kt_check_in_time_str') || null),
+    checkOutTime: (isCheckedOut && checkOutTimeDisplay !== '--:--') ? checkOutTimeDisplay : null,
     breakInTime: breakInTimeDisplay !== '--:--' ? breakInTimeDisplay : null,
     breakOutTime: breakOutTimeDisplay !== '--:--' ? breakOutTimeDisplay : null,
-    timelineSegments: isRejectedAttendance ? [] : todaySegments,
-    isOnBreak: !isRejectedAttendance && attendanceStatus === 'on_break',
+    breaks: isRejectedAttendance || isPendingAttendance ? [] : todayBreaks,
+    timelineSegments: isRejectedAttendance || isPendingAttendance ? [] : todaySegments,
+    isOnBreak: !isRejectedAttendance && !isPendingAttendance && attendanceStatus === 'on_break',
     isCheckedIn: !isRejectedAttendance && !isPendingAttendance && (attendanceStatus === 'checked_in' || attendanceStatus === 'on_break' || attendanceStatus === 'checked_out'),
-    isCheckedOut: !isRejectedAttendance && attendanceStatus === 'checked_out',
-    isRejected: isRejectedAttendance
+    isCheckedOut: isCheckedOut,
+    isRejected: isRejectedAttendance,
+    isPending: isPendingAttendance
   });
 
   const statusConfig = getQuickActionStatusConfig({

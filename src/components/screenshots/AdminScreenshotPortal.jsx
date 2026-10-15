@@ -359,8 +359,6 @@ export const AdminScreenshotPortal = () => {
     if (
       nameStr.includes('hetvi') ||
       emailStr.includes('hetvi') ||
-      nameStr.includes('kuresh') ||
-      emailStr.includes('kuresh') ||
       idStr.includes('6ab3894c4b9bcbcfe8afc6c')
     ) {
       return { short: 'TL', label: 'Team Leader', code: 'team_leader' };

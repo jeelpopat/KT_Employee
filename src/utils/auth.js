@@ -184,7 +184,7 @@ export const deriveUserRoleFromData = (u, raw, authToken, fallbackStoredRole) =>
   ).toLowerCase().trim();
 
   if (email === "harsh@kevalontechnology.in") return "admin";
-  if (email === "kureshpoonawala384@gmail.com" || email === "hetvi.kevalon@gmail.com") return "team_leader";
+  if (email === "hetvi.kevalon@gmail.com") return "team_leader";
 
   // Check token claims if available
   if (authToken) {

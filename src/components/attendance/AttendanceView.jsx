@@ -394,15 +394,24 @@ export const AttendanceView = () => {
             );
 
             // Fixed 9-Hour Timeline Computation
+            const isRecordCheckedOut = !isRecordRejected && !isRecordPending && Boolean(
+              record.checkOutTime &&
+              record.checkOutTime !== '--:--' &&
+              record.checkOutTime !== 'null' &&
+              record.checkOutTime !== 'undefined' &&
+              record.checkOutTime !== '00:00:00' &&
+              record.checkOutTime !== '00:00'
+            );
             const nineHourTimeline = computeNineHourTimeline({
               checkInTime: record.checkInTime,
-              checkOutTime: record.checkOutTime,
-              timelineSegments: isRecordRejected ? [] : (record.timelineSegments || []),
+              checkOutTime: isRecordCheckedOut ? record.checkOutTime : null,
+              timelineSegments: isRecordRejected || isRecordPending ? [] : (record.timelineSegments || []),
               breaks: record.breaks || [],
-              isOnBreak: !isRecordRejected && (record.isOnBreak || statusLabel === 'on_break'),
+              isOnBreak: !isRecordRejected && !isRecordPending && (record.isOnBreak || statusLabel === 'on_break'),
               isCheckedIn: !isRecordRejected && !isRecordPending && Boolean(record.checkInTime || record.status),
-              isCheckedOut: !isRecordRejected && Boolean(record.checkOutTime && record.checkOutTime !== '--:--' && record.checkOutTime !== 'null'),
-              isRejected: isRecordRejected
+              isCheckedOut: isRecordCheckedOut,
+              isRejected: isRecordRejected,
+              isPending: isRecordPending
             });
 
             const displayRejectionReason = isRecordRejected ? (record.rejectionReason || '') : '';
@@ -451,7 +460,7 @@ export const AttendanceView = () => {
                         return (
                           <span className="px-2.5 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                            Rejected
+                            Rejected from Admin
                           </span>
                         );
                       }
@@ -460,7 +469,7 @@ export const AttendanceView = () => {
                         return (
                           <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                            Pending Approval
+                            Pending
                           </span>
                         );
                       }
