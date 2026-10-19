@@ -302,45 +302,43 @@ const mapLog = (item, index) => {
 
   // =========================================================
   // IMPORTANT:
-  // Some HR/admin APIs store approval on status instead of approvalStatus.
-  // We must still enable timeline for those approved records.
   // =========================================================
-  const hasCheckIn = Boolean(
+  // AUTHENTIC CHECK-IN RESOLUTION (NO DUMMY / SYNTHETIC DATA)
+  // =========================================================
+  const rawCheckInVal =
     item?.approvedCheckInTime ||
     item?.checkInTime ||
     item?.punchIn ||
-    firstSession.checkin
+    firstSession.checkin ||
+    null;
+
+  const hasCheckIn = Boolean(
+    rawCheckInVal &&
+    rawCheckInVal !== '—' &&
+    rawCheckInVal !== '--:--'
   );
 
   const isApproved =
-    approvalStatus === 'approved' ||
-    rawStatus === 'approved' ||
-    rawStatus === 'accepted' ||
-    item?.isApproved === true ||
-    ['present', 'late', 'on time', 'half day', 'half-day', 'working', 'completed', 'checked_out', 'checked out'].includes(rawStatus);
+    hasCheckIn && (
+      approvalStatus === 'approved' ||
+      rawStatus === 'approved' ||
+      rawStatus === 'accepted' ||
+      item?.isApproved === true ||
+      item?.isApprovedCheckIn === true ||
+      ['present', 'late', 'on time', 'half day', 'half-day', 'working', 'completed', 'checked_out', 'checked out'].includes(rawStatus)
+    );
 
-  const approvedCheckIn =
-    isApproved || hasCheckIn
-      ? (
-        item?.approvedCheckInTime ||
-        item?.checkInTime ||
-        item?.punchIn ||
-        firstSession.checkin ||
-        ''
-      )
-      : '';
+  const approvedCheckIn = (hasCheckIn && isApproved) ? rawCheckInVal : '';
 
-  const approvedCheckOut =
-    isApproved || hasCheckIn
-      ? (
-        item?.checkOutTime ||
-        item?.punchOut ||
-        firstSession.checkout ||
-        ''
-      )
-      : '';
+  const rawCheckOutVal =
+    item?.checkOutTime ||
+    item?.punchOut ||
+    firstSession.checkout ||
+    '';
 
-  const approvedBreaks = (isApproved || hasCheckIn) ? breaks : [];
+  const approvedCheckOut = (hasCheckIn && isApproved) ? rawCheckOutVal : '';
+
+  const approvedBreaks = (hasCheckIn && isApproved) ? breaks : [];
 
   return {
     id:
@@ -384,7 +382,7 @@ const mapLog = (item, index) => {
     // =======================================================
     breaks: approvedBreaks,
 
-    totalHours: (isApproved || hasCheckIn)
+    totalHours: (hasCheckIn && isApproved)
       ? (
         item?.totalWorkTimeDisplay ||
         item?.totalWorkTimeHours ||
@@ -397,9 +395,9 @@ const mapLog = (item, index) => {
     isLate: isApproved && item?.isLate === true,
 
     // Keep approval status separately
-    approvalStatus: isApproved ? 'approved' : approvalStatus,
+    approvalStatus: isApproved ? 'approved' : (hasCheckIn ? approvalStatus : (rawStatus === 'absent' ? 'absent' : (approvalStatus || 'not_checked_in'))),
 
-    status: normalizeStatus(item),
+    status: hasCheckIn ? normalizeStatus(item) : (rawStatus === 'on leave' || rawStatus === 'leave' ? 'on leave' : 'absent'),
 
     avatarColor:
       item?.avatarColor ||
@@ -673,9 +671,9 @@ const AttendanceTimeline = ({
   ] = useState(null);
 
   // =========================================================
-  // NEVER RUN TIMER UNTIL APPROVED
+  // NEVER RUN TIMER UNTIL APPROVED AND VALID CHECK-IN EXISTS
   // =========================================================
-  if (approvalStatus !== 'approved') {
+  if (approvalStatus !== 'approved' || !checkIn || checkIn === '—' || checkIn === '--:--') {
     return (
       <div className="w-full bg-gray-100 h-6 rounded-lg flex items-center justify-center text-[10px] text-gray-500">
         {approvalStatus === 'pending'
@@ -929,7 +927,7 @@ export default function AttendanceLogs() {
 
   const token =
     typeof window !== 'undefined'
-      ? localStorage.getItem('token')
+      ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
       : null;
 
   /* =========================================================
@@ -1082,184 +1080,12 @@ export default function AttendanceLogs() {
         console.warn('Users fetch error:', uErr);
       }
 
-      // 3. Fetch adjustment history to merge any adjustments made for the selected date
+      // Real backend data only: purge any legacy adjustment caches from localStorage
       try {
-        const historyUrl = 'https://kt-backend-yzr4.onrender.com/api/adjustment/history';
-        const historyRes = await fetch(historyUrl, { method: 'GET', headers });
-        if (historyRes.ok) {
-          const historyData = await historyRes.json();
-          const historyList = historyData.data || historyData.adjustments || [];
-
-          const getIstDateString = (dateVal) => {
-            if (!dateVal) return '';
-            const d = new Date(dateVal);
-            if (isNaN(d.getTime())) return String(dateVal).split('T')[0];
-            const istDate = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
-            const year = istDate.getUTCFullYear();
-            const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(istDate.getUTCDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-          };
-
-          const getEmpNameFromVal = (val) => {
-            if (!val) return '';
-            return (
-              val?.employeeName ||
-              val?.name ||
-              val?.employee?.name ||
-              val?.user?.name ||
-              (typeof val?.userId === 'object' ? val?.userId?.name : '') ||
-              (typeof val?.employeeId === 'object' ? val?.employeeId?.name : '') ||
-              ''
-            ).trim().toLowerCase();
-          };
-
-          const findMatchingKey = (empId, empName) => {
-            const targetId = String(empId || '');
-            const targetName = String(empName || '').trim().toLowerCase();
-
-            for (const [key, val] of attendanceMap.entries()) {
-              if (targetId && String(key) === targetId) return key;
-              const valUser = val?.employee || val?.user || (typeof val?.userId === 'object' ? val?.userId : {}) || {};
-              const valId = valUser?._id || valUser?.id || val?._id || val?.userId;
-              if (targetId && valId && String(valId) === targetId) return key;
-
-              const valName = getEmpNameFromVal(val);
-              if (targetName && valName && (targetName === valName || targetName.includes(valName) || valName.includes(targetName))) {
-                return key;
-              }
-            }
-            return null;
-          };
-
-          historyList.forEach((adj) => {
-            if (!adj || isUnknownEmployeeOrUser(adj) || isUnknownEmployeeOrUser(adj.employeeName)) return;
-            const adjDateStr = getIstDateString(adj.date);
-            if (adjDateStr === date) {
-              const matchedKey = findMatchingKey(adj.employeeId, adj.employeeName);
-              const uIdKey = matchedKey || String(adj.employeeId);
-              const existing = attendanceMap.get(uIdKey) || {
-                _id: adj.employeeId,
-                employee: {
-                  _id: adj.employeeId,
-                  name: adj.employeeName || 'Unknown Employee',
-                  uniqueID: adj.uniqueID || '',
-                  email: adj.email || '',
-                  role: adj.role || 'employee',
-                },
-                user: {
-                  _id: adj.employeeId,
-                  name: adj.employeeName || 'Unknown Employee',
-                  uniqueID: adj.uniqueID || '',
-                  email: adj.email || '',
-                  role: adj.role || 'employee',
-                },
-                date,
-                totalWorkTime: 0,
-                totalBreakTime: 0,
-                breaks: [],
-              };
-
-              const firstSess = Array.isArray(adj.sessions) && adj.sessions[0] ? adj.sessions[0] : {};
-              let checkinVal = adj.checkInTime || firstSess.checkin || '';
-              let checkoutVal = adj.checkOutTime || firstSess.checkout || '';
-
-              if (checkinVal && typeof checkinVal === 'string' && /^\d{1,2}:\d{2}/.test(checkinVal)) {
-                const [h, m] = checkinVal.split(':').map(Number);
-                const d = new Date(date);
-                if (!isNaN(d.getTime())) {
-                  d.setHours(h, m, 0, 0);
-                  checkinVal = d.toISOString();
-                }
-              }
-
-              if (checkoutVal && typeof checkoutVal === 'string' && /^\d{1,2}:\d{2}/.test(checkoutVal)) {
-                const [h, m] = checkoutVal.split(':').map(Number);
-                const d = new Date(date);
-                if (!isNaN(d.getTime())) {
-                  d.setHours(h, m, 0, 0);
-                  checkoutVal = d.toISOString();
-                }
-              }
-
-              if (checkinVal) {
-                const adjStatus = String(adj.status || '').toLowerCase().trim();
-                attendanceMap.set(uIdKey, {
-                  ...existing,
-                  checkInTime: checkinVal,
-                  approvedCheckInTime: checkinVal,
-                  checkOutTime: checkoutVal || existing.checkOutTime || null,
-                  approvalStatus: 'approved',
-                  status: adjStatus || existing.status || 'absent',
-                  reason: adj.reason || existing.reason,
-                });
-              }
-            }
-          });
+        if (typeof window !== "undefined" && window.localStorage) {
+          localStorage.removeItem("attendance_adjustments");
         }
-      } catch (hErr) {
-        console.warn('Adjustment history fetch error:', hErr);
-      }
-
-      // 4. Merge local adjustments saved in localStorage (for missing backend records)
-      try {
-        const localAdjustments = JSON.parse(localStorage.getItem("attendance_adjustments") || "[]");
-        localAdjustments.forEach((adj) => {
-          if (!adj || isUnknownEmployeeOrUser(adj) || isUnknownEmployeeOrUser(adj.employeeName)) return;
-          if (adj.date === date && adj.employeeId) {
-            const uIdKey = String(adj.employeeId);
-            const existing = attendanceMap.get(uIdKey) || {
-              _id: adj.employeeId,
-              employee: {
-                _id: adj.employeeId,
-                name: adj.employeeName || "Unknown Employee",
-                uniqueID: adj.uniqueID || "",
-                email: adj.email || "",
-                role: adj.role || "employee",
-              },
-              user: {
-                _id: adj.employeeId,
-                name: adj.employeeName || "Unknown Employee",
-                uniqueID: adj.uniqueID || "",
-                email: adj.email || "",
-                role: adj.role || "employee",
-              },
-              date,
-              totalWorkTime: 0,
-              totalBreakTime: 0,
-              breaks: [],
-            };
-
-            const firstSess = Array.isArray(adj.sessions) && adj.sessions[0] ? adj.sessions[0] : {};
-
-            let checkinVal = adj.checkInTime || firstSess.checkin || "";
-            let checkoutVal = adj.checkOutTime || firstSess.checkout || "";
-
-            if (checkinVal && typeof checkinVal === 'string' && /^\d{1,2}:\d{2}/.test(checkinVal)) {
-              const [h, m] = checkinVal.split(':').map(Number);
-              const d = new Date(date);
-              if (!isNaN(d.getTime())) {
-                d.setHours(h, m, 0, 0);
-                checkinVal = d.toISOString();
-              }
-            }
-
-            if (checkinVal) {
-              attendanceMap.set(uIdKey, {
-                ...existing,
-                checkInTime: checkinVal,
-                approvedCheckInTime: checkinVal,
-                checkOutTime: checkoutVal || existing.checkOutTime || null,
-                approvalStatus: 'approved',
-                status: adj.status || existing.status || 'present',
-                reason: adj.reason || existing.reason,
-              });
-            }
-          }
-        });
-      } catch (lErr) {
-        console.warn("Local adjustments merge error:", lErr);
-      }
+      } catch { }
 
       // Filter out admin & finance users and unknown employees from attendance logs list
       const combinedLogs = Array.from(attendanceMap.values()).filter((item) => {
@@ -1487,17 +1313,23 @@ export default function AttendanceLogs() {
   };
 
   /* =========================================================
-     INITIALS
+     INITIALS (MAX 2 LETTERS)
   ========================================================= */
   const getInitials = (name) => {
-    if (!name) return 'NA';
+    if (!name || typeof name !== 'string') return 'NA';
 
-    return name
-      .split(' ')
-      .filter(Boolean)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase();
+    const parts = name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (parts.length === 0) return 'NA';
+
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.slice(0, 2).toUpperCase();
   };
 
   /* =========================================================
@@ -1772,6 +1604,10 @@ export default function AttendanceLogs() {
   };
 
   const getLogDetails = (log) => {
+    if (!log?.checkIn || log.approvalStatus !== 'approved') {
+      return { segments: [], workingMinutes: 0, breakMinutes: 0 };
+    }
+
     const segments = calculateAttendanceProgress(
       log.checkIn,
       log.breaks,
@@ -2240,7 +2076,7 @@ export default function AttendanceLogs() {
                             <div className="flex items-center gap-2">
 
                               <div
-                                className={`h-8 w-8 ${log.avatarColor} text-white flex items-center justify-center text-xs font-bold flex-shrink-0`}
+                                className={`h-8 w-8 rounded-full ${log.avatarColor} text-white flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-xs`}
                               >
                                 {getInitials(
                                   log.name
@@ -2333,7 +2169,7 @@ export default function AttendanceLogs() {
                           <div className="flex items-center gap-3 flex-1 min-w-0">
 
                             <div
-                              className={`h-9 w-9 sm:h-10 sm:w-10 ${log.avatarColor} text-white flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0`}
+                              className={`h-9 w-9 sm:h-10 sm:w-10 rounded-full ${log.avatarColor} text-white flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0 shadow-xs`}
                             >
                               {getInitials(
                                 log.name
@@ -2473,7 +2309,7 @@ export default function AttendanceLogs() {
             >
               <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className={`h-10 w-10 ${activeLog.avatarColor} flex flex-shrink-0 items-center justify-center text-sm font-bold text-white`}>
+                  <div className={`h-10 w-10 rounded-full ${activeLog.avatarColor} flex flex-shrink-0 items-center justify-center text-sm font-bold text-white shadow-xs`}>
                     {getInitials(activeLog.name)}
                   </div>
                   <div className="min-w-0">

@@ -153,6 +153,31 @@ const normalizeRequests = (payload) => {
       return payload.attendance;
     }
 
+    if (Array.isArray(payload.logs)) {
+      return payload.logs;
+    }
+
+    if (Array.isArray(payload.records)) {
+      return payload.records;
+    }
+
+    if (Array.isArray(payload.result)) {
+      return payload.result;
+    }
+
+    if (Array.isArray(payload.items)) {
+      return payload.items;
+    }
+
+    if (payload.data && typeof payload.data === "object") {
+      if (Array.isArray(payload.data.data)) return payload.data.data;
+      if (Array.isArray(payload.data.attendance)) return payload.data.attendance;
+      if (Array.isArray(payload.data.logs)) return payload.data.logs;
+      if (Array.isArray(payload.data.records)) return payload.data.records;
+      if (Array.isArray(payload.data.result)) return payload.data.result;
+      if (Array.isArray(payload.data.items)) return payload.data.items;
+    }
+
     if (payload._id || payload.userId) {
       return [payload];
     }
@@ -348,6 +373,38 @@ const extractEmployeeUserId = (item, allUsersList = []) => {
 };
 
 // ============================================================
+// ATTENDANCE STATUS EVALUATION HELPERS
+// ============================================================
+const isRecordApproved = (item) => {
+  if (!item) return false;
+  const s = String(item.approvalStatus || item.status || "").toLowerCase().trim();
+  if (s === "approved") return true;
+  if (item.isApproved === true || item.isApprovedCheckIn === true) return true;
+  if (Boolean(item.approvedCheckInTime) || Boolean(item.approvedBy) || Boolean(item.approverId)) return true;
+  if (item.checkInTime && item.effectiveCheckInTime && !item.rejectionReason && !item.rejectedBy && s !== "rejected" && s !== "pending") {
+    return true;
+  }
+  return false;
+};
+
+const isRecordRejected = (item) => {
+  if (!item) return false;
+  const s = String(item.approvalStatus || item.status || "").toLowerCase().trim();
+  if (s === "rejected") return true;
+  if (item.isRejected === true || item.isRejectedCheckIn === true) return true;
+  if (Boolean(item.rejectionReason) || Boolean(item.rejectedBy)) return true;
+  return false;
+};
+
+const getTodayLocal = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// ============================================================
 // MAP BACKEND REQUEST
 // ============================================================
 const mapRequest = (item, index) => {
@@ -368,6 +425,19 @@ const mapRequest = (item, index) => {
 
   const attendanceId = extractAttendanceId(item);
   const employeeUserId = extractEmployeeUserId(item);
+
+  const resolvedApprovalStatus = (() => {
+    const rawStatus = String(item.approvalStatus || "").toLowerCase().trim();
+    if (rawStatus === "approved" || rawStatus === "rejected" || rawStatus === "pending") {
+      return rawStatus;
+    }
+    if (isRecordRejected(item)) return "rejected";
+    if (isRecordApproved(item)) return "approved";
+    const generalStatus = String(item.status || "").toLowerCase().trim();
+    if (generalStatus === "rejected") return "rejected";
+    if (generalStatus === "approved") return "approved";
+    return "pending";
+  })();
 
   return {
     raw: item,
@@ -413,10 +483,7 @@ const mapRequest = (item, index) => {
       item.date ||
       "",
 
-    approvalStatus:
-      item.approvalStatus ||
-      item.status ||
-      "pending",
+    approvalStatus: resolvedApprovalStatus,
 
     avatarColor:
       item.avatarColor ||
@@ -465,6 +532,12 @@ export default function CheckInRequest() {
   const [allUsers, setAllUsers] = useState([]);
 
   const [requests, setRequests] = useState([]);
+  const [serverCounts, setServerCounts] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    total: 0,
+  });
 
   // Initial page loading
   const [loading, setLoading] = useState(true);
@@ -596,6 +669,23 @@ export default function CheckInRequest() {
 
       const data = await res.json();
 
+      // Read authoritative counters directly from backend API response
+      const apiPending = typeof data?.pendingCount === "number"
+        ? data.pendingCount
+        : (typeof data?.summary?.pendingCount === "number" ? data.summary.pendingCount : null);
+
+      const apiApproved = typeof data?.approvedCount === "number"
+        ? data.approvedCount
+        : (typeof data?.summary?.approvedCount === "number" ? data.summary.approvedCount : null);
+
+      const apiRejected = typeof data?.rejectedCount === "number"
+        ? data.rejectedCount
+        : (typeof data?.summary?.rejectedCount === "number" ? data.summary.rejectedCount : null);
+
+      const apiCount = typeof data?.count === "number"
+        ? data.count
+        : (typeof data?.totalCount === "number" ? data.totalCount : null);
+
       const normalized = normalizeRequests(data);
 
       const mappedRequests = normalized
@@ -617,8 +707,75 @@ export default function CheckInRequest() {
         })
         .map(mapRequest);
 
-      // Directly sync with live backend data so new entries show immediately and deleted records disappear
-      setRequests(mappedRequests);
+      // Query organizational attendance logs from /api/attendance/admin/all so that
+      // approved and rejected check-in records are also available when filtering
+      let additionalRecords = [];
+      try {
+        const todayDate = getTodayLocal();
+        let allRes = await fetch(
+          `https://kt-backend-yzr4.onrender.com/api/attendance/admin/all?date=${todayDate}&_t=${Date.now()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+            },
+          }
+        );
+        if (!allRes.ok) {
+          allRes = await fetch(
+            `https://kt-backend-yzr4.onrender.com/api/attendance/admin/all?_t=${Date.now()}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+              },
+            }
+          );
+        }
+        if (allRes.ok) {
+          const allData = await allRes.json();
+          const allLogs = normalizeRequests(allData);
+          additionalRecords = allLogs
+            .filter((item) => {
+              if (!item || isFinanceOrExcludedUser(item) || isUnknownEmployeeOrUser(item)) return false;
+              return isRecordApproved(item) || isRecordRejected(item);
+            })
+            .map((item, idx) => {
+              const mapped = mapRequest(item, idx + 500);
+              const isRej = isRecordRejected(item);
+              return {
+                ...mapped,
+                approvalStatus: isRej ? "rejected" : "approved",
+              };
+            });
+        }
+      } catch (e) {
+        // Silently continue if /admin/all is unavailable
+      }
+
+      // Merge pending requests and approved/rejected records
+      const existingIds = new Set(mappedRequests.map((r) => r.id));
+      const combined = [
+        ...mappedRequests,
+        ...additionalRecords.filter((r) => !existingIds.has(r.id)),
+      ];
+
+      setRequests(combined);
+
+      // Set authoritative counts from API response
+      const finalPending = apiPending !== null ? apiPending : mappedRequests.filter((r) => r.approvalStatus === "pending").length;
+      const finalApproved = apiApproved !== null ? apiApproved : combined.filter((r) => r.approvalStatus === "approved").length;
+      const finalRejected = apiRejected !== null ? apiRejected : combined.filter((r) => r.approvalStatus === "rejected").length;
+      const finalTotal = (apiPending !== null && apiApproved !== null && apiRejected !== null)
+        ? (apiPending + apiApproved + apiRejected)
+        : (apiCount !== null && apiCount > 0 ? apiCount : (finalPending + finalApproved + finalRejected));
+
+      setServerCounts({
+        pending: finalPending,
+        approved: finalApproved,
+        rejected: finalRejected,
+        total: finalTotal,
+      });
     } catch (err) {
       console.error(
         "Fetch Pending Requests Error:",
@@ -849,6 +1006,12 @@ export default function CheckInRequest() {
               : req
           )
         );
+
+        setServerCounts((prev) => ({
+          ...prev,
+          pending: Math.max(0, prev.pending - 1),
+          approved: prev.approved + 1,
+        }));
       }
 
       // ========================================================
@@ -914,6 +1077,12 @@ export default function CheckInRequest() {
 
         setRejectingRequest(null);
         setRejectionReason("");
+
+        setServerCounts((prev) => ({
+          ...prev,
+          pending: Math.max(0, prev.pending - 1),
+          rejected: prev.rejected + 1,
+        }));
       }
 
       // ========================================================
@@ -1016,28 +1185,27 @@ export default function CheckInRequest() {
   };
 
   // ============================================================
-  // COUNTS
+  // COUNTS (Authoritative from backend server counts with fallback)
   // ============================================================
   const pendingCount =
-    requests.filter(
-      (r) =>
-        r.approvalStatus ===
-        "pending"
-    ).length;
+    typeof serverCounts.pending === "number"
+      ? serverCounts.pending
+      : requests.filter((r) => r.approvalStatus === "pending").length;
 
   const approvedCount =
-    requests.filter(
-      (r) =>
-        r.approvalStatus ===
-        "approved"
-    ).length;
+    typeof serverCounts.approved === "number"
+      ? serverCounts.approved
+      : requests.filter((r) => r.approvalStatus === "approved").length;
 
   const rejectedCount =
-    requests.filter(
-      (r) =>
-        r.approvalStatus ===
-        "rejected"
-    ).length;
+    typeof serverCounts.rejected === "number"
+      ? serverCounts.rejected
+      : requests.filter((r) => r.approvalStatus === "rejected").length;
+
+  const totalCount =
+    typeof serverCounts.total === "number" && serverCounts.total > 0
+      ? serverCounts.total
+      : (pendingCount + approvedCount + rejectedCount > 0 ? (pendingCount + approvedCount + rejectedCount) : requests.length);
 
   // ============================================================
   // FILTER
@@ -1091,7 +1259,7 @@ export default function CheckInRequest() {
           <div className="h-10 bg-white border border-slate-200/80 px-3.5 py-1 rounded-lg shadow-xs text-xs sm:text-sm flex items-center">
             <span className="text-gray-500">Total: </span>
             <span className="ml-1.5 font-bold text-gray-900">
-              {requests.length}
+              {totalCount}
             </span>
           </div>
 
@@ -1121,12 +1289,20 @@ export default function CheckInRequest() {
       <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
 
         {/* ===================================================
-            STATS
+            STATS (Clickable to Filter by Status)
         =================================================== */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-4 border-b border-slate-200/80">
 
           {/* Pending */}
-          <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-2.5 sm:p-3 text-center">
+          <div
+            onClick={() => setFilterStatus(filterStatus === "pending" ? "all" : "pending")}
+            title="Click to filter Pending requests"
+            className={`transition-all rounded-lg p-2.5 sm:p-3 text-center border cursor-pointer select-none ${
+              filterStatus === "pending"
+                ? "bg-amber-100/90 border-amber-400 ring-2 ring-amber-400/30 shadow-xs"
+                : "bg-amber-50/70 border-amber-200/80 hover:bg-amber-100/60"
+            }`}
+          >
             <div className="flex items-center justify-center gap-1 text-amber-700 text-[10px] sm:text-xs font-bold uppercase">
               <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">
@@ -1143,7 +1319,15 @@ export default function CheckInRequest() {
           </div>
 
           {/* Approved */}
-          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-lg p-2.5 sm:p-3 text-center">
+          <div
+            onClick={() => setFilterStatus(filterStatus === "approved" ? "all" : "approved")}
+            title="Click to filter Approved requests"
+            className={`transition-all rounded-lg p-2.5 sm:p-3 text-center border cursor-pointer select-none ${
+              filterStatus === "approved"
+                ? "bg-emerald-100/90 border-emerald-400 ring-2 ring-emerald-400/30 shadow-xs"
+                : "bg-emerald-50/70 border-emerald-200/80 hover:bg-emerald-100/60"
+            }`}
+          >
             <div className="flex items-center justify-center gap-1 text-emerald-700 text-[10px] sm:text-xs font-bold uppercase">
               <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">
@@ -1160,7 +1344,15 @@ export default function CheckInRequest() {
           </div>
 
           {/* Rejected */}
-          <div className="bg-rose-50/70 border border-rose-200/80 rounded-lg p-2.5 sm:p-3 text-center">
+          <div
+            onClick={() => setFilterStatus(filterStatus === "rejected" ? "all" : "rejected")}
+            title="Click to filter Rejected requests"
+            className={`transition-all rounded-lg p-2.5 sm:p-3 text-center border cursor-pointer select-none ${
+              filterStatus === "rejected"
+                ? "bg-rose-100/90 border-rose-400 ring-2 ring-rose-400/30 shadow-xs"
+                : "bg-rose-50/70 border-rose-200/80 hover:bg-rose-100/60"
+            }`}
+          >
             <div className="flex items-center justify-center gap-1 text-rose-700 text-[10px] sm:text-xs font-bold uppercase">
               <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">
