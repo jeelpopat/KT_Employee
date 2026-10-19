@@ -347,15 +347,34 @@ export const normalizeAttendanceRecord = (record) => {
 };
 
 /**
- * Converts UTC minutes (from midnight UTC) to local minutes (from midnight local time)
+ * Safely resolves timeline segment minutes to local minutes from midnight.
+ * Backend timeline segments (fromMinutes, toMinutes) are generated in local shift minutes
+ * (e.g. 600 = 10:00 AM, 683 = 11:23 AM, 1140 = 7:00 PM).
+ * If a value is already in local minutes, converting it as if it were UTC creates an erroneous
+ * +5:30 time shift (e.g. 11:23 AM -> 4:53 PM, 7:00 PM -> 12:30 AM next day).
+ * This function detects whether the input is already in local minutes or requires UTC conversion.
+ * 
  * @param {number} utcMinutes 
+ * @param {number|null} [referenceLocalMinutes] Optional reference local minute (e.g. check-in minutes)
  * @returns {number} localMinutes
  */
-export const convertUTCMinutesToLocal = (utcMinutes) => {
-  if (utcMinutes === undefined || utcMinutes === null) return 0;
-  const d = new Date();
-  d.setUTCHours(Math.floor(utcMinutes / 60), utcMinutes % 60, 0, 0);
-  return d.getHours() * 60 + d.getMinutes();
+export const convertUTCMinutesToLocal = (utcMinutes, referenceLocalMinutes = null) => {
+  if (utcMinutes === undefined || utcMinutes === null || isNaN(utcMinutes)) return 0;
+  const num = Number(utcMinutes);
+
+  // If referenceLocalMinutes is provided (e.g. startMinutes from checkInTime)
+  if (referenceLocalMinutes !== null && referenceLocalMinutes !== undefined && !isNaN(referenceLocalMinutes)) {
+    const diffAsIs = Math.abs(num - referenceLocalMinutes);
+    const d = new Date();
+    d.setUTCHours(Math.floor(num / 60), num % 60, 0, 0);
+    const converted = d.getHours() * 60 + d.getMinutes();
+    const diffConverted = Math.abs(converted - referenceLocalMinutes);
+    // If raw num is closer to reference than the UTC-converted value, it's already local!
+    return diffAsIs <= diffConverted ? num : converted;
+  }
+
+  // Backend timeline segments are generated in local shift minutes (600 = 10:00 AM, 683 = 11:23 AM, etc.)
+  return num;
 };
 
 /**
@@ -645,22 +664,32 @@ export const computeNineHourTimeline = ({
       ? Math.min(endMinutes, parsedCheckOut)
       : endMinutes;
 
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
     timelineSegments.forEach((seg, idx) => {
-      const localFrom = convertUTCMinutesToLocal(seg.fromMinutes);
-      const localTo = convertUTCMinutesToLocal(seg.toMinutes);
+      const localFrom = convertUTCMinutesToLocal(seg.fromMinutes, startMinutes);
+      let localTo = convertUTCMinutesToLocal(seg.toMinutes, startMinutes);
+
+      const isBreak = seg.type === 'yellow' || (seg.label || '').toLowerCase().includes('break');
+      const isInactiveOrLate =
+        seg.type === 'grey' ||
+        seg.type === 'gray' ||
+        (seg.label || '').toLowerCase().includes('late') ||
+        (seg.label || '').toLowerCase().includes('early');
+
+      // If user is actively working (not checked out, not on break), extend working time live to current minute
+      if (!isBreak && !isInactiveOrLate && !isCheckedOut && !isOnBreak) {
+        if (currentMinutes > localTo) {
+          localTo = Math.min(maxAllowedEnd, currentMinutes);
+        }
+      }
 
       // Clamp strictly within the 9-hour timeline [startMinutes, maxAllowedEnd]
       const clampedFrom = Math.max(startMinutes, localFrom);
       const clampedTo = Math.min(maxAllowedEnd, localTo);
 
       if (clampedTo > clampedFrom) {
-        const isBreak = seg.type === 'yellow' || (seg.label || '').toLowerCase().includes('break');
-        const isInactiveOrLate =
-          seg.type === 'grey' ||
-          seg.type === 'gray' ||
-          (seg.label || '').toLowerCase().includes('late') ||
-          (seg.label || '').toLowerCase().includes('early');
-
         if (isBreak) {
           if (!breakStartTime) breakStartTime = formatMinutesToTimeStr(clampedFrom);
 
@@ -705,6 +734,11 @@ export const computeNineHourTimeline = ({
 
           accumulatedBreakMinutes += breakDuration;
         } else if (isInactiveOrLate) {
+          // If employee is actively working / not checked out, do not render premature "Checked Out" segments
+          if (!isCheckedOut && (seg.label || '').toLowerCase().includes('checked out')) {
+            return;
+          }
+
           const leftPercent = Math.max(0, ((clampedFrom - startMinutes) / TOTAL_MINUTES) * 100);
           const widthPercent = Math.min(100 - leftPercent, ((clampedTo - clampedFrom) / TOTAL_MINUTES) * 100);
 

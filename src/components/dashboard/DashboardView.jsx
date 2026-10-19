@@ -319,6 +319,7 @@ export const DashboardView = () => {
     const localRejected = localStorage.getItem('kt_attendance_rejected_' + todayStr) === 'true' || localStorage.getItem('kt_attendance_rejected_' + todayLocalStr) === 'true';
     const localCheckedIn = localStorage.getItem('kt_checked_in_' + todayStr) === 'true' || localStorage.getItem('kt_checked_in_' + todayLocalStr) === 'true';
     const localCheckedOut = localStorage.getItem('kt_checked_out_' + todayStr) === 'true' || localStorage.getItem('kt_checked_out_' + todayLocalStr) === 'true';
+    const localOnBreak = localStorage.getItem('kt_on_break_' + todayStr) === 'true' || localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true';
     const rawCheckIn = ta?.approvedCheckInTime || ta?.checkInTime || ta?.checkInTimeDisplay || ta?.approvedCheckInTimeDisplay || ta?.inTime || ta?.checkIn || ta?.punchIn;
     const rawCheckOut = ta?.checkOutTime || ta?.checkOutTimeDisplay || ta?.outTime || ta?.checkOut || ta?.punchOut;
     const statusLower = String(ta?.status || '').toLowerCase().trim();
