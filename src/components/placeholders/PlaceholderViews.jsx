@@ -1263,11 +1263,13 @@ export const TeamTaskManagementView = () => {
 
   const normalizeStatus = (status = '') => {
     const s = String(status || '').toLowerCase().trim().replace(/[- ]/g, '_');
-    if (['pending', 'assigned', 'to_do', 'todo'].includes(s)) return 'todo';
+    if (['pending', 'assigned', 'to_do', 'todo'].includes(s)) return 'pending';
     if (['in_progress', 'working', 'doing'].includes(s)) return 'in_progress';
-    if (['testing', 'review', 'in_review'].includes(s)) return 'review';
+    if (['testing'].includes(s)) return 'testing';
+    if (['review', 'in_review'].includes(s)) return 'review';
     if (['completed', 'done', 'finished'].includes(s)) return 'completed';
-    return 'todo';
+    if (['cancelled', 'canceled'].includes(s)) return 'cancelled';
+    return 'pending';
   };
 
   // Open Create Modal
@@ -1431,16 +1433,20 @@ export const TeamTaskManagementView = () => {
     });
   }, [tasks, searchQuery, projectFilter, priorityFilter, statusFilter]);
 
-  const todoTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'todo');
+  const todoTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'pending');
   const inProgressTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'in_progress');
+  const testingTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'testing');
   const reviewTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'review');
   const completedTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'completed');
+  const cancelledTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'cancelled');
 
   const columns = [
     { title: 'To Do', count: todoTasks.length, statusKey: 'pending', tasks: todoTasks, accent: 'border-t-slate-400 bg-slate-50' },
-    { title: 'In Progress', count: inProgressTasks.length, statusKey: 'in_progress', tasks: inProgressTasks, accent: 'border-t-amber-500 bg-amber-50/20' },
-    { title: 'Testing & Review', count: reviewTasks.length, statusKey: 'review', tasks: reviewTasks, accent: 'border-t-indigo-500 bg-indigo-50/20' },
-    { title: 'Completed', count: completedTasks.length, statusKey: 'completed', tasks: completedTasks, accent: 'border-t-emerald-500 bg-emerald-50/20' }
+    { title: 'In Progress', count: inProgressTasks.length, statusKey: 'in_progress', tasks: inProgressTasks, accent: 'border-t-blue-500 bg-blue-50/20' },
+    { title: 'Testing', count: testingTasks.length, statusKey: 'testing', tasks: testingTasks, accent: 'border-t-purple-500 bg-purple-50/20' },
+    { title: 'Review', count: reviewTasks.length, statusKey: 'review', tasks: reviewTasks, accent: 'border-t-indigo-500 bg-indigo-50/20' },
+    { title: 'Completed', count: completedTasks.length, statusKey: 'completed', tasks: completedTasks, accent: 'border-t-emerald-500 bg-emerald-50/20' },
+    { title: 'Cancelled', count: cancelledTasks.length, statusKey: 'cancelled', tasks: cancelledTasks, accent: 'border-t-rose-500 bg-rose-50/20' }
   ];
 
   const getPriorityBadge = (priority = 'medium') => {
@@ -1526,11 +1532,13 @@ export const TeamTaskManagementView = () => {
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {[
           { label: 'Total Tasks', value: tasks.length, border: 'border-l-indigo-600' },
-          { label: 'To Do', value: tasks.filter(t => normalizeStatus(t.status) === 'todo').length, border: 'border-l-slate-400' },
-          { label: 'In Progress', value: tasks.filter(t => normalizeStatus(t.status) === 'in_progress').length, border: 'border-l-amber-500' },
+          { label: 'To Do', value: tasks.filter(t => normalizeStatus(t.status) === 'pending').length, border: 'border-l-slate-400' },
+          { label: 'In Progress', value: tasks.filter(t => normalizeStatus(t.status) === 'in_progress').length, border: 'border-l-blue-500' },
+          { label: 'Testing', value: tasks.filter(t => normalizeStatus(t.status) === 'testing').length, border: 'border-l-purple-500' },
+          { label: 'Review', value: tasks.filter(t => normalizeStatus(t.status) === 'review').length, border: 'border-l-indigo-500' },
           { label: 'Completed', value: tasks.filter(t => normalizeStatus(t.status) === 'completed').length, border: 'border-l-emerald-500' },
         ].map((item, idx) => (
           <div key={idx} className={`p-4 bg-white border border-slate-200/80 border-l-4 ${item.border} rounded-xl shadow-xs transition-all`}>
@@ -1582,13 +1590,15 @@ export const TeamTaskManagementView = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none"
+            className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none cursor-pointer"
           >
             <option value="all">All Stages</option>
-            <option value="todo">To Do</option>
+            <option value="pending">To Do (Pending)</option>
             <option value="in_progress">In Progress</option>
-            <option value="review">Testing & Review</option>
+            <option value="testing">Testing</option>
+            <option value="review">Review</option>
             <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
       </div>
@@ -1617,7 +1627,7 @@ export const TeamTaskManagementView = () => {
         </div>
       ) : viewMode === 'kanban' ? (
         /* Kanban Board View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {columns.map((col, idx) => (
             <div
               key={idx}
@@ -1692,8 +1702,10 @@ export const TeamTaskManagementView = () => {
                           >
                             <option value="pending">To Do</option>
                             <option value="in_progress">In Progress</option>
-                            <option value="review">In Review</option>
+                            <option value="testing">Testing</option>
+                            <option value="review">Review</option>
                             <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
                           </select>
 
                           <div className="flex items-center gap-1">
@@ -1773,8 +1785,10 @@ export const TeamTaskManagementView = () => {
                     >
                       <option value="pending">To Do</option>
                       <option value="in_progress">In Progress</option>
-                      <option value="review">In Review</option>
+                      <option value="testing">Testing</option>
+                      <option value="review">Review</option>
                       <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
                     </select>
                   </td>
                   <td className="px-4 py-3.5 font-mono text-[11px] text-slate-600">
@@ -1915,6 +1929,7 @@ export const TeamTaskManagementView = () => {
                     <option value="testing">Testing</option>
                     <option value="review">Review</option>
                     <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
               </div>

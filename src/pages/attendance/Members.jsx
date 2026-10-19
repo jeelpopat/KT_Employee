@@ -1395,7 +1395,7 @@ const fetchAllMembers = async () => {
                       {memberInsights.tasks.map((task, idx) => (
                         <li key={task?._id || task?.id || idx} className="text-[11px] text-slate-700">
                           <div className="font-medium truncate">{task?.taskTitle || task?.title || 'Untitled Task'}</div>
-                          <div className="text-[10px] text-slate-500">{task?.status || 'Pending'} • {task?.progress || 0}%</div>
+                          <div className="text-[10px] text-slate-500 capitalize">{(task?.status || 'pending').replace(/_/g, ' ')} • {task?.progress || 0}%</div>
                         </li>
                       ))}
                     </ul>

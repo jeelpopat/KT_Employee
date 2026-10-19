@@ -308,14 +308,28 @@ export const ProjectView = () => {
             return String(tPId) === String(proj._id);
           });
 
-          // Calculate progress if 0 and tasks exist
-          let progressVal = proj.progress || 0;
-          if (progressVal === 0 && projectTasks.length > 0) {
-            const completedCount = projectTasks.filter(t => {
-              const s = String(t.status || '').toLowerCase();
-              return s === 'completed' || s === 'done';
-            }).length;
-            progressVal = Math.round((completedCount / projectTasks.length) * 100);
+          // Calculate dynamic progress strictly dependent on task progress and status
+          let progressVal = 0;
+          if (String(proj.status || '').toLowerCase() === 'completed') {
+            progressVal = 100;
+          } else if (projectTasks.length > 0) {
+            const activeTasks = projectTasks.filter(t => String(t.status || '').toLowerCase() !== 'cancelled');
+            if (activeTasks.length > 0) {
+              const totalTaskProgress = activeTasks.reduce((sum, t) => {
+                const s = String(t.status || '').toLowerCase().trim();
+                if (s === 'completed' || s === 'done') return sum + 100;
+                if (typeof t.progress === 'number' && !isNaN(t.progress) && t.progress > 0) {
+                  return sum + Math.min(100, Math.max(0, t.progress));
+                }
+                if (s === 'review') return sum + 85;
+                if (s === 'testing') return sum + 70;
+                if (s === 'in_progress' || s === 'in-progress' || s === 'active') return sum + 40;
+                return sum; // pending: 0
+              }, 0);
+              progressVal = Math.round(totalTaskProgress / activeTasks.length);
+            }
+          } else if (typeof proj.progress === 'number' && !isNaN(proj.progress)) {
+            progressVal = Math.min(100, Math.max(0, proj.progress));
           }
 
           return {
@@ -367,10 +381,12 @@ export const ProjectView = () => {
       );
 
       // Status filter
-      const statusLower = String(p.status || '').toLowerCase();
+      const statusLower = String(p.status || '').toLowerCase().trim().replace(/[- ]/g, '_');
+      const filterLower = String(selectedStatusFilter || '').toLowerCase().trim().replace(/[- ]/g, '_');
       const matchesStatus = 
-        selectedStatusFilter === 'all' || 
-        statusLower === selectedStatusFilter.toLowerCase();
+        filterLower === 'all' || 
+        statusLower === filterLower ||
+        (filterLower === 'in_progress' && (statusLower === 'active'));
 
       // Assignment filter ("Assigned to Me" vs "All") - only relevant for non-TL users
       let matchesAssignment = true;
@@ -412,8 +428,8 @@ export const ProjectView = () => {
   // Overall KPI metrics
   const totalProjects = accessibleProjects.length;
   const activeProjects = accessibleProjects.filter(p => {
-    const s = String(p.status || '').toLowerCase();
-    return s === 'active' || s === 'in_progress' || s === 'pending';
+    const s = String(p.status || '').toLowerCase().trim().replace(/[- ]/g, '_');
+    return s === 'in_progress' || s === 'testing' || s === 'review' || s === 'active';
   }).length;
   const completedProjects = accessibleProjects.filter(p => String(p.status || '').toLowerCase() === 'completed').length;
   
@@ -429,32 +445,46 @@ export const ProjectView = () => {
     return set.size;
   }, [accessibleProjects]);
 
-  const getStatusBadge = (status = 'active') => {
-    const s = String(status).toLowerCase();
-    if (s === 'completed') {
+  const getStatusBadge = (status = 'pending') => {
+    const s = String(status || '').toLowerCase().trim().replace(/[- ]/g, '_');
+    if (s === 'completed' || s === 'done') {
       return (
         <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
           Completed
         </span>
       );
     }
-    if (s === 'review' || s === 'testing') {
+    if (s === 'review' || s === 'in_review') {
       return (
         <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
           Review
         </span>
       );
     }
-    if (s === 'pending') {
+    if (s === 'testing') {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-          Pending
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+          Testing
+        </span>
+      );
+    }
+    if (s === 'in_progress' || s === 'active' || s === 'working') {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          In Progress
+        </span>
+      );
+    }
+    if (s === 'cancelled' || s === 'canceled') {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+          Cancelled
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-        Active
+      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+        Pending
       </span>
     );
   };
@@ -584,11 +614,12 @@ export const ProjectView = () => {
               className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none transition-colors cursor-pointer"
             >
               <option value="all">All Statuses</option>
-              <option value="active">Active</option>
               <option value="pending">Pending</option>
               <option value="in_progress">In Progress</option>
+              <option value="testing">Testing</option>
               <option value="review">Review</option>
               <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
         </div>
@@ -1035,9 +1066,7 @@ export const ProjectView = () => {
 
                         <div className="flex items-center gap-2 shrink-0">
                           {getPriorityBadge(task.priority)}
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 text-slate-700">
-                            {task.status}
-                          </span>
+                          {getStatusBadge(task.status)}
                         </div>
                       </div>
                     ))}
@@ -1219,10 +1248,11 @@ export const ProjectView = () => {
                     className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="pending">Pending</option>
-                    <option value="active">Active</option>
                     <option value="in_progress">In Progress</option>
+                    <option value="testing">Testing</option>
                     <option value="review">Review</option>
                     <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
 

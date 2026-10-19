@@ -529,6 +529,7 @@ export const DashboardView = () => {
       !isRejected && (
         ta?.isOnBreak === true ||
         ta?.isBreakActive === true ||
+        ta?.breakTimer?.isOnBreak === true ||
         statusLower === 'on_break' ||
         statusLower === 'on-break' ||
         statusLower === 'on break' ||
@@ -537,24 +538,52 @@ export const DashboardView = () => {
       )
     );
 
-    const isOnBreak = Boolean(!isRejected && hasCheckedIn && !hasCheckedOut && (localOnBreak || isBreakExplicitActive));
+    // If backend confirms that the latest break is completed (has valid endTime) and breakTimer is inactive,
+    // then backend definitively confirms the employee is NOT currently on break!
+    const isBackendConfirmedBreakEnded = Boolean(
+      ta &&
+      !isBreakExplicitActive && (
+        ta?.breakTimer?.isOnBreak === false ||
+        (breaksList.length > 0 && Boolean(breaksList[breaksList.length - 1].endTime)) ||
+        ta?.isOnBreak === false
+      )
+    );
+
+    const isOnBreak = Boolean(
+      !isRejected &&
+      hasCheckedIn &&
+      !hasCheckedOut &&
+      !isBackendConfirmedBreakEnded && (
+        isBreakExplicitActive ||
+        (localOnBreak && !ta)
+      )
+    );
 
     // Keep localStorage in sync with verified break state
     if (isOnBreak) {
       localStorage.setItem('kt_on_break_' + todayStr, 'true');
       localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
-    } else if (hasCheckedOut || isRejected || (hasCheckedIn && !isBreakExplicitActive && !localOnBreak)) {
+    } else {
       localStorage.removeItem('kt_on_break_' + todayStr);
       localStorage.removeItem('kt_on_break_' + todayLocalStr);
     }
 
     // Breaks taken today (Maximum 2 breaks allowed per day)
-    const totalBreaksTakenToday = isRejected ? 0 : Math.max(
+    // When backend data is loaded, backend breaksList/yellowSegments is authoritative!
+    const backendBreakCount = Math.max(
       breaksList.length,
       yellowSegments.length,
-      localBreakCount,
       isOnBreak ? 1 : 0
     );
+    const totalBreaksTakenToday = isRejected ? 0 : (
+      ta ? backendBreakCount : Math.max(backendBreakCount, localBreakCount)
+    );
+
+    // Keep localStorage break count synchronized with authoritative backend count
+    if (ta && !isRejected) {
+      localStorage.setItem('kt_break_count_' + todayStr, String(totalBreaksTakenToday));
+      localStorage.setItem('kt_break_count_' + todayLocalStr, String(totalBreaksTakenToday));
+    }
     setDailyBreaksCount(totalBreaksTakenToday);
 
     // Format Break Time Displays
@@ -1272,6 +1301,7 @@ export const DashboardView = () => {
             if (['pending', 'assigned', 'to_do', 'todo'].includes(str)) return 'todo';
             if (['in_progress', 'testing', 'review', 'in_review'].includes(str)) return 'inProgress';
             if (['completed', 'done'].includes(str)) return 'completed';
+            if (['cancelled', 'canceled'].includes(str)) return 'cancelled';
             return 'todo';
           };
           setTasksStats({

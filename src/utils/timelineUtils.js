@@ -685,6 +685,18 @@ export const computeNineHourTimeline = ({
         }
       }
 
+      // If user is actively on break, extend the active break segment live to current minute
+      if (isBreak && isOnBreak && !isCheckedOut) {
+        if (currentMinutes > localTo) {
+          localTo = Math.min(maxAllowedEnd, currentMinutes);
+        }
+      }
+
+      // If employee is actively on break right now, do not render working segments that appear after break start
+      if (!isBreak && !isInactiveOrLate && isOnBreak && localFrom >= startMinutes) {
+        return;
+      }
+
       // Clamp strictly within the 9-hour timeline [startMinutes, maxAllowedEnd]
       const clampedFrom = Math.max(startMinutes, localFrom);
       const clampedTo = Math.min(maxAllowedEnd, localTo);

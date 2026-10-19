@@ -290,7 +290,7 @@ export const Header = ({ onSignOut }) => {
         if (latestUnread && 'Notification' in window && Notification.permission === 'granted') {
           new Notification(latestUnread.title || 'New Admin Notification', {
             body: latestUnread.message || 'You have a new update.',
-            icon: '/favicon.ico',
+            icon: '/logo.png',
           });
         }
       }
@@ -338,7 +338,7 @@ export const Header = ({ onSignOut }) => {
         fetch(`https://kt-backend-yzr4.onrender.com/api/notification/read/${id}`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
-        }).catch(() => {});
+        }).catch(() => { });
       }
       setAdminNotifications((prev) =>
         prev.map((n) => (n.id === id || n._id === id ? { ...n, isRead: true } : n))
@@ -359,7 +359,7 @@ export const Header = ({ onSignOut }) => {
         fetch('https://kt-backend-yzr4.onrender.com/api/notification/read-all', {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
-        }).catch(() => {});
+        }).catch(() => { });
       }
       setAdminNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setAdminUnreadCount(0);
@@ -506,7 +506,7 @@ export const Header = ({ onSignOut }) => {
           if (latestUnread && 'Notification' in window && Notification.permission === 'granted') {
             new Notification(latestUnread.title || 'Kevalon Notification', {
               body: latestUnread.message || 'You have a new update.',
-              icon: '/favicon.ico',
+              icon: '/logo.png',
             });
           }
         }
@@ -689,11 +689,10 @@ export const Header = ({ onSignOut }) => {
             >
               <Bell size={18} />
               {activeUnreadCount > 0 && (
-                <span className={`absolute flex items-center justify-center text-white font-bold rounded-full shadow-xs ${
-                  isAdmin
-                    ? '-top-1 -right-1 h-4 min-w-4 px-1 bg-rose-500 text-[9px] ring-2 ring-white animate-pulse'
-                    : '-top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-indigo-600 text-[10px]'
-                }`}>
+                <span className={`absolute flex items-center justify-center text-white font-bold rounded-full shadow-xs ${isAdmin
+                  ? '-top-1 -right-1 h-4 min-w-4 px-1 bg-rose-500 text-[9px] ring-2 ring-white animate-pulse'
+                  : '-top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-indigo-600 text-[10px]'
+                  }`}>
                   {activeUnreadCount > 99 ? '99+' : activeUnreadCount}
                 </span>
               )}
@@ -745,55 +744,50 @@ export const Header = ({ onSignOut }) => {
                       <button
                         type="button"
                         onClick={() => setAdminTab('unread')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${
-                          adminTab === 'unread'
-                            ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${adminTab === 'unread'
+                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         Unread ({unreadAdminList.length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setAdminTab('all')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${
-                          adminTab === 'all'
-                            ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${adminTab === 'all'
+                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         All ({adminNotifications.length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setAdminTab('read')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${
-                          adminTab === 'read'
-                            ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${adminTab === 'read'
+                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         Read ({readAdminList.length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setAdminTab('requests')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${
-                          adminTab === 'requests'
-                            ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${adminTab === 'requests'
+                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         Requests ({adminRequestsCount})
                       </button>
                       <button
                         type="button"
                         onClick={() => setAdminTab('announcements')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${
-                          adminTab === 'announcements'
-                            ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${adminTab === 'announcements'
+                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         Announcements ({adminAnnouncementsCount})
                       </button>
@@ -821,9 +815,8 @@ export const Header = ({ onSignOut }) => {
                           <div
                             key={item._id || item.id || idx}
                             onClick={() => handleAdminNotificationClick(item)}
-                            className={`p-3 transition-colors flex items-start gap-2.5 cursor-pointer group ${
-                              !item.isRead ? 'bg-indigo-50/30 hover:bg-indigo-50/60' : 'hover:bg-slate-50 opacity-85'
-                            }`}
+                            className={`p-3 transition-colors flex items-start gap-2.5 cursor-pointer group ${!item.isRead ? 'bg-indigo-50/30 hover:bg-indigo-50/60' : 'hover:bg-slate-50 opacity-85'
+                              }`}
                           >
                             <div className={`p-1.5 rounded-lg border shrink-0 mt-0.5 ${getNotificationBg(item.type)}`}>
                               {getNotificationIcon(item.type)}
@@ -932,33 +925,30 @@ export const Header = ({ onSignOut }) => {
                       <button
                         type="button"
                         onClick={() => setEmployeeTab('unread')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all cursor-pointer ${
-                          employeeTab === 'unread'
-                            ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all cursor-pointer ${employeeTab === 'unread'
+                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         Unread ({employeeNotifications.filter((n) => !n.isRead).length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setEmployeeTab('all')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all cursor-pointer ${
-                          employeeTab === 'all'
-                            ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all cursor-pointer ${employeeTab === 'all'
+                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         All ({employeeNotifications.length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setEmployeeTab('read')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all cursor-pointer ${
-                          employeeTab === 'read'
-                            ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all cursor-pointer ${employeeTab === 'read'
+                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         Read ({employeeNotifications.filter((n) => n.isRead).length})
                       </button>
@@ -975,9 +965,8 @@ export const Header = ({ onSignOut }) => {
                           <div
                             key={notif._id}
                             onClick={() => !notif.isRead && handleEmployeeMarkAsRead(notif._id)}
-                            className={`p-3 sm:p-3.5 flex items-start gap-2.5 cursor-pointer hover:bg-slate-50/80 transition-colors ${
-                              !notif.isRead ? 'bg-indigo-50/30' : ''
-                            }`}
+                            className={`p-3 sm:p-3.5 flex items-start gap-2.5 cursor-pointer hover:bg-slate-50/80 transition-colors ${!notif.isRead ? 'bg-indigo-50/30' : ''
+                              }`}
                           >
                             <div className="mt-0.5 shrink-0 text-slate-500">
                               {notif.type === 'SYSTEM' ? (

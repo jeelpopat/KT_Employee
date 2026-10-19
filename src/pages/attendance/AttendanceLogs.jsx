@@ -2097,10 +2097,6 @@ export default function AttendanceLogs() {
                       Date (Newest)
                     </option>
 
-                    <option value="date-asc">
-                      Date (Oldest)
-                    </option>
-
                     <option value="name-asc">
                       Name (A-Z)
                     </option>

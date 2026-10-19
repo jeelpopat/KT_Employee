@@ -2022,6 +2022,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 <option value="all">All Statuses</option>
                 <option value="pending">Pending</option>
                 <option value="in_progress">In Progress</option>
+                <option value="testing">Testing</option>
+                <option value="review">Review</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
@@ -2070,7 +2072,23 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 const isExpanded = expandedProjects[project._id] || false;
                 const projectTasks = tasks.filter((t) => isSameId(t.projectId, project._id));
                 const completedCount = projectTasks.filter((t) => (t.status || "").toLowerCase() === "completed").length;
-                const projectPercent = projectTasks.length > 0 ? Math.round((completedCount / projectTasks.length) * 100) : 0;
+                const getTaskProgressVal = (t) => {
+                  const s = String(t.status || '').toLowerCase().trim();
+                  if (s === 'completed' || s === 'done') return 100;
+                  if (typeof t.progress === 'number' && !isNaN(t.progress) && t.progress > 0) {
+                    return Math.min(100, Math.max(0, t.progress));
+                  }
+                  if (s === 'review') return 85;
+                  if (s === 'testing') return 70;
+                  if (s === 'in_progress' || s === 'in-progress' || s === 'active') return 40;
+                  return 0;
+                };
+                const validProjectTasks = projectTasks.filter(t => (t.status || '').toLowerCase() !== 'cancelled');
+                const projectPercent = (project.status || '').toLowerCase() === 'completed'
+                  ? 100
+                  : validProjectTasks.length > 0
+                    ? Math.round(validProjectTasks.reduce((sum, t) => sum + getTaskProgressVal(t), 0) / validProjectTasks.length)
+                    : (typeof project.progress === 'number' && !isNaN(project.progress) ? project.progress : 0);
 
                 return (
                   <div
@@ -2964,7 +2982,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="pending">Pending</option>
-                    <option value="in-progress">In Progress</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="testing">Testing</option>
+                    <option value="review">Review</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
@@ -3412,6 +3432,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   >
                     <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
+                    <option value="testing">Testing</option>
+                    <option value="review">Review</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>

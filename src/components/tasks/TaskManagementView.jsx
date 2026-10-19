@@ -27,7 +27,8 @@ export const TaskManagementView = () => {
     const s = String(status || '').toLowerCase().trim().replace(/[- ]/g, '_');
     if (['pending', 'assigned', 'to_do', 'todo'].includes(s)) return 'pending';
     if (['in_progress', 'working', 'doing'].includes(s)) return 'in_progress';
-    if (['testing', 'review', 'in_review'].includes(s)) return 'review';
+    if (['testing'].includes(s)) return 'testing';
+    if (['review', 'in_review'].includes(s)) return 'review';
     if (['completed', 'done', 'finished'].includes(s)) return 'completed';
     if (['cancelled', 'canceled'].includes(s)) return 'cancelled';
     return 'pending';
@@ -205,8 +206,10 @@ export const TaskManagementView = () => {
   const totalCount = tasks.length;
   const pendingCount = tasks.filter(t => normalizeStatus(t.status) === 'pending').length;
   const inProgressCount = tasks.filter(t => normalizeStatus(t.status) === 'in_progress').length;
+  const testingCount = tasks.filter(t => normalizeStatus(t.status) === 'testing').length;
   const reviewCount = tasks.filter(t => normalizeStatus(t.status) === 'review').length;
   const completedCount = tasks.filter(t => normalizeStatus(t.status) === 'completed').length;
+  const cancelledCount = tasks.filter(t => normalizeStatus(t.status) === 'cancelled').length;
 
   const getPriorityBadge = (priority = 'medium') => {
     const p = String(priority || '').toLowerCase();
@@ -224,9 +227,11 @@ export const TaskManagementView = () => {
 
   const kanbanColumns = [
     { id: 'pending', title: 'To Do', count: pendingCount, borderAccent: 'border-t-slate-400' },
-    { id: 'in_progress', title: 'In Progress', count: inProgressCount, borderAccent: 'border-t-amber-500' },
-    { id: 'review', title: 'In Review / Testing', count: reviewCount, borderAccent: 'border-t-indigo-500' },
-    { id: 'completed', title: 'Completed', count: completedCount, borderAccent: 'border-t-green-500' }
+    { id: 'in_progress', title: 'In Progress', count: inProgressCount, borderAccent: 'border-t-blue-500' },
+    { id: 'testing', title: 'Testing', count: testingCount, borderAccent: 'border-t-purple-500' },
+    { id: 'review', title: 'Review', count: reviewCount, borderAccent: 'border-t-indigo-500' },
+    { id: 'completed', title: 'Completed', count: completedCount, borderAccent: 'border-t-emerald-500' },
+    { id: 'cancelled', title: 'Cancelled', count: cancelledCount, borderAccent: 'border-t-rose-500' }
   ];
 
   // Mobile-Optimized and Desktop List View Table
@@ -302,8 +307,10 @@ export const TaskManagementView = () => {
                       >
                         <option value="pending">To Do</option>
                         <option value="in_progress">In Progress</option>
+                        <option value="testing">Testing</option>
                         <option value="review">Review</option>
                         <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
                       </select>
                     </td>
                   </tr>
@@ -334,12 +341,13 @@ export const TaskManagementView = () => {
       </div>
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {[
           { label: 'Total Assigned', value: totalCount, icon: CheckSquare, accent: 'border-l-indigo-600' },
           { label: 'To Do', value: pendingCount, icon: Clock, accent: 'border-l-slate-400' },
-          { label: 'In Progress', value: inProgressCount, icon: TrendingUp, accent: 'border-l-amber-500' },
-          { label: 'In Review / Testing', value: reviewCount, icon: AlertCircle, accent: 'border-l-indigo-500' },
+          { label: 'In Progress', value: inProgressCount, icon: TrendingUp, accent: 'border-l-blue-500' },
+          { label: 'Testing', value: testingCount, icon: AlertCircle, accent: 'border-l-purple-500' },
+          { label: 'Review', value: reviewCount, icon: AlertCircle, accent: 'border-l-indigo-500' },
           { label: 'Completed', value: completedCount, icon: FileCheck, accent: 'border-l-emerald-500' }
         ].map((item, idx) => (
           <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
@@ -439,10 +447,12 @@ export const TaskManagementView = () => {
             className="px-3 py-1.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none transition-colors cursor-pointer"
           >
             <option value="all">All Statuses</option>
-            <option value="pending">To Do</option>
+            <option value="pending">To Do (Pending)</option>
             <option value="in_progress">In Progress</option>
-            <option value="review">Review / Testing</option>
+            <option value="testing">Testing</option>
+            <option value="review">Review</option>
             <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
       </div>
@@ -457,7 +467,7 @@ export const TaskManagementView = () => {
           {viewMode === 'kanban' ? (
             <>
               {/* Desktop Kanban Board */}
-              <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 {kanbanColumns.map(col => {
                   const columnTasks = filteredTasks.filter(t => normalizeStatus(t.status) === col.id);
                   const isDragOver = dragOverCol === col.id;
