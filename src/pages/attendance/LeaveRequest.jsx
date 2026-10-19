@@ -16,6 +16,7 @@ import {
   RefreshCw,
   User,
   ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
 import {
@@ -1485,7 +1486,11 @@ export default function LeaveRequest() {
           title="Approve Leave"
           className="w-8 h-8 shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center shadow-sm transition active:scale-90 disabled:opacity-50"
         >
-          <ApproveIcon className="w-4 h-4 stroke-[2.5]" />
+          {isActioning ? (
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
+          ) : (
+            <ApproveIcon className="w-4 h-4 stroke-[2.5]" />
+          )}
         </button>
 
         <button
@@ -1498,7 +1503,11 @@ export default function LeaveRequest() {
           title="Reject Leave"
           className="w-8 h-8 shrink-0 rounded-full bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white flex items-center justify-center shadow-sm transition active:scale-90 disabled:opacity-50"
         >
-          <X className="w-4 h-4 stroke-[2.5]" />
+          {isActioning ? (
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
+          ) : (
+            <X className="w-4 h-4 stroke-[2.5]" />
+          )}
         </button>
       </div>
     );
@@ -1510,8 +1519,10 @@ export default function LeaveRequest() {
   // ==========================================================
 
   const Loader = () => (
-    <div className="flex justify-center items-center py-16 sm:py-20">
-      <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+    <div className="flex flex-col justify-center items-center py-16 sm:py-24">
+      <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
+      <p className="text-sm font-semibold text-slate-800">Loading leave requests...</p>
+      <p className="text-xs text-slate-500 mt-1">Fetching latest employee leave applications</p>
     </div>
   );
 
@@ -2581,13 +2592,16 @@ export default function LeaveRequest() {
                         actioningId === selectedLeave.id ||
                         isApprovalAlreadyApproved(selectedLeave)
                       }
-                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold"
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-2xs"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      {actioningId === selectedLeave.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
 
-                      {actioningId ===
-                        selectedLeave.id
-                        ? "Processing..."
+                      {actioningId === selectedLeave.id
+                        ? "Approving..."
                         : "Approve"}
                     </button>
 
@@ -2605,13 +2619,16 @@ export default function LeaveRequest() {
                         actioningId ===
                         selectedLeave.id
                       }
-                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold"
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-2xs"
                     >
-                      <XCircle className="w-4 h-4" />
+                      {actioningId === selectedLeave.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <XCircle className="w-4 h-4" />
+                      )}
 
-                      {actioningId ===
-                        selectedLeave.id
-                        ? "Processing..."
+                      {actioningId === selectedLeave.id
+                        ? "Rejecting..."
                         : "Reject"}
                     </button>
 
@@ -2796,7 +2813,7 @@ export default function LeaveRequest() {
                   }`}
               >
                 {actioningId === actionModal.leave?.id ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : actionModal.status === "approved" ? (
                   <Check className="w-4 h-4 stroke-[2.5]" />
                 ) : (

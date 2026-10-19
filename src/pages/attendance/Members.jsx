@@ -1100,8 +1100,10 @@ const fetchAllMembers = async () => {
 
         {/* Content */}
         {loading ? (
-          <div className="flex justify-center items-center py-16 sm:py-20">
-            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+          <div className="flex flex-col justify-center items-center py-16 sm:py-24">
+            <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
+            <p className="text-sm font-semibold text-slate-800">Loading team members...</p>
+            <p className="text-xs text-slate-500 mt-1">Fetching live roles and attendance profiles</p>
           </div>
         ) : error ? (
           <div className="border border-rose-200 bg-rose-50/80 rounded-xl px-4 py-3 text-rose-700 flex items-center gap-2.5 text-sm">

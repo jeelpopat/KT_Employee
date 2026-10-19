@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 
 const API_BASE = 'https://kt-backend-yzr4.onrender.com/api/holiday';
@@ -601,8 +602,10 @@ export default function Holidays() {
       <div>
         <div className="w-full">
           {loading ? (
-            <div className="flex justify-center items-center py-16 sm:py-20">
-              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+            <div className="flex flex-col justify-center items-center py-16 sm:py-24">
+              <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
+              <p className="text-sm font-semibold text-slate-800">Loading holiday schedule...</p>
+              <p className="text-xs text-slate-500 mt-1">Fetching official office calendar and festive breaks</p>
             </div>
           ) : view === 'calendar' ? (
             renderCalendar()
@@ -808,7 +811,7 @@ export default function Holidays() {
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 text-sm rounded-xl disabled:cursor-not-allowed disabled:opacity-70 transition-colors shadow-xs hover:shadow cursor-pointer flex items-center justify-center gap-2"
                     >
                       {isSubmitting && (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
                       )}
                       <span>{isSubmitting ? 'Saving...' : editingId ? 'Update Holiday' : 'Add Holiday'}</span>
                     </button>

@@ -16,6 +16,8 @@ import {
   X,
   User,
   GraduationCap,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
@@ -46,6 +48,7 @@ export default function Employees() {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
@@ -295,6 +298,7 @@ export default function Employees() {
     }
 
     try {
+      setIsSubmitting(true);
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
@@ -324,6 +328,8 @@ export default function Employees() {
     } catch (err) {
       console.error(err);
       showToast("Something went wrong", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -410,6 +416,7 @@ export default function Employees() {
     }
 
     try {
+      setIsSubmitting(true);
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
@@ -439,6 +446,8 @@ export default function Employees() {
     } catch (error) {
       console.error("Update employee error:", error);
       showToast("Failed to update employee", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -579,17 +588,17 @@ export default function Employees() {
             </span>
           </div>
 
-          {/* LIVE */}
-          {/* <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 sm:h-2 sm:w-2 bg-green-500" />
-            </span>
-
-            <span className="text-[10px] sm:text-xs font-medium text-green-700">
-              Live
-            </span>
-          </div> */}
+          {/* REFRESH */}
+          <button
+            type="button"
+            onClick={() => fetchEmployees(false)}
+            disabled={loading}
+            title="Refresh employee directory"
+            className="h-10 px-3.5 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 rounded-lg shadow-xs flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
+            <span className="hidden xs:inline">{loading ? "Refreshing..." : "Refresh"}</span>
+          </button>
 
           {/* ADD */}
           <button
@@ -685,8 +694,10 @@ export default function Employees() {
 
         {/* ================= LOADING ================= */}
         {loading ? (
-          <div className="flex justify-center items-center py-16 sm:py-20">
-            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+          <div className="flex flex-col justify-center items-center py-16 sm:py-24">
+            <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
+            <p className="text-sm font-semibold text-slate-800">Loading employee directory...</p>
+            <p className="text-xs text-slate-500 mt-1">Fetching team records and credentials</p>
           </div>
 
         ) : filteredEmployees.length === 0 ? (
@@ -1452,14 +1463,22 @@ export default function Employees() {
 
                 <button
                   type="submit"
-                  className={`flex-1 px-4 py-2.5 text-sm font-medium text-white transition-colors rounded-lg shadow-xs ${editMode
+                  disabled={isSubmitting}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium text-white transition-colors rounded-lg shadow-xs flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${editMode
                     ? "bg-emerald-600 hover:bg-emerald-700"
                     : "bg-blue-600 hover:bg-blue-700"
                     }`}
                 >
-                  {editMode
-                    ? "Update Employee"
-                    : "Add Employee"}
+                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>
+                    {isSubmitting
+                      ? editMode
+                        ? "Updating Employee..."
+                        : "Adding Employee..."
+                      : editMode
+                      ? "Update Employee"
+                      : "Add Employee"}
+                  </span>
                 </button>
               </div>
             </form>

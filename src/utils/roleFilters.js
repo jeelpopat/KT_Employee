@@ -10,12 +10,12 @@ export const isFinanceOrExcludedUser = (user) => {
   // Extract nested user object if wrapped (e.g. employee.userID, attendance.userId, etc.)
   const target =
     typeof user === 'object' &&
-    (user.userID || user.userId || user.user || user.employeeId || user.assignedEmployee) &&
-    typeof (user.userID || user.userId || user.user || user.employeeId || user.assignedEmployee) === 'object'
+      (user.userID || user.userId || user.user || user.employeeId || user.assignedEmployee) &&
+      typeof (user.userID || user.userId || user.user || user.employeeId || user.assignedEmployee) === 'object'
       ? {
-          ...user,
-          ...(user.userID || user.userId || user.user || user.employeeId || user.assignedEmployee),
-        }
+        ...user,
+        ...(user.userID || user.userId || user.user || user.employeeId || user.assignedEmployee),
+      }
       : user;
 
   const role = String(
@@ -124,10 +124,8 @@ export const isFinanceOrExcludedUser = (user) => {
   ).toLowerCase().trim();
 
   if (
-    candidateName.includes('priya') ||
-    candidateName.includes('kuresh') ||
-    candidateEmail.includes('priya') ||
-    candidateEmail.includes('kuresh')
+    candidateName.includes('employee') ||
+    candidateEmail.includes('employee')
   ) {
     return true;
   }
@@ -196,10 +194,10 @@ export const isUnknownEmployeeOrUser = (entity) => {
 
   // Exclude test & demo users (Priya and Kuresh)
   if (
-    clean.includes('priya') ||
-    clean.includes('kuresh') ||
-    cleanEmail.includes('priya') ||
-    cleanEmail.includes('kuresh')
+    clean.includes('employee') ||
+    // clean.includes('kuresh') ||
+    cleanEmail.includes('employee')
+    // cleanEmail.includes('kuresh')
   ) {
     return true;
   }

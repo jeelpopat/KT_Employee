@@ -6,6 +6,7 @@ import {
   Search,
   AlertCircle,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import Modal from "../../components/common/Modal";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
@@ -1181,7 +1182,7 @@ export default function CheckInRequest() {
         =================================================== */}
         <div className="p-3 sm:p-4 border-b border-slate-200/80">
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
 
             <div className="flex-1 relative">
               <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -1223,6 +1224,17 @@ export default function CheckInRequest() {
                 Rejected
               </option>
             </select>
+
+            <button
+              type="button"
+              onClick={() => fetchPendingRequests(false)}
+              disabled={loading}
+              title="Refresh requests"
+              className="px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-2xs"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
+              <span>{loading ? "Refreshing..." : "Refresh"}</span>
+            </button>
           </div>
         </div>
 
@@ -1244,8 +1256,10 @@ export default function CheckInRequest() {
             LOADING EFFECT
         =================================================== */}
         {loading ? (
-          <div className="flex justify-center items-center py-16 sm:py-20">
-            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+          <div className="flex flex-col justify-center items-center py-16 sm:py-24">
+            <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
+            <p className="text-sm font-semibold text-slate-800">Loading check-in requests...</p>
+            <p className="text-xs text-slate-500 mt-1">Fetching pending employee check-in submissions</p>
           </div>
 
         ) : filteredRequests.length === 0 ? (
@@ -1426,41 +1440,43 @@ export default function CheckInRequest() {
 
                               {/* Reject */}
                               <button
-                                disabled={
-                                  actioningId ===
-                                  req.id
-                                }
+                                disabled={Boolean(actioningId)}
                                 onClick={() =>
                                   openRejectModal(
                                     req
                                   )
                                 }
-                                className="px-3 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-300 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-300 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
                               >
-                                {actioningId ===
-                                req.id
-                                  ? "..."
-                                  : "Reject"}
+                                {actioningId === req.id ? (
+                                  <>
+                                    <Loader2 className="animate-spin h-3.5 w-3.5" />
+                                    <span>Rejecting...</span>
+                                  </>
+                                ) : (
+                                  "Reject"
+                                )}
                               </button>
 
                               {/* Approve */}
                               <button
-                                disabled={
-                                  actioningId ===
-                                  req.id
-                                }
+                                disabled={Boolean(actioningId)}
                                 onClick={() =>
                                   handleAction(
                                     req,
                                     "approve"
                                   )
                                 }
-                                className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors shadow-2xs"
                               >
-                                {actioningId ===
-                                req.id
-                                  ? "..."
-                                  : "Approve"}
+                                {actioningId === req.id ? (
+                                  <>
+                                    <Loader2 className="animate-spin h-3.5 w-3.5" />
+                                    <span>Approving...</span>
+                                  </>
+                                ) : (
+                                  "Approve"
+                                )}
                               </button>
 
                             </div>
@@ -1574,41 +1590,43 @@ export default function CheckInRequest() {
 
                         {/* Reject */}
                         <button
-                          disabled={
-                            actioningId ===
-                            req.id
-                          }
+                          disabled={Boolean(actioningId)}
                           onClick={() =>
                             openRejectModal(
                               req
                             )
                           }
-                          className="flex-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-300 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-300 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
                         >
-                          {actioningId ===
-                          req.id
-                            ? "Processing..."
-                            : "Reject"}
+                          {actioningId === req.id ? (
+                            <>
+                              <Loader2 className="animate-spin h-3.5 w-3.5" />
+                              <span>Rejecting...</span>
+                            </>
+                          ) : (
+                            "Reject"
+                          )}
                         </button>
 
                         {/* Approve */}
                         <button
-                          disabled={
-                            actioningId ===
-                            req.id
-                          }
+                          disabled={Boolean(actioningId)}
                           onClick={() =>
                             handleAction(
                               req,
                               "approve"
                             )
                           }
-                          className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors shadow-2xs"
                         >
-                          {actioningId ===
-                          req.id
-                            ? "Processing..."
-                            : "Approve"}
+                          {actioningId === req.id ? (
+                            <>
+                              <Loader2 className="animate-spin h-3.5 w-3.5" />
+                              <span>Approving...</span>
+                            </>
+                          ) : (
+                            "Approve"
+                          )}
                         </button>
 
                       </div>
@@ -1650,7 +1668,8 @@ export default function CheckInRequest() {
           setRejectingRequest(null);
           setRejectionReason("");
         }}
-        className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
+        disabled={Boolean(actioningId)}
+        className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
       >
         Cancel
       </button>
@@ -1659,11 +1678,16 @@ export default function CheckInRequest() {
         type="button"
         onClick={confirmRejection}
         disabled={Boolean(actioningId)}
-        className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors shadow-2xs"
       >
-        {actioningId
-          ? "Rejecting..."
-          : "Reject Request"}
+        {actioningId ? (
+          <>
+            <Loader2 className="animate-spin h-3.5 w-3.5" />
+            <span>Rejecting Request...</span>
+          </>
+        ) : (
+          "Reject Request"
+        )}
       </button>
     </>
   }

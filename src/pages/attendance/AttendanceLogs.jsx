@@ -15,6 +15,8 @@ import {
   PauseCircle,
   LogIn,
   LogOut,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import {
   isFinanceOrExcludedUser,
@@ -1837,6 +1839,18 @@ export default function AttendanceLogs() {
             </span>
           </div>
 
+          {/* REFRESH */}
+          <button
+            type="button"
+            onClick={() => fetchLogs()}
+            disabled={loading}
+            title="Refresh attendance records"
+            className="h-10 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg shadow-xs flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-indigo-600' : 'text-slate-500'}`} />
+            <span className="hidden xs:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+
           {/* EXPORT */}
           <button
             onClick={() => setShowExportOptions(true)}
@@ -1894,7 +1908,11 @@ export default function AttendanceLogs() {
                 className="flex w-full items-center gap-3 border border-gray-200 rounded-lg px-3 py-3 text-left hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-60"
                 disabled={exportingMonth}
               >
-                <Calendar className="h-5 w-5 text-blue-600" />
+                {exportingMonth ? (
+                  <Loader2 className="h-5 w-5 text-blue-600 animate-spin shrink-0" />
+                ) : (
+                  <Calendar className="h-5 w-5 text-blue-600 shrink-0" />
+                )}
                 <span>
                   <span className="block text-sm font-medium text-gray-800">
                     {exportingMonth ? 'Preparing monthly file...' : 'Month-wise'}
@@ -2110,11 +2128,12 @@ export default function AttendanceLogs() {
 
         {/* =====================================================
             LOADING EFFECT
-            SAME STYLE AS PERFORMANCE COMPONENT
         ===================================================== */}
         {loading ? (
-          <div className="flex justify-center items-center py-16 sm:py-20">
-            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+          <div className="flex flex-col justify-center items-center py-16 sm:py-24">
+            <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
+            <p className="text-sm font-semibold text-slate-800">Loading attendance records...</p>
+            <p className="text-xs text-slate-500 mt-1">Fetching latest team logs for {formatIndianDate(selectedDate)}</p>
           </div>
         ) : filteredAndSortedLogs.length === 0 ? (
 

@@ -6,6 +6,7 @@ import {
   Save,
   RotateCcw,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
 
@@ -2216,8 +2217,10 @@ export default function Adjustments() {
       ====================================================== */}
 
       {loading && (
-        <div className="flex justify-center items-center py-16 sm:py-20">
-          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+        <div className="flex flex-col justify-center items-center py-16 sm:py-24">
+          <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
+          <p className="text-sm font-semibold text-slate-800">Loading attendance adjustment console...</p>
+          <p className="text-xs text-slate-500 mt-1">Fetching employee lists and adjustment history</p>
         </div>
       )}
  
@@ -2746,13 +2749,16 @@ export default function Adjustments() {
                   submitting ||
                   loading
                 }
-                className="w-full sm:w-auto bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white font-medium text-sm px-6 py-2.5 transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white font-medium text-sm px-6 py-2.5 transition-colors shadow-2xs cursor-pointer"
               >
-                {submitting
-                  ? "Submitting..."
-                  : editMode
-                  ? "Update Attendance"
-                  : "Submit"}
+                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>
+                  {submitting
+                    ? "Submitting..."
+                    : editMode
+                    ? "Update Attendance"
+                    : "Submit"}
+                </span>
               </button>
 
             </div>
