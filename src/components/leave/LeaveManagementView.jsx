@@ -390,14 +390,15 @@ export const LeaveManagementView = () => {
 
   // Force endDate to equal startDate if Half Day is selected
   useEffect(() => {
-    if ((isHalfDay || leaveType === 'half_day') && startDate) {
-      setEndDate(startDate);
+    if (isHalfDay || leaveType === 'half_day') {
+      setEndDate(startDate || '');
     }
   }, [isHalfDay, leaveType, startDate]);
 
   // Safely calculate actual working days excluding Sundays and Holidays
   const getCalculatedDays = () => {
-    if (isHalfDay || leaveType === 'half_day') return 0.5;
+    const isHalfDayActive = Boolean(isHalfDay || leaveType === 'half_day');
+    if (isHalfDayActive) return startDate ? 0.5 : 0;
     if (!startDate || !endDate) return 0;
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -442,8 +443,11 @@ export const LeaveManagementView = () => {
     setLeaveType('full_day');
     setIsHalfDay(false);
     setHalfDayType('first-half');
-    setStartDate(minAllowedDate);
-    setEndDate(minAllowedDate);
+    // Start with blank date fields so user can freely choose start date first
+    setStartDate('');
+    setEndDate('');
+    setReason('');
+    setAttachmentName('');
     setFormError('');
     setSuccessMsg('');
     setIsModalOpen(true);
@@ -459,28 +463,51 @@ export const LeaveManagementView = () => {
       return;
     }
 
-    if (startDate < minAllowedDate) {
-      setFormError('Policy Notice: Leave must be applied at least 2 days in advance.');
+    if (!startDate) {
+      setFormError('Please select a start date.');
       return;
     }
 
-    if (calculatedDays === 0) {
+    const isHalfDayActive = Boolean(isHalfDay || leaveType === 'half_day');
+    const finalEndDate = isHalfDayActive ? startDate : endDate;
+
+    if (!isHalfDayActive && !finalEndDate) {
+      setFormError('Please select an end date.');
+      return;
+    }
+
+    if (startDate < minAllowedDate) {
+      setFormError(`Policy Notice: Leave must be applied at least 2 days in advance (selectable from ${minAllowedDate} onwards).`);
+      return;
+    }
+
+    if (!isHalfDayActive && finalEndDate < startDate) {
+      setFormError('End date cannot be earlier than start date.');
+      return;
+    }
+
+    const finalTotalDays = isHalfDayActive ? 0.5 : Number(calculatedDays);
+
+    if (finalTotalDays === 0) {
       setFormError('Invalid Range: The selected dates fall entirely on recognized holidays or Sundays.');
       return;
     }
 
     setIsSubmitting(true);
 
-    const isHalfDayActive = Boolean(isHalfDay || leaveType === 'half_day');
     const finalHalfDayType = isHalfDayActive ? (halfDayType || 'first-half') : null;
-    const finalTotalDays = isHalfDayActive ? 0.5 : Number(calculatedDays);
-    const finalEndDate = isHalfDayActive ? startDate : endDate;
 
     try {
       // Sending exact payload mapped strictly to Mongoose Leave Schema
+      // Note: Backend LeaveSchema requires leaveType: 'full_day' (enum validation accepts 'full_day').
+      // When leaveType was 'half_day', backend fell back to invalid enum 'casual'.
+      // Half-day leave is properly signaled by isHalfDay: true, halfDayType, and totalDays: 0.5.
       const payload = {
         applicantRole: resolveApplicantRole(),
-        leaveType: isHalfDayActive ? 'half_day' : 'full_day',
+        leaveType: 'full_day',
+        leaveCategory: 'full_day',
+        category: 'full_day',
+        type: 'full_day',
         startDate: startDate,
         endDate: finalEndDate,
         isHalfDay: isHalfDayActive,
@@ -531,6 +558,8 @@ export const LeaveManagementView = () => {
           setIsModalOpen(false);
           setReason('');
           setAttachmentName('');
+          setStartDate('');
+          setEndDate('');
           setIsHalfDay(false);
           setSuccessMsg('');
         }, 1500);
@@ -946,6 +975,9 @@ export const LeaveManagementView = () => {
                       setLeaveType('full_day');
                       setIsHalfDay(false);
                       setHalfDayType(null);
+                      if (startDate && (!endDate || endDate < startDate)) {
+                        setEndDate(startDate);
+                      }
                     }}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
                       leaveType === 'full_day' && !isHalfDay
@@ -972,7 +1004,7 @@ export const LeaveManagementView = () => {
                       setLeaveType('half_day');
                       setIsHalfDay(true);
                       if (!halfDayType) setHalfDayType('first-half');
-                      setEndDate(startDate || minAllowedDate);
+                      setEndDate(startDate || '');
                     }}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between ${
                       leaveType === 'half_day' || isHalfDay
@@ -1041,7 +1073,10 @@ export const LeaveManagementView = () => {
               <div className="space-y-1.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-2">Start Date</label>
+                    <label className="block font-semibold text-slate-700 mb-2">
+                      {isHalfDay || leaveType === 'half_day' ? 'Leave Date' : 'Start Date'}
+                      <span className="text-red-500 ml-0.5">*</span>
+                    </label>
                     <input 
                       type="date" 
                       min={minAllowedDate}
@@ -1049,21 +1084,35 @@ export const LeaveManagementView = () => {
                       onChange={e => {
                         const val = e.target.value;
                         if (val && val < minAllowedDate) {
-                          setFormError('Policy Notice: Leave must be applied at least 2 days in advance.');
+                          setFormError(`Policy Notice: Leave must be applied at least 2 days in advance (from ${minAllowedDate} onwards).`);
                         } else {
                           setFormError('');
                         }
                         setStartDate(val);
-                        if (isHalfDay || leaveType === 'half_day' || endDate < val) {
+                        if (isHalfDay || leaveType === 'half_day') {
                           setEndDate(val);
+                        } else {
+                          // For full day: if endDate was not set or was before the new start date, update endDate to start date
+                          if (!endDate || endDate < val) {
+                            setEndDate(val);
+                          }
                         }
                       }}
                       className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                       required
                     />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Allowed from: <span className="font-semibold text-slate-700">{minAllowedDate}</span> onwards
+                    </p>
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-2">End Date</label>
+                    <label className="block font-semibold text-slate-700 mb-2">
+                      End Date
+                      {!(isHalfDay || leaveType === 'half_day') && <span className="text-red-500 ml-0.5">*</span>}
+                      {(isHalfDay || leaveType === 'half_day') && (
+                        <span className="text-xs font-normal text-slate-500 ml-1.5">(Auto-synced with Leave Date)</span>
+                      )}
+                    </label>
                     <input 
                       type="date" 
                       min={startDate || minAllowedDate}
@@ -1071,16 +1120,25 @@ export const LeaveManagementView = () => {
                       onChange={e => {
                         const val = e.target.value;
                         if (val && val < minAllowedDate) {
-                          setFormError('Policy Notice: Leave must be applied at least 2 days in advance.');
+                          setFormError(`Policy Notice: Leave must be applied at least 2 days in advance (from ${minAllowedDate} onwards).`);
+                        } else if (startDate && val < startDate) {
+                          setFormError('End Date cannot be earlier than Start Date.');
                         } else {
                           setFormError('');
                         }
                         setEndDate(val);
                       }}
-                      disabled={isHalfDay || leaveType === 'half_day'}
+                      disabled={isHalfDay || leaveType === 'half_day' || !startDate}
                       className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                      required
+                      required={!(isHalfDay || leaveType === 'half_day')}
                     />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      {isHalfDay || leaveType === 'half_day'
+                        ? 'Half day leave applies to a single selected date'
+                        : !startDate
+                          ? 'Select Start Date first'
+                          : `Must be on or after ${startDate}`}
+                    </p>
                   </div>
                 </div>
                 <p className="text-[11px] text-amber-600 font-medium">
@@ -1089,7 +1147,7 @@ export const LeaveManagementView = () => {
               </div>
               
               {/* Dynamic Working Days Banner */}
-              {startDate && endDate && (
+              {startDate && ((isHalfDay || leaveType === 'half_day') || endDate) && (
                 <div className={`p-2.5 rounded-lg border text-sm font-semibold flex items-center justify-between ${
                   calculatedDays === 0 
                     ? 'bg-red-50 text-red-700 border-red-200' 

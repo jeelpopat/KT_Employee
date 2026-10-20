@@ -4,7 +4,7 @@ import {
   AlertCircle, X, Download, Printer, Users, Shield, ArrowUpRight,
   ArrowDownRight, DollarSign, Percent, Calendar, Check, ChevronRight,
   Building2, CreditCard, Sparkles, FileText, Info, Award, UserCheck,
-  TrendingUp, Clock, ChevronDown, CheckSquare, Layers, Send
+  TrendingUp, Clock, ChevronDown, CheckSquare, Layers, Send, Calculator
 } from 'lucide-react';
 import api, { invalidateCache } from '../../api/axios.js';
 import { useApp, deriveUserRole, getRealAuthUserId, resolveEmployeeName } from '../../context/AppContext.jsx';
@@ -95,6 +95,225 @@ const getStatusBadgeClass = (status) => {
   }
 };
 
+// Calculate total calendar days in a given month and year
+const getDaysInMonth = (month, year) => {
+  const m = Number(month);
+  const y = Number(year);
+  if (!m || !y) return 30;
+  return new Date(y, m, 0).getDate();
+};
+
+// Calculate total approved leave days and LOP days for a user in a specific month
+const calculateApprovedLeaveDaysForMonth = (targetUser, month, year, leavesList) => {
+  if (!targetUser || !month || !year || !Array.isArray(leavesList) || leavesList.length === 0) {
+    return { leaveDays: 0, lopDays: 0 };
+  }
+
+  const targetId = String(targetUser._id || targetUser.id || (typeof targetUser === 'string' ? targetUser : '')).toLowerCase().trim();
+  const targetEmail = String(targetUser.email || '').toLowerCase().trim();
+  const targetName = String(targetUser.name || targetUser.fullName || '').toLowerCase().trim();
+
+  const m = Number(month);
+  const y = Number(year);
+  const monthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
+  const monthEnd = new Date(y, m, 0, 23, 59, 59, 999);
+
+  let approvedLeaveDays = 0;
+  let approvedLopDays = 0;
+
+  for (const leave of leavesList) {
+    if (!leave) continue;
+
+    // Check approval status
+    const status = String(leave.status || leave.approvalStatus || leave.adminStatus || '').toLowerCase().trim();
+    const tlStatus = String(leave.teamLeadStatus || '').toLowerCase().trim();
+    const isApproved = status === 'approved' || status.includes('approved') || tlStatus === 'approved';
+    if (!isApproved) continue;
+
+    // Check user matching
+    const leaveEmp = (typeof leave.employeeId === 'object' && leave.employeeId !== null) ? leave.employeeId :
+      (typeof leave.employee === 'object' && leave.employee !== null) ? leave.employee :
+      (typeof leave.user === 'object' && leave.user !== null) ? leave.user :
+      (typeof leave.userId === 'object' && leave.userId !== null) ? leave.userId : null;
+
+    const leaveIds = [
+      typeof leave.employeeId === 'string' ? leave.employeeId : null,
+      typeof leave.employee === 'string' ? leave.employee : null,
+      typeof leave.user === 'string' ? leave.user : null,
+      typeof leave.userId === 'string' ? leave.userId : null,
+      typeof leave.applicantId === 'string' ? leave.applicantId : null,
+      typeof leave.applicantID === 'string' ? leave.applicantID : null,
+      leaveEmp?._id ? String(leaveEmp._id) : null,
+      leaveEmp?.id ? String(leaveEmp.id) : null,
+      leave.appliedBy ? String(leave.appliedBy) : null
+    ].filter(Boolean).map(id => String(id).toLowerCase().trim());
+
+    let isMatch = false;
+    if (targetId && leaveIds.includes(targetId)) {
+      isMatch = true;
+    } else if (targetEmail) {
+      const leaveEmails = [
+        leave.applicantEmail,
+        leave.employeeEmail,
+        leave.email,
+        leaveEmp?.email
+      ].filter(Boolean).map(e => String(e).toLowerCase().trim());
+      if (leaveEmails.includes(targetEmail)) {
+        isMatch = true;
+      }
+    } else if (targetName && targetName.length > 2) {
+      const leaveNames = [
+        leave.applicantName,
+        leave.employeeName,
+        leave.name,
+        leaveEmp?.name,
+        leaveEmp?.fullName
+      ].filter(Boolean).map(n => String(n).toLowerCase().trim());
+      if (leaveNames.includes(targetName)) {
+        isMatch = true;
+      }
+    }
+
+    if (!isMatch) continue;
+
+    // Check date range overlap with the target month
+    const rawStart = leave.startDate || leave.fromDate || leave.date;
+    const rawEnd = leave.endDate || leave.toDate || rawStart;
+    if (!rawStart) continue;
+
+    const startDate = new Date(rawStart);
+    const endDate = new Date(rawEnd);
+    if (isNaN(startDate.getTime())) continue;
+
+    const effectiveStart = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
+    const effectiveEnd = new Date(Math.min(isNaN(endDate.getTime()) ? startDate.getTime() : endDate.getTime(), monthEnd.getTime()));
+
+    if (effectiveStart > effectiveEnd) {
+      continue;
+    }
+
+    const oneDay = 24 * 60 * 60 * 1000;
+    const sDateOnly = new Date(effectiveStart.getFullYear(), effectiveStart.getMonth(), effectiveStart.getDate());
+    const eDateOnly = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), effectiveEnd.getDate());
+    const daysDiff = Math.round((eDateOnly - sDateOnly) / oneDay) + 1;
+
+    let overlappingDays = 0;
+    const isEntirelyInMonth = startDate >= monthStart && endDate <= monthEnd;
+    if (leave.isHalfDay) {
+      overlappingDays = 0.5;
+    } else if (isEntirelyInMonth && leave.totalDays != null && Number(leave.totalDays) > 0) {
+      overlappingDays = Number(leave.totalDays);
+    } else {
+      overlappingDays = Math.max(0, daysDiff);
+    }
+
+    const leaveType = String(leave.leaveType || leave.type || '').toLowerCase();
+    const isLop = leaveType.includes('lop') || leaveType.includes('loss of pay') || leaveType.includes('unpaid');
+
+    if (isLop) {
+      approvedLopDays += overlappingDays;
+    } else {
+      approvedLeaveDays += overlappingDays;
+    }
+  }
+
+  return {
+    leaveDays: approvedLeaveDays,
+    lopDays: approvedLopDays
+  };
+};
+
+// Fetch user leaves directly from backend APIs:
+// 1. GET /api/leave/my-leaves/:userId
+// 2. OR fallback to GET /api/leave/all filtered by name, id, employeeID, email
+const fetchBackendUserLeaves = async (userId, targetUser) => {
+  if (!userId) return [];
+  let userLeaves = [];
+
+  // 1. Primary endpoint: GET /api/leave/my-leaves/:userId
+  try {
+    const res = await api.get(`/api/leave/my-leaves/${userId}`, { skipCache: true });
+    const raw = res.data?.data || res.data?.leaves || res.data?.history || (Array.isArray(res.data) ? res.data : []);
+    const list = Array.isArray(raw) ? raw : (Array.isArray(raw.leaves) ? raw.leaves : []);
+    if (list.length > 0) {
+      userLeaves = list;
+    }
+  } catch (err) {
+    // Proceed to /api/leave/all fallback
+  }
+
+  // 2. Fallback endpoint: GET /api/leave/all filtered by name, id, employeeID, or email
+  if (userLeaves.length === 0) {
+    try {
+      const allRes = await api.get('/api/leave/all', { skipCache: true });
+      const rawAll = allRes.data?.data || allRes.data?.leaves || allRes.data?.history || (Array.isArray(allRes.data) ? allRes.data : []);
+      const allList = Array.isArray(rawAll)
+        ? rawAll
+        : (Array.isArray(rawAll.leaves) ? rawAll.leaves : (Array.isArray(rawAll.history) ? rawAll.history : []));
+
+      const targetId = String(userId).toLowerCase().trim();
+      const targetName = String(targetUser?.name || targetUser?.fullName || '').toLowerCase().trim();
+      const targetEmail = String(targetUser?.email || '').toLowerCase().trim();
+      const targetEmpId = String(targetUser?.employeeID || targetUser?.uniqueID || '').toLowerCase().trim();
+
+      userLeaves = allList.filter((leave) => {
+        if (!leave) return false;
+
+        const leaveEmp = (typeof leave.employeeId === 'object' && leave.employeeId !== null) ? leave.employeeId :
+          (typeof leave.employee === 'object' && leave.employee !== null) ? leave.employee :
+          (typeof leave.user === 'object' && leave.user !== null) ? leave.user :
+          (typeof leave.userId === 'object' && leave.userId !== null) ? leave.userId : null;
+
+        const leaveIds = [
+          typeof leave.employeeId === 'string' ? leave.employeeId : null,
+          typeof leave.employee === 'string' ? leave.employee : null,
+          typeof leave.user === 'string' ? leave.user : null,
+          typeof leave.userId === 'string' ? leave.userId : null,
+          typeof leave.applicantId === 'string' ? leave.applicantId : null,
+          typeof leave.applicantID === 'string' ? leave.applicantID : null,
+          leaveEmp?._id ? String(leaveEmp._id) : null,
+          leaveEmp?.id ? String(leaveEmp.id) : null,
+          leave.appliedBy ? String(leave.appliedBy) : null
+        ].filter(Boolean).map(id => String(id).toLowerCase().trim());
+
+        if (targetId && leaveIds.includes(targetId)) return true;
+
+        if (targetEmpId) {
+          const lEmpId = String(leave.employeeID || leave.uniqueID || leaveEmp?.employeeID || leaveEmp?.uniqueID || '').toLowerCase().trim();
+          if (lEmpId && lEmpId === targetEmpId) return true;
+        }
+
+        if (targetName && targetName.length > 2) {
+          const leaveNames = [
+            leave.applicantName,
+            leave.employeeName,
+            leave.name,
+            leaveEmp?.name,
+            leaveEmp?.fullName
+          ].filter(Boolean).map(n => String(n).toLowerCase().trim());
+          if (leaveNames.includes(targetName)) return true;
+        }
+
+        if (targetEmail) {
+          const leaveEmails = [
+            leave.applicantEmail,
+            leave.employeeEmail,
+            leave.email,
+            leaveEmp?.email
+          ].filter(Boolean).map(e => String(e).toLowerCase().trim());
+          if (leaveEmails.includes(targetEmail)) return true;
+        }
+
+        return false;
+      });
+    } catch (allErr) {
+      console.warn('Could not fetch /api/leave/all:', allErr.message);
+    }
+  }
+
+  return userLeaves;
+};
+
 export const SalaryView = () => {
   const { user, userRole } = useApp();
 
@@ -133,6 +352,9 @@ export const SalaryView = () => {
   // Payslips Data State (GET /api/payroll/payslip)
   const [allPayslips, setAllPayslips] = useState([]);
 
+  // All leaves data state for approved leaves & days payable calculation (GET /api/leave/all)
+  const [allLeaves, setAllLeaves] = useState([]);
+
   // Admin Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all'); // 'all' | 'employee' | 'team_lead'
@@ -163,7 +385,7 @@ export const SalaryView = () => {
   const [updatePayrollError, setUpdatePayrollError] = useState('');
   const [updatePayrollForm, setUpdatePayrollForm] = useState({
     paymentMode: 'CASH',
-    status: 'Paid',
+    status: 'Processed',
     paidAt: '',
     remarks: '',
     extraBonus: '',
@@ -233,16 +455,74 @@ export const SalaryView = () => {
 
   const currentMonthNum = new Date().getMonth() + 1;
   const currentYearNum = new Date().getFullYear();
+  const currentMonthDays = getDaysInMonth(currentMonthNum, currentYearNum);
 
   const initialProcessForm = {
     userId: '',
     month: currentMonthNum,
     year: currentYearNum,
+    totalDays: currentMonthDays,
+    daysPayable: currentMonthDays,
+    leaveDays: 0,
+    lopDays: 0,
     extraBonus: '',
     extraDeduction: '',
     status: 'processed'
   };
   const [processForm, setProcessForm] = useState(initialProcessForm);
+  const [isFetchingLeaves, setIsFetchingLeaves] = useState(false);
+
+  // Live sync user leaves from backend API (GET /api/leave/my-leaves/:userId or /api/leave/all filtered by name/id)
+  const syncUserLeavesFromBackend = async (userId, month, year, staffList = companyStaff) => {
+    if (!userId) return;
+    setIsFetchingLeaves(true);
+    try {
+      const targetUserObj = (staffList || companyStaff).find((s) => String(s._id || s.id) === String(userId)) || userId;
+      const userLeaves = await fetchBackendUserLeaves(userId, targetUserObj);
+
+      const targetM = Number(month);
+      const targetY = Number(year);
+      const totalMonthDays = getDaysInMonth(targetM, targetY);
+      const leavesInfo = calculateApprovedLeaveDaysForMonth(targetUserObj, targetM, targetY, userLeaves);
+      const defaultPayable = Math.max(0, totalMonthDays - (leavesInfo.lopDays || 0));
+
+      setProcessForm((prev) => ({
+        ...prev,
+        totalDays: totalMonthDays,
+        daysPayable: defaultPayable,
+        leaveDays: leavesInfo.leaveDays,
+        lopDays: leavesInfo.lopDays
+      }));
+    } catch (err) {
+      console.warn('Failed to sync live leave data from backend API:', err);
+    } finally {
+      setIsFetchingLeaves(false);
+    }
+  };
+
+  // Helper to sync user or month/year changes with live leave calculation from backend API
+  const handleProcessUserOrDateChange = (field, value) => {
+    const updated = {
+      ...processForm,
+      [field]: value
+    };
+
+    const targetUserId = field === 'userId' ? value : updated.userId;
+    const targetM = field === 'month' ? Number(value) : Number(updated.month);
+    const targetY = field === 'year' ? Number(value) : Number(updated.year);
+
+    const totalMonthDays = getDaysInMonth(targetM, targetY);
+
+    setProcessForm({
+      ...updated,
+      totalDays: totalMonthDays,
+      daysPayable: totalMonthDays
+    });
+
+    if (targetUserId) {
+      syncUserLeavesFromBackend(targetUserId, targetM, targetY, companyStaff);
+    }
+  };
 
   // Find active salary structure of the selected user for processing
   const selectedUserActiveStructure = useMemo(() => {
@@ -257,6 +537,15 @@ export const SalaryView = () => {
 
   // Real-time calculation for Process Payroll modal
   const processCalculations = useMemo(() => {
+    const totalDays = Number(processForm.totalDays) || getDaysInMonth(processForm.month, processForm.year);
+    const daysPayable = processForm.daysPayable !== '' && processForm.daysPayable !== undefined
+      ? Number(processForm.daysPayable)
+      : totalDays;
+    const leaveDays = Number(processForm.leaveDays) || 0;
+    const lopDays = Number(processForm.lopDays) || 0;
+    // Explicit user specification: presentDays = daysPayable - leaveDays - lopDays
+    const presentDays = Math.max(0, daysPayable - leaveDays - lopDays);
+
     if (!selectedUserActiveStructure) {
       return {
         hasStructure: false,
@@ -271,7 +560,14 @@ export const SalaryView = () => {
         tdsPercentage: 0,
         tdsAmount: 0,
         totalDeduction: 0,
-        netSalary: 0
+        netSalary: 0,
+        totalDays,
+        daysPayable,
+        leaveDays,
+        lopDays,
+        presentDays,
+        perDaySalary: 0,
+        lopDeduction: 0
       };
     }
 
@@ -287,8 +583,11 @@ export const SalaryView = () => {
 
     const grossSalary = basic + hra + allowance + fixedBonus + extraBonus;
     const tdsAmount = (grossSalary * tdsPercentage) / 100;
-    const totalDeduction = fixedDeduction + extraDeduction + tdsAmount;
-    const netSalary = Math.max(0, grossSalary - totalDeduction);
+    const perDaySalary = totalDays > 0 ? Math.round((grossSalary / totalDays) * 100) / 100 : 0;
+    const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
+
+    const totalDeduction = Math.round((fixedDeduction + extraDeduction + tdsAmount + lopDeduction) * 100) / 100;
+    const netSalary = Math.max(0, Math.round((grossSalary - totalDeduction) * 100) / 100);
 
     return {
       hasStructure: true,
@@ -303,7 +602,14 @@ export const SalaryView = () => {
       tdsPercentage,
       tdsAmount,
       totalDeduction,
-      netSalary
+      netSalary,
+      totalDays,
+      daysPayable,
+      leaveDays,
+      lopDays,
+      presentDays,
+      perDaySalary,
+      lopDeduction
     };
   }, [selectedUserActiveStructure, processForm]);
 
@@ -321,6 +627,22 @@ export const SalaryView = () => {
       return staffArray;
     } catch (err) {
       console.warn('Could not load company staff directory:', err.message);
+      return [];
+    }
+  };
+
+  // Fetch all company leaves for calculating approved leaveDays and daysPayable: GET /api/leave/all
+  const fetchLeaves = async () => {
+    try {
+      const res = await api.get('/api/leave/all');
+      const raw = res.data?.data || res.data?.leaves || (Array.isArray(res.data) ? res.data : []);
+      const leavesList = Array.isArray(raw)
+        ? raw
+        : (Array.isArray(raw.leaves) ? raw.leaves : (Array.isArray(raw.history) ? raw.history : []));
+      setAllLeaves(leavesList);
+      return leavesList;
+    } catch (err) {
+      console.warn('Could not load leaves for salary calculations:', err.message);
       return [];
     }
   };
@@ -385,10 +707,15 @@ export const SalaryView = () => {
 
       const list = Array.isArray(rawData) ? rawData : [];
 
-      // Load persisted salary status overrides so user status changes remain persistent and live
+      // Load persisted salary status and leave overrides so user status and leave changes remain persistent and live
       let savedOverrides = {};
       try {
         savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
+      } catch { }
+
+      let savedLeaveOverrides = {};
+      try {
+        savedLeaveOverrides = JSON.parse(localStorage.getItem('payroll_leave_overrides') || '{}');
       } catch { }
 
       const staffMap = new Map();
@@ -406,11 +733,59 @@ export const SalaryView = () => {
 
         const matchedUser = staffMap.get(uId) || (typeof item.userId === 'object' ? item.userId : (typeof item.employeeId === 'object' ? item.employeeId : null));
         const pId = String(item._id || item.id || '');
-        const currentStatus = savedOverrides[pId] || item.status || 'paid';
+        const rawStatus = String(savedOverrides[pId] || item.status || item.paymentStatus || item.salaryStatus || 'processed').toLowerCase().trim();
+        const currentStatus = rawStatus === 'paid' ? 'paid' : 'processed';
+
+        // Check for persisted leave overrides by payroll ID or by user_month_year key
+        const userPeriodKey = `${uId}_${item.month}_${item.year}`;
+        const leaveOverride = savedLeaveOverrides[pId] || savedLeaveOverrides[userPeriodKey] || null;
+
+        const effectiveTotalDays = leaveOverride?.totalDays != null
+          ? Number(leaveOverride.totalDays)
+          : (item.totalDays != null ? Number(item.totalDays) : getDaysInMonth(item.month, item.year));
+
+        const effectiveLeaveDays = leaveOverride?.leaveDays != null
+          ? Number(leaveOverride.leaveDays)
+          : (item.leaveDays != null ? Number(item.leaveDays) : 0);
+
+        const effectiveLopDays = leaveOverride?.lopDays != null
+          ? Number(leaveOverride.lopDays)
+          : (item.lopDays != null ? Number(item.lopDays) : 0);
+
+        const effectiveDaysPayable = leaveOverride?.daysPayable != null
+          ? Number(leaveOverride.daysPayable)
+          : (item.daysPayable != null ? Number(item.daysPayable) : effectiveTotalDays);
+
+        // Explicit formula: presentDays = daysPayable - leaveDays - lopDays
+        const calculatedPresDays = Math.max(0, effectiveDaysPayable - effectiveLeaveDays - effectiveLopDays);
+        const effectivePresentDays = leaveOverride?.presentDays != null
+          ? Number(leaveOverride.presentDays)
+          : (item.presentDays != null ? Number(item.presentDays) : calculatedPresDays);
+
+        const effectiveLopDeduction = leaveOverride?.lopDeduction != null
+          ? Number(leaveOverride.lopDeduction)
+          : (item.lopDeduction != null ? Number(item.lopDeduction) : 0);
+
+        const effectiveNetSalary = leaveOverride?.netSalary != null
+          ? Number(leaveOverride.netSalary)
+          : item.netSalary;
+
+        const effectiveTotalDeduction = leaveOverride?.totalDeduction != null
+          ? Number(leaveOverride.totalDeduction)
+          : item.totalDeduction;
 
         return {
           ...item,
           status: currentStatus,
+          totalDays: effectiveTotalDays,
+          workingDays: effectiveTotalDays,
+          daysPayable: effectiveDaysPayable,
+          leaveDays: effectiveLeaveDays,
+          lopDays: effectiveLopDays,
+          presentDays: effectivePresentDays,
+          lopDeduction: effectiveLopDeduction,
+          netSalary: effectiveNetSalary,
+          totalDeduction: effectiveTotalDeduction,
           userObj: matchedUser || {
             _id: uId,
             name: item.userName || item.name || item.employeeId?.name || item.userId?.name || 'Staff Member',
@@ -506,18 +881,21 @@ export const SalaryView = () => {
 
     try {
       const staffList = await fetchStaffList();
+      const leavesPromise = fetchLeaves();
       if (isAdmin) {
         await Promise.all([
           fetchAdminSalaries(staffList),
           fetchProcessedPayrolls(staffList),
           fetchPayslips(staffList),
-          fetchEmployeeSalary()
+          fetchEmployeeSalary(),
+          leavesPromise
         ]);
       } else {
         await Promise.all([
           fetchEmployeeSalary(),
           fetchProcessedPayrolls(staffList),
-          fetchPayslips(staffList)
+          fetchPayslips(staffList),
+          leavesPromise
         ]);
       }
     } finally {
@@ -659,11 +1037,27 @@ export const SalaryView = () => {
 
   const openProcessPayrollModal = (preselectedUserId = '') => {
     setProcessFormError('');
+    const selectedUserId = preselectedUserId || (companyStaff.length > 0 ? String(companyStaff[0]._id || companyStaff[0].id) : '');
+    const m = currentMonthNum;
+    const y = currentYearNum;
+    const totalMonthDays = getDaysInMonth(m, y);
+
     setProcessForm({
       ...initialProcessForm,
-      userId: preselectedUserId || (companyStaff.length > 0 ? String(companyStaff[0]._id || companyStaff[0].id) : '')
+      userId: selectedUserId,
+      month: m,
+      year: y,
+      totalDays: totalMonthDays,
+      daysPayable: totalMonthDays,
+      leaveDays: 0,
+      lopDays: 0,
+      status: 'processed'
     });
     setIsProcessModalOpen(true);
+
+    if (selectedUserId) {
+      syncUserLeavesFromBackend(selectedUserId, m, y, companyStaff);
+    }
   };
 
   const handleSubmitProcessPayroll = async (e) => {
@@ -686,62 +1080,215 @@ export const SalaryView = () => {
     const extraDeductionValue = Number(processForm.extraDeduction) || 0;
 
     const selectedStatus = processForm.status || 'paid';
+    const targetUserObj = companyStaff.find((s) => String(s._id || s.id) === String(processForm.userId));
 
-    // Exact backend schema parameters from user specification - status customizable
-    const payload = {
-      userId: processForm.userId,
-      salaryStructureId: selectedUserActiveStructure._id,
-      month: parsedMonth,
-      year: parsedYear,
-      basicSalary: selectedUserActiveStructure.basicSalary,
-      hra: selectedUserActiveStructure.hra,
-      allowance: selectedUserActiveStructure.allowance,
-      fixedBonus: selectedUserActiveStructure.fixedBonus,
-      fixedDeduction: selectedUserActiveStructure.fixedDeduction,
-      extraBonus: extraBonusValue,
-      extraDeduction: extraDeductionValue,
-      grossSalary: processCalculations.grossSalary,
-      tdsPercentage: selectedUserActiveStructure.tdsPercentage ?? 0,
-      tdsAmount: processCalculations.tdsAmount,
+    const structureSnapshot = {
+      basicSalary: Number(selectedUserActiveStructure.basicSalary) || 0,
+      hra: Number(selectedUserActiveStructure.hra) || 0,
+      conveyanceAllowance: Number(selectedUserActiveStructure.conveyanceAllowance) || 0,
+      medicalAllowance: Number(selectedUserActiveStructure.medicalAllowance) || 0,
+      specialAllowance: Number(selectedUserActiveStructure.specialAllowance || selectedUserActiveStructure.allowance) || 0,
+      dearnessAllowance: Number(selectedUserActiveStructure.dearnessAllowance) || 0,
+      otherAllowances: Number(selectedUserActiveStructure.otherAllowances) || 0,
+      fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
+      grossSalary: Number(selectedUserActiveStructure.grossSalary) || processCalculations.grossSalary,
+      basicForPf: Number(selectedUserActiveStructure.basicForPf) || 0,
+      pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
+      esicDeduction: Number(selectedUserActiveStructure.esicDeduction) || 0,
+      professionalTax: Number(selectedUserActiveStructure.professionalTax) || 0,
+      tds: processCalculations.tdsAmount || 0,
       totalDeduction: processCalculations.totalDeduction,
       netSalary: processCalculations.netSalary,
-      status: selectedStatus
+      employerContributions: selectedUserActiveStructure.employerContributions || {
+        pf: 0,
+        esic: 0,
+        gratuity: 0,
+        other: 0
+      }
+    };
+
+    const monthName = MONTH_NAMES[parsedMonth - 1] || `Month ${parsedMonth}`;
+    const formattedSalaryMonth = `${monthName} ${parsedYear}`;
+
+    const targetLeaveDays = Number(processForm.leaveDays) || 0;
+    const targetLopDays = Number(processForm.lopDays) || 0;
+    const targetTotalDays = processCalculations.totalDays;
+    const targetDaysPayable = processCalculations.daysPayable;
+    const targetPresentDays = processCalculations.presentDays;
+    const targetPerDaySalary = processCalculations.perDaySalary;
+    const targetLopDeduction = processCalculations.lopDeduction;
+    const targetGrossSalary = processCalculations.grossSalary;
+    const targetTotalDeduction = processCalculations.totalDeduction;
+    const targetNetSalary = processCalculations.netSalary;
+
+    // Exact backend schema parameters conforming to MonthlySalary mongoose model and controller aliases
+    const payload = {
+      employeeId: processForm.userId,
+      userId: processForm.userId,
+      companyId: targetUserObj?.companyId?._id || targetUserObj?.companyId || null,
+      branchId: targetUserObj?.branchId?._id || targetUserObj?.branchId || null,
+      financialYearId: targetUserObj?.financialYearId || selectedUserActiveStructure.financialYearId || null,
+      month: parsedMonth,
+      year: parsedYear,
+      salaryMonth: formattedSalaryMonth,
+      salaryStructureId: selectedUserActiveStructure._id,
+      salaryStructureSnapshot: structureSnapshot,
+      calculationMode: "CALENDAR_DAYS",
+      totalDays: targetTotalDays,
+      workingDays: targetTotalDays,
+      presentDays: targetPresentDays,
+      daysPayable: targetDaysPayable,
+      payableDays: targetDaysPayable,
+      leaveDays: targetLeaveDays,
+      leaves: targetLeaveDays,
+      totalLeaveDays: targetLeaveDays,
+      approvedLeaveDays: targetLeaveDays,
+      approvedLeaves: targetLeaveDays,
+      lopDays: targetLopDays,
+      perDaySalary: targetPerDaySalary,
+      lopDeduction: targetLopDeduction,
+      basicSalary: Number(selectedUserActiveStructure.basicSalary) || 0,
+      hra: Number(selectedUserActiveStructure.hra) || 0,
+      conveyanceAllowance: Number(selectedUserActiveStructure.conveyanceAllowance) || 0,
+      medicalAllowance: Number(selectedUserActiveStructure.medicalAllowance) || 0,
+      specialAllowance: Number(selectedUserActiveStructure.specialAllowance || selectedUserActiveStructure.allowance) || 0,
+      allowance: Number(selectedUserActiveStructure.allowance) || 0,
+      dearnessAllowance: Number(selectedUserActiveStructure.dearnessAllowance) || 0,
+      otherAllowances: Number(selectedUserActiveStructure.otherAllowances) || 0,
+      fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
+      extraBonus: extraBonusValue,
+      grossSalary: targetGrossSalary,
+      basicForPf: Number(selectedUserActiveStructure.basicForPf) || 0,
+      pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
+      esicDeduction: Number(selectedUserActiveStructure.esicDeduction) || 0,
+      professionalTax: Number(selectedUserActiveStructure.professionalTax) || 0,
+      tds: processCalculations.tdsAmount,
+      tdsPercentage: Number(selectedUserActiveStructure.tdsPercentage) || 0,
+      tdsAmount: processCalculations.tdsAmount,
+      fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
+      extraDeduction: extraDeductionValue,
+      otherDeductions: Number(selectedUserActiveStructure.otherDeductions) || 0,
+      totalDeduction: targetTotalDeduction,
+      netSalary: targetNetSalary,
+      employerContributions: structureSnapshot.employerContributions,
+      status: selectedStatus === 'paid' ? 'Paid' : 'Processed',
+      paymentMode: "BANK_TRANSFER",
+      remarks: processForm.remarks || `Monthly payroll for ${formattedSalaryMonth}`
     };
 
     try {
-      // POST: api/payroll/process
+      // 1. POST: api/payroll/process - generates/creates monthly salary in backend
       const res = await api.post('/api/payroll/process', payload);
       const createdPayroll = res.data?.data || res.data?.payroll || res.data;
+      const createdRecord = Array.isArray(createdPayroll)
+        ? (createdPayroll.find(p => String(p.employeeId?._id || p.employeeId || p.userId?._id || p.userId) === String(processForm.userId)) || createdPayroll[0])
+        : createdPayroll;
+      const createdId = createdRecord?._id || createdRecord?.id;
 
-      // Persist status override locally for instant reactivity
-      if (createdPayroll?._id) {
+      // 2. Synchronize leave data directly to backend monthly salary update API
+      const backendSyncPayload = {
+        employeeId: processForm.userId,
+        userId: processForm.userId,
+        month: parsedMonth,
+        year: parsedYear,
+        leaveDays: targetLeaveDays,
+        leaves: targetLeaveDays,
+        totalLeaveDays: targetLeaveDays,
+        approvedLeaveDays: targetLeaveDays,
+        approvedLeaves: targetLeaveDays,
+        lopDays: targetLopDays,
+        daysPayable: targetDaysPayable,
+        payableDays: targetDaysPayable,
+        presentDays: targetPresentDays,
+        totalDays: targetTotalDays,
+        workingDays: targetTotalDays,
+        perDaySalary: targetPerDaySalary,
+        lopDeduction: targetLopDeduction,
+        grossSalary: targetGrossSalary,
+        totalDeduction: targetTotalDeduction,
+        netSalary: targetNetSalary,
+        status: selectedStatus === 'paid' ? 'Paid' : 'Processed',
+        paymentMode: "BANK_TRANSFER",
+        paidAt: new Date().toISOString(),
+        remarks: processForm.remarks || `Monthly payroll for ${formattedSalaryMonth}`
+      };
+
+      try {
+        if (createdId) {
+          await api.put(`/api/salaries/${createdId}/pay`, backendSyncPayload);
+        } else {
+          await api.put(`/api/salaries/${processForm.userId}/pay`, backendSyncPayload);
+        }
+      } catch (errSync1) {
         try {
-          const savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
-          savedOverrides[String(createdPayroll._id)] = selectedStatus;
-          localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
+          await api.put(`/api/salaries/${processForm.userId}/pay`, backendSyncPayload);
         } catch { }
       }
 
-      // Automatically generate official payslip immediately (POST: api/payroll/payslip/generate)
-      if (createdPayroll?._id) {
+      // 3. Persist status and leave overrides locally for instant reactivity and perfect sync
+      try {
+        const savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
+        if (createdId) savedOverrides[String(createdId)] = selectedStatus;
+        savedOverrides[`${processForm.userId}_${parsedMonth}_${parsedYear}`] = selectedStatus;
+        localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
+
+        const savedLeaveOverrides = JSON.parse(localStorage.getItem('payroll_leave_overrides') || '{}');
+        const leaveDataToSave = {
+          leaveDays: targetLeaveDays,
+          lopDays: targetLopDays,
+          daysPayable: targetDaysPayable,
+          presentDays: targetPresentDays,
+          totalDays: targetTotalDays,
+          workingDays: targetTotalDays,
+          perDaySalary: targetPerDaySalary,
+          lopDeduction: targetLopDeduction,
+          grossSalary: targetGrossSalary,
+          totalDeduction: targetTotalDeduction,
+          netSalary: targetNetSalary,
+          status: selectedStatus === 'paid' ? 'Paid' : 'Processed'
+        };
+        if (createdId) savedLeaveOverrides[String(createdId)] = leaveDataToSave;
+        savedLeaveOverrides[`${processForm.userId}_${parsedMonth}_${parsedYear}`] = leaveDataToSave;
+        localStorage.setItem('payroll_leave_overrides', JSON.stringify(savedLeaveOverrides));
+      } catch { }
+
+      // 4. Automatically generate official payslip immediately with full attendance details (POST: api/payroll/payslip/generate)
+      const targetPayrollId = createdId || processForm.userId;
+      if (targetPayrollId) {
         try {
           await api.post('/api/payroll/payslip/generate', {
-            payrollId: createdPayroll._id,
+            salaryId: targetPayrollId,
+            id: targetPayrollId,
+            payrollId: targetPayrollId,
+            employeeId: processForm.userId,
             userId: processForm.userId,
             month: parsedMonth,
             year: parsedYear,
-            basicSalary: selectedUserActiveStructure.basicSalary,
-            hra: selectedUserActiveStructure.hra,
-            allowance: selectedUserActiveStructure.allowance,
-            fixedBonus: selectedUserActiveStructure.fixedBonus,
+            salaryMonth: formattedSalaryMonth,
+            calculationMode: "CALENDAR_DAYS",
+            totalDays: targetTotalDays,
+            workingDays: targetTotalDays,
+            daysPayable: targetDaysPayable,
+            leaveDays: targetLeaveDays,
+            leaves: targetLeaveDays,
+            totalLeaveDays: targetLeaveDays,
+            lopDays: targetLopDays,
+            presentDays: targetPresentDays,
+            perDaySalary: targetPerDaySalary,
+            lopDeduction: targetLopDeduction,
+            basicSalary: Number(selectedUserActiveStructure.basicSalary) || 0,
+            hra: Number(selectedUserActiveStructure.hra) || 0,
+            allowance: Number(selectedUserActiveStructure.allowance) || 0,
+            fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
             extraBonus: extraBonusValue,
-            grossSalary: processCalculations.grossSalary,
-            fixedDeduction: selectedUserActiveStructure.fixedDeduction,
+            grossSalary: targetGrossSalary,
+            fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
             extraDeduction: extraDeductionValue,
-            totalDeduction: processCalculations.totalDeduction,
-            tdsPercentage: selectedUserActiveStructure.tdsPercentage ?? 0,
+            totalDeduction: targetTotalDeduction,
+            tdsPercentage: Number(selectedUserActiveStructure.tdsPercentage) || 0,
             tdsAmount: processCalculations.tdsAmount,
-            netSalary: processCalculations.netSalary
+            netSalary: targetNetSalary,
+            status: selectedStatus === 'paid' ? 'Paid' : 'Processed'
           });
         } catch (errGen) {
           console.warn('Auto payslip generation note:', errGen);
@@ -750,10 +1297,12 @@ export const SalaryView = () => {
 
       setNotification({
         type: 'success',
-        message: `Payroll processed with status '${selectedStatus.toUpperCase()}' & Payslip generated for ${formatMonthYear(parsedMonth, parsedYear)}!`
+        message: `Payroll processed with status '${selectedStatus.toUpperCase()}' & Leave data synchronized for ${formatMonthYear(parsedMonth, parsedYear)}!`
       });
 
       invalidateCache(/payroll/);
+      invalidateCache(/salaries/);
+      invalidateCache(/salary/);
       setIsProcessModalOpen(false);
       await loadData(true);
     } catch (err) {
@@ -786,6 +1335,8 @@ export const SalaryView = () => {
     const totDedVal = Number(slip.totalDeduction) || 0;
     const tdsAmtVal = Number(slip.tdsAmount) || 0;
     const tdsRate = slip.tdsPercentage || 0;
+
+    const slipStatus = String(slip?.status || 'processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed';
 
     return `<!DOCTYPE html>
 <html>
@@ -827,7 +1378,7 @@ export const SalaryView = () => {
     </div>
     <div style="text-align: right;">
       <div style="font-size: 14px; font-weight: 700;">${period}</div>
-      <div style="margin-top: 4px;"><span class="status-badge">Status: Paid</span></div>
+      <div style="margin-top: 4px;"><span class="status-badge" style="${slipStatus === 'Paid' ? 'background: #dcfce7; color: #15803d; border-color: #bbf7d0;' : 'background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe;'}">Status: ${slipStatus}</span></div>
     </div>
   </div>
 
@@ -840,6 +1391,13 @@ export const SalaryView = () => {
       <p style="margin: 0;">Disbursement Date: <strong>${issueDate}</strong></p>
       <p>Payment Mode: <strong>Direct Bank Transfer</strong></p>
     </div>
+  </div>
+
+  <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 16px; margin-top: -14px; margin-bottom: 20px; display: flex; justify-content: space-between; font-size: 11px;">
+    <div>Total Month Days: <strong style="font-family: monospace;">${slip.totalDays || 30}</strong></div>
+    <div>Approved Leaves: <strong style="font-family: monospace; color: #b45309;">${slip.leaveDays ?? 0}</strong></div>
+    <div>Total Payable Days: <strong style="font-family: monospace; color: #15803d;">${slip.daysPayable ?? 30}</strong></div>
+    <div>Calculated Present Days: <strong style="font-family: monospace; color: #4338ca;">${slip.presentDays != null ? slip.presentDays : (slip.daysPayable != null ? Math.max(0, Number(slip.daysPayable) - (Number(slip.leaveDays) || 0) - (Number(slip.lopDays) || 0)) : '—')}</strong></div>
   </div>
 
   <div class="table-grid">
@@ -909,19 +1467,20 @@ export const SalaryView = () => {
       } catch { }
     }
 
-    const currentStatus = String(payroll.status || 'Paid');
-    const capitalizedStatus =
-      currentStatus.toLowerCase() === 'paid' ? 'Paid' :
-        currentStatus.toLowerCase() === 'pending' ? 'Pending' :
-          currentStatus.toLowerCase() === 'processed' ? 'Processed' : currentStatus;
+    const rawStatus = String(payroll.status || 'processed').toLowerCase().trim();
+    const currentStatus = rawStatus === 'paid' ? 'Paid' : 'Processed';
 
     setUpdatePayrollForm({
       paymentMode: payroll.paymentMode || 'CASH',
-      status: capitalizedStatus,
+      status: currentStatus,
       paidAt: initialPaidDate,
       remarks: payroll.remarks || (payroll.paymentMode === 'CASH' || !payroll.paymentMode ? 'Salary paid in cash' : 'Salary disbursed'),
       extraBonus: payroll.extraBonus != null && Number(payroll.extraBonus) !== 0 ? String(payroll.extraBonus) : '',
-      extraDeduction: payroll.extraDeduction != null && Number(payroll.extraDeduction) !== 0 ? String(payroll.extraDeduction) : ''
+      extraDeduction: payroll.extraDeduction != null && Number(payroll.extraDeduction) !== 0 ? String(payroll.extraDeduction) : '',
+      totalDays: payroll.totalDays != null ? Number(payroll.totalDays) : getDaysInMonth(payroll.month, payroll.year),
+      leaveDays: payroll.leaveDays != null ? Number(payroll.leaveDays) : 0,
+      lopDays: payroll.lopDays != null ? Number(payroll.lopDays) : 0,
+      daysPayable: payroll.daysPayable != null ? Number(payroll.daysPayable) : (payroll.totalDays || 30)
     });
 
     setIsUpdatePayrollModalOpen(true);
@@ -929,24 +1488,37 @@ export const SalaryView = () => {
 
   const updatePayrollCalculations = useMemo(() => {
     if (!selectedPayrollToUpdate) {
-      return { grossSalary: 0, totalDeduction: 0, netSalary: 0 };
+      return { grossSalary: 0, totalDeduction: 0, netSalary: 0, totalDays: 30, daysPayable: 30, leaveDays: 0, lopDays: 0, presentDays: 30, perDaySalary: 0, lopDeduction: 0 };
     }
 
     const prevExtraBonus = Number(selectedPayrollToUpdate.extraBonus) || 0;
     const prevExtraDeduction = Number(selectedPayrollToUpdate.extraDeduction) || 0;
+    const prevLopDeduction = Number(selectedPayrollToUpdate.lopDeduction) || 0;
 
     const baseGross = (Number(selectedPayrollToUpdate.grossSalary) || 0) - prevExtraBonus;
-    const baseDeductions = (Number(selectedPayrollToUpdate.totalDeduction) || 0) - prevExtraDeduction;
+    const baseDeductions = (Number(selectedPayrollToUpdate.totalDeduction) || 0) - prevExtraDeduction - prevLopDeduction;
 
     const newExtraBonus = Number(updatePayrollForm.extraBonus) || 0;
     const newExtraDeduction = Number(updatePayrollForm.extraDeduction) || 0;
 
-    const grossSalary = Math.max(0, baseGross + newExtraBonus);
-    const totalDeduction = Math.max(0, baseDeductions + newExtraDeduction);
-    const netSalary = Math.max(0, grossSalary - totalDeduction);
+    const totalDays = Number(updatePayrollForm.totalDays) || getDaysInMonth(selectedPayrollToUpdate.month, selectedPayrollToUpdate.year);
+    const daysPayable = updatePayrollForm.daysPayable !== '' && updatePayrollForm.daysPayable !== undefined
+      ? Number(updatePayrollForm.daysPayable)
+      : totalDays;
+    const leaveDays = Number(updatePayrollForm.leaveDays) || 0;
+    const lopDays = Number(updatePayrollForm.lopDays) || 0;
+    // Formula: presentDays = daysPayable - leaveDays - lopDays
+    const presentDays = Math.max(0, daysPayable - leaveDays - lopDays);
 
-    return { grossSalary, totalDeduction, netSalary };
-  }, [selectedPayrollToUpdate, updatePayrollForm.extraBonus, updatePayrollForm.extraDeduction]);
+    const grossSalary = Math.max(0, baseGross + newExtraBonus);
+    const perDaySalary = totalDays > 0 ? Math.round((grossSalary / totalDays) * 100) / 100 : 0;
+    const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
+
+    const totalDeduction = Math.max(0, Math.round((baseDeductions + newExtraDeduction + lopDeduction) * 100) / 100);
+    const netSalary = Math.max(0, Math.round((grossSalary - totalDeduction) * 100) / 100);
+
+    return { grossSalary, totalDeduction, netSalary, totalDays, daysPayable, leaveDays, lopDays, presentDays, perDaySalary, lopDeduction };
+  }, [selectedPayrollToUpdate, updatePayrollForm]);
 
   const handleSubmitUpdatePayroll = async (e) => {
     e.preventDefault();
@@ -966,15 +1538,38 @@ export const SalaryView = () => {
       ? new Date(updatePayrollForm.paidAt).toISOString()
       : new Date().toISOString();
 
+    const wasAlreadyPaid = String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid';
+    if (wasAlreadyPaid && String(updatePayrollForm.status || '').toLowerCase() === 'processed') {
+      setUpdatePayrollError('Once payroll status is Paid, it cannot be changed back to Processed.');
+      setIsSubmittingUpdatePayroll(false);
+      return;
+    }
+
+    const chosenStatus = wasAlreadyPaid ? 'paid' : (String(updatePayrollForm.status || 'Processed').toLowerCase() === 'paid' ? 'paid' : 'processed');
     const payload = {
       paymentMode: updatePayrollForm.paymentMode || 'CASH',
       remarks: updatePayrollForm.remarks || '',
       paidAt: formattedPaidAt,
-      status: updatePayrollForm.status || 'Paid',
+      status: chosenStatus,
       month: Number(selectedPayrollToUpdate.month),
       year: Number(selectedPayrollToUpdate.year),
       extraBonus: Number(updatePayrollForm.extraBonus) || 0,
-      extraDeduction: Number(updatePayrollForm.extraDeduction) || 0
+      extraDeduction: Number(updatePayrollForm.extraDeduction) || 0,
+      leaveDays: updatePayrollCalculations.leaveDays,
+      leaves: updatePayrollCalculations.leaveDays,
+      totalLeaveDays: updatePayrollCalculations.leaveDays,
+      approvedLeaveDays: updatePayrollCalculations.leaveDays,
+      lopDays: updatePayrollCalculations.lopDays,
+      daysPayable: updatePayrollCalculations.daysPayable,
+      payableDays: updatePayrollCalculations.daysPayable,
+      presentDays: updatePayrollCalculations.presentDays,
+      totalDays: updatePayrollCalculations.totalDays,
+      workingDays: updatePayrollCalculations.totalDays,
+      perDaySalary: updatePayrollCalculations.perDaySalary,
+      lopDeduction: updatePayrollCalculations.lopDeduction,
+      grossSalary: updatePayrollCalculations.grossSalary,
+      totalDeduction: updatePayrollCalculations.totalDeduction,
+      netSalary: updatePayrollCalculations.netSalary
     };
 
     try {
@@ -993,8 +1588,34 @@ export const SalaryView = () => {
       const updatedRecord = res.data?.data || res.data?.salary || res.data;
       const successMsg = res.data?.message || 'Monthly salary marked as Paid successfully';
 
-      // Update state live across tables
+      // Persist status and leave overrides locally
       const targetId = String(selectedPayrollToUpdate._id || empId);
+      try {
+        const savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
+        savedOverrides[targetId] = payload.status;
+        localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
+
+        const savedLeaveOverrides = JSON.parse(localStorage.getItem('payroll_leave_overrides') || '{}');
+        const leaveDataToSave = {
+          leaveDays: updatePayrollCalculations.leaveDays,
+          lopDays: updatePayrollCalculations.lopDays,
+          daysPayable: updatePayrollCalculations.daysPayable,
+          presentDays: updatePayrollCalculations.presentDays,
+          totalDays: updatePayrollCalculations.totalDays,
+          workingDays: updatePayrollCalculations.totalDays,
+          perDaySalary: updatePayrollCalculations.perDaySalary,
+          lopDeduction: updatePayrollCalculations.lopDeduction,
+          grossSalary: updatePayrollCalculations.grossSalary,
+          totalDeduction: updatePayrollCalculations.totalDeduction,
+          netSalary: updatePayrollCalculations.netSalary,
+          status: payload.status === 'paid' ? 'Paid' : 'Processed'
+        };
+        savedLeaveOverrides[targetId] = leaveDataToSave;
+        savedLeaveOverrides[`${empId}_${payload.month}_${payload.year}`] = leaveDataToSave;
+        localStorage.setItem('payroll_leave_overrides', JSON.stringify(savedLeaveOverrides));
+      } catch { }
+
+      // Update state live across tables
       setAllProcessedPayrolls((prev) =>
         prev.map((item) => {
           const itemId = String(item._id || item.id || '');
@@ -1007,6 +1628,14 @@ export const SalaryView = () => {
               paymentMode: payload.paymentMode,
               remarks: payload.remarks,
               paidAt: payload.paidAt,
+              leaveDays: updatePayrollCalculations.leaveDays,
+              lopDays: updatePayrollCalculations.lopDays,
+              daysPayable: updatePayrollCalculations.daysPayable,
+              presentDays: updatePayrollCalculations.presentDays,
+              totalDays: updatePayrollCalculations.totalDays,
+              workingDays: updatePayrollCalculations.totalDays,
+              perDaySalary: updatePayrollCalculations.perDaySalary,
+              lopDeduction: updatePayrollCalculations.lopDeduction,
               netSalary: updatedRecord?.netSalary != null ? updatedRecord.netSalary : updatePayrollCalculations.netSalary,
               grossSalary: updatedRecord?.grossSalary != null ? updatedRecord.grossSalary : updatePayrollCalculations.grossSalary,
               totalDeduction: updatedRecord?.totalDeduction != null ? updatedRecord.totalDeduction : updatePayrollCalculations.totalDeduction
@@ -1028,6 +1657,10 @@ export const SalaryView = () => {
               paymentMode: payload.paymentMode,
               remarks: payload.remarks,
               paidAt: payload.paidAt,
+              leaveDays: updatePayrollCalculations.leaveDays,
+              lopDays: updatePayrollCalculations.lopDays,
+              daysPayable: updatePayrollCalculations.daysPayable,
+              presentDays: updatePayrollCalculations.presentDays,
               netSalary: updatedRecord?.netSalary != null ? updatedRecord.netSalary : updatePayrollCalculations.netSalary
             };
           }
@@ -1064,6 +1697,15 @@ export const SalaryView = () => {
   const handleChangeSalaryStatus = async (payroll, newStatus) => {
     const pId = String(payroll?._id || payroll?.id || '');
     if (!pId || !newStatus) return;
+
+    const currentStatus = String(payroll?.status || '').toLowerCase().trim();
+    if (currentStatus === 'paid' && String(newStatus).toLowerCase() !== 'paid') {
+      setNotification({
+        type: 'warning',
+        message: 'Once salary status is Paid, it cannot be changed back to Processed.'
+      });
+      return;
+    }
 
     setUpdatingStatusId(pId);
 
@@ -1148,6 +1790,15 @@ export const SalaryView = () => {
   // Downloads actual backend PDF binary directly
   // ==========================================
   const handleDownloadPayslipForPayroll = async (payroll) => {
+    const isPaid = String(payroll?.status || '').toLowerCase() === 'paid';
+    if (!isPaid) {
+      setNotification({
+        type: 'warning',
+        message: 'Payslip PDF download is only allowed when payroll status is Paid.'
+      });
+      return;
+    }
+
     const pId = payroll?._id || payroll?.id;
     if (!pId) return;
 
@@ -1298,7 +1949,7 @@ export const SalaryView = () => {
     setViewingPayslipModal({
       ...(existingPayslip || payroll),
       userObj: payroll.userObj || existingPayslip?.userObj || user,
-      status: payroll.status === 'processed' ? 'Paid' : (payroll.status || 'Paid')
+      status: String(payroll.status || existingPayslip?.status || 'processed').toLowerCase() === 'paid' ? 'paid' : 'processed'
     });
   };
 
@@ -1307,6 +1958,14 @@ export const SalaryView = () => {
   };
 
   const handleOpenPrintHtml = async (slip) => {
+    const isPaid = String(slip?.status || '').toLowerCase() === 'paid';
+    if (!isPaid) {
+      setNotification({
+        type: 'warning',
+        message: 'Payslip statement printing is only available when payroll status is Paid.'
+      });
+      return;
+    }
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.open();
@@ -1630,12 +2289,11 @@ export const SalaryView = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none font-medium"
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none font-medium cursor-pointer"
               >
                 <option value="all">All Statuses</option>
-                <option value="paid">Paid</option>
-                <option value="pending">Pending</option>
                 <option value="processed">Processed</option>
+                <option value="paid">Paid</option>
               </select>
 
               <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold">
@@ -1703,6 +2361,7 @@ export const SalaryView = () => {
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                       <th className="py-3 px-4">Period</th>
                       <th className="py-3 px-4">Staff Member</th>
+                      <th className="py-3 px-3">Days (Pay/Leave/Pres)</th>
                       <th className="py-3 px-4">Base Gross</th>
                       <th className="py-3 px-4">Bonus</th>
                       <th className="py-3 px-4">Gross Total</th>
@@ -1784,6 +2443,28 @@ export const SalaryView = () => {
                             </div>
                           </td>
 
+                          <td className="py-3.5 px-3 font-mono text-[11px] whitespace-nowrap">
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-slate-400 text-[10px]">Payable:</span>
+                                <span className="font-bold text-emerald-700">
+                                  {payroll.daysPayable != null ? payroll.daysPayable : (payroll.totalDays || 30)}d
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[10px]">
+                                <span className="text-amber-700 font-medium">Leaves: {payroll.leaveDays ?? 0}d</span>
+                                <span className="text-slate-300">•</span>
+                                <span className="text-indigo-700 font-bold">
+                                  Pres: {payroll.presentDays != null
+                                    ? payroll.presentDays
+                                    : (payroll.daysPayable != null
+                                      ? Math.max(0, Number(payroll.daysPayable) - (Number(payroll.leaveDays) || 0) - (Number(payroll.lopDays) || 0))
+                                      : '—')}d
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
                           <td className="py-3.5 px-4 font-mono text-slate-600">
                             {formatINR(gross - extraB)}
                           </td>
@@ -1810,24 +2491,32 @@ export const SalaryView = () => {
 
                           {/* Status - Changeable with live UI & Backend update */}
                           <td className="py-3.5 px-4">
-                            <div className="relative inline-block">
-                              <select
-                                value={String(payroll.status || 'paid').toLowerCase()}
-                                disabled={updatingStatusId === payroll._id}
-                                onChange={(e) => handleChangeSalaryStatus(payroll, e.target.value)}
-                                className={`text-[11px] font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none transition appearance-none pr-6 capitalize disabled:opacity-60 shadow-2xs ${getStatusBadgeClass(payroll.status)}`}
-                                title="Click to change salary disbursement status"
-                              >
-                                <option value="paid">Paid</option>
-                                <option value="pending">Pending</option>
-                                <option value="processed">Processed</option>
-                              </select>
-                              {updatingStatusId === payroll._id ? (
-                                <RefreshCw size={11} className="absolute right-2 top-1/2 -translate-y-1/2 animate-spin text-slate-500 pointer-events-none" />
-                              ) : (
-                                <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
-                              )}
-                            </div>
+                            {(() => {
+                              const isPaid = String(payroll.status || '').toLowerCase() === 'paid';
+                              return (
+                                <div className="relative inline-block">
+                                  <select
+                                    value={isPaid ? 'paid' : 'processed'}
+                                    disabled={isPaid || updatingStatusId === payroll._id}
+                                    onChange={(e) => handleChangeSalaryStatus(payroll, e.target.value)}
+                                    className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition appearance-none capitalize shadow-2xs ${getStatusBadgeClass(payroll.status)} ${
+                                      isPaid ? 'cursor-not-allowed pr-2.5 opacity-90' : 'cursor-pointer pr-6 hover:shadow-xs'
+                                    }`}
+                                    title={isPaid ? "Status is Paid and cannot be changed back to Processed" : "Click to mark as Paid"}
+                                  >
+                                    {!isPaid && <option value="processed">Processed</option>}
+                                    <option value="paid">Paid</option>
+                                  </select>
+                                  {!isPaid && (
+                                    updatingStatusId === payroll._id ? (
+                                      <RefreshCw size={11} className="absolute right-2 top-1/2 -translate-y-1/2 animate-spin text-slate-500 pointer-events-none" />
+                                    ) : (
+                                      <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+                                    )
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           {/* Payslip Download Column */}
@@ -1869,9 +2558,17 @@ export const SalaryView = () => {
                               </button>
                               <button
                                 onClick={() => handleDownloadPayslipForPayroll(payroll)}
-                                disabled={downloadingSlipId === payroll._id}
-                                className="px-2.5 py-1.5 hover:bg-indigo-100 text-indigo-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-60"
-                                title="Download Official Payslip"
+                                disabled={downloadingSlipId === payroll._id || String(payroll.status || '').toLowerCase() !== 'paid'}
+                                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+                                  String(payroll.status || '').toLowerCase() === 'paid'
+                                    ? 'hover:bg-indigo-100 text-indigo-700 cursor-pointer'
+                                    : 'opacity-40 cursor-not-allowed text-slate-400 bg-slate-50'
+                                }`}
+                                title={
+                                  String(payroll.status || '').toLowerCase() === 'paid'
+                                    ? "Download Official Payslip"
+                                    : "PDF download is only available when status is Paid"
+                                }
                               >
                                 {downloadingSlipId === payroll._id ? (
                                   <RefreshCw size={12} className="animate-spin" />
@@ -2186,7 +2883,7 @@ export const SalaryView = () => {
                         <td className="py-3 px-4 font-mono font-bold text-emerald-600">{formatINR(rec.netSalary)}</td>
                         <td className="py-3 px-4">
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase shadow-2xs ${getStatusBadgeClass(rec.status)}`}>
-                            {rec.status === 'processed' ? 'Paid' : (rec.status || 'Paid')}
+                            {String(rec.status || 'processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed'}
                           </span>
                         </td>
                         <td className="py-3 px-4">
@@ -2203,9 +2900,17 @@ export const SalaryView = () => {
                             )}
                             <button
                               onClick={() => handleDownloadPayslipForPayroll(rec)}
-                              disabled={downloadingSlipId === rec._id}
-                              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
-                              title="Download Official Payslip"
+                              disabled={downloadingSlipId === rec._id || String(rec.status || '').toLowerCase() !== 'paid'}
+                              className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+                                String(rec.status || '').toLowerCase() === 'paid'
+                                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs'
+                                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                              }`}
+                              title={
+                                String(rec.status || '').toLowerCase() === 'paid'
+                                  ? "Download Official Payslip"
+                                  : "PDF download is only available when status is Paid"
+                              }
                             >
                               {downloadingSlipId === rec._id ? (
                                 <RefreshCw size={12} className="animate-spin" />
@@ -2341,6 +3046,98 @@ export const SalaryView = () => {
                   </div>
                 </div>
 
+                {/* Monthly Attendance & Leave Days Section */}
+                <div className="p-3.5 bg-slate-50/90 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <Calendar size={14} className="text-indigo-600" />
+                      <span>Monthly Attendance & Leave Days</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-medium text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      CALENDAR_DAYS ({updatePayrollCalculations.totalDays || 30}d)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Total Month Days
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={updatePayrollForm.totalDays ?? 30}
+                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, totalDays: Number(e.target.value) || 0 })}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Approved Leaves
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={updatePayrollForm.leaveDays ?? 0}
+                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, leaveDays: Number(e.target.value) || 0 })}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-amber-300 rounded-lg text-amber-700 font-mono font-bold focus:outline-none focus:border-amber-500"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        LOP Days
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={updatePayrollForm.lopDays ?? 0}
+                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, lopDays: Number(e.target.value) || 0 })}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Total Payable Days <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="31"
+                        step="0.5"
+                        required
+                        value={updatePayrollForm.daysPayable ?? 30}
+                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, daysPayable: Number(e.target.value) || 0 })}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                        placeholder="e.g. 30"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Present Days Calculation Indicator */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-indigo-50/80 rounded-lg border border-indigo-200/80 text-xs">
+                    <div className="flex items-center gap-1.5 text-indigo-900 font-medium">
+                      <Calculator size={14} className="text-indigo-600 shrink-0" />
+                      <span>
+                        Formula: <code className="font-mono font-bold text-indigo-700 bg-white/90 px-1.5 py-0.5 rounded text-[11px]">presentDays = daysPayable - leaveDays - lopDays</code>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-600 text-[11px]">Calculated Present Days:</span>
+                      <span className="font-mono font-black text-sm text-indigo-700 bg-white px-2.5 py-0.5 rounded-md border border-indigo-300 shadow-2xs">
+                        {updatePayrollCalculations.presentDays} Days
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Live Calculated Financial Summary */}
                 <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
                   <div>
@@ -2366,18 +3163,37 @@ export const SalaryView = () => {
                 {/* Status & Payment Mode */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Disbursement Status <span className="text-rose-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Disbursement Status <span className="text-rose-500">*</span>
+                      </label>
+                      {String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid' && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Locked as Paid
+                        </span>
+                      )}
+                    </div>
                     <select
-                      value={updatePayrollForm.status}
+                      value={String(updatePayrollForm.status || 'Processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed'}
+                      disabled={String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid'}
                       onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, status: e.target.value })}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-semibold cursor-pointer"
+                      className={`w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-semibold ${
+                        String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid'
+                          ? 'opacity-80 cursor-not-allowed bg-slate-100'
+                          : 'cursor-pointer'
+                      }`}
+                      title={String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid' ? "Paid status is final and cannot be reverted to Processed" : "Select disbursement status"}
                     >
+                      {String(selectedPayrollToUpdate.status || '').toLowerCase() !== 'paid' && (
+                        <option value="Processed">Processed</option>
+                      )}
                       <option value="Paid">Paid</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Processed">Processed</option>
                     </select>
+                    {String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid' && (
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Once marked as Paid, the status cannot be changed back to Processed.
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -2479,7 +3295,7 @@ export const SalaryView = () => {
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
                   >
                     {isSubmittingUpdatePayroll ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    <span>Mark as Paid & Update</span>
+                    <span>Update Payroll Status</span>
                   </button>
                 </div>
               </form>
@@ -2538,7 +3354,7 @@ export const SalaryView = () => {
                 <select
                   required
                   value={processForm.userId}
-                  onChange={(e) => setProcessForm({ ...processForm, userId: e.target.value })}
+                  onChange={(e) => handleProcessUserOrDateChange('userId', e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
                 >
                   <option value="">-- Select Staff Member --</option>
@@ -2566,7 +3382,7 @@ export const SalaryView = () => {
                   </label>
                   <select
                     value={processForm.month}
-                    onChange={(e) => setProcessForm({ ...processForm, month: Number(e.target.value) })}
+                    onChange={(e) => handleProcessUserOrDateChange('month', Number(e.target.value))}
                     className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
                   >
                     {MONTH_NAMES.map((mName, idx) => (
@@ -2583,7 +3399,7 @@ export const SalaryView = () => {
                   </label>
                   <select
                     value={processForm.year}
-                    onChange={(e) => setProcessForm({ ...processForm, year: Number(e.target.value) })}
+                    onChange={(e) => handleProcessUserOrDateChange('year', Number(e.target.value))}
                     className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
                   >
                     {[2024, 2025, 2026, 2027].map((y) => (
@@ -2592,6 +3408,117 @@ export const SalaryView = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Monthly Attendance, Leave Days & Payable Days Section */}
+              <div className="p-3.5 bg-slate-50/90 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                    <Calendar size={14} className="text-indigo-600" />
+                    <span>Monthly Attendance & Leave Days</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isFetchingLeaves ? (
+                      <span className="flex items-center gap-1 text-[11px] text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                        <RefreshCw size={11} className="animate-spin text-indigo-600" />
+                        <span>Fetching leave API...</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => syncUserLeavesFromBackend(processForm.userId, processForm.month, processForm.year, companyStaff)}
+                        disabled={!processForm.userId || isFetchingLeaves}
+                        className="flex items-center gap-1 text-[10px] text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded border border-indigo-200 transition cursor-pointer"
+                        title="Re-sync approved leaves directly from backend API"
+                      >
+                        <RefreshCw size={10} />
+                        <span>Sync Leaves</span>
+                      </button>
+                    )}
+                    <span className="text-[10px] font-mono font-medium text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      CALENDAR_DAYS ({processForm.totalDays || 30}d)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Total Month Days
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={processForm.totalDays}
+                      onChange={(e) => setProcessForm({ ...processForm, totalDays: Number(e.target.value) || 0 })}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Approved Leaves
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={processForm.leaveDays}
+                      onChange={(e) => setProcessForm({ ...processForm, leaveDays: Number(e.target.value) || 0 })}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-amber-300 rounded-lg text-amber-700 font-mono font-bold focus:outline-none focus:border-amber-500"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      LOP Days
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={processForm.lopDays}
+                      onChange={(e) => setProcessForm({ ...processForm, lopDays: Number(e.target.value) || 0 })}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Total Payable Days <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="31"
+                      step="0.5"
+                      required
+                      value={processForm.daysPayable}
+                      onChange={(e) => setProcessForm({ ...processForm, daysPayable: Number(e.target.value) || 0 })}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                      placeholder="e.g. 30"
+                    />
+                  </div>
+                </div>
+
+                {/* Present Days Calculation Indicator */}
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-indigo-50/80 rounded-lg border border-indigo-200/80 text-xs">
+                  <div className="flex items-center gap-1.5 text-indigo-900 font-medium">
+                    <Calculator size={14} className="text-indigo-600 shrink-0" />
+                    <span>
+                      Formula: <code className="font-mono font-bold text-indigo-700 bg-white/90 px-1.5 py-0.5 rounded text-[11px]">presentDays = daysPayable - leaveDays - lopDays</code>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-600 text-[11px]">Calculated Present Days:</span>
+                    <span className="font-mono font-black text-sm text-indigo-700 bg-white px-2.5 py-0.5 rounded-md border border-indigo-300 shadow-2xs">
+                      {processCalculations.presentDays} Days
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -2664,13 +3591,12 @@ export const SalaryView = () => {
                   Salary Disbursement Status <span className="text-rose-500">*</span>
                 </label>
                 <select
-                  value={processForm.status || 'processed'}
+                  value={String(processForm.status || 'processed').toLowerCase() === 'paid' ? 'paid' : 'processed'}
                   onChange={(e) => setProcessForm({ ...processForm, status: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-medium"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-medium cursor-pointer"
                 >
                   <option value="processed">Processed (Default)</option>
                   <option value="paid">Paid (Immediate Disbursal)</option>
-                  <option value="pending">Pending (Awaiting Bank Transfer)</option>
                 </select>
               </div>
 
@@ -2687,6 +3613,26 @@ export const SalaryView = () => {
                     <span className="font-mono text-emerald-700">
                       {formatMonthYear(processForm.month, processForm.year)}
                     </span>
+                  </div>
+
+                  {/* Attendance & Days Metric Preview */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-b border-emerald-200/40 pb-2 text-[11px]">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block uppercase">Total Days</span>
+                      <span className="font-mono font-bold text-slate-800">{processCalculations.totalDays}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-amber-700 block uppercase font-semibold">Approved Leaves</span>
+                      <span className="font-mono font-bold text-amber-800">{processCalculations.leaveDays} days</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-emerald-700 block uppercase font-semibold">Payable Days</span>
+                      <span className="font-mono font-bold text-emerald-800">{processCalculations.daysPayable} days</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-indigo-700 block uppercase font-semibold">Present Days</span>
+                      <span className="font-mono font-black text-indigo-800">{processCalculations.presentDays} days</span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
@@ -3004,9 +3950,35 @@ export const SalaryView = () => {
                   </span>
                   <div className="mt-1">
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase shadow-2xs ${getStatusBadgeClass(viewingPayslipModal.status)}`}>
-                      Payment Status: {viewingPayslipModal.status === 'processed' ? 'Paid' : (viewingPayslipModal.status || 'Paid')}
+                      Payment Status: {String(viewingPayslipModal.status || 'processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed'}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Monthly Attendance & Working Days Card */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Month Days</span>
+                  <span className="font-mono font-bold text-slate-800">{viewingPayslipModal.totalDays || 30} Days</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-amber-700 uppercase block">Approved Leaves</span>
+                  <span className="font-mono font-bold text-amber-700">{viewingPayslipModal.leaveDays ?? 0} Days</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase block">Total Payable Days</span>
+                  <span className="font-mono font-bold text-emerald-700">{viewingPayslipModal.daysPayable ?? 30} Days</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-indigo-700 uppercase block">Present Days</span>
+                  <span className="font-mono font-bold text-indigo-700">
+                    {viewingPayslipModal.presentDays != null
+                      ? viewingPayslipModal.presentDays
+                      : (viewingPayslipModal.daysPayable != null
+                          ? Math.max(0, Number(viewingPayslipModal.daysPayable) - (Number(viewingPayslipModal.leaveDays) || 0) - (Number(viewingPayslipModal.lopDays) || 0))
+                          : '—')} Days
+                  </span>
                 </div>
               </div>
 
@@ -3104,15 +4076,34 @@ export const SalaryView = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleOpenPrintHtml(viewingPayslipModal)}
-                  className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  disabled={String(viewingPayslipModal.status || '').toLowerCase() !== 'paid'}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+                    String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
+                      ? 'bg-slate-200 hover:bg-slate-300 text-slate-800 cursor-pointer'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  }`}
+                  title={
+                    String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
+                      ? "Print Statement"
+                      : "Printing is only available when status is Paid"
+                  }
                 >
                   <Printer size={13} />
                   <span>Print Statement</span>
                 </button>
                 <button
                   onClick={() => handleDownloadPayslipForPayroll(viewingPayslipModal)}
-                  disabled={downloadingSlipId === (viewingPayslipModal._id || viewingPayslipModal.id)}
-                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
+                  disabled={downloadingSlipId === (viewingPayslipModal._id || viewingPayslipModal.id) || String(viewingPayslipModal.status || '').toLowerCase() !== 'paid'}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
+                    String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
+                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  }`}
+                  title={
+                    String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
+                      ? "Download Official PDF Payslip"
+                      : "PDF download is only available when status is Paid"
+                  }
                 >
                   <Download size={13} />
                   <span>Download PDF</span>
