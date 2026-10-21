@@ -144,7 +144,19 @@ export const PerformanceView = () => {
     return { label: 'Evaluation In Progress', color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' };
   };
 
-  const ratingInfo = getScoreRating(score);
+  const getRatingInfo = (rVal) => {
+    const num = parseFloat(rVal);
+    if (!isNaN(num)) {
+      if (num >= 8.5) return { label: `${num % 1 === 0 ? num : num.toFixed(1)} / 10`, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' };
+      if (num >= 7.0) return { label: `${num % 1 === 0 ? num : num.toFixed(1)} / 10`, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200' };
+      if (num >= 5.0) return { label: `${num % 1 === 0 ? num : num.toFixed(1)} / 10`, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' };
+      return { label: `${num % 1 === 0 ? num : num.toFixed(1)} / 10`, color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200' };
+    }
+    if (rVal) return { label: String(rVal), color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200' };
+    return { label: 'Pending Evaluation', color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' };
+  };
+
+  const ratingBadge = getRatingInfo(performanceData?.rating);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Recent';
@@ -168,7 +180,7 @@ export const PerformanceView = () => {
           <div>
             <h2 className="text-xl font-bold text-slate-900">My Performance</h2>
             <p className="text-xs sm:text-sm text-slate-500">
-              Personal performance percentage, productivity score, and supervisor feedback
+              Personal performance percentage (out of 100), rating (out of 10), and feedback
             </p>
           </div>
         </div>
@@ -188,6 +200,16 @@ export const PerformanceView = () => {
           <Loader2 size={32} className="animate-spin text-indigo-500" />
           <p className="text-xs text-slate-500 font-medium">Loading your performance metrics...</p>
         </div>
+      ) : !performanceData ? (
+        <div className="flex flex-col items-center justify-center p-16 bg-white border border-slate-200/80 rounded-xl text-center space-y-3">
+          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
+            <Award size={24} />
+          </div>
+          <h3 className="text-base font-semibold text-slate-800">No Performance Records Found</h3>
+          <p className="text-xs text-slate-500 max-w-md">
+            You do not have any performance evaluations recorded yet. When your administrator completes your evaluation, your score, rating, evaluator remarks, and feedback will appear here.
+          </p>
+        </div>
       ) : (
         <>
           {/* Main Scorecard Banner */}
@@ -198,8 +220,8 @@ export const PerformanceView = () => {
               <div className="space-y-3 flex-1">
                 <div className="flex items-center gap-2.5">
                   <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Evaluation Scorecard</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${ratingInfo.bg} ${ratingInfo.color}`}>
-                    {ratingInfo.label}
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${ratingBadge.bg} ${ratingBadge.color}`}>
+                    Rating: {ratingBadge.label}
                   </span>
                 </div>
 
@@ -209,14 +231,14 @@ export const PerformanceView = () => {
 
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
                   <span>Email: <strong className="text-slate-700">{user?.email || performanceData?.employeeEmail || 'N/A'}</strong></span>
-                  <span>Role: <strong className="text-slate-700 uppercase">{user?.role || performanceData?.employeeType || 'Employee'}</strong></span>
+                  <span>Evaluator: <strong className="text-slate-700">{performanceData?.evaluatorName || (typeof performanceData?.submittedBy === 'object' ? (performanceData?.submittedBy?.name || performanceData?.submittedBy?.fullName) : performanceData?.submittedBy) || 'Admin'} ({performanceData?.evaluatorRole || 'Evaluator'})</strong></span>
                   <span>Evaluated Date: <strong className="text-slate-700">{formatDate(performanceData?.updatedAt || performanceData?.createdAt)}</strong></span>
                 </div>
 
                 {/* Progress Bar */}
                 <div className="space-y-1.5 pt-2 max-w-xl">
                   <div className="flex justify-between text-xs font-semibold text-slate-700">
-                    <span>Performance Rating</span>
+                    <span>Performance (out of 100)</span>
                     <span>{score}%</span>
                   </div>
                   <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
@@ -235,26 +257,32 @@ export const PerformanceView = () => {
                   {score}%
                 </span>
                 <span className="text-xs font-semibold text-slate-500 mt-1">
-                  Overall Rating
+                  Performance Score
                 </span>
-                <span className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                  GET api/performance/:id
+                <span className="text-xs font-bold text-indigo-600 mt-1">
+                  Rating: {ratingBadge.label}
                 </span>
               </div>
             </div>
 
-            {/* Evaluator Remarks */}
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Evaluator Remarks & Feedback</h4>
-              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl">
-                <p className="text-xs text-slate-700 italic leading-relaxed">
-                  "{performanceData?.remarks || 'No specific remarks recorded for this evaluation cycle yet. Keep up the consistent deliverables.'}"
-                </p>
+            {/* Evaluator Remarks & Feedback */}
+            <div className="mt-6 pt-5 border-t border-slate-100 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Feedback</h4>
+                  <p className="text-xs text-slate-700 italic leading-relaxed">
+                    {performanceData?.feedback ? `"${performanceData.feedback}"` : "No feedback recorded."}
+                  </p>
+                </div>
+                <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Remarks</h4>
+                  <p className="text-xs text-slate-700 italic leading-relaxed">
+                    {performanceData?.remarks || performanceData?.remark ? `"${performanceData.remarks || performanceData.remark}"` : "No remarks recorded."}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-
-
         </>
       )}
     </div>

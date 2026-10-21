@@ -22,7 +22,6 @@ import {
   AlertCircle,
   X,
   ShieldCheck,
-  Plus,
   Crown,
   Landmark,
   UserCheck
@@ -60,15 +59,6 @@ const EmployeeRequests = () => {
   const [teamLeads, setTeamLeads] = useState([]);
   const [loadingTeamLeads, setLoadingTeamLeads] = useState(false);
   const [selectedTeamLeadId, setSelectedTeamLeadId] = useState('');
-
-  // Add Company modal state
-  const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
-  const [newCompanyName, setNewCompanyName] = useState('');
-  const [newCompanyGstin, setNewCompanyGstin] = useState('');
-  const [newCompanyPan, setNewCompanyPan] = useState('');
-  const [newCompanyCity, setNewCompanyCity] = useState('');
-  const [addingCompany, setAddingCompany] = useState(false);
-  const [addCompanyError, setAddCompanyError] = useState('');
 
   // Fetch users from API
   const fetchUsers = async (isSilent = false) => {
@@ -136,7 +126,7 @@ const EmployeeRequests = () => {
             const cData = compData?.data || compData?.companies || compData || [];
             if (Array.isArray(cData) && cData.length > 0) companyList = cData;
           }
-        } catch {}
+        } catch { }
       }
 
       if (companyList.length === 0) {
@@ -147,7 +137,7 @@ const EmployeeRequests = () => {
             const cData = compData?.data || compData?.companies || compData || [];
             if (Array.isArray(cData) && cData.length > 0) companyList = cData;
           }
-        } catch {}
+        } catch { }
       }
 
       setCompanies(companyList);
@@ -192,7 +182,7 @@ const EmployeeRequests = () => {
             const list = bData?.data || bData?.branches || bData || [];
             if (Array.isArray(list) && list.length > 0) branchList = list;
           }
-        } catch {}
+        } catch { }
       }
 
       if (branchList.length === 0) {
@@ -208,7 +198,7 @@ const EmployeeRequests = () => {
               });
             }
           }
-        } catch {}
+        } catch { }
       }
 
       setBranches(branchList);
@@ -253,7 +243,7 @@ const EmployeeRequests = () => {
             const list = fData?.data || fData?.financialYears || fData?.years || fData || [];
             if (Array.isArray(list) && list.length > 0) fyList = list;
           }
-        } catch {}
+        } catch { }
       }
 
       if (fyList.length === 0) {
@@ -269,7 +259,7 @@ const EmployeeRequests = () => {
               });
             }
           }
-        } catch {}
+        } catch { }
       }
 
       setFinancialYears(fyList);
@@ -283,86 +273,6 @@ const EmployeeRequests = () => {
     }
   };
 
-  // Create / Add New Company: POST /api/company
-  const handleCreateCompany = async (e) => {
-    if (e) e.preventDefault();
-    if (!newCompanyName.trim()) {
-      setAddCompanyError('Please enter a company name.');
-      return;
-    }
-    setAddingCompany(true);
-    setAddCompanyError('');
-    try {
-      const token = getAuthToken();
-      const payload = {
-        name: newCompanyName.trim(),
-        companyName: newCompanyName.trim(),
-        ...(newCompanyGstin.trim() ? { gstin: newCompanyGstin.trim().toUpperCase(), gstNumber: newCompanyGstin.trim().toUpperCase() } : {}),
-        ...(newCompanyPan.trim() ? { pan: newCompanyPan.trim().toUpperCase(), panNumber: newCompanyPan.trim().toUpperCase() } : {}),
-        ...(newCompanyCity.trim() ? { city: newCompanyCity.trim() } : {})
-      };
-
-      let createdComp = null;
-      try {
-        const reqHeaders = {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        };
-        const res = await api.post('/api/company', payload, { headers: reqHeaders });
-        if (res.data?.data) {
-          createdComp = res.data.data;
-        }
-      } catch (postErr) {
-        const fetchRes = await fetch('https://kt-backend-yzr4.onrender.com/api/company', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify(payload)
-        });
-        const resData = await fetchRes.json();
-        if (resData?.data) {
-          createdComp = resData.data;
-        } else {
-          throw new Error(resData?.message || postErr.message || 'Failed to add company');
-        }
-      }
-
-      // Re-fetch all companies from server
-      const updatedList = await fetchCompanies();
-      const compId = createdComp?._id || createdComp?.id || (updatedList.length > 0 ? (updatedList[0]._id || updatedList[0].id) : null);
-      if (compId) {
-        setSelectedCompanyId(compId);
-        const bList = await fetchBranches(compId);
-        if (bList.length > 0) {
-          const firstBId = bList[0]._id || bList[0].id;
-          setSelectedBranchId(firstBId);
-          const fyList = await fetchFinancialYears(firstBId, compId);
-          if (fyList.length > 0) {
-            const activeFy = fyList.find(f => f.status === 'active');
-            setSelectedFinancialYearId(activeFy ? (activeFy._id || activeFy.id) : (fyList[0]._id || fyList[0].id));
-          }
-        } else {
-          setSelectedBranchId('');
-          setSelectedFinancialYearId('');
-        }
-      }
-
-      setShowAddCompanyModal(false);
-      setNewCompanyName('');
-      setNewCompanyGstin('');
-      setNewCompanyPan('');
-      setNewCompanyCity('');
-      setSuccessNotification(`Company "${newCompanyName.trim()}" ready!`);
-      setTimeout(() => setSuccessNotification(''), 4000);
-    } catch (err) {
-      console.error('Failed to add company:', err);
-      setAddCompanyError(err.message || 'Failed to create company. Please check input.');
-    } finally {
-      setAddingCompany(false);
-    }
-  };
 
   // Fetch Available Team Leads ONLY from https://kt-backend-yzr4.onrender.com/api/employee/list
   const fetchTeamLeads = async () => {
@@ -597,7 +507,7 @@ const EmployeeRequests = () => {
       if (userObj._id && savedUserTL[String(userObj._id)]) {
         return savedUserTL[String(userObj._id)];
       }
-    } catch {}
+    } catch { }
 
     // 3. Check localStorage 'teamLeadAssignedEmployees'
     try {
@@ -614,7 +524,7 @@ const EmployeeRequests = () => {
           }
         }
       }
-    } catch {}
+    } catch { }
 
     return null;
   };
@@ -661,7 +571,7 @@ const EmployeeRequests = () => {
       if (userObj._id && savedBank[String(userObj._id)]) {
         return savedBank[String(userObj._id)];
       }
-    } catch {}
+    } catch { }
 
     return null;
   };
@@ -729,10 +639,6 @@ const EmployeeRequests = () => {
 
   // ================= MODAL DROPDOWN INTERACTION HANDLERS =================
   const handleCompanyChange = async (newCompanyId) => {
-    if (newCompanyId === '__ADD_NEW__') {
-      setShowAddCompanyModal(true);
-      return;
-    }
     setSelectedCompanyId(newCompanyId);
     setSelectedBranchId('');
     setSelectedFinancialYearId('');
@@ -772,6 +678,28 @@ const EmployeeRequests = () => {
     if (e) e.preventDefault();
     if (!approvingUser) return;
 
+    // Strict validation: Team Leader, Company Name, Branch, and Financial Year are all mandatory!
+    const missingFields = [];
+    if (!selectedTeamLeadId || !String(selectedTeamLeadId).trim()) {
+      missingFields.push('Team Leader (TL)');
+    }
+    if (!selectedCompanyId || !String(selectedCompanyId).trim()) {
+      missingFields.push('Company Name');
+    }
+    if (!selectedBranchId || !String(selectedBranchId).trim()) {
+      missingFields.push('Branch');
+    }
+    if (!selectedFinancialYearId || !String(selectedFinancialYearId).trim()) {
+      missingFields.push('Financial Year');
+    }
+
+    if (missingFields.length > 0) {
+      setApprovalError(
+        `Cannot approve employee: ${missingFields.join(', ')} ${missingFields.length === 1 ? 'is' : 'are'} required. Please assign a Team Leader and all Company details before approving.`
+      );
+      return;
+    }
+
     const userId = getUserIdentifier(approvingUser, 0);
     setSubmittingApproval(true);
     setApprovalError('');
@@ -779,10 +707,10 @@ const EmployeeRequests = () => {
     // Find selected Team Lead record (dynamic only)
     const selectedTL = selectedTeamLeadId
       ? teamLeads.find(t =>
-          String(t._id) === String(selectedTeamLeadId) ||
-          String(t.userId) === String(selectedTeamLeadId) ||
-          String(t.id) === String(selectedTeamLeadId)
-        )
+        String(t._id) === String(selectedTeamLeadId) ||
+        String(t.userId) === String(selectedTeamLeadId) ||
+        String(t.id) === String(selectedTeamLeadId)
+      )
       : null;
     const tlNameVal = selectedTL ? (selectedTL.name || selectedTL.fullName || null) : null;
     const tlEmailVal = selectedTL?.email || null;
@@ -897,8 +825,8 @@ const EmployeeRequests = () => {
               teamLead: selectedTeamLeadId,
               employees: [userId]
             })
-          }).catch(() => {});
-        } catch {}
+          }).catch(() => { });
+        } catch { }
       }
 
       if (isSuccess) {
@@ -935,7 +863,7 @@ const EmployeeRequests = () => {
             }
             localStorage.setItem('teamLeadAssignedEmployees', JSON.stringify(currentAssignments));
             localStorage.setItem('kt_assigned_employees', JSON.stringify(currentAssignments));
-          } catch {}
+          } catch { }
 
           // Persist User -> Team Lead mapping
           try {
@@ -948,7 +876,7 @@ const EmployeeRequests = () => {
               assignedAt: new Date().toISOString()
             };
             localStorage.setItem('kt_user_assigned_tl', JSON.stringify(currentTLMap));
-          } catch {}
+          } catch { }
         }
 
         // Persist User -> Bank Details mapping (if details exist)
@@ -957,7 +885,7 @@ const EmployeeRequests = () => {
             const currentBankMap = JSON.parse(localStorage.getItem('kt_employee_bank_details') || '{}');
             currentBankMap[userId] = bankData;
             localStorage.setItem('kt_employee_bank_details', JSON.stringify(currentBankMap));
-          } catch {}
+          } catch { }
         }
 
         // Update user state locally
@@ -1008,10 +936,12 @@ const EmployeeRequests = () => {
 
   // ================= REJECT / REVOKE ACTION =================
   const handleAction = async (user, action) => {
+    if (action === 'approve') {
+      handleApproveClick(user);
+      return;
+    }
     const userId = getUserIdentifier(user, 0);
-    const endpoint = action === 'approve'
-      ? 'https://kt-backend-yzr4.onrender.com/api/users/approve'
-      : 'https://kt-backend-yzr4.onrender.com/api/users/reject';
+    const endpoint = 'https://kt-backend-yzr4.onrender.com/api/users/reject';
 
     setProcessingState({ userId, action });
     setError('');
@@ -1120,8 +1050,8 @@ const EmployeeRequests = () => {
       if (isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return false;
 
       const searchMatch = user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user?.department?.toLowerCase().includes(searchTerm.toLowerCase());
+        user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user?.department?.toLowerCase().includes(searchTerm.toLowerCase());
 
       if (!searchMatch) return false;
 
@@ -1504,11 +1434,10 @@ const EmployeeRequests = () => {
                       handleApproveClick(user);
                     }}
                     disabled={isApproved}
-                    className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${
-                      isApproved
-                        ? 'cursor-not-allowed bg-gray-100 text-gray-400'
-                        : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
-                    }`}
+                    className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isApproved
+                      ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
+                      }`}
                   >
                     {isApproved ? (
                       <span className="flex items-center justify-center gap-1.5">
@@ -1529,13 +1458,12 @@ const EmployeeRequests = () => {
                       handleAction(user, 'reject');
                     }}
                     disabled={isProcessingReject}
-                    className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${
-                      isProcessingReject
-                        ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                        : isApproved
+                    className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isProcessingReject
+                      ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                      : isApproved
                         ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-[1.02] active:scale-[0.98]'
                         : 'bg-rose-100 text-rose-700 hover:bg-rose-200 hover:scale-[1.02] active:scale-[0.98]'
-                    }`}
+                      }`}
                   >
                     {isProcessingReject ? (
                       <span className="flex items-center justify-center gap-1.5">
@@ -1642,12 +1570,12 @@ const EmployeeRequests = () => {
                       <Crown size={15} />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider">
-                        1. Assign Team Lead (TL) <span className="text-slate-500 font-normal lowercase">(passes null if unassigned)</span>
+                      <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
+                        <span>1. Assign Team Lead (TL)</span>
+                        <span className="text-rose-500 font-bold">*</span>
+                        <span className="text-rose-600 font-semibold text-[10px] lowercase bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">required</span>
                       </label>
-                      <p className="text-[11px] text-blue-800">
-                        Assign Team Lead for {approvingUser?.name || 'this employee'} if available.
-                      </p>
+
                     </div>
                   </div>
                   {loadingTeamLeads && (
@@ -1664,13 +1592,16 @@ const EmployeeRequests = () => {
                     value={selectedTeamLeadId}
                     onChange={(e) => {
                       setSelectedTeamLeadId(e.target.value);
-                      if (approvalError && !selectedTeamLeadId) setApprovalError('');
+                      if (approvalError) setApprovalError('');
                     }}
                     disabled={submittingApproval || loadingTeamLeads}
-                    className="w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition text-slate-900 font-medium"
+                    className={`w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white rounded-xl focus:outline-none focus:ring-2 transition text-slate-900 font-medium ${!selectedTeamLeadId && approvalError
+                      ? 'border-2 border-rose-400 ring-2 ring-rose-100 focus:border-rose-600 focus:ring-rose-200'
+                      : 'border border-blue-300 focus:ring-blue-500/20 focus:border-blue-600'
+                      }`}
                   >
                     <option value="">
-                      -- {loadingTeamLeads ? 'Loading Team Leads...' : teamLeads.length === 0 ? 'No Team Leads available (passes null)' : 'Select Team Lead (or leave empty to pass null)'} --
+                      -- {loadingTeamLeads ? 'Loading Team Leads...' : teamLeads.length === 0 ? 'No Team Leads available' : 'Select Team Leader (Required) *'} --
                     </option>
                     {teamLeads.map((tl) => {
                       const tlId = String(tl._id || tl.id || tl.userId);
@@ -1703,8 +1634,9 @@ const EmployeeRequests = () => {
                     </div>
                   );
                 })() : (
-                  <p className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-                    <span>No Team Lead selected • will pass null</span>
+                  <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
+                    <AlertCircle size={13} className="shrink-0 text-rose-500" />
+                    <span>Team Leader must be assigned before approval</span>
                   </p>
                 )}
               </div>
@@ -1719,12 +1651,12 @@ const EmployeeRequests = () => {
                       <Building2 size={15} />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        2. Organization Details <span className="text-slate-500 font-normal lowercase">(passes null if unassigned)</span>
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
+                        <span>2. Organization Details</span>
+                        <span className="text-rose-500 font-bold">*</span>
+                        <span className="text-rose-600 font-semibold text-[10px] lowercase bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">required</span>
                       </h4>
-                      <p className="text-[11px] text-slate-500">
-                        Company entity, branch office & financial year
-                      </p>
+
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -1750,30 +1682,23 @@ const EmployeeRequests = () => {
 
                 {/* Field 1: Company Name */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-semibold text-slate-700">
-                      Company Name
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddCompanyModal(true)}
-                      className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer transition"
-                      title="Add a new company"
-                    >
-                      <Plus size={13} />
-                      <span>Add Company</span>
-                    </button>
-                  </div>
+                  <label className="block text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                    <span>Company Name</span>
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <div className="relative">
                     <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     <select
                       value={selectedCompanyId}
                       onChange={(e) => handleCompanyChange(e.target.value)}
                       disabled={submittingApproval || loadingCompanies}
-                      className="w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900"
+                      className={`w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white rounded-xl focus:outline-none focus:ring-2 transition text-slate-900 ${!selectedCompanyId && approvalError
+                        ? 'border-2 border-rose-400 ring-2 ring-rose-100 focus:border-rose-600 focus:ring-rose-200'
+                        : 'border border-slate-300 focus:ring-indigo-500/20 focus:border-indigo-600'
+                        }`}
                     >
                       <option value="">
-                        -- {loadingCompanies ? 'Loading Companies...' : companies.length === 0 ? 'No Companies available (passes null)' : 'Select Company (or leave empty to pass null)'} --
+                        -- {loadingCompanies ? 'Loading Companies...' : companies.length === 0 ? 'No Companies available' : 'Select Company Name (Required) *'} --
                       </option>
                       {companies.map((c) => {
                         const id = c._id || c.id;
@@ -1784,16 +1709,19 @@ const EmployeeRequests = () => {
                           </option>
                         );
                       })}
-                      <option value="__ADD_NEW__">+ Add New Company...</option>
                     </select>
                   </div>
+                  {!selectedCompanyId && (
+                    <p className="text-[10px] text-rose-500 font-medium">Company Name is required</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Field 2: Branch */}
                   <div className="space-y-1">
-                    <label className="block text-[11px] font-semibold text-slate-700">
-                      Branch
+                    <label className="block text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                      <span>Branch</span>
+                      <span className="text-rose-500 font-bold">*</span>
                     </label>
                     <div className="relative">
                       <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -1801,16 +1729,19 @@ const EmployeeRequests = () => {
                         value={selectedBranchId}
                         onChange={(e) => handleBranchChange(e.target.value)}
                         disabled={submittingApproval || loadingBranches || !selectedCompanyId}
-                        className="w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900"
+                        className={`w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white rounded-xl focus:outline-none focus:ring-2 transition text-slate-900 ${!selectedBranchId && approvalError
+                          ? 'border-2 border-rose-400 ring-2 ring-rose-100 focus:border-rose-600 focus:ring-rose-200'
+                          : 'border border-slate-300 focus:ring-indigo-500/20 focus:border-indigo-600'
+                          }`}
                       >
                         <option value="">
                           {loadingBranches
                             ? 'Loading branches...'
                             : !selectedCompanyId
-                            ? '-- Select Company First --'
-                            : branches.length === 0
-                            ? 'No branches available (passes null)'
-                            : '-- Select Branch (or leave empty to pass null) --'}
+                              ? '-- Select Company First --'
+                              : branches.length === 0
+                                ? 'No branches available'
+                                : '-- Select Branch (Required) * --'}
                         </option>
                         {branches.map((b) => {
                           const id = b._id || b.id;
@@ -1823,29 +1754,39 @@ const EmployeeRequests = () => {
                         })}
                       </select>
                     </div>
+                    {!selectedBranchId && selectedCompanyId && (
+                      <p className="text-[10px] text-rose-500 font-medium">Branch is required</p>
+                    )}
                   </div>
 
                   {/* Field 3: Financial Year */}
                   <div className="space-y-1">
-                    <label className="block text-[11px] font-semibold text-slate-700">
-                      Financial Year
+                    <label className="block text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                      <span>Financial Year</span>
+                      <span className="text-rose-500 font-bold">*</span>
                     </label>
                     <div className="relative">
                       <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                       <select
                         value={selectedFinancialYearId}
-                        onChange={(e) => setSelectedFinancialYearId(e.target.value)}
+                        onChange={(e) => {
+                          setSelectedFinancialYearId(e.target.value);
+                          if (approvalError) setApprovalError('');
+                        }}
                         disabled={submittingApproval || loadingFY || !selectedBranchId}
-                        className="w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900 font-mono"
+                        className={`w-full h-10 pl-10 pr-8 text-xs sm:text-sm bg-white rounded-xl focus:outline-none focus:ring-2 transition text-slate-900 font-mono ${!selectedFinancialYearId && approvalError
+                          ? 'border-2 border-rose-400 ring-2 ring-rose-100 focus:border-rose-600 focus:ring-rose-200'
+                          : 'border border-slate-300 focus:ring-indigo-500/20 focus:border-indigo-600'
+                          }`}
                       >
                         <option value="">
                           {loadingFY
                             ? 'Loading Financial Years...'
                             : !selectedBranchId
-                            ? '-- Select Branch First --'
-                            : financialYears.length === 0
-                            ? 'No Financial Years available (passes null)'
-                            : '-- Select Financial Year (or leave empty to pass null) --'}
+                              ? '-- Select Branch First --'
+                              : financialYears.length === 0
+                                ? 'No Financial Years available'
+                                : '-- Select Financial Year (Required) * --'}
                         </option>
                         {financialYears.map((fy) => {
                           const id = fy._id || fy.id;
@@ -1859,172 +1800,63 @@ const EmployeeRequests = () => {
                         })}
                       </select>
                     </div>
+                    {!selectedFinancialYearId && selectedBranchId && (
+                      <p className="text-[10px] text-rose-500 font-medium">Financial Year is required</p>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Footer Actions */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setApprovingUser(null)}
-                  disabled={submittingApproval}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs sm:text-sm font-semibold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingApproval}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
-                >
-                  {submittingApproval ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Submitting Approval...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle size={16} />
-                      <span>Confirm & Approve (Assign TL)</span>
-                    </>
-                  )}
-                </button>
+              <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                {(!selectedTeamLeadId || !selectedCompanyId || !selectedBranchId || !selectedFinancialYearId) ? (
+                  <div className="flex items-center gap-1.5 text-[11px] text-amber-700 font-medium">
+
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
+
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setApprovingUser(null)}
+                    disabled={submittingApproval}
+                    className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs sm:text-sm font-semibold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingApproval || !selectedTeamLeadId || !selectedCompanyId || !selectedBranchId || !selectedFinancialYearId}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={
+                      !selectedTeamLeadId || !selectedCompanyId || !selectedBranchId || !selectedFinancialYearId
+                        ? 'Please select TL, Company Name, Branch, and Financial Year to approve'
+                        : 'Confirm and Approve Employee'
+                    }
+                  >
+                    {submittingApproval ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Submitting Approval...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle size={16} />
+                        <span>Confirm & Approve</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ==================================================== */}
-      {/* ADD COMPANY MODAL */}
-      {/* ==================================================== */}
-      {showAddCompanyModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
-          onClick={() => setShowAddCompanyModal(false)}
-        >
-          <div
-            className="relative w-full max-w-md rounded-2xl border border-slate-200/80 bg-white shadow-2xl p-5 sm:p-6 animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
-                  <Building2 size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                    Add New Company
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Register company into available organization list
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddCompanyModal(false)}
-                className="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {addCompanyError && (
-              <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                <AlertCircle size={15} className="shrink-0" />
-                <span>{addCompanyError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreateCompany} className="mt-4 space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Company Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newCompanyName}
-                  onChange={(e) => setNewCompanyName(e.target.value)}
-                  placeholder="e.g. KEVALON Technology Pvt. Ltd."
-                  className="w-full h-10 px-3 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    GSTIN (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={newCompanyGstin}
-                    onChange={(e) => setNewCompanyGstin(e.target.value.toUpperCase())}
-                    placeholder="24BQSPH0154B1Z9"
-                    className="w-full h-10 px-3 text-xs uppercase bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    PAN (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={newCompanyPan}
-                    onChange={(e) => setNewCompanyPan(e.target.value.toUpperCase())}
-                    placeholder="BQSPH0154"
-                    className="w-full h-10 px-3 text-xs uppercase bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  City / Location (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newCompanyCity}
-                  onChange={(e) => setNewCompanyCity(e.target.value)}
-                  placeholder="e.g. Ahmedabad, Gujarat"
-                  className="w-full h-10 px-3 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition text-slate-900"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setShowAddCompanyModal(false)}
-                  disabled={addingCompany}
-                  className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={addingCompany || !newCompanyName.trim()}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-semibold shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
-                >
-                  {addingCompany ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      <span>Saving Company...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={14} />
-                      <span>Save & Select Company</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ==================================================== */}
       {/* ENHANCED FULL DETAIL MODAL (MOBILE RESPONSIVE) */}
@@ -2262,11 +2094,10 @@ const EmployeeRequests = () => {
 
               {/* Status & Quick Action */}
               <div className="border-t border-slate-200 pt-3 sm:pt-4 space-y-2">
-                <div className={`rounded-lg p-2 sm:p-3 ${
-                  selectedUser?.isApproved
-                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                    : 'bg-amber-50 border border-amber-200 text-amber-800'
-                }`}>
+                <div className={`rounded-lg p-2 sm:p-3 ${selectedUser?.isApproved
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50 border border-amber-200 text-amber-800'
+                  }`}>
                   <p className="text-xs sm:text-sm font-medium text-center">
                     Status: {selectedUser?.isApproved ? '✅ Approved' : '⏳ Pending Review'}
                   </p>

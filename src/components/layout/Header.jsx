@@ -794,7 +794,7 @@ export const Header = ({ onSignOut }) => {
                     </div>
 
                     {/* Admin Items List */}
-                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-100/80">
+                    <div className="max-h-96 overflow-y-auto divide-y divide-slate-100/80">
                       {filteredAdminNotifications.length === 0 ? (
                         <div className="p-6 text-center text-slate-400">
                           {adminTab === 'unread' ? (
@@ -823,15 +823,15 @@ export const Header = ({ onSignOut }) => {
                             </div>
 
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-1">
-                                <p className={`truncate text-xs ${!item.isRead ? 'font-semibold text-slate-900' : 'font-medium text-slate-600'}`}>
+                              <div className="flex items-start justify-between gap-2">
+                                <p className={`text-xs break-words leading-snug ${!item.isRead ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
                                   {item.title}
                                 </p>
                                 {!item.isRead && (
-                                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 shrink-0" />
+                                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 shrink-0 mt-1" />
                                 )}
                               </div>
-                              <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
+                              <p className="text-[11px] text-slate-600 mt-1 leading-relaxed break-words whitespace-pre-wrap">
                                 {item.message}
                               </p>
                               <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
@@ -955,7 +955,7 @@ export const Header = ({ onSignOut }) => {
                     </div>
 
                     {/* Employee Items List */}
-                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                    <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
                       {filteredEmployeeNotifications.length === 0 ? (
                         <div className="p-6 text-center text-xs text-slate-400">
                           No notifications available
@@ -978,13 +978,13 @@ export const Header = ({ onSignOut }) => {
                               )}
                             </div>
                             <div className="flex-1 min-w-0 text-xs">
-                              <div className="font-semibold text-slate-800 flex justify-between items-center gap-2">
-                                <span className="truncate">{notif.title}</span>
-                                <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                              <div className="font-semibold text-slate-800 flex justify-between items-start gap-2">
+                                <span className="break-words leading-snug">{notif.title}</span>
+                                <span className="text-[10px] text-slate-400 font-mono shrink-0 mt-0.5">
                                   {formatNotificationDate(notif.createdAt)}
                                 </span>
                               </div>
-                              <p className="text-slate-500 mt-1 text-[11px] leading-relaxed break-words line-clamp-3">
+                              <p className="text-slate-600 mt-1 text-[11px] leading-relaxed break-words whitespace-pre-wrap">
                                 {notif.message}
                               </p>
                             </div>
