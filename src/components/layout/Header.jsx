@@ -11,6 +11,7 @@ import api from '../../api/axios.js';
 import companyLogo from '../../assets/Logo.png';
 import { tabToPath, pathToTab } from '../../utils/navigation.js';
 import { useConfirm } from '../common/ConfirmDialog.jsx';
+import { showToast } from '../common/Toast.jsx';
 
 export const Header = ({ onSignOut }) => {
   const {
@@ -385,7 +386,7 @@ export const Header = ({ onSignOut }) => {
 
   const handleAnnouncementSubmit = async () => {
     if (!announcementForm.title.trim() || !announcementForm.message.trim()) {
-      alert('Please fill both title and message before posting.');
+      showToast('Please fill both title and message before posting.', 'error');
       return;
     }
 
@@ -422,11 +423,13 @@ export const Header = ({ onSignOut }) => {
         setEditingAnnouncementId(null);
         setShowAnnouncementModal(false);
         await fetchAdminNotificationsFeed();
+        showToast('Announcement published successfully!', 'success');
       } else {
-        alert(data?.message || 'Failed to save announcement. Please try again.');
+        showToast(data?.message || 'Failed to save announcement. Please try again.', 'error');
       }
     } catch (error) {
       console.error('Error posting announcement:', error);
+      showToast('Failed to save announcement. Please try again.', 'error');
     }
   };
 

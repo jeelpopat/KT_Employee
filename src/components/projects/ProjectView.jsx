@@ -15,6 +15,7 @@ import {
   isAdminRole 
 } from '../../utils/teamLeadUtils.js';
 import { normalizeTaskStatus, getProgressForStatus } from '../../utils/taskUtils.js';
+import { showToast } from '../common/Toast.jsx';
 
 // Helper to normalize and build assigned member list from project and /members endpoint data
 const buildAssignedMemberList = (proj, membersData) => {
@@ -219,9 +220,10 @@ export const ProjectView = () => {
         setSelectedProjectModal(null);
       }
       await fetchLiveProjectsAndTasks();
+      showToast('Project deleted successfully.', 'success');
     } catch (err) {
       console.error('Failed to delete project:', err);
-      alert(err.response?.data?.message || 'Failed to delete project');
+      showToast(err.response?.data?.message || 'Failed to delete project', 'error');
     } finally {
       setIsSubmitting(false);
     }

@@ -30,6 +30,7 @@ import {
   Layers
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
+import { showToast } from "../../components/common/Toast";
 import {
   isFinanceOrExcludedUser,
   filterOutFinanceUsers,
@@ -1469,19 +1470,19 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       };
 
       if (!payload.projectId) {
-        alert("Please select a project before saving a task.");
+        showToast("Please select a project before saving a task.", "error");
         return;
       }
 
       if (!assignedTeamLeadUserId && !assignedTeamLeadEmployeeId && !payload.assignedEmployee) {
-        alert("Please assign this task to a team lead or an employee.");
+        showToast("Please assign this task to a team lead or an employee.", "error");
         return;
       }
 
       if (payload.assignedEmployee) {
         const allowedAssigneeIds = getAvailableTaskAssignees(taskProject, editingTask ? payload.assignedEmployee : null).map(normalizeId);
         if (!allowedAssigneeIds.includes(normalizeId(payload.assignedEmployee))) {
-          alert("Please assign this task to an employee assigned to the selected project.");
+          showToast("Please assign this task to an employee assigned to the selected project.", "error");
           return;
         }
       }
@@ -1504,7 +1505,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
             }
           }
         }
-        alert("Task updated successfully!");
+        showToast("Task updated successfully!", "success");
       } else {
         try {
           await axios.post(`${TASK_URL}/create`, payload, { headers });
@@ -1512,7 +1513,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           console.warn("Primary create task failed, trying fallback:", err1.message);
           await axios.post(`${TASK_PROJECT_MANAGE_URL}/create`, payload, { headers });
         }
-        alert("Task created successfully!");
+        showToast("Task created successfully!", "success");
       }
 
       const updatedTasks = await fetchTasks();
@@ -1524,7 +1525,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       closeTaskModal();
     } catch (error) {
       console.error("Task save error:", error);
-      alert(`Task ${editingTask ? "update" : "creation"} failed: ` + (error?.response?.data?.message || error?.message || "Unknown error"));
+      showToast(`Task ${editingTask ? "update" : "creation"} failed: ` + (error?.response?.data?.message || error?.message || "Unknown error"), "error");
     }
   };
 
@@ -1538,7 +1539,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       await fetchTasks(selectedProject?._id || null);
     } catch (error) {
       console.error("Failed to update status:", error);
-      alert("Failed to update status");
+      showToast("Failed to update status", "error");
     }
   };
 
@@ -1559,9 +1560,10 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       if (selectedTaskDetails && isSameId(selectedTaskDetails._id, taskId)) {
         setSelectedTaskDetails(null);
       }
+      showToast("Task deleted successfully.", "success");
     } catch (error) {
       console.error("Failed to delete task:", error);
-      alert("Failed to delete task");
+      showToast("Failed to delete task", "error");
     }
   };
 
@@ -1593,11 +1595,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
       await fetchProjects();
       await fetchTasks();
-      alert("Project deleted successfully.");
+      showToast("Project deleted successfully.", "success");
     } catch (error) {
       console.error("Failed to delete project:", error);
       const msg = error?.response?.data?.message || error?.message || "Failed to delete project";
-      alert(`Failed to delete project: ${msg}`);
+      showToast(`Failed to delete project: ${msg}`, "error");
     }
   };
 
@@ -1658,17 +1660,17 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       };
 
       if (!projectForm.projectName.trim()) {
-        alert("Please enter project name.");
+        showToast("Please enter project name.", "error");
         return;
       }
 
       if (!projectForm.clientName.trim()) {
-        alert("Please enter client name.");
+        showToast("Please enter client name.", "error");
         return;
       }
 
       if (!projectForm.assignedTL) {
-        alert("Please select a team lead.");
+        showToast("Please select a team lead.", "error");
         return;
       }
 
@@ -1680,10 +1682,10 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         // Backend route expected: PUT /api/projectManage/project/:id
         await axios.put(`${BASE_URL}/${id}`, payload);
 
-        alert("Project updated successfully.");
+        showToast("Project updated successfully.", "success");
       } else {
         await axios.post(`${BASE_URL}/create`, payload);
-        alert("Project created successfully.");
+        showToast("Project created successfully.", "success");
       }
 
       await fetchProjects();
@@ -1703,7 +1705,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         error?.message ||
         "Unable to save project.";
 
-      alert(`Project ${selectedProject ? "update" : "creation"} failed: ${message}`);
+      showToast(`Project ${selectedProject ? "update" : "creation"} failed: ${message}`, "error");
     }
   };
 

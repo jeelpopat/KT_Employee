@@ -20,6 +20,7 @@ import {
   isProjectAssignedToLead,
 } from '../../utils/teamLeadUtils.js';
 import { normalizeTaskStatus, getProgressForStatus, getTaskProgress } from '../../utils/taskUtils.js';
+import { showToast } from '../common/Toast.jsx';
 
 export { ProjectView };
 
@@ -1144,7 +1145,7 @@ export const DocumentsView = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => alert(`Viewing document: ${doc.title}`)}
+                  onClick={() => showToast(`Viewing document: ${doc.title}`, 'info')}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                 >
                   <Download size={13} /> View
@@ -1311,11 +1312,11 @@ export const TeamTaskManagementView = () => {
   const handleSaveTask = async (e) => {
     e.preventDefault();
     if (!taskForm.taskTitle.trim()) {
-      alert('Please enter a task title.');
+      showToast('Please enter a task title.', 'error');
       return;
     }
     if (!taskForm.projectId) {
-      alert('Please select a project.');
+      showToast('Please select a project.', 'error');
       return;
     }
 
@@ -1372,9 +1373,10 @@ export const TeamTaskManagementView = () => {
       setIsCreateModalOpen(false);
       setEditingTask(null);
       await fetchAllData();
+      showToast('Task saved successfully!', 'success');
     } catch (err) {
       console.error('Failed to save task:', err);
-      alert(err.response?.data?.message || 'Failed to save task');
+      showToast(err.response?.data?.message || 'Failed to save task', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -1419,12 +1421,12 @@ export const TeamTaskManagementView = () => {
     setIsSubmitting(true);
     try {
       await api.delete(`/api/projectManage/task/delete/${deletingTask._id}`);
-      showAlert('Task deleted successfully!');
+      showToast('Task deleted successfully!', 'success');
       setDeletingTask(null);
       await fetchAllData();
     } catch (err) {
       console.error('Failed to delete task:', err);
-      alert(err.response?.data?.message || 'Failed to delete task');
+      showToast(err.response?.data?.message || 'Failed to delete task', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -2289,10 +2291,11 @@ export const TeamLeaveManagementView = () => {
       setActionModal(null);
       setRemarksText('');
       await fetchLeaves();
+      showToast('Leave approved successfully!', 'success');
     } catch (err) {
       console.error('Failed to approve leave:', err);
       const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to approve leave';
-      alert(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -2330,10 +2333,11 @@ export const TeamLeaveManagementView = () => {
       setActionModal(null);
       setRemarksText('');
       await fetchLeaves();
+      showToast(`Leave has been rejected.`, 'success');
     } catch (err) {
       console.error('Failed to reject leave:', err);
       const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to reject leave';
-      alert(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsSubmitting(false);
     }

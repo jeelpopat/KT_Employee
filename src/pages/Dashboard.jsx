@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import api from "../api/axios";
 import { useConfirm } from "../components/common/ConfirmDialog";
+import { showToast } from "../components/common/Toast";
 import {
   isFinanceOrExcludedUser,
   filterOutFinanceUsers,
@@ -625,7 +626,7 @@ export default function Dashboard() {
 
   const confirmAction = async () => {
     if (!leaveRemark || !leaveRemark.trim()) {
-      alert("Please enter a description / remark.");
+      showToast("Please enter a description / remark.", "error");
       return;
     }
     await updateLeaveStatus(selectedLeave, selectedStatus, leaveRemark);

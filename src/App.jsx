@@ -6,6 +6,7 @@ import { validateUserSession, performAutoCheckout, clearAuth, isTokenExpired } f
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
+import { ToastContainer, showToast } from './components/common/Toast.jsx';
 
 // Lazy-load layout and views so unauthenticated users download ONLY the Login screen
 const Sidebar = lazy(() => import('./components/layout/Sidebar.jsx').then(m => ({ default: m.Sidebar })));
@@ -183,6 +184,31 @@ const MainLayout = ({ handleSignOut }) => {
 };
 
 export default function App() {
+  // Global interceptor for native browser alert() -> clean modern UI Toast
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const originalAlert = window.alert;
+      window.alert = (message) => {
+        const msgStr = typeof message === 'string' ? message : (message?.message || JSON.stringify(message));
+        const lower = (msgStr || '').toLowerCase();
+        const isErr =
+          lower.includes('fail') ||
+          lower.includes('error') ||
+          lower.includes('require') ||
+          lower.includes('please') ||
+          lower.includes('wrong') ||
+          lower.includes('invalid') ||
+          lower.includes('missing') ||
+          lower.includes('not found') ||
+          lower.includes('denied');
+        showToast(msgStr, isErr ? 'error' : 'success');
+      };
+      return () => {
+        window.alert = originalAlert;
+      };
+    }
+  }, []);
+
   const [isCheckingAuth, setIsCheckingAuth] = useState(() => {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     if (!token || isTokenExpired(token)) {
@@ -326,6 +352,7 @@ export default function App() {
 
   return (
     <AppProvider>
+      <ToastContainer />
       {isAuthenticated ? (
         <MainLayout handleSignOut={handleSignOut} />
       ) : authView === 'reset_password' ? (

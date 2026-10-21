@@ -14,6 +14,7 @@ import {
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js'; 
 import companyLogo from '../../assets/Logo.png';
+import { showToast } from '../common/Toast.jsx';
 
 // Deterministically convert any string/id into a 24-char hex string for MongoDB ObjectId
 const toValidObjectId = (id) => {
@@ -451,12 +452,12 @@ export const ProfileView = () => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert("Please upload a valid image file (PNG, JPG, WEBP).");
+      showToast("Please upload a valid image file (PNG, JPG, WEBP).", "error");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("File size exceeds 5MB limit. Please choose a smaller image.");
+      showToast("File size exceeds 5MB limit. Please choose a smaller image.", "error");
       return;
     }
 
@@ -663,7 +664,7 @@ export const ProfileView = () => {
     if (!file || !targetActionDocId) return;
 
     if (file.size > 15 * 1024 * 1024) {
-      alert("File size exceeds 15MB limit. Please upload a smaller file.");
+      showToast("File size exceeds 15MB limit. Please upload a smaller file.", "error");
       return;
     }
 
@@ -780,7 +781,7 @@ export const ProfileView = () => {
   // Sync Passport Size Photo to Profile Avatar
   const handleApplyPassportAsProfile = async (doc) => {
     if (!doc.fileUrl) {
-      alert("Please upload a passport size photo first.");
+      showToast("Please upload a passport size photo first.", "error");
       return;
     }
 
@@ -841,12 +842,12 @@ export const ProfileView = () => {
       : newDocForm.presetType;
 
     if (!finalTitle) {
-      alert("Please specify a document title.");
+      showToast("Please specify a document title.", "error");
       return;
     }
 
     if (!newDocForm.file) {
-      alert("Please attach a file for this document.");
+      showToast("Please attach a file for this document.", "error");
       return;
     }
 
@@ -920,7 +921,7 @@ export const ProfileView = () => {
       reader.readAsDataURL(newDocForm.file);
     } catch (err) {
       console.error("Failed to add document:", err);
-      alert("Failed to add document. Please try again.");
+      showToast("Failed to add document. Please try again.", "error");
     } finally {
       setIsSubmittingNewDoc(false);
     }
@@ -1002,10 +1003,11 @@ export const ProfileView = () => {
       }));
 
       setIsSaved(true);
+      showToast("Profile details updated successfully!", "success");
       setTimeout(() => setIsSaved(false), 3000);
     } catch (error) {
       console.error("Failed to update profile:", error);
-      alert("Failed to update profile details.");
+      showToast("Failed to update profile details.", "error");
     } finally {
       setIsSaving(false);
     }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import Toast from "../../components/common/Toast";
+import Toast, { showToast } from "../../components/common/Toast";
 import {
   Settings,
   X,
@@ -200,10 +200,7 @@ export default function Adjustments() {
       !tempSettings.absentAfter ||
       !tempSettings.officeEndTime
     ) {
-      alert(
-        "Please fill all attendance timings."
-      );
-
+      showToast("Please fill all attendance timings.", "error");
       return;
     }
 
@@ -211,10 +208,7 @@ export default function Adjustments() {
       tempSettings.lateAfter <=
       tempSettings.officeStartTime
     ) {
-      alert(
-        "Late After time must be greater than Office Start Time."
-      );
-
+      showToast("Late After time must be greater than Office Start Time.", "error");
       return;
     }
 
@@ -222,10 +216,7 @@ export default function Adjustments() {
       tempSettings.absentAfter <=
       tempSettings.lateAfter
     ) {
-      alert(
-        "Absent After time must be greater than Late After time."
-      );
-
+      showToast("Absent After time must be greater than Late After time.", "error");
       return;
     }
 
@@ -233,10 +224,7 @@ export default function Adjustments() {
       tempSettings.officeEndTime <=
       tempSettings.absentAfter 
     ) {
-      alert(
-        "Office End Time must be greater than Absent After time."
-      );
-
+      showToast("Office End Time must be greater than Absent After time.", "error");
       return;
     }
 
@@ -249,10 +237,7 @@ export default function Adjustments() {
         tempSettings.minimumPresentHours
       ) <= 0
     ) {
-      alert(
-        "Minimum Present Hours must be greater than 0."
-      );
-
+      showToast("Minimum Present Hours must be greater than 0.", "error");
       return;
     }
 
@@ -261,10 +246,7 @@ export default function Adjustments() {
         tempSettings.minimumHalfDayHours
       ) <= 0
     ) {
-      alert(
-        "Minimum Half-Day Hours must be greater than 0."
-      );
-
+      showToast("Minimum Half-Day Hours must be greater than 0.", "error");
       return;
     }
 
@@ -276,10 +258,7 @@ export default function Adjustments() {
         tempSettings.minimumPresentHours
       )
     ) {
-      alert(
-        "Half-Day hours must be less than Present hours."
-      );
-
+      showToast("Half-Day hours must be less than Present hours.", "error");
       return;
     }
 
@@ -705,10 +684,7 @@ export default function Adjustments() {
     if (
       sessionCount >= 2
     ) {
-      alert(
-        "Maximum 2 sessions allowed"
-      );
-
+      showToast("Maximum 2 sessions allowed", "warning");
       return;
     }
 
@@ -750,10 +726,7 @@ export default function Adjustments() {
     if (
       sessionCount <= 1
     ) {
-      alert(
-        "Minimum 1 session required"
-      );
-
+      showToast("Minimum 1 session required", "warning");
       return;
     }
 
@@ -1197,20 +1170,14 @@ export default function Adjustments() {
       !formData.employeeId ||
       !formData.date
     ) {
-      alert(
-        "Please select Employee and Date."
-      );
-
+      showToast("Please select Employee and Date.", "error");
       return;
     }
 
     if (
       !formData.reason.trim()
     ) {
-      alert(
-        "Please enter Reason."
-      );
-
+      showToast("Please enter Reason.", "error");
       return;
     }
 
@@ -1224,10 +1191,7 @@ export default function Adjustments() {
       );
 
     if (!hasAnyTime) {
-      alert(
-        "Please fill in at least one time field."
-      );
-
+      showToast("Please fill in at least one time field.", "error");
       return;
     }
 
@@ -1245,10 +1209,7 @@ export default function Adjustments() {
         );
 
       if (!allTimesFilled) {
-        alert(
-          "For PUT, all 4 timing fields must be filled."
-        );
-
+        showToast("For PUT, all 4 timing fields must be filled.", "error");
         return;
       }
     }
@@ -1647,11 +1608,10 @@ export default function Adjustments() {
           "Something went wrong."
       );
 
-      alert(
-        `❌ Error: ${
-          error.message ||
-          "Something went wrong."
-        }`
+      showToast(
+        error.message ||
+        "Something went wrong saving attendance adjustment.",
+        "error"
       );
     } finally {
       setSubmitting(false);

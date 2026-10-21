@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { isFinanceOrExcludedUser } from "../utils/roleFilters";
+import { showToast } from "../components/common/Toast";
 
 const BASE_URL = "https://kt-backend-yzr4.onrender.com/api";
 
@@ -287,7 +288,7 @@ const AssignmentModal = ({
     const distinctIds = distinct.map((emp) => String(emp._id));
 
     if (distinctIds.length === 0) {
-      alert("Please select at least one employee.");
+      showToast("Please select at least one employee.", "error");
       return;
     }
 
@@ -1272,7 +1273,7 @@ const getDesignation = (lead) => {
     try {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       if (!token) {
-        alert("Authentication required. Please login again.");
+        showToast("Authentication required. Please login again.", "error");
         return;
       }
   
@@ -1429,10 +1430,10 @@ const getDesignation = (lead) => {
         }
       }
 
-      alert("Assignments saved successfully! Each employee is assigned to at most 1 Team Lead.");
+      showToast("Assignments saved successfully! Each employee is assigned to at most 1 Team Lead.", "success");
     } catch (error) {
       console.error('Error saving assignments:', error);
-      alert(error?.response?.data?.message || 'Failed to save assignments. Please try again.');
+      showToast(error?.response?.data?.message || 'Failed to save assignments. Please try again.', "error");
     }
   };
 

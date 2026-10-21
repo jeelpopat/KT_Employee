@@ -23,6 +23,7 @@ import {
   isUnknownEmployeeOrUser,
   filterOutUnknownUsers
 } from '../../utils/roleFilters';
+import { showToast } from '../../components/common/Toast';
 
 const ATTENDANCE_URL =
   'https://kt-backend-yzr4.onrender.com/api/attendance/admin/all';
@@ -1518,14 +1519,16 @@ export default function AttendanceLogs() {
         wb,
         fileName
       );
+      showToast('Daily attendance logs exported successfully.', 'success');
     } catch (error) {
       console.error(
         'Export error:',
         error
       );
 
-      alert(
-        'Failed to export data'
+      showToast(
+        'Failed to export data',
+        'error'
       );
     }
   };
@@ -1595,9 +1598,10 @@ export default function AttendanceLogs() {
 
       downloadExcel(monthLogs, `Attendance_Logs_${monthKey}.xlsx`);
       setShowExportOptions(false);
+      showToast('Monthly attendance logs exported successfully.', 'success');
     } catch (exportError) {
       console.error('Monthly export error:', exportError);
-      alert(exportError.message || 'Failed to export monthly attendance data');
+      showToast(exportError.message || 'Failed to export monthly attendance data', 'error');
     } finally {
       setExportingMonth(false);
     }

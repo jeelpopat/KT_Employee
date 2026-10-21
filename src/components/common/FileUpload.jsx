@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UploadCloud, FileText, X } from 'lucide-react';
+import { showToast } from './Toast';
 
 export const FileUpload = ({
   label,
@@ -22,7 +23,7 @@ export const FileUpload = ({
 
   const processFile = (file) => {
     if (file.size > maxSizeMB * 1024 * 1024) {
-      alert(`File size exceeds limit of ${maxSizeMB}MB`);
+      showToast(`File size exceeds limit of ${maxSizeMB}MB`, 'error');
       return;
     }
     setSelectedFile(file);

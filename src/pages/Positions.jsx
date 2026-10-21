@@ -7,6 +7,7 @@ import {
   LayoutGrid, List as ListIcon, Download, Printer
 } from "lucide-react";
 import { useConfirm } from "../components/common/ConfirmDialog";
+import { showToast } from "../components/common/Toast";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
@@ -103,16 +104,17 @@ export default function Positions() {
       const result = await response.json();
 
       if (result.success) {
+        showToast(result.message || "Position saved successfully!", "success");
         setShowModal(false);
         setEditId(null);
         setFormData(initialFormState);
         fetchPositions();
       } else {
-        alert(result.message || "Something went wrong!");
+        showToast(result.message || "Something went wrong!", "error");
       }
     } catch (error) {
       console.log(error);
-      alert("Error saving position!");
+      showToast("Error saving position!", "error");
     }
   };
 
@@ -150,13 +152,14 @@ export default function Positions() {
         });
         const result = await response.json();
         if (result.success) {
+          showToast(result.message || "Position deleted successfully!", "success");
           fetchPositions();
         } else {
-          alert(result.message || "Failed to delete position!");
+          showToast(result.message || "Failed to delete position!", "error");
         }
       } catch (error) {
         console.log(error);
-        alert("Error deleting position!");
+        showToast("Error deleting position!", "error");
       }
     }
   };
