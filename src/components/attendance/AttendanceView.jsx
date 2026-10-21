@@ -161,12 +161,19 @@ export const AttendanceView = () => {
         return record;
       });
 
-      // If today's record wasn't returned by timeline API but exists or was rejected today, ensure it appears
-      if (!todayFound && (todayDoc || isTodayRejected) && (activeFilterTab === 'today' || activeFilterTab === '10days' || activeFilterTab === '7days' || activeFilterTab === 'month')) {
+      // If today's record wasn't returned by timeline API but exists with verified check-in or was rejected today, ensure it appears
+      const hasTodayValidAttendance = Boolean(
+        isTodayRejected ||
+        (todayDoc && (
+          (todayDoc.checkInTime && todayDoc.checkInTime !== '--:--' && todayDoc.checkInTime !== '00:00:00') ||
+          (todayDoc.status && !['not_checked_in', 'not-checked-in', 'not checked in', 'absent', 'none', 'idle'].includes(String(todayDoc.status).toLowerCase()))
+        ))
+      );
+      if (!todayFound && hasTodayValidAttendance && (activeFilterTab === 'today' || activeFilterTab === '10days' || activeFilterTab === '7days' || activeFilterTab === 'month')) {
         mergedRecords.push({
           _id: todayDoc?._id || `today-${todayStr}`,
           date: todayDoc?.date || new Date().toISOString(),
-          checkInTime: todayDoc?.checkInTime || todayDoc?.inTime || localStorage.getItem('kt_check_in_time_str'),
+          checkInTime: todayDoc?.checkInTime || todayDoc?.inTime || (isTodayRejected ? '--:--' : null),
           checkOutTime: todayDoc?.checkOutTime || todayDoc?.outTime,
           status: isTodayRejected ? 'rejected' : (todayDoc?.status || 'present'),
           approvalStatus: isTodayRejected ? 'rejected' : todayDoc?.approvalStatus,

@@ -15,9 +15,10 @@ export const isTodayDate = (dateVal) => {
     const trimmed = dateVal.trim();
     if (!trimmed || trimmed === '--:--' || trimmed === 'null' || trimmed === 'undefined' || trimmed === '00:00:00' || trimmed === '00:00') return false;
 
-    // 1. If it's a time string (e.g. "10:19 AM", "11:13 am", "10:42:00")
+    // 1. If it's a pure time-only string (e.g. "10:19 AM", "11:13 am", "10:42:00") without date component,
+    // it cannot be verified as today. Return false to prevent historical punch times from being misidentified as today.
     if (/^\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?$/i.test(trimmed)) {
-      return true; // Time-only punch value belongs to today's active attendance session
+      return false;
     }
 
     // 2. If it's an ISO string or contains time (e.g. "2026-10-14T18:30:00.000Z" or "2026-10-15 17:20:00")
@@ -478,13 +479,29 @@ export const computeNineHourTimeline = ({
     }
   }
 
-  // If startMinutes is still null, check localStorage for authentic saved check-in time string
-  if (startMinutes === null && typeof window !== 'undefined' && window.localStorage) {
+  // If startMinutes is still null, ONLY check localStorage if the user is ACTUALLY checked in, on break, or checked out
+  if (startMinutes === null && (isCheckedIn || isOnBreak || isCheckedOut) && typeof window !== 'undefined' && window.localStorage) {
     const savedIn = localStorage.getItem('kt_check_in_time_str');
     const savedMins = parseTimeToMinutes(savedIn);
     if (savedMins !== null) {
       startMinutes = savedMins;
     }
+  }
+
+  // If employee has NOT checked in yet (and not rejected, not pending, not on break, not checked out): strictly return unstarted timeline
+  if (!isCheckedIn && !isOnBreak && !isCheckedOut && !isPending && !isRejected) {
+    return {
+      startMinutes: null,
+      endMinutes: null,
+      midMinutes: null,
+      startTimeStr: '--:--',
+      midTimeStr: '--:--',
+      endTimeStr: '--:--',
+      breakStartTime: '',
+      displaySegments: [],
+      statusMarkers: [],
+      hasCheckedIn: false
+    };
   }
 
   // If rejected by admin: shift was NOT approved/active. Do not draw working time segments or continue progress!

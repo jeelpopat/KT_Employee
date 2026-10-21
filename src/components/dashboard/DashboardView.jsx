@@ -342,6 +342,11 @@ export const DashboardView = () => {
       checkInStatusLower.includes('reject')
     );
 
+    const isNotCheckedInStatus = !statusLower || [
+      'not_checked_in', 'not-checked-in', 'not checked in',
+      'absent', 'none', 'idle', 'unregistered', 'off'
+    ].includes(statusLower) || statusLower.startsWith('not_') || statusLower.startsWith('not ');
+
     const hasValidCheckInTime = Boolean(
       rawCheckIn &&
       rawCheckIn !== '--:--' &&
@@ -349,21 +354,26 @@ export const DashboardView = () => {
       rawCheckIn !== 'undefined' &&
       rawCheckIn !== '00:00:00' &&
       rawCheckIn !== '00:00' &&
-      rawCheckIn !== ''
+      rawCheckIn !== '' &&
+      rawCheckIn !== '—' &&
+      rawCheckIn !== '-' &&
+      rawCheckIn !== 'NA' &&
+      rawCheckIn !== 'N/A' &&
+      parseTimeToMinutes(rawCheckIn) !== null
     );
 
-    const isPresentStatus = [
+    const isPresentStatus = !isNotCheckedInStatus && [
       'present', 'late', 'half day', 'half-day', 'checked_in', 'checked-in',
       'checked in', 'working', 'active', 'on_break', 'on-break', 'on break'
-    ].some(s => statusLower === s || statusLower.includes(s));
+    ].includes(statusLower);
 
-    const isCheckedOutStatus = [
+    const isCheckedOutStatus = !isNotCheckedInStatus && [
       'checked_out', 'checked-out', 'checked out', 'completed'
-    ].some(s => statusLower === s || statusLower.includes(s));
+    ].includes(statusLower);
 
-    // Explicit approval recognition
+    // Explicit approval recognition (must not be not_checked_in status)
     const isExplicitlyApproved = Boolean(
-      !isRejected && (
+      !isRejected && !isNotCheckedInStatus && (
         ta?.isApproved === true ||
         approvalStatusLower === 'approved' ||
         adminStatusLower === 'approved' ||
@@ -401,10 +411,34 @@ export const DashboardView = () => {
       )
     );
 
+    const hasValidCheckOutTime = Boolean(
+      rawCheckOut &&
+      rawCheckOut !== '--:--' &&
+      rawCheckOut !== '00:00:00' &&
+      rawCheckOut !== '00:00' &&
+      rawCheckOut !== 'null' &&
+      rawCheckOut !== 'undefined' &&
+      rawCheckOut !== '' &&
+      rawCheckOut !== '—' &&
+      rawCheckOut !== '-' &&
+      parseTimeToMinutes(rawCheckOut) !== null
+    );
+
+    // Check-in Recognition: ONLY if there is authentic attendance data in the database with a valid check-in time!
+    // An employee CANNOT be checked in without a valid parseable check-in punch time.
+    const hasCheckedIn = Boolean(
+      !isRejected &&
+      !isPendingApproval &&
+      !isNotCheckedInStatus &&
+      ta &&
+      hasValidCheckInTime
+    );
+
     // Synchronize localStorage persistence with verified state
     if (isRejected) {
       localStorage.removeItem('kt_checked_in_' + todayStr);
       localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+      localStorage.removeItem('kt_check_in_time_str');
       localStorage.removeItem('kt_attendance_pending_' + todayStr);
       localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
       localStorage.removeItem('kt_on_break_' + todayStr);
@@ -422,7 +456,7 @@ export const DashboardView = () => {
       localStorage.removeItem('kt_rejection_reason_' + todayStr);
       localStorage.setItem('kt_attendance_pending_' + todayStr, 'true');
       localStorage.setItem('kt_attendance_pending_' + todayLocalStr, 'true');
-    } else if (isExplicitlyApproved || localCheckedIn || hasValidCheckInTime) {
+    } else if (hasCheckedIn && hasValidCheckInTime) {
       localStorage.removeItem('kt_attendance_pending_' + todayStr);
       localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
       localStorage.removeItem('kt_attendance_rejected_' + todayStr);
@@ -432,28 +466,43 @@ export const DashboardView = () => {
       localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
     }
 
-    const hasValidCheckOutTime = Boolean(
-      rawCheckOut &&
-      rawCheckOut !== '--:--' &&
-      rawCheckOut !== '00:00:00' &&
-      rawCheckOut !== '00:00' &&
-      rawCheckOut !== 'null' &&
-      rawCheckOut !== 'undefined' &&
-      rawCheckOut !== ''
-    );
+    // IF EMPLOYEE HAS NOT CHECKED IN TODAY:
+    // Strictly reset all attendance states to unstarted, zero out working hours, and purge stale storage
+    if (!hasCheckedIn && !isPendingApproval && !isRejected) {
+      localStorage.removeItem('kt_checked_in_' + todayStr);
+      localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+      localStorage.removeItem('kt_check_in_time_str');
+      localStorage.removeItem('kt_check_in_time');
+      localStorage.removeItem('kt_on_break_' + todayStr);
+      localStorage.removeItem('kt_on_break_' + todayLocalStr);
+      localStorage.removeItem('kt_checked_out_' + todayStr);
+      localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+      localStorage.removeItem('kt_check_out_time_str');
+      localStorage.removeItem('kt_active_session_id');
+      localStorage.removeItem('kt_current_attendance_id');
+      localStorage.removeItem('kt_break_count_' + todayStr);
+      localStorage.removeItem('kt_break_count_' + todayLocalStr);
 
-    // Check-in Recognition (strictly today, strictly NOT rejected, strictly NOT pending)
-    const hasCheckedIn = Boolean(
-      !isRejected &&
-      !isPendingApproval && (
-        isExplicitlyApproved ||
-        hasValidCheckInTime ||
-        localCheckedIn ||
-        isPresentStatus ||
-        isCheckedOutStatus ||
-        ta?.isActiveSession === true
-      )
-    );
+      setCheckInTimeDisplay('--:--');
+      setCheckOutTimeDisplay('--:--');
+      setBreakInTimeDisplay('--:--');
+      setBreakOutTimeDisplay('--:--');
+      setTotalWorkTimeDisplay('0h 0m');
+      setTotalBreakTimeDisplay('0m');
+      setTodaySegments([]);
+      setTodayBreaks([]);
+      setDailyBreaksCount(0);
+      setAttendanceStatus('not_checked_in');
+      if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('not_checked_in');
+      setActionsAvailable({
+        canCheckIn: true,
+        canStartBreak: false,
+        canEndBreak: false,
+        canCheckOut: false
+      });
+      setAttendanceEvaluation(null);
+      return;
+    }
 
     // If backend confirms employee is checked in without checkout, purge all stale checkout flags
     if (hasCheckedIn && !isRejected && !isPendingApproval && !hasValidCheckOutTime && !isCheckedOutStatus) {
@@ -619,19 +668,19 @@ export const DashboardView = () => {
     }
 
     // Format time displays strictly for today
-    if (rawCheckIn && hasValidCheckInTime) {
+    if (hasCheckedIn && rawCheckIn && hasValidCheckInTime) {
       const formatted = formatISOToLocalTime(rawCheckIn);
       setCheckInTimeDisplay(formatted);
       if (formatted !== '--:--') {
         localStorage.setItem('kt_check_in_time_str', formatted);
       }
-    } else if (ta?.checkInTimeDisplay && ta.checkInTimeDisplay !== '--:--') {
+    } else if (hasCheckedIn && ta?.checkInTimeDisplay && ta.checkInTimeDisplay !== '--:--') {
       const formatted = formatISOToLocalTime(ta.checkInTimeDisplay);
       setCheckInTimeDisplay(formatted);
       if (formatted !== '--:--') {
         localStorage.setItem('kt_check_in_time_str', formatted);
       }
-    } else if (hasCheckedIn || isPendingApproval || localPending) {
+    } else if (hasCheckedIn) {
       setCheckInTimeDisplay(localStorage.getItem('kt_check_in_time_str') || '--:--');
     } else {
       setCheckInTimeDisplay('--:--');
@@ -667,7 +716,7 @@ export const DashboardView = () => {
     }
     setTotalBreakTimeDisplay(`${breakMins}m`);
 
-    const inVal = rawCheckIn || (hasCheckedIn ? localStorage.getItem('kt_check_in_time_str') : null) || null;
+    const inVal = (hasCheckedIn && hasValidCheckInTime) ? (rawCheckIn || (hasCheckedIn ? localStorage.getItem('kt_check_in_time_str') : null) || null) : null;
     const outVal = hasCheckedOut 
       ? (rawCheckOut || localStorage.getItem('kt_check_out_time_str') || (ta?.officeEndTime ? formatISOToLocalTime(ta.officeEndTime) : null))
       : null;
@@ -771,7 +820,7 @@ export const DashboardView = () => {
         const tData = todayRes.data?.attendance || todayRes.data?.data?.attendance || todayRes.data?.data || todayRes.data;
         if (tData && (tData.checkInTime || tData.status || tData.approvalStatus || tData.adminStatus || tData._id)) {
           // Verify that this attendance document is actually for today (and not an old record from yesterday)
-          if (isTodayDate(tData.date) || isTodayDate(tData.checkInTime) || isTodayDate(tData.createdAt) || !tData.date) {
+          if (isTodayDate(tData.date) || isTodayDate(tData.createdAt) || (tData.checkInTime && isTodayDate(tData.checkInTime))) {
             todayDoc = tData;
           }
         }
@@ -785,11 +834,13 @@ export const DashboardView = () => {
           const dashRes = await api.get('/api/employee-panel/dashboard', { skipCache: true });
           const dAtt = dashRes.data?.data?.todayAttendance || dashRes.data?.todayAttendance;
           if (dAtt && (dAtt.checkInTime || dAtt.status)) {
-            todayDoc = {
-              ...dAtt,
-              date: dAtt.date || new Date().toISOString().split('T')[0],
-              totalWorkTime: dashRes.data?.data?.statistics?.todayWorkingHours || dAtt.currentWorkingHours || 0
-            };
+            if (isTodayDate(dAtt.date) || isTodayDate(dAtt.createdAt) || (dAtt.checkInTime && isTodayDate(dAtt.checkInTime))) {
+              todayDoc = {
+                ...dAtt,
+                date: dAtt.date || new Date().toISOString().split('T')[0],
+                totalWorkTime: dashRes.data?.data?.statistics?.todayWorkingHours || dAtt.currentWorkingHours || 0
+              };
+            }
           }
         } catch (dErr) {}
       }
@@ -802,8 +853,10 @@ export const DashboardView = () => {
             const attByIdRes = await api.get(`/api/attendance/${cachedAttId}`, { skipCache: true });
             const attData = attByIdRes.data?.attendance || attByIdRes.data?.data || attByIdRes.data;
             if (attData && (attData.checkInTime || attData.status)) {
-              if (isTodayDate(attData.date) || isTodayDate(attData.checkInTime) || isTodayDate(attData.createdAt) || !attData.date) {
+              if (isTodayDate(attData.date) || isTodayDate(attData.createdAt) || (attData.checkInTime && isTodayDate(attData.checkInTime))) {
                 todayDoc = attData;
+              } else {
+                localStorage.removeItem('kt_current_attendance_id');
               }
             }
           }
@@ -822,7 +875,7 @@ export const DashboardView = () => {
 
         // Find today's record in the returned list
         let found = Array.isArray(tlList) 
-          ? tlList.find(r => isTodayDate(r.date) || isTodayDate(r.checkInTime) || isTodayDate(r.createdAt))
+          ? tlList.find(r => isTodayDate(r.date) || isTodayDate(r.createdAt) || (r.checkInTime && isTodayDate(r.checkInTime)))
           : null;
 
         // Fallback: If not found with ?filter=today, fetch ?filter=last10days (which is the default in AttendanceView)
@@ -831,7 +884,7 @@ export const DashboardView = () => {
             const tlRes10 = await api.get('/api/employee-panel/attendance/timeline?filter=last10days', { skipCache: true });
             const list10 = tlRes10.data?.data || tlRes10.data?.timeline || [];
             if (Array.isArray(list10)) {
-              found = list10.find(r => isTodayDate(r.date) || isTodayDate(r.checkInTime) || isTodayDate(r.createdAt));
+              found = list10.find(r => isTodayDate(r.date) || isTodayDate(r.createdAt) || (r.checkInTime && isTodayDate(r.checkInTime)));
             }
           } catch (e10) {
             console.warn("Timeline last10days fallback notice:", e10.message);
@@ -909,29 +962,23 @@ export const DashboardView = () => {
             storedUser?.employee?.email
           ].filter(Boolean).map(x => String(x).toLowerCase().trim());
 
-          const candNames = [
-            user?.name,
-            user?.fullName,
-            user?.employeeName,
-            user?.employee?.name,
-            user?.employee?.fullName,
-            user?.user?.name,
-            user?.user?.fullName,
-            storedUser?.name,
-            storedUser?.fullName,
-            storedUser?.employee?.name,
-            storedUser?.employeeName
-          ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
-
           const matchedAdmin = aList.find(item => {
             if (!item) return false;
-            // Ensure record is for today
-            const isItemToday = isTodayDate(item.date) || isTodayDate(item.attendanceDate) || isTodayDate(item.createdAt) || isTodayDate(item.checkInTime) || isTodayDate(item.checkIn) || isTodayDate(item.approvedCheckInTime) || !item.date;
+            // Record MUST be strictly for today
+            const isItemToday = isTodayDate(item.date) || isTodayDate(item.attendanceDate) || isTodayDate(item.createdAt);
             if (!isItemToday) return false;
 
-            const itemIds = [
-              item._id,
-              item.id,
+            // Only consider if item has an actual check-in or is active
+            const hasCheckIn = Boolean(
+              item.checkInTime || item.punchIn || item.checkIn || item.approvedCheckInTime
+            );
+            const statusL = String(item.status || item.attendanceStatus || '').toLowerCase();
+            if (!hasCheckIn && ['not_checked_in', 'not-checked-in', 'absent', 'none', 'idle'].includes(statusL)) {
+              return false;
+            }
+
+            // Strictly match user identity - NEVER match item._id (which is attendance record ID!)
+            const itemUserIds = [
               item.employeeId,
               item.employeeID,
               item.userId,
@@ -943,7 +990,7 @@ export const DashboardView = () => {
               typeof item.userId === 'object' ? item.userId?._id : null
             ].filter(Boolean).map(x => String(x).toLowerCase().trim());
 
-            if (candIds.length > 0 && itemIds.some(id => candIds.includes(id))) return true;
+            if (candIds.length > 0 && itemUserIds.some(id => candIds.includes(id))) return true;
 
             const itemEmails = [
               item.email,
@@ -955,6 +1002,21 @@ export const DashboardView = () => {
 
             if (candEmails.length > 0 && itemEmails.some(em => candEmails.includes(em))) return true;
 
+            // Strict exact full-name match only (no substring/partial matching!)
+            const candNames = [
+              user?.name,
+              user?.fullName,
+              user?.employeeName,
+              user?.employee?.name,
+              user?.employee?.fullName,
+              user?.user?.name,
+              user?.user?.fullName,
+              storedUser?.name,
+              storedUser?.fullName,
+              storedUser?.employee?.name,
+              storedUser?.employeeName
+            ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
+
             const itemNames = [
               item.name,
               item.employeeName,
@@ -962,7 +1024,7 @@ export const DashboardView = () => {
               typeof item.user === 'object' ? (item.user?.name || item.user?.fullName) : null
             ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
 
-            return candNames.length > 0 && itemNames.some(nm => candNames.some(c => c === nm || c.includes(nm) || nm.includes(c)));
+            return candNames.length > 0 && itemNames.some(nm => candNames.some(c => c === nm));
           });
 
           if (matchedAdmin) {
@@ -1959,15 +2021,16 @@ export const DashboardView = () => {
 
   // --- Calculate Fixed 9-Hour Timeline Layout ---
   const isCheckedOut = !isRejectedAttendance && !isPendingAttendance && attendanceStatus === 'checked_out';
+  const isCheckedInActive = !isRejectedAttendance && !isPendingAttendance && (attendanceStatus === 'checked_in' || attendanceStatus === 'on_break' || attendanceStatus === 'checked_out');
   const nineHourTimeline = computeNineHourTimeline({
-    checkInTime: checkInTimeDisplay !== '--:--' ? checkInTimeDisplay : (localStorage.getItem('kt_check_in_time_str') || null),
+    checkInTime: (isCheckedInActive && checkInTimeDisplay !== '--:--') ? checkInTimeDisplay : null,
     checkOutTime: (isCheckedOut && checkOutTimeDisplay !== '--:--') ? checkOutTimeDisplay : null,
-    breakInTime: breakInTimeDisplay !== '--:--' ? breakInTimeDisplay : null,
-    breakOutTime: breakOutTimeDisplay !== '--:--' ? breakOutTimeDisplay : null,
-    breaks: isRejectedAttendance || isPendingAttendance ? [] : todayBreaks,
-    timelineSegments: isRejectedAttendance || isPendingAttendance ? [] : todaySegments,
+    breakInTime: (isCheckedInActive && breakInTimeDisplay !== '--:--') ? breakInTimeDisplay : null,
+    breakOutTime: (isCheckedInActive && breakOutTimeDisplay !== '--:--') ? breakOutTimeDisplay : null,
+    breaks: isRejectedAttendance || isPendingAttendance || !isCheckedInActive ? [] : todayBreaks,
+    timelineSegments: isRejectedAttendance || isPendingAttendance || !isCheckedInActive ? [] : todaySegments,
     isOnBreak: !isRejectedAttendance && !isPendingAttendance && attendanceStatus === 'on_break',
-    isCheckedIn: !isRejectedAttendance && !isPendingAttendance && (attendanceStatus === 'checked_in' || attendanceStatus === 'on_break' || attendanceStatus === 'checked_out'),
+    isCheckedIn: isCheckedInActive,
     isCheckedOut: isCheckedOut,
     isRejected: isRejectedAttendance,
     isPending: isPendingAttendance
