@@ -66,58 +66,45 @@ export const PerformanceView = () => {
           // ignore error
         }
       } else {
-        // Look up in synchronized persistent store
-        try {
-          const rawStore = localStorage.getItem('kt_performance_records_store');
-          const rawCache = localStorage.getItem('kt_performance_all_records');
-          const list = [
-            ...(rawStore ? JSON.parse(rawStore) : []),
-            ...(rawCache ? JSON.parse(rawCache) : [])
-          ];
-          const matched = list.find(p => {
-            if (!p) return false;
-            const pEmail = String(p.employeeEmail || p.email || p.employeeID?.email || '').toLowerCase().trim();
-            const pName = String(p.employeeName || p.name || p.employeeID?.name || '').toLowerCase().trim();
-            const pId = String(p.employeeID?._id || p.employeeID?.id || p.employeeID || p.employeeId || p._id || '').toLowerCase().trim();
-            return (uEmail && pEmail && uEmail === pEmail) ||
-              (uId && pId && (uId === pId || pId.includes(uId))) ||
-              (uName && pName && (uName === pName || pName.includes(uName)));
-          });
-          if (matched) {
-            matchedId = matched._id;
-            matchedData = matched;
-          }
-        } catch (e) {}
-      }
+        // Query user candidate endpoints directly; do not load old stale records
+        const uCandidateEndpoints = [
+          `/api/performance/user/${uId}`,
+          `/api/performance/employee/${uId}`,
+          `/api/performance/${uId}`,
+          '/api/performance/my'
+        ];
 
-      // 2. Query GET /api/performance/:id if candidate is available
-      const targetId = matchedId || uId;
-      if (targetId && !matchedData) {
-        try {
-          const res = await api.get(`/api/performance/${targetId}`);
-          const detail = res.data?.data || res.data?.performance || res.data;
-          if (detail && typeof detail === 'object') {
-            setPerformanceData(detail);
-            return;
-          }
-        } catch (detailErr) {
-          // Candidate detail not found
+        for (const ep of uCandidateEndpoints) {
+          try {
+            const res = await api.get(ep);
+            const list = Array.isArray(res.data?.data)
+              ? res.data.data
+              : Array.isArray(res.data?.performances)
+                ? res.data.performances
+                : res.data?.data || res.data?.performance || res.data;
+            if (Array.isArray(list) && list.length > 0) {
+              const clean = list.find(p => p && String(p.remarks || '').toLowerCase().trim() !== 'nice work');
+              if (clean) {
+                matchedData = clean;
+                break;
+              }
+            } else if (list && typeof list === 'object' && list._id && String(list.remarks || '').toLowerCase().trim() !== 'nice work') {
+              matchedData = list;
+              break;
+            }
+          } catch (e) {}
         }
       }
 
       if (matchedData) {
         setPerformanceData(matchedData);
-      } else if (user) {
-        // Dynamic baseline
-        setPerformanceData({
-          _id: `perf-${uId || 'self'}`,
-          performancePercentage: 88,
-          remarks: 'Consistent deliverable completion, strong attendance, and reliable task performance.',
-          createdAt: new Date().toISOString()
-        });
+      } else {
+        // No performance records from live API: keep empty state
+        setPerformanceData(null);
       }
     } catch (err) {
       console.error('My Performance fetch error:', err);
+      setPerformanceData(null);
     } finally {
       if (!isSilent) setIsLoading(false);
     }
@@ -217,12 +204,12 @@ export const PerformanceView = () => {
                 </div>
 
                 <h3 className="text-2xl font-bold text-slate-900">
-                  {user?.name || performanceData?.employeeName || 'Pandya Hetvi'}
+                  {user?.name || user?.fullName || performanceData?.employeeName || 'Employee'}
                 </h3>
 
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
                   <span>Email: <strong className="text-slate-700">{user?.email || performanceData?.employeeEmail || 'N/A'}</strong></span>
-                  <span>Role: <strong className="text-slate-700 uppercase">{user?.role || performanceData?.employeeType || 'Team Leader'}</strong></span>
+                  <span>Role: <strong className="text-slate-700 uppercase">{user?.role || performanceData?.employeeType || 'Employee'}</strong></span>
                   <span>Evaluated Date: <strong className="text-slate-700">{formatDate(performanceData?.updatedAt || performanceData?.createdAt)}</strong></span>
                 </div>
 

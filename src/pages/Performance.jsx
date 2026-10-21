@@ -37,7 +37,7 @@ const DEPARTMENTS = [
 const PERF_CACHE_KEY = "kt_performance_all_records";
 const PERF_STORE_KEY = "kt_performance_records_store";
 
-// Helper to identify and purge any dummy/synthetic performance records
+// Helper to identify and purge any dummy/synthetic or old test performance records
 const isDummyPerformanceRecord = (p) => {
   if (!p) return true;
   if (isUnknownEmployeeOrUser(p)) return true;
@@ -49,12 +49,48 @@ const isDummyPerformanceRecord = (p) => {
   ) {
     return true;
   }
+  // Remove and purge old hardcoded/test evaluation records
+  const remarks = String(p.remarks || "").toLowerCase().trim();
+  if (remarks === "nice work" || remarks.includes("nice work")) {
+    return true;
+  }
+  const dateStr = String(p.createdAt || p.date || "");
+  if (dateStr.includes("2026-10-19") && (remarks === "nice work" || Number(p.performancePercentage || p.percentage) === 60)) {
+    return true;
+  }
   return false;
 };
+
+// Purge stale or test performance records from local storage across all keys
+const purgeStalePerformances = () => {
+  try {
+    [PERF_CACHE_KEY, PERF_STORE_KEY].forEach((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter((p) => !isDummyPerformanceRecord(p));
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem(key, JSON.stringify(cleaned));
+          }
+        } else {
+          localStorage.removeItem(key);
+        }
+      } catch {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch {}
+};
+
+// Run purge immediately on module execution
+purgeStalePerformances();
 
 // Retrieve all stored & synchronized performances (ONLY real reviews, no dummy data)
 const getStoredPerformances = () => {
   try {
+    purgeStalePerformances();
     const rawStore = localStorage.getItem(PERF_STORE_KEY);
     const rawCache = localStorage.getItem(PERF_CACHE_KEY);
 
@@ -190,6 +226,18 @@ const Performance = () => {
                 ? data
                 : [];
 
+          // Clean any old test records from backend if present
+          rawPerfs.forEach((perf) => {
+            if (isDummyPerformanceRecord(perf) && perf._id && !String(perf._id).startsWith("perf-")) {
+              try {
+                fetch(`https://kt-backend-yzr4.onrender.com/api/performance/delete/${perf._id}`, {
+                  method: "DELETE",
+                  headers
+                }).catch(() => {});
+              } catch {}
+            }
+          });
+
           const filteredPerfs = rawPerfs.filter((perf) => {
             if (!perf || isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf)) return false;
             if (isFinanceOrExcludedUser(perf)) return false;
@@ -215,7 +263,8 @@ const Performance = () => {
       } else {
         // ============================================================
         // EMPLOYEE & TEAM LEAD:
-        // Attempt candidate user endpoints or load from real stored records
+        // Pure live API query. If API doesn't return any performance,
+        // DO NOT show old cached records. Show empty state.
         // ============================================================
         const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").trim();
         let fetchedData = null;
@@ -254,29 +303,22 @@ const Performance = () => {
           }
         }
 
-        // Get synchronized real records from persistent storage
-        const stored = getStoredPerformances();
-        let allAvailable = [...stored];
+        // Only display if live API explicitly returned records for this user.
+        // Otherwise, keep empty state (no performance).
         if (fetchedData && fetchedData.length > 0) {
-          const mergedMap = new Map();
-          allAvailable.forEach((p) => {
-            if (p && !isDummyPerformanceRecord(p)) mergedMap.set(String(p._id || `${p.employeeEmail}-${p.createdAt}`), p);
-          });
-          fetchedData.forEach((p) => {
-            if (p && !isDummyPerformanceRecord(p)) mergedMap.set(String(p._id || `${p.employeeEmail}-${p.createdAt}`), p);
-          });
-          allAvailable = Array.from(mergedMap.values());
-          try {
-            localStorage.setItem(PERF_STORE_KEY, JSON.stringify(allAvailable));
-          } catch { }
+          setPerformances(fetchedData);
+        } else {
+          setPerformances([]);
         }
-
-        setPerformances(allAvailable);
       }
     } catch (err) {
       console.error("Backend performance fetch error:", err);
-      const stored = getStoredPerformances();
-      setPerformances(stored);
+      if (isAdmin) {
+        const stored = getStoredPerformances();
+        setPerformances(stored);
+      } else {
+        setPerformances([]);
+      }
     } finally {
       if (!isSilent) setLoading(false);
     }
@@ -341,6 +383,13 @@ const Performance = () => {
   }, [headers]);
 
   useEffect(() => {
+    purgeStalePerformances();
+    if (!isAdmin) {
+      try {
+        localStorage.removeItem(PERF_CACHE_KEY);
+        localStorage.removeItem(PERF_STORE_KEY);
+      } catch {}
+    }
     if (isAdmin) {
       fetchEmployees();
     }
