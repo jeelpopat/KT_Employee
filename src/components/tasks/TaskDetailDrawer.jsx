@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
+import { normalizeTaskStatus, getProgressForStatus, getTaskProgress } from '../../utils/taskUtils.js';
 
 export const TaskDetailDrawer = ({ onTaskUpdate }) => {
   const { user, selectedTask, setSelectedTask } = useApp();
@@ -37,16 +38,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
   // Use full details if loaded, otherwise fallback to the basic list data
   const displayTask = taskDetails || selectedTask;
 
-  const normalizeStatus = (status = '') => {
-    const s = String(status || '').toLowerCase().trim().replace(/[- ]/g, '_');
-    if (['pending', 'assigned', 'to_do', 'todo'].includes(s)) return 'pending';
-    if (['in_progress', 'working', 'doing'].includes(s)) return 'in_progress';
-    if (['testing'].includes(s)) return 'testing';
-    if (['review', 'in_review'].includes(s)) return 'review';
-    if (['completed', 'done', 'finished'].includes(s)) return 'completed';
-    if (['cancelled', 'canceled'].includes(s)) return 'cancelled';
-    return 'pending';
-  };
+  const normalizeStatus = (status = '') => normalizeTaskStatus(status);
 
   const currentNormalizedStatus = normalizeStatus(displayTask.status);
 
@@ -59,14 +51,26 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
   };
 
   const handleUpdateStatus = async (newStatus) => {
-    setTaskDetails(prev => ({ ...prev, status: newStatus }));
+    const autoProgress = getProgressForStatus(newStatus);
+    setTaskDetails(prev => ({ 
+      ...prev, 
+      status: newStatus,
+      progress: autoProgress !== null ? autoProgress : prev.progress
+    }));
     try {
+      const payload = {
+        status: newStatus,
+        ...(autoProgress !== null ? { progress: autoProgress } : {})
+      };
       try {
-        await api.put(`/api/projectManage/task/update/${displayTask._id}`, { status: newStatus });
+        await api.put(`/api/projectManage/task/update/${displayTask._id}`, payload);
       } catch (pmErr) {
         const msg = pmErr.response?.data?.message || pmErr.message || '';
         if (!msg.includes('milestoneId')) {
           await api.put(`/api/task/status/${displayTask._id}`, { status: newStatus });
+          if (autoProgress !== null) {
+            await api.put(`/api/task/update/${displayTask._id}`, { progress: autoProgress });
+          }
         }
       }
       if (onTaskUpdate) onTaskUpdate(); // Refresh background Kanban list
@@ -77,14 +81,25 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
 
   const handleUpdateProgress = async (e) => {
     const newProgress = parseInt(e.target.value);
-    setTaskDetails(prev => ({ ...prev, progress: newProgress }));
+    setTaskDetails(prev => ({ 
+      ...prev, 
+      progress: newProgress,
+      status: newProgress === 100 ? 'completed' : prev.status
+    }));
     try {
+      const payload = {
+        progress: newProgress,
+        ...(newProgress === 100 ? { status: 'completed' } : {})
+      };
       try {
-        await api.put(`/api/projectManage/task/update/${displayTask._id}`, { progress: newProgress });
+        await api.put(`/api/projectManage/task/update/${displayTask._id}`, payload);
       } catch (pmErr) {
         const msg = pmErr.response?.data?.message || pmErr.message || '';
         if (!msg.includes('milestoneId')) {
           await api.put(`/api/task/update/${displayTask._id}`, { progress: newProgress });
+          if (newProgress === 100) {
+            await api.put(`/api/task/status/${displayTask._id}`, { status: 'completed' });
+          }
         }
       }
       if (onTaskUpdate) onTaskUpdate();
@@ -168,6 +183,7 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                 >
                   <option value="pending">To Do (Pending)</option>
                   <option value="in_progress">In Progress</option>
+                  <option value="delayed">Delayed</option>
                   <option value="testing">Testing</option>
                   <option value="review">Review</option>
                   <option value="completed">Completed</option>
@@ -225,13 +241,13 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
               <div className="flex justify-between text-xs font-medium text-slate-800">
                 <span>Task Completion Progress</span>
-                <span className="text-indigo-600 font-mono font-bold">{displayTask.progress || 0}%</span>
+                <span className="text-indigo-600 font-mono font-bold">{getTaskProgress(displayTask)}%</span>
               </div>
               <input 
                 type="range" 
                 min="0" 
                 max="100" 
-                value={displayTask.progress || 0}
+                value={getTaskProgress(displayTask)}
                 onChange={handleUpdateProgress}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
               />

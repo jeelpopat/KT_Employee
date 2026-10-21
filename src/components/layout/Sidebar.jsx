@@ -63,15 +63,15 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: Camera },
       ]
     },
-    {
-      title: "Recruitment & Leads",
-      items: [
-        { tab: 'admin-applications', label: 'Applications', icon: FileText },
-        { tab: 'admin-positions', label: 'Positions', icon: Briefcase },
-        // { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: TrendingUp },
-        { tab: 'admin-contacts', label: 'Contacts', icon: Users },
-      ]
-    },
+    // {
+    //   title: "Recruitment & Leads",
+    //   items: [
+    //     { tab: 'admin-applications', label: 'Applications', icon: FileText },
+    //     { tab: 'admin-positions', label: 'Positions', icon: Briefcase },
+    //     { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: TrendingUp },
+    //     { tab: 'admin-contacts', label: 'Contacts', icon: Users },
+    //   ]
+    // },
     {
       title: "Account",
       items: [

@@ -14,6 +14,7 @@ import {
   isTeamLeadRole, 
   isAdminRole 
 } from '../../utils/teamLeadUtils.js';
+import { normalizeTaskStatus, getProgressForStatus } from '../../utils/taskUtils.js';
 
 // Helper to normalize and build assigned member list from project and /members endpoint data
 const buildAssignedMemberList = (proj, membersData) => {
@@ -316,15 +317,15 @@ export const ProjectView = () => {
             const activeTasks = projectTasks.filter(t => String(t.status || '').toLowerCase() !== 'cancelled');
             if (activeTasks.length > 0) {
               const totalTaskProgress = activeTasks.reduce((sum, t) => {
-                const s = String(t.status || '').toLowerCase().trim();
-                if (s === 'completed' || s === 'done') return sum + 100;
+                const s = normalizeTaskStatus(t.status);
                 if (typeof t.progress === 'number' && !isNaN(t.progress) && t.progress > 0) {
+                  if (s === 'completed') return sum + 100;
+                  if (s === 'cancelled') return sum + 0;
                   return sum + Math.min(100, Math.max(0, t.progress));
                 }
-                if (s === 'review') return sum + 85;
-                if (s === 'testing') return sum + 70;
-                if (s === 'in_progress' || s === 'in-progress' || s === 'active') return sum + 40;
-                return sum; // pending: 0
+                const autoProgress = getProgressForStatus(t.status);
+                if (autoProgress !== null) return sum + autoProgress;
+                return sum;
               }, 0);
               progressVal = Math.round(totalTaskProgress / activeTasks.length);
             }

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import api, { clearApiCache } from '../api/axios.js';
 import { validateUserSession, performAutoCheckout, clearAuth, normalizeRole } from '../utils/auth.js';
+import { getProgressForStatus } from '../utils/taskUtils.js';
 
 import {
   getMonitoringSettings,
@@ -1192,19 +1193,30 @@ export const AppProvider = ({ children }) => {
 
   // Task Actions
   const handleUpdateTaskStatus = async (taskId, status) => {
+    const autoProgress = getProgressForStatus(status);
     setTasks(prev => prev.map(t => (t._id === taskId || t.id === taskId) ? {
       ...t,
       status,
-      progress: status === 'completed' ? 100 : (t.progress || 0),
-      progressPercentage: status === 'completed' ? 100 : t.progressPercentage
+      progress: autoProgress !== null ? autoProgress : (t.progress || 0),
+      progressPercentage: autoProgress !== null ? autoProgress : (t.progressPercentage || 0)
     } : t));
 
     if (selectedTask && (selectedTask._id === taskId || selectedTask.id === taskId)) {
-      setSelectedTask(prev => prev ? { ...prev, status, progress: status === 'completed' ? 100 : prev.progress } : null);
+      setSelectedTask(prev => prev ? { 
+        ...prev, 
+        status, 
+        progress: autoProgress !== null ? autoProgress : prev.progress 
+      } : null);
     }
 
     try {
-      await api.put(`/api/task/status/${taskId}`, { status });
+      await api.put(`/api/task/status/${taskId}`, { 
+        status, 
+        ...(autoProgress !== null ? { progress: autoProgress } : {}) 
+      });
+      if (autoProgress !== null) {
+        await api.put(`/api/task/update/${taskId}`, { progress: autoProgress });
+      }
     } catch (e) {
       console.warn("Failed to update task status on server:", e);
     }

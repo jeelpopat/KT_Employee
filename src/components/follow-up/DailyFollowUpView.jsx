@@ -8,6 +8,7 @@ import {
 import api from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
 import { isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
+import { getTaskProgress } from '../../utils/taskUtils.js';
 
 export const DailyFollowUpView = () => {
   const { user } = useApp();
@@ -679,13 +680,13 @@ export const DailyFollowUpView = () => {
                                           {tRef.taskTitle || 'Untitled Task'}
                                         </span>
                                         <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">
-                                          {tRef.progress || 0}%
+                                          {getTaskProgress(tRef)}%
                                         </span>
                                       </div>
                                       <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
                                         <div
                                           className="bg-indigo-600 h-full rounded-full transition-all duration-300"
-                                          style={{ width: `${Math.min(100, Math.max(0, tRef.progress || 0))}%` }}
+                                          style={{ width: `${Math.min(100, Math.max(0, getTaskProgress(tRef)))}%` }}
                                         />
                                       </div>
                                       <div className="flex justify-between items-center text-[10px] text-slate-500">

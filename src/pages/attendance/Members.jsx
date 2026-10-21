@@ -28,6 +28,15 @@ import {
   FileText
 } from 'lucide-react';
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from '../../utils/roleFilters';
+import { getTaskProgress } from '../../utils/taskUtils';
+import {
+  EMPLOYEE_DEPARTMENTS_ROLES,
+  ALL_EMPLOYEE_DEPARTMENTS,
+  ALL_EMPLOYEE_ROLES,
+  getDepartmentForRole,
+  matchesEmployeeDepartment,
+  matchesEmployeeRole
+} from '../../utils/employeeRoles';
 
 const avatarColors = [
   'from-indigo-500 to-indigo-600',
@@ -257,6 +266,8 @@ export default function Members() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [selectedEmployeeRole, setSelectedEmployeeRole] = useState('all');
   const [selectedMember, setSelectedMember] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [attendanceStatusMap, setAttendanceStatusMap] = useState({});
@@ -773,10 +784,24 @@ const fetchAllMembers = async () => {
     let filtered = members;
 
     if (searchTerm) {
+      const q = searchTerm.toLowerCase();
       filtered = filtered.filter(member =>
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.department.toLowerCase().includes(searchTerm.toLowerCase())
+        member.name?.toLowerCase().includes(q) ||
+        member.email?.toLowerCase().includes(q) ||
+        member.department?.toLowerCase().includes(q) ||
+        member.designation?.toLowerCase().includes(q)
+      );
+    }
+
+    if (selectedDepartment !== 'all') {
+      filtered = filtered.filter(member =>
+        matchesEmployeeDepartment(member, selectedDepartment)
+      );
+    }
+
+    if (selectedEmployeeRole !== 'all') {
+      filtered = filtered.filter(member =>
+        matchesEmployeeRole(member, selectedEmployeeRole)
       );
     }
 
@@ -793,7 +818,7 @@ const fetchAllMembers = async () => {
     }
 
     setFilteredMembers(filtered);
-  }, [searchTerm, selectedRole, selectedStatus, members]);
+  }, [searchTerm, selectedRole, selectedStatus, selectedDepartment, selectedEmployeeRole, members]);
 
   const resolveTeamMemberDetails = async (memberIds, allMembers, token) => {
   if (!Array.isArray(memberIds) || memberIds.length === 0) {
@@ -1051,8 +1076,8 @@ const fetchAllMembers = async () => {
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-4 shadow-xs">
-        <div className="flex flex-col sm:flex-row gap-2.5">
+      <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-4 shadow-xs space-y-2.5">
+        <div className="flex flex-col lg:flex-row gap-2.5">
           <div className="flex-1 relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -1064,12 +1089,75 @@ const fetchAllMembers = async () => {
             />
           </div>
           
-          <div className="flex gap-2">
-            <div className="relative flex-1 sm:flex-none">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* Department Filter */}
+            <div className="relative">
+              <select
+                value={selectedDepartment}
+                onChange={(e) => {
+                  const nextDept = e.target.value;
+                  setSelectedDepartment(nextDept);
+                  if (nextDept !== 'all' && selectedEmployeeRole !== 'all') {
+                    const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[nextDept] || [];
+                    if (!rolesInDept.includes(selectedEmployeeRole)) {
+                      setSelectedEmployeeRole('all');
+                    }
+                  }
+                }}
+                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
+              >
+                <option value="all">All Departments</option>
+                {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+              <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Employee Role Filter */}
+            <div className="relative">
+              <select
+                value={selectedEmployeeRole}
+                onChange={(e) => {
+                  const nextRole = e.target.value;
+                  setSelectedEmployeeRole(nextRole);
+                  if (nextRole !== 'all' && selectedDepartment === 'all') {
+                    const deducedDept = getDepartmentForRole(nextRole);
+                    if (deducedDept) setSelectedDepartment(deducedDept);
+                  }
+                }}
+                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
+              >
+                <option value="all">All Roles</option>
+                {selectedDepartment !== 'all' && EMPLOYEE_DEPARTMENTS_ROLES[selectedDepartment] ? (
+                  EMPLOYEE_DEPARTMENTS_ROLES[selectedDepartment].map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))
+                ) : (
+                  Object.entries(EMPLOYEE_DEPARTMENTS_ROLES).map(([dept, roles]) => (
+                    <optgroup key={dept} label={dept}>
+                      {roles.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                )}
+              </select>
+              <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* System Role Filter */}
+            <div className="relative">
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full sm:w-40 h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
+                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 {roles.map(role => (
                   <option key={role} value={role}>
@@ -1080,11 +1168,12 @@ const fetchAllMembers = async () => {
               <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             </div>
 
-            <div className="relative flex-1 sm:flex-none">
+            {/* Status Filter */}
+            <div className="relative">
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full sm:w-36 h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
+                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 {statuses.map(status => (
                   <option key={status} value={status}>
@@ -1096,6 +1185,25 @@ const fetchAllMembers = async () => {
             </div>
           </div>
         </div>
+
+        {/* Clear Filters shortcut */}
+        {(selectedDepartment !== 'all' || selectedEmployeeRole !== 'all' || selectedRole !== 'all' || selectedStatus !== 'all' || searchTerm) && (
+          <div className="flex justify-end pt-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDepartment('all');
+                setSelectedEmployeeRole('all');
+                setSelectedRole('all');
+                setSelectedStatus('all');
+                setSearchTerm('');
+              }}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+            >
+              Clear all filters
+            </button>
+          </div>
+        )}
       </div>
 
         {/* Content */}
@@ -1395,7 +1503,7 @@ const fetchAllMembers = async () => {
                       {memberInsights.tasks.map((task, idx) => (
                         <li key={task?._id || task?.id || idx} className="text-[11px] text-slate-700">
                           <div className="font-medium truncate">{task?.taskTitle || task?.title || 'Untitled Task'}</div>
-                          <div className="text-[10px] text-slate-500 capitalize">{(task?.status || 'pending').replace(/_/g, ' ')} • {task?.progress || 0}%</div>
+                          <div className="text-[10px] text-slate-500 capitalize">{(task?.status || 'pending').replace(/_/g, ' ')} • {getTaskProgress(task)}%</div>
                         </li>
                       ))}
                     </ul>

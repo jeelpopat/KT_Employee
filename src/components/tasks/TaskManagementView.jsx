@@ -7,6 +7,7 @@ import {
 import { useApp } from '../../context/AppContext.jsx';
 import { TaskDetailDrawer } from './TaskDetailDrawer.jsx';
 import api from '../../api/axios.js';
+import { normalizeTaskStatus, getProgressForStatus, getTaskProgress } from '../../utils/taskUtils.js';
 
 export const TaskManagementView = () => {
   const { user, setSelectedTask } = useApp();
@@ -23,16 +24,7 @@ export const TaskManagementView = () => {
   const [dragOverCol, setDragOverCol] = useState(null);
 
   // Status Normalizer: maps live schema and legacy status values to standard keys
-  const normalizeStatus = (status = '') => {
-    const s = String(status || '').toLowerCase().trim().replace(/[- ]/g, '_');
-    if (['pending', 'assigned', 'to_do', 'todo'].includes(s)) return 'pending';
-    if (['in_progress', 'working', 'doing'].includes(s)) return 'in_progress';
-    if (['testing'].includes(s)) return 'testing';
-    if (['review', 'in_review'].includes(s)) return 'review';
-    if (['completed', 'done', 'finished'].includes(s)) return 'completed';
-    if (['cancelled', 'canceled'].includes(s)) return 'cancelled';
-    return 'pending';
-  };
+  const normalizeStatus = (status = '') => normalizeTaskStatus(status);
 
   // Helper to verify if a task is assigned to the current logged-in user
   const isMyTask = (t, currentUser) => {
@@ -149,19 +141,31 @@ export const TaskManagementView = () => {
   // Handle Drag-and-Drop or Dropdown Status Updates
   const handleUpdateTaskStatus = async (taskId, newStatus) => {
     setIsUpdating(true);
+    const newProgress = getProgressForStatus(newStatus);
     try {
       // Optimistically update UI instantly for a smooth experience
       setTasks(prevTasks => prevTasks.map(t =>
-        t._id === taskId ? { ...t, status: newStatus } : t
+        t._id === taskId ? { 
+          ...t, 
+          status: newStatus,
+          progress: newProgress !== null ? newProgress : t.progress
+        } : t
       ));
 
       // Execute actual API PUT request to live backend: primary /api/projectManage/task/update/:id
+      const payload = { 
+        status: newStatus,
+        ...(newProgress !== null ? { progress: newProgress } : {})
+      };
       try {
-        await api.put(`/api/projectManage/task/update/${taskId}`, { status: newStatus });
+        await api.put(`/api/projectManage/task/update/${taskId}`, payload);
       } catch (pmErr) {
         const msg = pmErr.response?.data?.message || pmErr.message || '';
         if (!msg.includes('milestoneId')) {
           await api.put(`/api/task/status/${taskId}`, { status: newStatus });
+          if (newProgress !== null) {
+            await api.put(`/api/task/update/${taskId}`, { progress: newProgress });
+          }
         }
       }
     } catch (error) {
@@ -204,8 +208,9 @@ export const TaskManagementView = () => {
 
   // Analytics Metrics using normalized statuses
   const totalCount = tasks.length;
-  const pendingCount = tasks.filter(t => normalizeStatus(t.status) === 'pending').length;
+  const pendingCount = tasks.filter(t => ['pending', 'assigned'].includes(normalizeStatus(t.status))).length;
   const inProgressCount = tasks.filter(t => normalizeStatus(t.status) === 'in_progress').length;
+  const delayedCount = tasks.filter(t => normalizeStatus(t.status) === 'delayed').length;
   const testingCount = tasks.filter(t => normalizeStatus(t.status) === 'testing').length;
   const reviewCount = tasks.filter(t => normalizeStatus(t.status) === 'review').length;
   const completedCount = tasks.filter(t => normalizeStatus(t.status) === 'completed').length;
@@ -228,6 +233,7 @@ export const TaskManagementView = () => {
   const kanbanColumns = [
     { id: 'pending', title: 'To Do', count: pendingCount, borderAccent: 'border-t-slate-400' },
     { id: 'in_progress', title: 'In Progress', count: inProgressCount, borderAccent: 'border-t-blue-500' },
+    { id: 'delayed', title: 'Delayed', count: delayedCount, borderAccent: 'border-t-amber-500' },
     { id: 'testing', title: 'Testing', count: testingCount, borderAccent: 'border-t-purple-500' },
     { id: 'review', title: 'Review', count: reviewCount, borderAccent: 'border-t-indigo-500' },
     { id: 'completed', title: 'Completed', count: completedCount, borderAccent: 'border-t-emerald-500' },
@@ -294,9 +300,9 @@ export const TaskManagementView = () => {
                     <td className="hidden md:table-cell px-5 py-4">
                       <div className="w-24 flex items-center gap-3">
                         <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                          <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${task.progress || 0}%` }} />
+                          <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${getTaskProgress(task)}%` }} />
                         </div>
-                        <span className="font-mono text-[10px] font-semibold text-slate-700">{task.progress || 0}%</span>
+                        <span className="font-mono text-[10px] font-semibold text-slate-700">{getTaskProgress(task)}%</span>
                       </div>
                     </td>
                     <td className="px-4 md:px-5 py-4" onClick={e => e.stopPropagation()}>
@@ -307,6 +313,7 @@ export const TaskManagementView = () => {
                       >
                         <option value="pending">To Do</option>
                         <option value="in_progress">In Progress</option>
+                        <option value="delayed">Delayed</option>
                         <option value="testing">Testing</option>
                         <option value="review">Review</option>
                         <option value="completed">Completed</option>
@@ -449,6 +456,7 @@ export const TaskManagementView = () => {
             <option value="all">All Statuses</option>
             <option value="pending">To Do (Pending)</option>
             <option value="in_progress">In Progress</option>
+            <option value="delayed">Delayed</option>
             <option value="testing">Testing</option>
             <option value="review">Review</option>
             <option value="completed">Completed</option>
@@ -545,12 +553,12 @@ export const TaskManagementView = () => {
                                 <div className="space-y-1.5 mt-1">
                                   <div className="flex justify-between text-xs font-medium text-slate-500">
                                     <span>Progress</span>
-                                    <span className="font-mono text-slate-700">{task.progress || 0}%</span>
+                                    <span className="font-mono text-slate-700">{getTaskProgress(task)}%</span>
                                   </div>
                                   <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                                     <div
                                       className="h-full bg-indigo-600 rounded-full transition-all"
-                                      style={{ width: `${task.progress || 0}%` }}
+                                      style={{ width: `${getTaskProgress(task)}%` }}
                                     />
                                   </div>
                                 </div>

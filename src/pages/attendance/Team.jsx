@@ -43,6 +43,7 @@ import {
   isTeamLeadRole, 
   isAdminRole 
 } from "../../utils/teamLeadUtils";
+import { normalizeTaskStatus, getProgressForStatus, getTaskProgress } from "../../utils/taskUtils";
 
 const BASE_URL =
   "https://kt-backend-yzr4.onrender.com/api/projectManage/project";
@@ -1318,6 +1319,13 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         assignedTo: value,
         assignedEmployee: value,
       });
+    } else if (name === "status") {
+      const autoProgress = getProgressForStatus(value);
+      setTaskForm({
+        ...taskForm,
+        status: value,
+        progress: autoProgress !== null ? autoProgress : taskForm.progress,
+      });
     } else {
       setTaskForm({
         ...taskForm,
@@ -2073,14 +2081,14 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 const projectTasks = tasks.filter((t) => isSameId(t.projectId, project._id));
                 const completedCount = projectTasks.filter((t) => (t.status || "").toLowerCase() === "completed").length;
                 const getTaskProgressVal = (t) => {
-                  const s = String(t.status || '').toLowerCase().trim();
-                  if (s === 'completed' || s === 'done') return 100;
+                  const s = normalizeTaskStatus(t.status);
                   if (typeof t.progress === 'number' && !isNaN(t.progress) && t.progress > 0) {
+                    if (s === 'completed') return 100;
+                    if (s === 'cancelled') return 0;
                     return Math.min(100, Math.max(0, t.progress));
                   }
-                  if (s === 'review') return 85;
-                  if (s === 'testing') return 70;
-                  if (s === 'in_progress' || s === 'in-progress' || s === 'active') return 40;
+                  const autoProgress = getProgressForStatus(t.status);
+                  if (autoProgress !== null) return autoProgress;
                   return 0;
                 };
                 const validProjectTasks = projectTasks.filter(t => (t.status || '').toLowerCase() !== 'cancelled');
@@ -3432,6 +3440,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   >
                     <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
+                    <option value="delayed">Delayed</option>
                     <option value="testing">Testing</option>
                     <option value="review">Review</option>
                     <option value="completed">Completed</option>

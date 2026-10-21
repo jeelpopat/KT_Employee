@@ -19,6 +19,7 @@ import {
   isLeaveOfAssignedTeam,
   isProjectAssignedToLead,
 } from '../../utils/teamLeadUtils.js';
+import { normalizeTaskStatus, getProgressForStatus, getTaskProgress } from '../../utils/taskUtils.js';
 
 export { ProjectView };
 
@@ -1276,16 +1277,7 @@ export const TeamTaskManagementView = () => {
     };
   }, [isCreateModalOpen, editingTask, deletingTask]);
 
-  const normalizeStatus = (status = '') => {
-    const s = String(status || '').toLowerCase().trim().replace(/[- ]/g, '_');
-    if (['pending', 'assigned', 'to_do', 'todo'].includes(s)) return 'pending';
-    if (['in_progress', 'working', 'doing'].includes(s)) return 'in_progress';
-    if (['testing'].includes(s)) return 'testing';
-    if (['review', 'in_review'].includes(s)) return 'review';
-    if (['completed', 'done', 'finished'].includes(s)) return 'completed';
-    if (['cancelled', 'canceled'].includes(s)) return 'cancelled';
-    return 'pending';
-  };
+  const normalizeStatus = (status = '') => normalizeTaskStatus(status);
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
@@ -1329,12 +1321,14 @@ export const TeamTaskManagementView = () => {
 
     setIsSubmitting(true);
     try {
+      const autoProgress = getProgressForStatus(taskForm.status);
       const payload = {
         taskTitle: taskForm.taskTitle.trim(),
         projectId: taskForm.projectId,
         taskDescription: taskForm.taskDescription.trim(),
         priority: taskForm.priority || 'medium',
         status: taskForm.status || 'pending',
+        progress: autoProgress !== null ? autoProgress : 0,
         estimatedHours: Number(taskForm.estimatedHours) || 0
       };
       if (taskForm.dueDate) payload.dueDate = taskForm.dueDate;
@@ -1389,15 +1383,27 @@ export const TeamTaskManagementView = () => {
   // Quick Status Change: PUT /api/projectManage/task/update/:id
   const handleQuickStatusChange = async (task, newStatus, e) => {
     if (e) e.stopPropagation();
+    const newProgress = getProgressForStatus(newStatus);
     // Optimistic UI update
-    setTasks(prev => prev.map(t => t._id === task._id ? { ...t, status: newStatus } : t));
+    setTasks(prev => prev.map(t => t._id === task._id ? { 
+      ...t, 
+      status: newStatus,
+      progress: newProgress !== null ? newProgress : t.progress 
+    } : t));
     try {
+      const payload = { 
+        status: newStatus,
+        ...(newProgress !== null ? { progress: newProgress } : {})
+      };
       try {
-        await api.put(`/api/projectManage/task/update/${task._id}`, { status: newStatus });
+        await api.put(`/api/projectManage/task/update/${task._id}`, payload);
       } catch (upErr) {
         const msg = upErr.response?.data?.message || upErr.message || '';
         if (!msg.includes('milestoneId')) {
           await api.put(`/api/task/status/${task._id}`, { status: newStatus });
+          if (newProgress !== null) {
+            await api.put(`/api/task/update/${task._id}`, { progress: newProgress });
+          }
         }
       }
       showAlert(`Task marked as ${newStatus.replace('_', ' ')}`);
@@ -1448,8 +1454,9 @@ export const TeamTaskManagementView = () => {
     });
   }, [tasks, searchQuery, projectFilter, priorityFilter, statusFilter]);
 
-  const todoTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'pending');
+  const todoTasks = filteredTasks.filter(t => ['pending', 'assigned'].includes(normalizeStatus(t.status)));
   const inProgressTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'in_progress');
+  const delayedTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'delayed');
   const testingTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'testing');
   const reviewTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'review');
   const completedTasks = filteredTasks.filter(t => normalizeStatus(t.status) === 'completed');
@@ -1458,6 +1465,7 @@ export const TeamTaskManagementView = () => {
   const columns = [
     { title: 'To Do', count: todoTasks.length, statusKey: 'pending', tasks: todoTasks, accent: 'border-t-slate-400 bg-slate-50' },
     { title: 'In Progress', count: inProgressTasks.length, statusKey: 'in_progress', tasks: inProgressTasks, accent: 'border-t-blue-500 bg-blue-50/20' },
+    { title: 'Delayed', count: delayedTasks.length, statusKey: 'delayed', tasks: delayedTasks, accent: 'border-t-amber-500 bg-amber-50/20' },
     { title: 'Testing', count: testingTasks.length, statusKey: 'testing', tasks: testingTasks, accent: 'border-t-purple-500 bg-purple-50/20' },
     { title: 'Review', count: reviewTasks.length, statusKey: 'review', tasks: reviewTasks, accent: 'border-t-indigo-500 bg-indigo-50/20' },
     { title: 'Completed', count: completedTasks.length, statusKey: 'completed', tasks: completedTasks, accent: 'border-t-emerald-500 bg-emerald-50/20' },
@@ -1610,6 +1618,7 @@ export const TeamTaskManagementView = () => {
             <option value="all">All Stages</option>
             <option value="pending">To Do (Pending)</option>
             <option value="in_progress">In Progress</option>
+            <option value="delayed">Delayed</option>
             <option value="testing">Testing</option>
             <option value="review">Review</option>
             <option value="completed">Completed</option>
@@ -1717,6 +1726,7 @@ export const TeamTaskManagementView = () => {
                           >
                             <option value="pending">To Do</option>
                             <option value="in_progress">In Progress</option>
+                            <option value="delayed">Delayed</option>
                             <option value="testing">Testing</option>
                             <option value="review">Review</option>
                             <option value="completed">Completed</option>
@@ -1800,6 +1810,7 @@ export const TeamTaskManagementView = () => {
                     >
                       <option value="pending">To Do</option>
                       <option value="in_progress">In Progress</option>
+                      <option value="delayed">Delayed</option>
                       <option value="testing">Testing</option>
                       <option value="review">Review</option>
                       <option value="completed">Completed</option>
@@ -1941,6 +1952,7 @@ export const TeamTaskManagementView = () => {
                   >
                     <option value="pending">To Do / Pending</option>
                     <option value="in_progress">In Progress</option>
+                    <option value="delayed">Delayed</option>
                     <option value="testing">Testing</option>
                     <option value="review">Review</option>
                     <option value="completed">Completed</option>

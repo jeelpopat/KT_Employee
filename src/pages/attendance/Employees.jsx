@@ -27,6 +27,14 @@ import {
   filterOutUnknownUsers,
   isUnknownEmployeeOrUser
 } from "../../utils/roleFilters";
+import {
+  EMPLOYEE_DEPARTMENTS_ROLES,
+  ALL_EMPLOYEE_DEPARTMENTS,
+  ALL_EMPLOYEE_ROLES,
+  getDepartmentForRole,
+  matchesEmployeeDepartment,
+  matchesEmployeeRole
+} from "../../utils/employeeRoles";
 
 const API_BASE = "https://kt-backend-yzr4.onrender.com/api";
 
@@ -53,6 +61,8 @@ export default function Employees() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
+  const [filterDepartment, setFilterDepartment] = useState("all");
+  const [filterEmployeeRole, setFilterEmployeeRole] = useState("all");
   const [toast, setToast] = useState({ message: "", type: "success" });
 
   const showToast = (message, type = "success") => {
@@ -282,6 +292,11 @@ export default function Employees() {
       return null;
     }
 
+    if (!payload.department) {
+      showToast("Department is required", "error");
+      return null;
+    }
+
     return payload;
   };
 
@@ -344,6 +359,23 @@ export default function Employees() {
       employee.name ||
       `${employee.firstName || ""} ${employee.lastName || ""}`.trim();
 
+    const rawDesig =
+      employee.designation?.name ||
+      employee.designation?.designationName ||
+      employee.designation ||
+      employee.position ||
+      "";
+
+    let rawDept =
+      employee.department?.departmentName ||
+      employee.departmentName ||
+      employee.department ||
+      "";
+
+    if (!rawDept && rawDesig) {
+      rawDept = getDepartmentForRole(rawDesig);
+    }
+
     setFormData({
       fullName: displayName,
       email: employee.email || "",
@@ -357,12 +389,8 @@ export default function Employees() {
         employee.userID?.phoneNumber ||
         employee.userID?.phone ||
         "",
-      designation: employee.designation || "",
-      department:
-        employee.department?.departmentName ||
-        employee.departmentName ||
-        employee.department ||
-        "",
+      designation: rawDesig,
+      department: rawDept,
       role: (() => {
         const r = String(employee.role || "").trim().toLowerCase();
         if (r === "hr") return "hr";
@@ -532,7 +560,8 @@ export default function Employees() {
     const matchesSearch =
       fullName.includes(search) ||
       emp.email?.toLowerCase().includes(search) ||
-      emp.designation?.toLowerCase().includes(search);
+      emp.designation?.toLowerCase().includes(search) ||
+      emp.department?.toLowerCase?.().includes(search);
 
     const matchesStatus =
       filterStatus === "all" || emp.employeeStatus === filterStatus;
@@ -547,7 +576,10 @@ export default function Employees() {
       (filterRole === "team lead" && isEmpTL) ||
       (filterRole === "employee" && !isEmpHR && !isEmpTL);
 
-    return matchesSearch && matchesStatus && matchesRole;
+    const matchesDept = matchesEmployeeDepartment(emp, filterDepartment);
+    const matchesEmpRole = matchesEmployeeRole(emp, filterEmployeeRole);
+
+    return matchesSearch && matchesStatus && matchesRole && matchesDept && matchesEmpRole;
   });
 
   return (
@@ -637,13 +669,17 @@ export default function Employees() {
 
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap relative"
               >
                 <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
 
                 <span className="hidden xs:inline">
                   Filters
                 </span>
+
+                {(filterDepartment !== "all" || filterEmployeeRole !== "all" || filterRole !== "all" || filterStatus !== "all") && (
+                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                )}
 
                 <ChevronDown
                   className={`h-3 w-3 transition-transform ${showFilters ? "rotate-180" : ""
@@ -654,39 +690,130 @@ export default function Employees() {
 
             {/* FILTER OPTIONS */}
             {showFilters && (
-              <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3 pt-2 sm:pt-3 border-t border-gray-100">
-                <div>
-                  <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
-                    Status
-                  </label>
+              <div className="pt-2 sm:pt-3 border-t border-gray-100 space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                  {/* Department Filter */}
+                  <div>
+                    <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
+                      Department
+                    </label>
 
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
+                    <select
+                      value={filterDepartment}
+                      onChange={(e) => {
+                        const nextDept = e.target.value;
+                        setFilterDepartment(nextDept);
+                        if (nextDept !== "all" && filterEmployeeRole !== "all") {
+                          const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[nextDept] || [];
+                          if (!rolesInDept.includes(filterEmployeeRole)) {
+                            setFilterEmployeeRole("all");
+                          }
+                        }
+                      }}
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
+                    >
+                      <option value="all">All Departments</option>
+                      {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Employee Role Filter */}
+                  <div>
+                    <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
+                      Employee Role
+                    </label>
+
+                    <select
+                      value={filterEmployeeRole}
+                      onChange={(e) => {
+                        const nextRole = e.target.value;
+                        setFilterEmployeeRole(nextRole);
+                        if (nextRole !== "all" && filterDepartment === "all") {
+                          const deducedDept = getDepartmentForRole(nextRole);
+                          if (deducedDept) setFilterDepartment(deducedDept);
+                        }
+                      }}
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
+                    >
+                      <option value="all">All Roles</option>
+                      {filterDepartment !== "all" && EMPLOYEE_DEPARTMENTS_ROLES[filterDepartment] ? (
+                        EMPLOYEE_DEPARTMENTS_ROLES[filterDepartment].map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))
+                      ) : (
+                        Object.entries(EMPLOYEE_DEPARTMENTS_ROLES).map(([dept, roles]) => (
+                          <optgroup key={dept} label={dept}>
+                            {roles.map((role) => (
+                              <option key={role} value={role}>
+                                {role}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  {/* System Role Filter */}
+                  <div>
+                    <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
+                      System Role
+                    </label>
+
+                    <select
+                      value={filterRole}
+                      onChange={(e) => setFilterRole(e.target.value)}
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
+                    >
+                      <option value="all">All Roles</option>
+                      <option value="employee">Employee</option>
+                      <option value="team lead">Team Lead</option>
+                      <option value="hr">HR</option>
+                    </select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
+                      Status
+                    </label>
+
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
-                    Role
-                  </label>
-
-                  <select
-                    value={filterRole}
-                    onChange={(e) => setFilterRole(e.target.value)}
-                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
-                  >
-                    <option value="all">All Roles</option>
-                    <option value="employee">Employee</option>
-                    <option value="team lead">Team Lead</option>
-                    <option value="hr">HR</option>
-                  </select>
-                </div>
+                {/* Clear all filters shortcut if any filter is active */}
+                {(filterDepartment !== "all" || filterEmployeeRole !== "all" || filterRole !== "all" || filterStatus !== "all" || searchTerm) && (
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterDepartment("all");
+                        setFilterEmployeeRole("all");
+                        setFilterRole("all");
+                        setFilterStatus("all");
+                        setSearchTerm("");
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                    >
+                      Clear all filters
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1306,37 +1433,87 @@ export default function Employees() {
                 </div>
               </div>
 
-              {/* ROW 2: DESIGNATION & DEPARTMENT (2 per row) */}
+              {/* ROW 2: DEPARTMENT & ROLE / DESIGNATION (2 per row) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Designation *
-                  </label>
-
-                  <input
-                    name="designation"
-                    placeholder="e.g. UI/UX Designer"
-                    value={formData.designation}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
-                  />
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Department *
                   </label>
 
-                  <input
-                    type="text"
+                  <select
                     name="department"
-                    placeholder="e.g. Design, IT, HR"
                     value={formData.department}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      const newDept = e.target.value;
+                      setFormData((prev) => {
+                        const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[newDept] || [];
+                        const isCurrentRoleInDept = rolesInDept.some(
+                          (r) => r.toLowerCase() === (prev.designation || "").toLowerCase()
+                        );
+                        return {
+                          ...prev,
+                          department: newDept,
+                          designation: isCurrentRoleInDept ? prev.designation : "",
+                        };
+                      });
+                    }}
                     required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
-                  />
+                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg bg-white"
+                  >
+                    <option value="">Select Department</option>
+                    {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                    {formData.department && !ALL_EMPLOYEE_DEPARTMENTS.includes(formData.department) && (
+                      <option value={formData.department}>{formData.department}</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Role / Designation *
+                  </label>
+
+                  <select
+                    name="designation"
+                    value={formData.designation}
+                    onChange={(e) => {
+                      const newRole = e.target.value;
+                      const deducedDept = getDepartmentForRole(newRole);
+                      setFormData((prev) => ({
+                        ...prev,
+                        designation: newRole,
+                        department: prev.department || deducedDept,
+                      }));
+                    }}
+                    required
+                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg bg-white"
+                  >
+                    <option value="">Select Role</option>
+                    {formData.department && EMPLOYEE_DEPARTMENTS_ROLES[formData.department] ? (
+                      EMPLOYEE_DEPARTMENTS_ROLES[formData.department].map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))
+                    ) : (
+                      Object.entries(EMPLOYEE_DEPARTMENTS_ROLES).map(([dept, roles]) => (
+                        <optgroup key={dept} label={dept}>
+                          {roles.map((role) => (
+                            <option key={role} value={role}>
+                              {role}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))
+                    )}
+                    {formData.designation && !ALL_EMPLOYEE_ROLES.includes(formData.designation) && (
+                      <option value={formData.designation}>{formData.designation}</option>
+                    )}
+                  </select>
                 </div>
               </div>
 
