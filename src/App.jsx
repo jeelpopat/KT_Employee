@@ -161,14 +161,14 @@ const MainLayout = ({ handleSignOut }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+      <Suspense fallback={<div className="h-16 border-b border-[#00334d] bg-[#003d5b]" />}>
+        <Header onSignOut={handleSignOut} />
+      </Suspense>
       <Suspense fallback={null}>
         <Sidebar onSignOut={handleSignOut} />
       </Suspense>
-      <div className="lg:pl-60 flex flex-col min-h-screen">
-        <Suspense fallback={<div className="h-16 border-b border-slate-200/80 bg-white" />}>
-          <Header onSignOut={handleSignOut} />
-        </Suspense>
-        <main className="flex-1 p-3 pt-20 sm:p-5 sm:pt-20 lg:p-6 lg:pt-20">
+      <div className="lg:pl-60 flex flex-col min-h-screen pt-16">
+        <main className="flex-1 p-3 pt-4 sm:p-5 sm:pt-6 lg:p-6 lg:pt-6">
           <div className="page-content w-full">
             <Suspense fallback={
               <div className="flex items-center justify-center min-h-[350px]">

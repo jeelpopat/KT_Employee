@@ -9,6 +9,7 @@ import {
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
 import companyLogo from '../../assets/Logo.png';
+import whiteLogo from '../../assets/white logo.png';
 import { tabToPath, pathToTab } from '../../utils/navigation.js';
 import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
@@ -629,22 +630,40 @@ export const Header = ({ onSignOut }) => {
   const activeUnreadCount = isAdmin ? adminUnreadCount : employeeUnreadCount;
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-30 h-16 border-b transition-colors shadow-xs backdrop-blur lg:left-60 ${
-      isAdmin ? 'bg-[#003d5b] border-[#00334d]' : 'border-slate-200/80 bg-white/95'
-    }`}>
+    <header className="fixed top-0 left-0 right-0 w-full z-50 h-16 border-b border-[#00334d] bg-[#003d5b] text-white transition-colors shadow-xs">
       <div className="flex h-full items-center justify-between px-3 sm:px-6">
 
-        {/* Left: Mobile Brand (Logo & Company Name) */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex items-center gap-2 lg:hidden">
-            <img src={companyLogo} alt="Kevalon Tech" className="h-7 w-auto object-contain shrink-0" />
-            <span className="font-semibold text-xs sm:text-sm text-slate-800 tracking-tight whitespace-nowrap">
-              Kevalon Tech
-            </span>
-          </div>
+        {/* Left: Mobile Sidebar Toggle & White Brand Logo */}
+        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setIsMobileSidebarOpen((prev) => !prev);
+              setIsNotificationsOpen(false);
+              setIsProfileMenuOpen(false);
+            }}
+            aria-label={isMobileSidebarOpen ? 'Close navigation' : 'Open navigation'}
+            className="p-1.5 rounded-lg text-white/90 hover:bg-white/10 hover:text-white focus:outline-none cursor-pointer lg:hidden transition-colors"
+          >
+            {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
 
-          <div className="hidden lg:block">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400"></p>
+          <div
+            onClick={() => {
+              const homeTab = (userRole === 'admin' || userRole === 'hr') ? 'admin-dashboard' : 'dashboard';
+              setCurrentTab(homeTab);
+              if (tabToPath && tabToPath[homeTab]) {
+                navigate(tabToPath[homeTab]);
+              }
+            }}
+            className="flex items-center cursor-pointer select-none py-1"
+            title="Kevalon Technology"
+          >
+            <img
+              src={whiteLogo}
+              alt="Kevalon Technology"
+              className="h-7 sm:h-8.5 w-auto object-contain shrink-0"
+            />
           </div>
         </div>
 
@@ -690,18 +709,11 @@ export const Header = ({ onSignOut }) => {
               }}
               aria-label={`Notifications${activeUnreadCount > 0 ? `, ${activeUnreadCount} unread` : ''}`}
               title="View notifications"
-              className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors relative cursor-pointer ${
-                isAdmin
-                  ? 'text-white hover:bg-white/10'
-                  : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'
-              }`}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white hover:bg-white/10 transition-colors relative cursor-pointer"
             >
               <Bell size={18} />
               {activeUnreadCount > 0 && (
-                <span className={`absolute flex items-center justify-center text-white font-bold rounded-full shadow-xs ${isAdmin
-                  ? '-top-1 -right-1 h-4 min-w-4 px-1 bg-rose-500 text-[9px] ring-2 ring-[#003d5b] animate-pulse'
-                  : '-top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-indigo-600 text-[10px]'
-                  }`}>
+                <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 bg-rose-500 text-white font-bold rounded-full text-[9px] ring-2 ring-[#003d5b] animate-pulse flex items-center justify-center">
                   {activeUnreadCount > 99 ? '99+' : activeUnreadCount}
                 </span>
               )}
@@ -1018,16 +1030,10 @@ export const Header = ({ onSignOut }) => {
                 setIsProfileMenuOpen((prev) => !prev);
                 setIsNotificationsOpen(false);
               }}
-              className={`flex items-center gap-2 p-1 pl-1.5 rounded-lg transition-colors cursor-pointer ${
-                isAdmin ? 'hover:bg-white/10 bg-transparent' : 'hover:bg-slate-50 bg-white'
-              }`}
+              className="flex items-center gap-2 p-1 pl-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent"
             >
               <div className="relative shrink-0">
-                <div className={`flex items-center justify-center font-bold text-xs ${
-                  isAdmin
-                    ? 'w-8 h-8 rounded-full bg-[#007bb5] text-white shadow-xs'
-                    : 'w-7 h-7 rounded-md border border-slate-200 bg-slate-50 overflow-hidden'
-                }`}>
+                <div className="w-8 h-8 rounded-full bg-white text-[#003d5b] font-bold text-xs flex items-center justify-center ring-2 ring-white/20 shadow-xs overflow-hidden">
                   {isAdmin ? (
                     displayName
                       .split(' ')
@@ -1042,11 +1048,11 @@ export const Header = ({ onSignOut }) => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <img
-                      src={companyLogo}
-                      alt="Logo"
-                      className="w-full h-full object-contain p-0.5"
-                    />
+                    displayName
+                      .split(' ')
+                      .map((word) => word.charAt(0).toUpperCase())
+                      .slice(0, 2)
+                      .join('') || 'HK'
                   )}
                 </div>
                 <span
@@ -1056,10 +1062,8 @@ export const Header = ({ onSignOut }) => {
               </div>
 
               <div className="hidden sm:flex items-center gap-1.5 pr-1">
-                <span className={`text-xs font-bold truncate max-w-[140px] tracking-wide ${
-                  isAdmin ? 'text-white uppercase' : 'text-slate-800'
-                }`}>
-                  {displayName}
+                <span className="text-xs font-bold truncate max-w-[150px] tracking-wide text-white uppercase">
+                  {displayName || 'HARSH KOTHARI'}
                 </span>
               </div>
             </button>
@@ -1120,19 +1124,7 @@ export const Header = ({ onSignOut }) => {
             )}
           </div>
 
-          {/* Mobile Menu 3-Line Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsMobileSidebarOpen((prev) => !prev);
-              setIsNotificationsOpen(false);
-              setIsProfileMenuOpen(false);
-            }}
-            aria-label={isMobileSidebarOpen ? 'Close navigation' : 'Open navigation'}
-            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none cursor-pointer lg:hidden transition-colors"
-          >
-            {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+
         </div>
       </div>
 
