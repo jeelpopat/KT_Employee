@@ -1007,12 +1007,6 @@ const fetchAllMembers = async () => {
 
         {/* Header Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <div className="h-10 px-3.5 bg-white border border-slate-200/80 rounded-lg shadow-xs text-xs sm:text-sm flex items-center gap-2">
-            <Users className="h-4 w-4 text-slate-400" />
-            <span className="text-slate-500">Total:</span>
-            <span className="font-bold text-slate-900">{members.length}</span>
-          </div>
-
           <button
             type="button"
             onClick={() => setRefreshKey((k) => k + 1)}
