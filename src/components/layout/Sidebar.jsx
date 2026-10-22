@@ -302,15 +302,15 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
       ]
     },
-    {
-      title: "RECRUITMENT AND LEADS",
-      items: [
-        { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
-        { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
-        { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: PerformanceIcon },
-        { tab: 'admin-contacts', label: 'Contacts', icon: ContactsIcon },
-      ]
-    },
+    // {
+    //   title: "RECRUITMENT AND LEADS",
+    //   items: [
+    //     { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
+    //     { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
+    //     { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: PerformanceIcon },
+    //     { tab: 'admin-contacts', label: 'Contacts', icon: ContactsIcon },
+    //   ]
+    // },
     {
       title: "ACCOUNT",
       items: [
