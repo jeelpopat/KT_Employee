@@ -10,6 +10,52 @@ import {
 } from "lucide-react";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
 
+// Helper to reliably format any date string/object/timestamp to YYYY-MM-DD for HTML date inputs
+export const formatDateForInput = (raw) => {
+  if (!raw) return "";
+
+  // 1. If already valid YYYY-MM-DD
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+    return raw.trim();
+  }
+
+  // 2. If DD-MM-YYYY or DD/MM/YYYY
+  if (typeof raw === "string") {
+    const dmy = raw.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dmy) {
+      const [, d, m, y] = dmy;
+      return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
+  }
+
+  // 3. If starts with YYYY-MM-DD (e.g. ISO string with time)
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}T/.test(raw.trim())) {
+    try {
+      const d = new Date(raw.trim());
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+    } catch (e) {}
+    return raw.trim().split("T")[0];
+  }
+
+  // 4. Try generic date parsing (handles "22 Oct 2026", Date objects, timestamps)
+  try {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+  } catch (e) {}
+
+  return "";
+};
+
 export default function Adjustments() {
   // ============================================================
   // DEFAULT ATTENDANCE SETTINGS
@@ -557,8 +603,21 @@ export default function Adjustments() {
       const uniqueMap = new Map();
       cleaned.forEach((item) => {
         if (!item) return;
+        const normalizedDate = formatDateForInput(
+          item.date ||
+          item.attendanceDate ||
+          item.checkInTime ||
+          item.inTime ||
+          item.createdAt ||
+          item.dateStr ||
+          item.day ||
+          ""
+        );
+        if (normalizedDate && (!item.date || item.date !== normalizedDate)) {
+          item.date = normalizedDate;
+        }
         const empId = typeof item.employeeId === "object" ? (item.employeeId?._id || item.employeeId?.id) : item.employeeId;
-        const key = `${empId || "unknown"}-${item.date || ""}`;
+        const key = `${empId || "unknown"}-${normalizedDate || item.date || ""}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, item);
         }
@@ -1092,10 +1151,20 @@ export default function Adjustments() {
         })
       );
 
+    const resolvedDate = formatDateForInput(
+      item.date ||
+      item.attendanceDate ||
+      item.checkInTime ||
+      item.inTime ||
+      item.createdAt ||
+      item.dateStr ||
+      item.day ||
+      ""
+    );
+
     setFormData({
       employeeId,
-      date:
-        item.date || "",
+      date: resolvedDate,
       sessions,
       reason:
         item.reason || "",
@@ -1692,8 +1761,8 @@ export default function Adjustments() {
     }
 
     try {
-      const date =
-        new Date(dateStr);
+      const normalized = formatDateForInput(dateStr);
+      const date = normalized ? new Date(normalized + "T00:00:00") : new Date(dateStr);
 
       if (
         Number.isNaN(
@@ -2313,7 +2382,7 @@ export default function Adjustments() {
                 <input
                   type="date"
                   value={
-                    formData.date
+                    formatDateForInput(formData.date)
                   }
                   onChange={
                     handleDateChange
