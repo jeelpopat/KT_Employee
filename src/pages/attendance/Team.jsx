@@ -26,7 +26,6 @@ import {
   Search,
   Filter,
   Sparkles,
-  DollarSign,
   Layers
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
@@ -2194,8 +2193,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                             )}
 
                             {project.projectBudget && (
-                              <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200/80 text-emerald-700 px-2.5 py-1 rounded-lg font-semibold text-xs">
-                                <DollarSign className="w-3.5 h-3.5" />
+                              <span className="inline-flex items-center bg-emerald-50 border border-emerald-200/80 text-emerald-700 px-2.5 py-1 rounded-lg font-semibold text-xs">
                                 Budget: Rs. {project.projectBudget}
                               </span>
                             )}
