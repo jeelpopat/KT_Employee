@@ -1282,6 +1282,11 @@ const Performance = () => {
     const feedbackText = (modalForm.feedback || "").trim();
     const remarksText = (modalForm.remarks || modalForm.remark || "").trim();
     const selectedDate = modalForm.date ? modalForm.date : new Date().toLocaleDateString("en-CA");
+    const [yearStr, monthStr, dayStr] = selectedDate.split("-");
+    const yearNum = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthStr, 10);
+    const dateObj = new Date(yearNum, monthNum - 1, parseInt(dayStr || "1", 10));
+    const monthName = dateObj.toLocaleString("en-US", { month: "long" });
     const isoDateTime = selectedDate ? new Date(`${selectedDate}T12:00:00.000Z`).toISOString() : new Date().toISOString();
 
     const evaluatorId = String(getRealAuthUserId(user) || user?._id || user?.id || "");
@@ -1310,7 +1315,10 @@ const Performance = () => {
         evaluatorName: evaluatorName,
         evaluatorRole: evaluatorRole,
         date: selectedDate,
-        createdAt: isoDateTime
+        createdAt: isoDateTime,
+        month: monthNum,
+        year: yearNum,
+        monthName: monthName
       };
 
       if (isEditModalOpen && editingRecord) {
@@ -1339,7 +1347,10 @@ const Performance = () => {
           remark: remarksText,
           feedback: feedbackText,
           date: selectedDate,
-          createdAt: isoDateTime
+          createdAt: isoDateTime,
+          month: monthNum,
+          year: yearNum,
+          monthName: monthName
         };
         updateInPersistentStore(updatedData);
 
@@ -1347,7 +1358,7 @@ const Performance = () => {
         setIsEditModalOpen(false);
         setEditingRecord(null);
       } else {
-        const response = await fetch(
+        let response = await fetch(
           "https://kt-backend-yzr4.onrender.com/api/performance/create",
           {
             method: "POST",
@@ -1359,7 +1370,30 @@ const Performance = () => {
           }
         );
 
-        const data = await response.json();
+        let data = await response.json().catch(() => ({}));
+
+        // Fallback: If backend specifically expects month name string (e.g. "October")
+        if (!response.ok && (data.message || "").toLowerCase().includes("month")) {
+          const fallbackRes = await fetch(
+            "https://kt-backend-yzr4.onrender.com/api/performance/create",
+            {
+              method: "POST",
+              headers: {
+                ...headers,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                ...payload,
+                month: monthName
+              }),
+            }
+          );
+          if (fallbackRes.ok) {
+            response = fallbackRes;
+            data = await fallbackRes.json().catch(() => ({}));
+          }
+        }
+
         if (!response.ok) {
           throw new Error(data.message || "Failed to submit performance record");
         }
@@ -1416,7 +1450,10 @@ const Performance = () => {
                   remark: remarksText,
                   feedback: feedbackText,
                   date: selectedDate,
-                  createdAt: isoDateTime
+                  createdAt: isoDateTime,
+                  month: monthNum,
+                  year: yearNum,
+                  monthName: monthName
                 }),
               }
             );
