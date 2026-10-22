@@ -17,6 +17,7 @@ import {
   LogOut,
   RefreshCw,
   Loader2,
+  FileText,
 } from 'lucide-react';
 import {
   isFinanceOrExcludedUser,
@@ -676,7 +677,7 @@ const AttendanceTimeline = ({
   // =========================================================
   if (approvalStatus !== 'approved' || !checkIn || checkIn === '—' || checkIn === '--:--') {
     return (
-      <div className="w-full bg-gray-100 h-6 rounded-lg flex items-center justify-center text-[10px] text-gray-500">
+      <div className="w-full bg-slate-100/80 h-7 rounded-lg flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/60">
         {approvalStatus === 'pending'
           ? 'Pending approval'
           : approvalStatus === 'rejected'
@@ -692,12 +693,11 @@ const AttendanceTimeline = ({
     checkOut
   );
 
-  // Timeline width is always based on the configured 9-hour workday.
   const totalDuration = WORKDAY_MINUTES;
 
   if (segments.length === 0) {
     return (
-      <div className="w-full bg-gray-100 h-6 rounded-lg flex items-center justify-center text-[10px] text-gray-500">
+      <div className="w-full bg-slate-100/80 h-7 rounded-lg flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/60">
         No timeline data available
       </div>
     );
@@ -706,90 +706,65 @@ const AttendanceTimeline = ({
   const getColorClass = (color) => {
     switch (color) {
       case 'blue':
-        return 'bg-gradient-to-r from-blue-400 to-blue-600';
-
+        return 'bg-gradient-to-r from-blue-500 to-blue-600';
       case 'yellow':
-        return 'bg-gradient-to-r from-yellow-300 to-yellow-500';
-
+        return 'bg-gradient-to-r from-amber-400 to-amber-500';
       case 'gray':
-        return 'bg-gradient-to-r from-gray-300 to-gray-500';
-
+        return 'bg-gradient-to-r from-slate-400 to-slate-500';
       default:
-        return 'bg-gray-300';
+        return 'bg-slate-300';
     }
   };
 
   const getHoverColor = (color) => {
     switch (color) {
       case 'blue':
-        return 'hover:from-blue-500 hover:to-blue-700';
-
+        return 'hover:brightness-105';
       case 'yellow':
-        return 'hover:from-yellow-400 hover:to-yellow-600';
-
+        return 'hover:brightness-105';
       case 'gray':
-        return 'hover:from-gray-400 hover:to-gray-600';
-
+        return 'hover:brightness-105';
       default:
         return '';
     }
   };
 
-  const getSegmentIcon = (color) => {
-    switch (color) {
-      case 'blue':
-        return <Briefcase className="h-3 w-3 inline text-blue-100" />;
-
-      case 'yellow':
-        return <Coffee className="h-3 w-3 inline text-amber-100" />;
-
-      case 'gray':
-        return <PauseCircle className="h-3 w-3 inline text-gray-100" />;
-
-      default:
-        return null;
-    }
-  };
-
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between items-center text-[10px] text-gray-500">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            In: {formatTime(checkIn)}
+    <div className="space-y-1.5 min-w-[280px]">
+      <div className="flex items-center justify-between text-[11px] text-slate-500">
+        <div className="flex items-center gap-2 font-medium">
+          <span className="flex items-center gap-1 text-slate-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            In: <span className="font-semibold text-slate-900">{formatTime(checkIn)}</span>
           </span>
-
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            Out: {formatTime(checkOut)}
+          <span className="text-slate-300">•</span>
+          <span className="flex items-center gap-1 text-slate-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+            Out: <span className="font-semibold text-slate-900">{formatTime(checkOut)}</span>
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-700">
-            {segments.map((seg, idx) => (
-              <span key={idx}>
-                {idx > 0 && ' → '}
-
-                <span
-                  className={
-                    seg.color === 'blue'
-                      ? 'text-blue-600'
-                      : seg.color === 'yellow'
-                        ? 'text-yellow-600'
-                        : 'text-gray-500'
-                  }
-                >
-                  {seg.label}
-                </span>
+        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+          {segments.map((seg, idx) => (
+            <span key={idx} className="flex items-center gap-1">
+              {idx > 0 && <span className="text-slate-300">→</span>}
+              <span
+                className={`font-medium ${
+                  seg.color === 'blue'
+                    ? 'text-blue-600'
+                    : seg.color === 'yellow'
+                      ? 'text-amber-600'
+                      : 'text-slate-500'
+                }`}
+              >
+                {seg.label}
               </span>
-            ))}
-          </span>
+            </span>
+          ))}
         </div>
       </div>
 
-      <div className="relative w-full h-6 rounded-lg overflow-hidden shadow-inner bg-gray-100">
+      <div className="relative w-full h-4 rounded-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-2xs">
         {segments.map((segment, idx) => {
           const width =
             ((segment.end - segment.start) /
@@ -813,15 +788,12 @@ const AttendanceTimeline = ({
                 items-center
                 justify-center
                 text-white
-                text-xs
+                text-[10px]
                 font-semibold
                 transition-all
-                duration-200
+                duration-150
                 cursor-pointer
-                ${isHovered
-                  ? 'shadow-lg z-10 scale-y-105'
-                  : ''
-                }
+                ${isHovered ? 'z-10 shadow-xs' : ''}
               `}
               style={{
                 width: `${width}%`,
@@ -830,9 +802,6 @@ const AttendanceTimeline = ({
                   totalDuration) *
                   100
                   }%`,
-                boxShadow: isHovered
-                  ? '0 4px 12px rgba(0,0,0,0.3)'
-                  : 'none',
               }}
               onMouseEnter={() =>
                 setLocalHoveredSegment(idx)
@@ -842,46 +811,14 @@ const AttendanceTimeline = ({
               }
               title={`${segment.label}: ${segment.startTime} - ${segment.endTime}`}
             >
-              {width > 12 && (
-                <span className="truncate px-1 flex items-center gap-1">
-                  <span className="text-sm">
-                    {getSegmentIcon(segment.color)}
-                  </span>
-
-                  <span className="hidden sm:inline text-[11px]">
-                    {segment.label}
-                  </span>
+              {width > 14 && (
+                <span className="truncate px-1.5 text-[9px] font-bold">
+                  {segment.label}
                 </span>
               )}
             </div>
           );
         })}
-      </div>
-
-      <div className="flex justify-between text-xs font-medium text-gray-600 mt-2">
-        <span className="flex items-center gap-1.5">
-          <LogIn className="h-3.5 w-3.5 text-emerald-600" />
-          Check-in
-        </span>
-
-        {breaks?.length > 0 && (
-          <span className="flex items-center gap-1.5">
-            <Coffee className="h-3.5 w-3.5 text-amber-600" />
-            Break
-          </span>
-        )}
-
-        {segments.some((s) => s.color === 'gray') && (
-          <span className="flex items-center gap-1.5">
-            <PauseCircle className="h-3.5 w-3.5 text-gray-500" />
-            Idle
-          </span>
-        )}
-
-        <span className="flex items-center gap-1.5">
-          <LogOut className="h-3.5 w-3.5 text-rose-600" />
-          Check-out
-        </span>
       </div>
     </div>
   );
@@ -1273,6 +1210,67 @@ export default function AttendanceLogs() {
           ),
           color: 'gray',
           label: 'Unknown',
+        };
+    }
+  };
+
+  /* =========================================================
+     STATUS BADGE (PILL TAG WITH COLORED DOT)
+  ========================================================= */
+  const getStatusBadge = (status) => {
+    const s = String(status || '').toLowerCase().trim();
+    switch (s) {
+      case 'on time':
+      case 'present':
+        return {
+          bg: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+          dot: 'bg-emerald-500',
+          label: 'On Time',
+        };
+      case 'late':
+        return {
+          bg: 'bg-amber-50 text-amber-700 border-amber-200/80',
+          dot: 'bg-amber-500',
+          label: 'Late',
+        };
+      case 'half day':
+      case 'half-day':
+      case 'halfday':
+        return {
+          bg: 'bg-blue-50 text-blue-700 border-blue-200/80',
+          dot: 'bg-blue-500',
+          label: 'Half Day',
+        };
+      case 'on leave':
+      case 'leave':
+        return {
+          bg: 'bg-purple-50 text-purple-700 border-purple-200/80',
+          dot: 'bg-purple-500',
+          label: 'On Leave',
+        };
+      case 'absent':
+        return {
+          bg: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          dot: 'bg-rose-500',
+          label: 'Absent',
+        };
+      case 'pending':
+        return {
+          bg: 'bg-amber-50 text-amber-700 border-amber-200/80',
+          dot: 'bg-amber-500',
+          label: 'Pending',
+        };
+      case 'rejected':
+        return {
+          bg: 'bg-red-50 text-red-700 border-red-200/80',
+          dot: 'bg-red-500',
+          label: 'Rejected',
+        };
+      default:
+        return {
+          bg: 'bg-slate-50 text-slate-700 border-slate-200/80',
+          dot: 'bg-slate-400',
+          label: status || 'Unknown',
         };
     }
   };
@@ -1792,505 +1790,268 @@ export default function AttendanceLogs() {
         ))}
       </div>
 
-      {/* MAIN CARD */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {/* ==================================================== */}
+      {/* 3. ATTENDANCE HISTORY CARD (MATCHING PERFORMANCE) */}
+      {/* ==================================================== */}
+      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4">
 
-        {/* TIMELINE LEGEND */}
-        <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-gray-700 bg-gray-50 p-3 border-b border-gray-200">
-
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white">
-              <Briefcase className="h-3 w-3" />
+        {/* Header Row: Title & Timeline Legend */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+              <FileText size={16} />
             </div>
-            <span className="font-medium text-slate-700">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Attendance Records
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Daily employee attendance records, shift timelines and break details
+              </p>
+            </div>
+          </div>
+
+          {/* Timeline Legend Pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/80">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
               Working
             </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-r from-yellow-300 to-yellow-500 flex items-center justify-center text-white">
-              <Coffee className="h-3 w-3" />
-            </div>
-            <span className="font-medium text-slate-700">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/80">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
               Break
             </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-r from-gray-300 to-gray-500 flex items-center justify-center text-white">
-              <PauseCircle className="h-3 w-3" />
-            </div>
-            <span className="font-medium text-slate-700">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+              <span className="w-2 h-2 rounded-full bg-slate-400" />
               Idle
             </span>
           </div>
         </div>
 
-        {/* SEARCH + FILTER */}
-        <div className="p-2 sm:p-4 border-b border-gray-200">
+        {/* Filter Toolbar: Search + Status + Sort */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-1">
+          <div className="relative w-full md:flex-1 max-w-md">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search employee by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all"
+            />
+          </div>
 
-          <div className="flex flex-col gap-2 sm:gap-4">
-
-            <div className="flex flex-col xs:flex-row xs:items-center gap-2 sm:gap-4">
-
-              {/* SEARCH */}
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by name or email..."
-                  value={searchTerm}
-                  onChange={(e) =>
-                    setSearchTerm(
-                      e.target.value
-                    )
-                  }
-                  className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-slate-400"
-                />
-              </div>
-
-              {/* FILTER */}
-              <button
-                onClick={() =>
-                  setShowFilters(
-                    !showFilters
-                  )
-                }
-                className="h-10 px-3.5 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-200/80 hover:bg-slate-50 rounded-lg flex items-center gap-2 whitespace-nowrap flex-shrink-0 shadow-xs transition-colors"
+          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
+            {/* Status Filter */}
+            <div className="relative">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer appearance-none pr-8 font-normal"
               >
-                <Filter className="h-4 w-4 text-slate-500" />
-                <span className="hidden xs:inline">
-                  Filters
-                </span>
-                <ChevronDown
-                  className={`h-3.5 w-3.5 text-slate-400 transition-transform ${showFilters
-                    ? 'rotate-180'
-                    : ''
-                    }`}
-                />
-              </button>
+                <option value="all">All Status</option>
+                <option value="on time">On Time</option>
+                <option value="present">Present</option>
+                <option value="late">Late</option>
+                <option value="half day">Half Day</option>
+                <option value="absent">Absent</option>
+                <option value="on leave">On Leave</option>
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
 
-            {/* FILTER OPTIONS */}
-            {showFilters && (
-              <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3 pt-2 sm:pt-3 border-t border-gray-200">
-
-                <div>
-                  <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
-                    Status
-                  </label>
-
-                  <select
-                    value={filterStatus}
-                    onChange={(e) =>
-                      setFilterStatus(
-                        e.target.value
-                      )
-                    }
-                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                  >
-                    <option value="all">
-                      All Status
-                    </option>
-
-                    <option value="on time">
-                      On Time
-                    </option>
-
-                    <option value="present">
-                      Present
-                    </option>
-
-                    <option value="late">
-                      Late
-                    </option>
-
-                    <option value="on leave">
-                      On Leave
-                    </option>
-
-                    <option value="absent">
-                      Absent
-                    </option>
-
-                    <option value="half day">
-                      Half Day
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
-                    Sort By
-                  </label>
-
-                  <select
-                    value={`${sortField}-${sortOrder}`}
-                    onChange={(e) => {
-                      const [
-                        field,
-                        order,
-                      ] =
-                        e.target.value.split(
-                          '-'
-                        );
-
-                      setSortField(field);
-                      setSortOrder(order);
-                    }}
-                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                  >
-                    <option value="date-desc">
-                      Date (Newest)
-                    </option>
-
-                    <option value="name-asc">
-                      Name (A-Z)
-                    </option>
-
-                    <option value="name-desc">
-                      Name (Z-A)
-                    </option>
-                  </select>
-                </div>
-              </div>
-            )}
+            {/* Sort Filter */}
+            <div className="relative">
+              <select
+                value={`${sortField}-${sortOrder}`}
+                onChange={(e) => {
+                  const [field, order] = e.target.value.split('-');
+                  setSortField(field);
+                  setSortOrder(order);
+                }}
+                className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer appearance-none pr-8 font-normal"
+              >
+                <option value="date-desc">Date (Newest)</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
           </div>
         </div>
 
         {/* ERROR */}
         {error && (
-          <div className="mx-2 sm:mx-4 mt-2 sm:mt-4 bg-red-50 border border-red-300 text-red-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-
-            <span className="break-words">
-              {error}
-            </span>
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span className="break-words">{error}</span>
           </div>
         )}
 
-        {/* =====================================================
-            LOADING EFFECT
-        ===================================================== */}
+        {/* LOADING & TABLE */}
         {loading ? (
-          <div className="flex flex-col justify-center items-center py-16 sm:py-24">
-            <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
-            <p className="text-sm font-semibold text-slate-800">Loading attendance records...</p>
-            <p className="text-xs text-slate-500 mt-1">Fetching latest team logs for {formatIndianDate(selectedDate)}</p>
+          <div className="p-16 text-center">
+            <RefreshCw size={28} className="animate-spin text-[#0088cc] mx-auto mb-3" />
+            <p className="text-xs font-semibold text-slate-500">Loading attendance records...</p>
+            <p className="text-[11px] text-slate-400 mt-1">Fetching latest team logs for {formatIndianDate(selectedDate)}</p>
           </div>
         ) : filteredAndSortedLogs.length === 0 ? (
-
-          /* EMPTY */
-          <div className="text-center py-12 sm:py-16">
-
-            <div className="flex justify-center mb-3 sm:mb-4">
-
-              <div className="bg-blue-50 border border-blue-300 p-3 sm:p-4">
-
-                <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
-
-              </div>
-            </div>
-
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800">
-
-              {searchTerm ||
-                filterStatus !== 'all'
-                ? 'No Results Found'
-                : 'No Attendance Logs'}
-
-            </h3>
-
-            <p className="mt-1 text-xs sm:text-sm text-gray-500 px-4">
-
-              {searchTerm ||
-                filterStatus !== 'all'
-                ? 'Try adjusting your search or filter terms'
-                : 'Attendance records will appear here.'}
-
+          <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50">
+            <Clock size={36} className="text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-700">No attendance logs found</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              {searchTerm || filterStatus !== 'all'
+                ? 'No attendance records match your search or filter criteria.'
+                : 'No attendance records available for this selected date.'}
             </p>
           </div>
         ) : (
-
-          /* DATA */
-          <div className="p-2 sm:p-4">
-
-            {/* DESKTOP */}
-            <div className="hidden xl:block overflow-x-auto border border-gray-200">
-
-              <table className="w-full text-sm">
-
+          <>
+            {/* Desktop Table */}
+            <div className="hidden xl:block overflow-x-auto border border-slate-200/80 rounded-lg">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-
-                  <tr className="border-b border-gray-200 bg-gray-50 text-xs font-bold uppercase text-gray-500">
-
-                    <th className="px-3 py-2.5 text-left">
-                      #
-                    </th>
-
-                    <th className="px-3 py-2.5 text-left">
-                      Employee
-                    </th>
-
+                  <tr className="border-b border-slate-200/80 bg-slate-50/80 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
+                    <th className="py-3 px-3 w-12 text-left">#</th>
+                    <th className="py-3 px-4">EMPLOYEE</th>
                     <th
-                      className="px-3 py-2.5 text-left cursor-pointer hover:text-gray-700"
-                      onClick={() =>
-                        handleSort('date')
-                      }
+                      className="py-3 px-4 cursor-pointer hover:text-slate-800 transition-colors"
+                      onClick={() => handleSort('date')}
                     >
                       <div className="flex items-center gap-1">
-                        Date
-                        <ArrowUpDown className="h-3 w-3" />
+                        <span>DATE</span>
+                        <ArrowUpDown className="h-3 w-3 text-slate-400" />
                       </div>
                     </th>
-
-                    <th className="px-3 py-2.5 text-left min-w-[280px]">
-                      Timeline
-                    </th>
-
-                    <th className="px-3 py-2.5 text-left">
-                      Total Hours
-                    </th>
-
-                    <th className="px-3 py-2.5 text-left">
-                      Status
-                    </th>
-
+                    <th className="py-3 px-4 min-w-[320px]">TIMELINE</th>
+                    <th className="py-3 px-4 whitespace-nowrap">TOTAL HOURS</th>
+                    <th className="py-3 px-4 whitespace-nowrap">STATUS</th>
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-gray-200">
-
-                  {filteredAndSortedLogs.map(
-                    (log, index) => {
-
-                      const {
-                        icon,
-                      } =
-                        getStatusIconAndColor(
-                          log.status
-                        );
-
-                      return (
-                        <tr
-                          key={log.id}
-                          className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => setSelectedLog(log)}
-                        >
-
-                          <td className="px-3 py-3 text-sm font-medium text-gray-500">
-                            {index + 1}
-                          </td>
-
-                          <td className="px-3 py-3">
-
-                            <div className="flex items-center gap-2">
-
-                              <div
-                                className={`h-8 w-8 rounded-full ${log.avatarColor} text-white flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-xs`}
-                              >
-                                {getInitials(
-                                  log.name
-                                )}
-                              </div>
-
-                              <div className="min-w-0">
-
-                                <p className="font-medium text-gray-800 truncate max-w-[120px]">
-                                  {log.name}
-                                </p>
-
-                                <p className="text-xs text-gray-400 truncate max-w-[120px]">
-                                  {log.email}
-                                </p>
-
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">
-                            {formatIndianDate(
-                              log.date
-                            )}
-                          </td>
-
-                          <td className="px-3 py-3 min-w-[280px]">
-
-                            <AttendanceTimeline
-                              checkIn={log.checkIn}
-                              breaks={log.breaks}
-                              checkOut={log.checkOut}
-                              approvalStatus={log.approvalStatus}
-                            />
-
-                          </td>
-
-                          <td className="px-3 py-3 text-sm font-semibold text-gray-800 whitespace-nowrap">
-                            {log.totalHours}
-                          </td>
-
-                          <td className="px-3 py-3">
-
-                            <span
-                              title={
-                                log.status
-                              }
-                              className={`inline-flex items-center justify-center h-8 w-8 rounded border ${getStatusStyle(
-                                log.status
-                              )}`}
-                            >
-                              {icon}
-                            </span>
-
-                          </td>
-
-                        </tr>
-                      );
-                    }
-                  )}
-
-                </tbody>
-              </table>
-            </div>
-
-            {/* MOBILE / TABLET */}
-            <div className="xl:hidden">
-
-              <div className="space-y-3">
-
-                {filteredAndSortedLogs.map(
-                  (log, index) => {
-
-                    const {
-                      icon,
-                    } =
-                      getStatusIconAndColor(
-                        log.status
-                      );
+                <tbody className="divide-y divide-slate-100">
+                  {filteredAndSortedLogs.map((log, index) => {
+                    const badge = getStatusBadge(log.status);
 
                     return (
-                      <div
+                      <tr
                         key={log.id}
-                        className="border border-gray-200 p-3 sm:p-4 cursor-pointer hover:shadow-md transition-shadow"
+                        className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                         onClick={() => setSelectedLog(log)}
                       >
+                        <td className="py-3 px-3 text-slate-400 font-medium">
+                          {index + 1}
+                        </td>
 
-                        <div className="flex items-start justify-between">
-
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-3">
                             <div
-                              className={`h-9 w-9 sm:h-10 sm:w-10 rounded-full ${log.avatarColor} text-white flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0 shadow-xs`}
+                              className={`h-9 w-9 rounded-full ${log.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs`}
                             >
-                              {getInitials(
-                                log.name
-                              )}
+                              {getInitials(log.name)}
                             </div>
 
-                            <div className="min-w-0 flex-1">
-
-                              <h3 className="font-semibold text-gray-800 text-sm sm:text-base truncate">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-800 text-xs sm:text-sm truncate group-hover:text-[#0088cc] transition-colors">
                                 {log.name}
-                              </h3>
-
-                              <p className="text-xs text-gray-400 truncate">
+                              </p>
+                              <p className="text-[11px] text-slate-400 truncate">
                                 {log.email}
                               </p>
-
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {formatIndianDate(
-                                  log.date
-                                )}
-                              </p>
-
                             </div>
                           </div>
+                        </td>
 
-                          <div className="ml-2 flex-shrink-0">
+                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap font-medium text-xs">
+                          {formatIndianDate(log.date)}
+                        </td>
 
-                            <span
-                              title={
-                                log.status
-                              }
-                              className={`inline-flex items-center justify-center h-8 w-8 rounded border ${getStatusStyle(
-                                log.status
-                              )}`}
-                            >
-                              {icon}
-                            </span>
-
-                          </div>
-                        </div>
-
-                        <div className="mt-3">
-
+                        <td className="py-3 px-4 min-w-[320px]">
                           <AttendanceTimeline
                             checkIn={log.checkIn}
                             breaks={log.breaks}
                             checkOut={log.checkOut}
                             approvalStatus={log.approvalStatus}
                           />
+                        </td>
 
-                        </div>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-200/60 font-mono">
+                            {log.totalHours}
+                          </span>
+                        </td>
 
-                        <div className="mt-2 pt-2 border-t border-gray-200 flex flex-wrap gap-2 text-xs text-gray-600">
-
-                          <div className="flex items-center gap-1">
-
-                            <Clock className="h-3 w-3 text-gray-400" />
-
-                            <span>
-                              In:{' '}
-                              {formatTime(
-                                log.checkIn
-                              )}
-                            </span>
-
-                          </div>
-
-                          <div className="flex items-center gap-1">
-
-                            <Clock className="h-3 w-3 text-gray-400" />
-
-                            <span>
-                              Out:{' '}
-                              {formatTime(
-                                log.checkOut
-                              )}
-                            </span>
-
-                          </div>
-
-                          <div className="flex items-center gap-1">
-
-                            <span className="font-semibold text-gray-700">
-                              Total:{' '}
-                              {
-                                log.totalHours
-                              }
-                            </span>
-
-                          </div>
-
-                          <div className="flex items-center gap-1">
-
-                            <span className="font-semibold text-gray-700 capitalize">
-                              Status:{' '}
-                              {log.status}
-                            </span>
-
-                          </div>
-
-                        </div>
-
-                      </div>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.bg}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                            <span>{badge.label}</span>
+                          </span>
+                        </td>
+                      </tr>
                     );
-                  }
-                )}
-
-              </div>
+                  })}
+                </tbody>
+              </table>
             </div>
-          </div>
+
+            {/* Mobile / Tablet Cards */}
+            <div className="xl:hidden space-y-3">
+              {filteredAndSortedLogs.map((log) => {
+                const badge = getStatusBadge(log.status);
+
+                return (
+                  <div
+                    key={log.id}
+                    className="bg-white border border-slate-200/80 rounded-xl p-4 cursor-pointer hover:border-[#0088cc]/60 hover:shadow-xs transition-all space-y-3"
+                    onClick={() => setSelectedLog(log)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={`h-10 w-10 rounded-full ${log.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs`}
+                        >
+                          {getInitials(log.name)}
+                        </div>
+
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-slate-900 text-sm truncate">
+                            {log.name}
+                          </h4>
+                          <p className="text-xs text-slate-400 truncate">
+                            {log.email}
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {formatIndianDate(log.date)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shrink-0 ${badge.bg}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                        <span>{badge.label}</span>
+                      </span>
+                    </div>
+
+                    <div>
+                      <AttendanceTimeline
+                        checkIn={log.checkIn}
+                        breaks={log.breaks}
+                        checkOut={log.checkOut}
+                        approvalStatus={log.approvalStatus}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                      <span className="text-slate-400 font-medium">Total Duration</span>
+                      <span className="font-semibold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200/60 font-mono">
+                        {log.totalHours}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -2312,23 +2073,23 @@ export default function AttendanceLogs() {
             onClick={() => setSelectedLog(null)}
           >
             <div
-              className="max-w-lg max-h-[90vh] overflow-y-auto bg-white shadow-2xl"
+              className="max-w-lg w-full max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden"
               role="dialog"
               aria-modal="true"
               aria-labelledby="attendance-details-title"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
+              <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200/80 bg-white px-5 py-4 sm:px-6">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className={`h-10 w-10 rounded-full ${activeLog.avatarColor} flex flex-shrink-0 items-center justify-center text-sm font-bold text-white shadow-xs`}>
+                  <div className={`h-11 w-11 rounded-full ${activeLog.avatarColor} flex flex-shrink-0 items-center justify-center text-sm font-bold text-white shadow-xs`}>
                     {getInitials(activeLog.name)}
                   </div>
                   <div className="min-w-0">
-                    <h2 id="attendance-details-title" className="truncate text-lg font-bold text-gray-800">
+                    <h2 id="attendance-details-title" className="truncate text-base sm:text-lg font-bold text-slate-900">
                       {activeLog.name}
                     </h2>
-                    <p className="truncate text-xs text-gray-500">
-                      {formatIndianDate(activeLog.date)}
+                    <p className="truncate text-xs text-slate-400 mt-0.5">
+                      {activeLog.email} • {formatIndianDate(activeLog.date)}
                     </p>
                   </div>
                 </div>
@@ -2337,54 +2098,60 @@ export default function AttendanceLogs() {
                   type="button"
                   onClick={() => setSelectedLog(null)}
                   aria-label="Close attendance details"
-                  className="flex-shrink-0 p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  className="flex-shrink-0 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="space-y-4 px-4 py-5 sm:px-6">
+              <div className="space-y-4 px-5 py-5 sm:px-6">
                 <div className="flex items-center justify-between gap-3">
-                  <span className={`inline-flex items-center border px-2.5 py-1 text-xs font-semibold capitalize ${getStatusStyle(activeLog.status)}`}>
-                    {activeLog.status}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Total: <strong className="text-gray-800">{activeLog.totalHours}</strong>
+                  {(() => {
+                    const badge = getStatusBadge(activeLog.status);
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${badge.bg}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                        <span>{badge.label}</span>
+                      </span>
+                    );
+                  })()}
+                  <span className="text-xs text-slate-500 font-medium">
+                    Total Work Hours: <strong className="text-slate-900 font-bold font-mono">{activeLog.totalHours}</strong>
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="border border-emerald-200 bg-emerald-50 p-3">
-                    <p className="text-[10px] font-semibold uppercase text-emerald-700">Check In</p>
-                    <p className="mt-1 text-sm font-bold text-emerald-800">{formatTime(activeLog.checkIn)}</p>
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                  <div className="border border-emerald-200/80 bg-emerald-50/70 p-3 rounded-xl shadow-2xs">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Check In</p>
+                    <p className="mt-1 text-sm font-bold text-emerald-900 font-mono">{formatTime(activeLog.checkIn)}</p>
                   </div>
-                  <div className="border border-rose-200 bg-rose-50 p-3">
-                    <p className="text-[10px] font-semibold uppercase text-rose-700">Check Out</p>
-                    <p className="mt-1 text-sm font-bold text-rose-800">{formatTime(activeLog.checkOut)}</p>
+                  <div className="border border-rose-200/80 bg-rose-50/70 p-3 rounded-xl shadow-2xs">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Check Out</p>
+                    <p className="mt-1 text-sm font-bold text-rose-900 font-mono">{formatTime(activeLog.checkOut)}</p>
                   </div>
-                  <div className="border border-blue-200 bg-blue-50 p-3">
-                    <p className="text-[10px] font-semibold uppercase text-blue-700">Working</p>
-                    <p className="mt-1 text-sm font-bold text-blue-800">{formatDuration(workingMinutes)}</p>
+                  <div className="border border-blue-200/80 bg-blue-50/70 p-3 rounded-xl shadow-2xs">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Working</p>
+                    <p className="mt-1 text-sm font-bold text-blue-900 font-mono">{formatDuration(workingMinutes)}</p>
                   </div>
-                  <div className="border border-yellow-200 bg-yellow-50 p-3">
-                    <p className="text-[10px] font-semibold uppercase text-yellow-700">Break</p>
-                    <p className="mt-1 text-sm font-bold text-yellow-800">{formatDuration(breakMinutes)}</p>
+                  <div className="border border-amber-200/80 bg-amber-50/70 p-3 rounded-xl shadow-2xs">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Break</p>
+                    <p className="mt-1 text-sm font-bold text-amber-900 font-mono">{formatDuration(breakMinutes)}</p>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold text-gray-800">Time Details</h3>
+                  <h3 className="mb-2 text-xs font-bold text-slate-700 uppercase tracking-wider">Break & Segment Details</h3>
                   {segments.length > 0 ? (
-                    <div className="divide-y divide-gray-100 border border-gray-200">
+                    <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-xl overflow-hidden bg-slate-50/30">
                       {segments.map((segment, index) => (
-                        <div key={`${segment.label}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2.5 text-xs sm:px-4">
+                        <div key={`${segment.label}-${index}`} className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs">
                           <div className="flex items-center gap-2">
-                            <span className={`h-2.5 w-2.5 rounded-full ${segment.color === 'yellow' ? 'bg-yellow-400' : segment.color === 'gray' ? 'bg-gray-400' : 'bg-blue-500'}`} />
-                            <span className="font-medium text-gray-700">{segment.label}</span>
+                            <span className={`h-2.5 w-2.5 rounded-full ${segment.color === 'yellow' ? 'bg-amber-400' : segment.color === 'gray' ? 'bg-slate-400' : 'bg-blue-500'}`} />
+                            <span className="font-semibold text-slate-800">{segment.label}</span>
                           </div>
-                          <span className="text-gray-500">
+                          <span className="text-slate-500 font-medium">
                             {segment.startTime} - {segment.endTime}
-                            <span className="ml-2 font-semibold text-gray-700">
+                            <span className="ml-2 font-bold text-slate-700 font-mono">
                               ({formatDuration(segment.end - segment.start)})
                             </span>
                           </span>
@@ -2392,7 +2159,7 @@ export default function AttendanceLogs() {
                       ))}
                     </div>
                   ) : (
-                    <p className="border border-gray-200 px-3 py-4 text-center text-xs text-gray-500">
+                    <p className="border border-slate-200/80 rounded-xl px-3 py-4 text-center text-xs text-slate-400">
                       No timeline data available
                     </p>
                   )}
