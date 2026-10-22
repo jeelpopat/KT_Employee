@@ -656,13 +656,13 @@ export const Header = ({ onSignOut }) => {
                 navigate(tabToPath[homeTab]);
               }
             }}
-            className="flex items-center cursor-pointer select-none py-1"
+            className="flex items-center cursor-pointer select-none py-0.5"
             title="Kevalon Technology"
           >
             <img
               src={whiteLogo}
               alt="Kevalon Technology"
-              className="h-7 sm:h-8.5 w-auto object-contain shrink-0"
+              className="h-10 sm:h-11 md:h-12 w-auto max-h-12 object-contain shrink-0 drop-shadow-xs"
             />
           </div>
         </div>

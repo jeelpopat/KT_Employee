@@ -4,11 +4,11 @@ import { useApp } from '../../context/AppContext.jsx';
 import { tabToPath } from '../../utils/navigation.js';
 
 // ==========================================================
-// PIXEL-PERFECT REFERENCE SVG ICONS MATCHING USER SCREENSHOT
+// EXACT REFERENCE ICONS MATCHING USER SCREENSHOT (media_1792663861944.png)
 // ==========================================================
 
 // 1. Dashboard: 4 rounded squares in 2x2 grid
-const DashboardIcon = ({ size = 16, className = "" }) => (
+const DashboardIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect x="3" y="3" width="7" height="7" rx="1.5" />
     <rect x="14" y="3" width="7" height="7" rx="1.5" />
@@ -17,32 +17,32 @@ const DashboardIcon = ({ size = 16, className = "" }) => (
   </svg>
 );
 
-// 2. Performance: 3 vertical columns with an upward trend line
-const PerformanceIcon = ({ size = 16, className = "" }) => (
+// 2. Performance: Axis with 3 vertical columns and upward trending line
+const PerformanceIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M3 3v16a2 2 0 0 0 2 2h16" />
     <path d="M7 17v-4" />
     <path d="M12 17v-7" />
     <path d="M17 17v-11" />
-    <path d="M6 13l5-4 4 2 5-6" />
+    <path d="m6 13 5-4 4 2 5-6" />
+    <path d="M18 5h2v2" />
   </svg>
 );
 
-// 3. Attendance Logs: Document with folded top-right corner, lines and plus symbol at bottom right
-const AttendanceLogsIcon = ({ size = 16, className = "" }) => (
+// 3. Attendance Logs: Document with folded top-right corner, 2 lines and plus at bottom-right
+const AttendanceLogsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6" />
-    <path d="M14 2v6h6" />
-    <path d="M14 2l6 6" />
-    <path d="M8 12h4" />
-    <path d="M8 16h2" />
-    <path d="M18 15v6" />
-    <path d="M15 18h6" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="8" y1="12" x2="13" y2="12" />
+    <line x1="8" y1="16" x2="11" y2="16" />
+    <line x1="18" y1="15" x2="18" y2="21" />
+    <line x1="15" y1="18" x2="21" y2="18" />
   </svg>
 );
 
 // 4. Check-ins Requests: Circular clock
-const CheckInsIcon = ({ size = 16, className = "" }) => (
+const CheckInsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="9" />
     <polyline points="12 6 12 12 16 14" />
@@ -50,7 +50,7 @@ const CheckInsIcon = ({ size = 16, className = "" }) => (
 );
 
 // 5. Leave Requests: Calendar with binder rings
-const LeaveRequestsIcon = ({ size = 16, className = "" }) => (
+const LeaveRequestsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect x="3" y="4" width="18" height="18" rx="2" />
     <line x1="16" y1="2" x2="16" y2="6" />
@@ -60,7 +60,7 @@ const LeaveRequestsIcon = ({ size = 16, className = "" }) => (
 );
 
 // 6. Adjustments: Cog / Settings gear
-const AdjustmentsIcon = ({ size = 16, className = "" }) => (
+const AdjustmentsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -68,7 +68,7 @@ const AdjustmentsIcon = ({ size = 16, className = "" }) => (
 );
 
 // 7. Holidays and Events: Umbrella
-const HolidaysIcon = ({ size = 16, className = "" }) => (
+const HolidaysIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M22 12a10.06 10.06 0 0 0-20 0Z" />
     <path d="M12 12v8a2 2 0 0 0 4 0" />
@@ -77,7 +77,7 @@ const HolidaysIcon = ({ size = 16, className = "" }) => (
 );
 
 // 8. Employee: Two users outline
-const EmployeeIcon = ({ size = 16, className = "" }) => (
+const EmployeeIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
     <circle cx="9" cy="7" r="4" />
@@ -87,7 +87,7 @@ const EmployeeIcon = ({ size = 16, className = "" }) => (
 );
 
 // 9. Employee Requests: Single user with plus sign
-const EmployeeRequestsIcon = ({ size = 16, className = "" }) => (
+const EmployeeRequestsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
     <circle cx="9" cy="7" r="4" />
@@ -97,7 +97,7 @@ const EmployeeRequestsIcon = ({ size = 16, className = "" }) => (
 );
 
 // 10. Team Members: 3 people grouped together
-const TeamMembersIcon = ({ size = 16, className = "" }) => (
+const TeamMembersIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M17 21v-2a4 4 0 0 0-3-3.87" />
     <path d="M7 21v-2a4 4 0 0 1 3-3.87" />
@@ -109,7 +109,7 @@ const TeamMembersIcon = ({ size = 16, className = "" }) => (
 );
 
 // 11. Team Leads: Award ribbon medallion
-const TeamLeadsIcon = ({ size = 16, className = "" }) => (
+const TeamLeadsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <circle cx="12" cy="8" r="6" />
     <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
@@ -117,7 +117,7 @@ const TeamLeadsIcon = ({ size = 16, className = "" }) => (
 );
 
 // 12. Salary & Payroll: Wallet
-const SalaryIcon = ({ size = 16, className = "" }) => (
+const SalaryIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
     <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
@@ -126,7 +126,7 @@ const SalaryIcon = ({ size = 16, className = "" }) => (
 );
 
 // 13. Task Management: Checklist
-const TaskManagementIcon = ({ size = 16, className = "" }) => (
+const TaskManagementIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <line x1="8" y1="6" x2="21" y2="6" />
     <line x1="8" y1="12" x2="21" y2="12" />
@@ -138,7 +138,7 @@ const TaskManagementIcon = ({ size = 16, className = "" }) => (
 );
 
 // 14. Screenshot Monitoring: Camera
-const ScreenshotIcon = ({ size = 16, className = "" }) => (
+const ScreenshotIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
     <circle cx="12" cy="13" r="3" />
@@ -146,7 +146,7 @@ const ScreenshotIcon = ({ size = 16, className = "" }) => (
 );
 
 // 15. Applications: ID badge card
-const ApplicationsIcon = ({ size = 16, className = "" }) => (
+const ApplicationsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <rect x="6" y="8" width="4" height="4" rx="0.5" />
@@ -157,7 +157,7 @@ const ApplicationsIcon = ({ size = 16, className = "" }) => (
 );
 
 // 16. Positions: Storefront with awning & door
-const PositionsIcon = ({ size = 16, className = "" }) => (
+const PositionsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" />
     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
@@ -168,23 +168,23 @@ const PositionsIcon = ({ size = 16, className = "" }) => (
 );
 
 // 17. Contacts: Single user outline
-const ContactsIcon = ({ size = 16, className = "" }) => (
+const ContactsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
 
-// 18. Profile: User portrait outline
-const ProfileIcon = ({ size = 16, className = "" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
+// 18. Profile: Solid black silhouette user (EXACT MATCH to reference screenshot)
+const ProfileIcon = ({ size = 18, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className}>
+    <circle cx="12" cy="7.5" r="4" />
+    <path d="M20 21v-1.5A5.5 5.5 0 0 0 14.5 14h-5A5.5 5.5 0 0 0 4 19.5V21h16Z" />
   </svg>
 );
 
 // 19. Projects: Briefcase
-const ProjectsIcon = ({ size = 16, className = "" }) => (
+const ProjectsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
     <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
@@ -192,7 +192,7 @@ const ProjectsIcon = ({ size = 16, className = "" }) => (
 );
 
 // 20. Daily Report: File Text
-const DailyReportIcon = ({ size = 16, className = "" }) => (
+const DailyReportIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <polyline points="14 2 14 8 20 8" />
@@ -202,8 +202,8 @@ const DailyReportIcon = ({ size = 16, className = "" }) => (
   </svg>
 );
 
-// 21. Log Out
-const LogOutIcon = ({ size = 16, className = "" }) => (
+// 21. Log Out: Red arrow exiting bracket
+const LogOutIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
     <polyline points="16 17 21 12 16 7" />
@@ -269,14 +269,14 @@ export const Sidebar = ({ onSignOut }) => {
   // Structured menu sections matching Admin Panel organization & typography
   const ADMIN_SECTIONS = [
     {
-      title: "Overview",
+      title: "OVERVIEW",
       items: [
         { tab: 'admin-dashboard', label: 'Dashboard', icon: DashboardIcon },
         { tab: 'admin-performance', label: 'Performance', icon: PerformanceIcon },
       ]
     },
     {
-      title: "Attendance and Leaves",
+      title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
         { tab: 'admin-checkin-requests', label: 'Check-ins Requests', icon: CheckInsIcon },
@@ -286,7 +286,7 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "People and Organization",
+      title: "PEOPLE AND ORGANIZATION",
       items: [
         { tab: 'admin-employees', label: 'Employee', icon: EmployeeIcon },
         { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon },
@@ -297,13 +297,13 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "Monitoring and Security",
+      title: "MONITORING AND SECURITY",
       items: [
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
       ]
     },
     {
-      title: "Recruitment and Leads",
+      title: "RECRUITMENT AND LEADS",
       items: [
         { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
         { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
@@ -312,7 +312,7 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "Account",
+      title: "ACCOUNT",
       items: [
         { tab: 'profile', label: 'Profile', icon: ProfileIcon },
       ]
@@ -321,14 +321,14 @@ export const Sidebar = ({ onSignOut }) => {
 
   const HR_SECTIONS = [
     {
-      title: "Overview",
+      title: "OVERVIEW",
       items: [
         { tab: 'admin-dashboard', label: 'Dashboard', icon: DashboardIcon },
         { tab: 'admin-performance', label: 'Performance', icon: PerformanceIcon },
       ]
     },
     {
-      title: "Attendance and Leaves",
+      title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
         { tab: 'admin-checkin-requests', label: 'Check-ins Requests', icon: CheckInsIcon },
@@ -338,7 +338,7 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "People and Organization",
+      title: "PEOPLE AND ORGANIZATION",
       items: [
         { tab: 'admin-employees', label: 'Employees', icon: EmployeeIcon },
         { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon },
@@ -347,13 +347,13 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "Monitoring and Security",
+      title: "MONITORING AND SECURITY",
       items: [
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
       ]
     },
     {
-      title: "Recruitment and Hiring",
+      title: "RECRUITMENT AND HIRING",
       items: [
         { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
         { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
@@ -361,7 +361,7 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "Account",
+      title: "ACCOUNT",
       items: [
         { tab: 'profile', label: 'Profile', icon: ProfileIcon },
       ]
@@ -370,14 +370,14 @@ export const Sidebar = ({ onSignOut }) => {
 
   const TL_SECTIONS = [
     {
-      title: "Overview",
+      title: "OVERVIEW",
       items: [
         { tab: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
         { tab: 'performance', label: 'Performance', icon: PerformanceIcon },
       ]
     },
     {
-      title: "Team Management",
+      title: "TEAM MANAGEMENT",
       items: [
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
         { tab: 'team-tasks', label: 'Task Management', icon: TaskManagementIcon },
@@ -388,7 +388,7 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "My Workspace",
+      title: "MY WORKSPACE",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
         { tab: 'tasks', label: 'My Tasks', icon: TaskManagementIcon },
@@ -400,7 +400,7 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "Account",
+      title: "ACCOUNT",
       items: [
         { tab: 'profile', label: 'Profile', icon: ProfileIcon },
       ]
@@ -409,20 +409,20 @@ export const Sidebar = ({ onSignOut }) => {
 
   const EMP_SECTIONS = [
     {
-      title: "Overview",
+      title: "OVERVIEW",
       items: [
         { tab: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
         { tab: 'performance', label: 'My Performance', icon: PerformanceIcon },
       ]
     },
     {
-      title: "Monitoring",
+      title: "MONITORING",
       items: [
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
       ]
     },
     {
-      title: "My Work",
+      title: "MY WORK",
       items: [
         { tab: 'tasks', label: 'My Tasks', icon: TaskManagementIcon },
         { tab: 'projects', label: 'My Projects', icon: ProjectsIcon },
@@ -430,7 +430,7 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "Attendance & People",
+      title: "ATTENDANCE & PEOPLE",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
         { tab: 'leave', label: 'My Leaves', icon: LeaveRequestsIcon },
@@ -441,7 +441,7 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "Account",
+      title: "ACCOUNT",
       items: [
         { tab: 'profile', label: 'Profile', icon: ProfileIcon },
       ]
@@ -477,10 +477,10 @@ export const Sidebar = ({ onSignOut }) => {
           lg:translate-x-0`}
       >
         {/* Navigation Area */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-3.5 text-xs">
           {menuSections.map((section) => (
             <div key={section.title} className="space-y-1">
-              <p className="px-2.5 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 bg-slate-100/70 rounded-xs">
+              <p className="px-2.5 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 bg-[#edf4f8] rounded-xs">
                 {section.title}
               </p>
               {section.items.map((item) => {
@@ -494,7 +494,7 @@ export const Sidebar = ({ onSignOut }) => {
                     onClick={() => handleNavClick(item.tab)}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-all duration-150 text-xs cursor-pointer text-left ${isActive
                       ? "text-white font-semibold shadow-xs"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium"
+                      : "text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium"
                       }`}
                     style={
                       isActive
@@ -503,7 +503,7 @@ export const Sidebar = ({ onSignOut }) => {
                     }
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <Icon size={16} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                      <Icon size={18} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-600'}`} />
                       <span className="truncate">{item.label}</span>
                     </div>
 
@@ -528,7 +528,7 @@ export const Sidebar = ({ onSignOut }) => {
                 {roleLabels[userRole] || 'Administrator'}
               </span>
               <span
-                className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full text-white bg-[#0088cc] capitalize"
+                className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full text-white bg-[#0082c3] capitalize"
               >
                 {userRole === 'admin' ? 'Admin' : (userRole === 'hr' ? 'HR' : (userRole === 'team_leader' ? 'TL' : 'Employee'))}
               </span>
@@ -543,7 +543,7 @@ export const Sidebar = ({ onSignOut }) => {
             }}
             className="w-full flex items-center gap-2 px-1 py-1 text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
           >
-            <LogOutIcon size={16} className="shrink-0 text-rose-500" />
+            <LogOutIcon size={18} className="shrink-0 text-rose-500" />
             <span>Log Out</span>
           </button>
         </div>
