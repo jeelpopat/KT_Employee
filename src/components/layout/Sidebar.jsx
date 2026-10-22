@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Clock, FileText, CheckSquare,
   CalendarDays, User, LogOut, X, Menu,
@@ -17,6 +17,45 @@ export const Sidebar = ({ onSignOut }) => {
     attendanceStatus, handleCheckOut, userRole
   } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isTabActive = (itemTab) => {
+    if (currentTab === itemTab) return true;
+
+    // Check location pathname match with tabToPath
+    const currentPath = location.pathname;
+    if (tabToPath && tabToPath[itemTab] && tabToPath[itemTab] === currentPath) {
+      return true;
+    }
+
+    // Check common aliases across role views
+    const aliases = {
+      'admin-performance': ['performance', 'admin-performance'],
+      'performance': ['performance', 'admin-performance'],
+      'admin-dashboard': ['dashboard', 'admin-dashboard'],
+      'dashboard': ['dashboard', 'admin-dashboard'],
+      'admin-salary': ['salary', 'admin-salary'],
+      'salary': ['salary', 'admin-salary'],
+      'admin-team-tasks': ['team-tasks', 'admin-team-tasks'],
+      'team-tasks': ['team-tasks', 'admin-team-tasks'],
+      'admin-holidays': ['holiday', 'admin-holidays'],
+      'holiday': ['holiday', 'admin-holidays'],
+      'admin-members': ['team-members', 'admin-members'],
+      'team-members': ['team-members', 'admin-members'],
+      'admin-employees': ['employees', 'admin-employees'],
+      'employees': ['employees', 'admin-employees'],
+      'admin-leave-requests': ['team-leaves', 'admin-leave-requests'],
+      'team-leaves': ['team-leaves', 'admin-leave-requests'],
+      'admin-settings': ['settings', 'admin-settings', 'setting'],
+      'settings': ['settings', 'admin-settings', 'setting'],
+    };
+
+    if (aliases[itemTab] && aliases[itemTab].includes(currentTab)) {
+      return true;
+    }
+
+    return false;
+  };
 
   const handleNavClick = (tab) => {
     setCurrentTab(tab);
@@ -264,7 +303,7 @@ export const Sidebar = ({ onSignOut }) => {
               </p>
               {section.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentTab === item.tab;
+                const isActive = isTabActive(item.tab);
 
                 return (
                   <button
@@ -272,9 +311,14 @@ export const Sidebar = ({ onSignOut }) => {
                     type="button"
                     onClick={() => handleNavClick(item.tab)}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-all duration-150 text-xs cursor-pointer text-left ${isActive
-                      ? "bg-gradient-to-r from-[#0088cc] to-[#009ee3] text-white font-semibold shadow-xs"
+                      ? "text-white font-semibold shadow-xs"
                       : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium"
                       }`}
+                    style={
+                      isActive
+                        ? { background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }
+                        : undefined
+                    }
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Icon size={16} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
@@ -301,7 +345,10 @@ export const Sidebar = ({ onSignOut }) => {
               <span className="text-xs font-bold text-slate-800">
                 {roleLabels[userRole] || 'Administrator'}
               </span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#0088cc] text-white lowercase">
+              <span
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white lowercase"
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+              >
                 {userRole || 'admin'}
               </span>
             </div>

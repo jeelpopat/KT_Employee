@@ -592,7 +592,8 @@ export default function Holidays() {
             onClick={() => {
               openAddHolidayModal();
             }}
-            className="h-10 px-4 text-xs sm:text-sm font-medium bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="h-10 px-4 text-xs sm:text-sm font-medium btn-brand-primary text-white rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
           >
             <span>+ Add Holiday</span>
           </button>
@@ -808,7 +809,8 @@ export default function Holidays() {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="flex-1 bg-[#0088cc] hover:bg-[#0077b3] text-white font-semibold py-2.5 px-4 text-sm rounded-xl disabled:cursor-not-allowed disabled:opacity-70 transition-colors shadow-xs hover:shadow cursor-pointer flex items-center justify-center gap-2"
+                      className="flex-1 btn-brand-primary text-white font-semibold py-2.5 px-4 text-sm rounded-xl disabled:cursor-not-allowed disabled:opacity-70 transition-all shadow-xs hover:shadow cursor-pointer flex items-center justify-center gap-2"
+                      style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                     >
                       {isSubmitting && (
                         <Loader2 className="w-4 h-4 animate-spin text-white" />

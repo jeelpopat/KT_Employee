@@ -2778,7 +2778,8 @@ export default function Adjustments() {
                   submitting ||
                   loading
                 }
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#0088cc] hover:bg-[#0077b3] disabled:opacity-50 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors shadow-xs cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 btn-brand-primary disabled:opacity-50 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-all shadow-xs cursor-pointer"
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>

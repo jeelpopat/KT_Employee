@@ -1959,7 +1959,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 });
                 setShowProjectModal(true);
               }}
-              className="bg-[#0088cc] hover:bg-[#0077b3] text-white px-4 py-2 sm:px-5 sm:py-2 rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 font-semibold text-xs cursor-pointer"
+              className="btn-brand-primary text-white px-4 py-2 sm:px-5 sm:py-2 rounded-lg shadow-xs transition-all flex items-center justify-center gap-2 font-semibold text-xs cursor-pointer"
+              style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
             >
               <Plus className="w-4 h-4" />
               New Project
@@ -3189,7 +3190,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
                 <button
                   type="submit"
-                  className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+                  className="w-full sm:flex-1 btn-brand-primary text-white py-3 rounded-lg font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer"
+                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                 >
                   {selectedProject ? "Update Project" : "Create Project"}
                 </button>

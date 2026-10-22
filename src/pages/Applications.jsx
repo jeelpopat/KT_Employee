@@ -613,7 +613,8 @@ export default function Applications() {
               </button>
               <button
                 onClick={scheduleInterview}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-[#0088cc] hover:bg-[#0077b3] rounded-lg transition-colors shadow-xs cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white btn-brand-primary rounded-lg transition-all shadow-xs cursor-pointer"
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 Schedule
               </button>

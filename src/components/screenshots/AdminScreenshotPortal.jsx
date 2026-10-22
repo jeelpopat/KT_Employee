@@ -706,7 +706,8 @@ export const AdminScreenshotPortal = () => {
                 fetchSettings();
                 setIsSettingsModalOpen(true);
               }}
-              className="h-10 px-4 rounded-lg bg-[#0088cc] hover:bg-[#0077b3] text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+              className="h-10 px-4 rounded-lg btn-brand-primary text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+              style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
             >
               <Settings size={14} />
               <span>Settings</span>
@@ -956,7 +957,8 @@ export const AdminScreenshotPortal = () => {
                   fetchSettings();
                   setIsSettingsModalOpen(true);
                 }}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                className="px-3 py-1.5 rounded-lg btn-brand-primary text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 <Settings size={13} />
                 <span>Settings</span>

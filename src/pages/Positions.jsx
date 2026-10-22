@@ -229,7 +229,8 @@ export default function Positions() {
             setFormData(initialFormState);
             setShowModal(true);
           }}
-          className="h-10 px-4 bg-[#0088cc] text-white rounded-lg hover:bg-[#0077b3] transition-colors shadow-xs flex items-center gap-2 font-medium text-xs sm:text-sm cursor-pointer"
+          className="h-10 px-4 btn-brand-primary text-white rounded-lg transition-all shadow-xs flex items-center gap-2 font-medium text-xs sm:text-sm cursor-pointer"
+          style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
         >
           <Plus className="h-4 w-4" />
           Create Position
@@ -740,7 +741,8 @@ export default function Positions() {
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-[#0088cc] hover:bg-[#0077b3] rounded-lg transition-colors shadow-xs cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white btn-brand-primary rounded-lg transition-all shadow-xs cursor-pointer"
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 {editId ? "Update Position" : "Create Position"}
               </button>

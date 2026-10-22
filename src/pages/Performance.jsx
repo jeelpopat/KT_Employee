@@ -1754,7 +1754,8 @@ const Performance = () => {
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="h-10 px-4 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                className="h-10 px-4 btn-brand-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 <Plus size={15} />
                 <span>Add Performance</span>
@@ -1837,7 +1838,8 @@ const Performance = () => {
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="mt-4 px-4 py-2 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                className="mt-4 px-4 py-2 btn-brand-primary text-white rounded-lg text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 <Plus size={14} />
                 <span>Add Performance</span>
@@ -2207,7 +2209,8 @@ const Performance = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+                  className="px-4 py-2 btn-brand-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-60"
+                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                 >
                   {submitting && <RefreshCw size={13} className="animate-spin" />}
                   <span>{isEditModalOpen ? "Update Record" : "Submit Record"}</span>
@@ -2296,7 +2299,8 @@ const Performance = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedFeedbackModal(null)}
-                  className="px-4 py-2 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg text-xs font-medium cursor-pointer shadow-xs transition"
+                  className="px-4 py-2 btn-brand-primary text-white rounded-lg text-xs font-medium cursor-pointer shadow-xs transition-all"
+                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                 >
                   Close
                 </button>

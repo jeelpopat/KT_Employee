@@ -638,7 +638,8 @@ export default function Employees() {
               resetForm();
               setShowModal(true);
             }}
-            className="h-10 px-4 bg-[#0088cc] text-white hover:bg-[#0077b3] transition-colors flex items-center gap-2 shadow-xs text-xs sm:text-sm font-medium rounded-lg cursor-pointer"
+            className="h-10 px-4 btn-brand-primary text-white transition-all flex items-center gap-2 shadow-xs text-xs sm:text-sm font-medium rounded-lg cursor-pointer"
+            style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
           >
             <Plus className="h-4 w-4" />
             Add Employee
@@ -1643,8 +1644,9 @@ export default function Employees() {
                   disabled={isSubmitting}
                   className={`flex-1 px-4 py-2.5 text-sm font-medium text-white transition-colors rounded-lg shadow-xs flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${editMode
                     ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-blue-600 hover:bg-blue-700"
+                    : "btn-brand-primary"
                     }`}
+                  style={!editMode ? { background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' } : undefined}
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>

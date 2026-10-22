@@ -462,9 +462,14 @@ export default function Contacts() {
                     onClick={() => setFilterService(service)}
                     className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
                       filterService === service
-                        ? "bg-[#0088cc] text-white shadow-xs font-semibold"
+                        ? "btn-brand-primary text-white shadow-xs font-semibold"
                         : "bg-white text-slate-600 border border-slate-200/80 hover:border-slate-300 hover:text-slate-900"
                     }`}
+                    style={
+                      filterService === service
+                        ? { background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }
+                        : undefined
+                    }
                   >
                     {service === "all" ? "All" : service}
                   </button>
@@ -485,9 +490,14 @@ export default function Contacts() {
                       }}
                       className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                         filterService === service
-                          ? "bg-[#0088cc] text-white shadow-xs font-semibold"
+                          ? "btn-brand-primary text-white shadow-xs font-semibold"
                           : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-900"
                       }`}
+                      style={
+                        filterService === service
+                          ? { background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }
+                          : undefined
+                      }
                     >
                       {service === "all" ? "All" : service}
                     </button>

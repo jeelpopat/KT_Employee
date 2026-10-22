@@ -68,6 +68,10 @@ const MainLayout = ({ handleSignOut }) => {
         setCurrentTab('admin-dashboard');
       } else if (userRole !== 'admin' && userRole !== 'hr' && (mapped === 'admin-dashboard' || path === '/admin' || path === '/admin/dashboard')) {
         setCurrentTab('dashboard');
+      } else if ((userRole === 'admin' || userRole === 'hr') && (mapped === 'performance' || path === '/performance')) {
+        setCurrentTab('admin-performance');
+      } else if (userRole !== 'admin' && userRole !== 'hr' && (mapped === 'admin-performance' || path === '/performance')) {
+        setCurrentTab('performance');
       } else {
         setCurrentTab(mapped);
       }

@@ -209,7 +209,8 @@ export default function Setting() {
           <button
             type="submit"
             disabled={isSaving}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0088cc] hover:bg-[#0077b3] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg btn-brand-primary text-white text-xs font-semibold shadow-xs cursor-pointer transition-all disabled:opacity-50"
+            style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
           >
             <Save size={14} />
             <span>{isSaving ? "Saving..." : "Save Workspace Settings"}</span>

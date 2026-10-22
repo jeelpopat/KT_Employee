@@ -182,3 +182,19 @@
     font-size: 0.8rem;
   }
 }
+
+/* Custom Brand Gradient */
+.bg-brand-gradient {
+  background: linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%) !important;
+}
+
+.btn-brand-primary {
+  background: linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%) !important;
+  color: #ffffff !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-brand-primary:hover {
+  opacity: 0.95;
+  filter: brightness(1.08);
+}
