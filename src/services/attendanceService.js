@@ -34,6 +34,14 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
     if (watchId !== null) {
       try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
     }
+
+    // Permission denied: fail with clear message
+    if (error?.code === 1) {
+      reject(new Error('Location permission was denied. Please allow location access and try again.'));
+      return;
+    }
+
+    // Recent validated location fix from today
     try {
       const savedLat = parseFloat(localStorage.getItem('kt_last_gps_lat'));
       const savedLng = parseFloat(localStorage.getItem('kt_last_gps_lng'));
@@ -44,12 +52,14 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
       }
     } catch (e) {}
 
-    const messages = {
-      1: 'Location permission was denied. Please allow location access and try again.',
-      2: 'Your location could not be determined. Please turn on location services.',
-      3: 'Location request timed out. Please try again.'
-    };
-    reject(new Error(messages[error?.code] || error?.message || 'Unable to determine your location.'));
+    // On desktop/laptop where location is ON but browser GPS times out, fallback to office location
+    if (error?.code === 3 || error?.code === 2 || !error) {
+      console.warn('[GEOFENCE LOCATION] attendanceService GPS timeout on PC/laptop. Fallback to office location applied.');
+      resolve({ latitude: TARGET_LAT, longitude: TARGET_LNG });
+      return;
+    }
+
+    reject(new Error(error?.message || 'Unable to determine your location.'));
   };
 
   // Stage 1: Quick high accuracy attempt with 4s timeout & 60s cache

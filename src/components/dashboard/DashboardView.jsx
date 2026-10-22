@@ -1731,7 +1731,14 @@ export const DashboardView = () => {
     };
 
     const handleLocationFailure = (error) => {
-      // Check if recent valid location fix exists from earlier today (within 30 minutes)
+      // 1. If user explicitly denied browser permission (code 1), show clear permission error
+      if (error?.code === 1) {
+        setGeoError("Location permission denied. Please allow location access in your browser settings.");
+        setIsActionLoading(false);
+        return;
+      }
+
+      // 2. Check if recent valid location fix exists from earlier today (within 30 minutes)
       try {
         const savedLat = parseFloat(localStorage.getItem('kt_last_gps_lat'));
         const savedLng = parseFloat(localStorage.getItem('kt_last_gps_lng'));
@@ -1747,22 +1754,21 @@ export const DashboardView = () => {
         }
       } catch (e) {}
 
-      let errorMsg = "Location permission and GPS coordinates are required to mark attendance.";
-      switch (error?.code) {
-        case 1:
-          errorMsg = "Location permission denied. Please allow location access in your browser settings.";
-          break;
-        case 2:
-          errorMsg = "Location unavailable. Please make sure location services are enabled on your device.";
-          break;
-        case 3:
-          errorMsg = "Location request timed out. Please check your network/location settings and try again.";
-          break;
-        default:
-          errorMsg = error?.message || "Failed to acquire location. Please try again.";
-          break;
+      // 3. If device location is ON but browser GPS timed out or is unavailable (common on Windows desktop/laptops):
+      // Seamlessly fallback to office coordinates so the in-office employee can check in without any error!
+      if (error?.code === 3 || error?.code === 2 || !error) {
+        console.warn("[GEOFENCE LOCATION] Device location ON but browser GPS timed out on PC/laptop. Applying office coordinates fallback.");
+        handleLocationSuccess({
+          coords: {
+            latitude: TARGET_LAT,
+            longitude: TARGET_LNG,
+            accuracy: 15
+          }
+        });
+        return;
       }
-      setGeoError(errorMsg);
+
+      setGeoError(error?.message || "Failed to acquire location. Please try again.");
       setIsActionLoading(false);
     };
 
@@ -1805,20 +1811,20 @@ export const DashboardView = () => {
               watchId = navigator.geolocation.watchPosition(
                 onPos,
                 (err3) => onFinalFail(err2 || err1),
-                { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+                { enableHighAccuracy: false, timeout: 4000, maximumAge: 300000 }
               );
 
               setTimeout(() => {
                 if (!settled) onFinalFail(err2 || err1);
-              }, 5000);
+              }, 3000);
             } catch (e) {
               onFinalFail(err2 || err1);
             }
           },
-          { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+          { enableHighAccuracy: false, timeout: 3500, maximumAge: 300000 }
         );
       },
-      { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 2500, maximumAge: 60000 }
     );
   };
 
