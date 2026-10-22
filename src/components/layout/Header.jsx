@@ -629,7 +629,9 @@ export const Header = ({ onSignOut }) => {
   const activeUnreadCount = isAdmin ? adminUnreadCount : employeeUnreadCount;
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-30 h-16 border-b border-slate-200/80 bg-white/95 shadow-xs backdrop-blur lg:left-60">
+    <header className={`fixed top-0 left-0 right-0 z-30 h-16 border-b transition-colors shadow-xs backdrop-blur lg:left-60 ${
+      isAdmin ? 'bg-[#003d5b] border-[#00334d]' : 'border-slate-200/80 bg-white/95'
+    }`}>
       <div className="flex h-full items-center justify-between px-3 sm:px-6">
 
         {/* Left: Mobile Brand (Logo & Company Name) */}
@@ -671,9 +673,9 @@ export const Header = ({ onSignOut }) => {
                 setEditingAnnouncementId(null);
                 setShowAnnouncementModal(true);
               }}
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-xs font-semibold hover:bg-indigo-100 transition-colors cursor-pointer shadow-xs"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white text-slate-800 hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer shadow-xs"
             >
-              <Plus size={14} className="text-indigo-600" />
+              <Plus size={14} className="text-slate-800" />
               <span>Announcement</span>
             </button>
           )}
@@ -688,12 +690,16 @@ export const Header = ({ onSignOut }) => {
               }}
               aria-label={`Notifications${activeUnreadCount > 0 ? `, ${activeUnreadCount} unread` : ''}`}
               title="View notifications"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors relative cursor-pointer"
+              className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors relative cursor-pointer ${
+                isAdmin
+                  ? 'text-white hover:bg-white/10'
+                  : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'
+              }`}
             >
               <Bell size={18} />
               {activeUnreadCount > 0 && (
                 <span className={`absolute flex items-center justify-center text-white font-bold rounded-full shadow-xs ${isAdmin
-                  ? '-top-1 -right-1 h-4 min-w-4 px-1 bg-rose-500 text-[9px] ring-2 ring-white animate-pulse'
+                  ? '-top-1 -right-1 h-4 min-w-4 px-1 bg-rose-500 text-[9px] ring-2 ring-[#003d5b] animate-pulse'
                   : '-top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-indigo-600 text-[10px]'
                   }`}>
                   {activeUnreadCount > 99 ? '99+' : activeUnreadCount}
@@ -1012,11 +1018,23 @@ export const Header = ({ onSignOut }) => {
                 setIsProfileMenuOpen((prev) => !prev);
                 setIsNotificationsOpen(false);
               }}
-              className="flex items-center gap-1.5 sm:gap-2 p-1 pl-1.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer bg-white"
+              className={`flex items-center gap-2 p-1 pl-1.5 rounded-lg transition-colors cursor-pointer ${
+                isAdmin ? 'hover:bg-white/10 bg-transparent' : 'hover:bg-slate-50 bg-white'
+              }`}
             >
               <div className="relative shrink-0">
-                <div className="w-7 h-7 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
-                  {displayPhoto && !headerImgError ? (
+                <div className={`flex items-center justify-center font-bold text-xs ${
+                  isAdmin
+                    ? 'w-8 h-8 rounded-full bg-[#007bb5] text-white shadow-xs'
+                    : 'w-7 h-7 rounded-md border border-slate-200 bg-slate-50 overflow-hidden'
+                }`}>
+                  {isAdmin ? (
+                    displayName
+                      .split(' ')
+                      .map((word) => word.charAt(0).toUpperCase())
+                      .slice(0, 2)
+                      .join('') || 'HK'
+                  ) : displayPhoto && !headerImgError ? (
                     <img
                       src={displayPhoto}
                       alt={displayName}
@@ -1038,7 +1056,9 @@ export const Header = ({ onSignOut }) => {
               </div>
 
               <div className="hidden sm:flex items-center gap-1.5 pr-1">
-                <span className="text-xs font-semibold text-slate-800 truncate max-w-[120px]">
+                <span className={`text-xs font-bold truncate max-w-[140px] tracking-wide ${
+                  isAdmin ? 'text-white uppercase' : 'text-slate-800'
+                }`}>
                   {displayName}
                 </span>
               </div>

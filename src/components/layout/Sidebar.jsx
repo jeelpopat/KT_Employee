@@ -48,7 +48,7 @@ export const Sidebar = ({ onSignOut }) => {
     {
       title: "People & Organization",
       items: [
-        { tab: 'admin-employees', label: 'Employees', icon: Users },
+        { tab: 'admin-employees', label: 'Employee', icon: Users },
         { tab: 'admin-employee-requests', label: 'Employee Requests', icon: UserCheck },
         { tab: 'admin-members', label: 'Team Members', icon: Users },
         { tab: 'admin-team-lead', label: 'Team Leads', icon: Award },
@@ -63,15 +63,15 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: Camera },
       ]
     },
-    // {
-    //   title: "Recruitment & Leads",
-    //   items: [
-    //     { tab: 'admin-applications', label: 'Applications', icon: FileText },
-    //     { tab: 'admin-positions', label: 'Positions', icon: Briefcase },
-    //     { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: TrendingUp },
-    //     { tab: 'admin-contacts', label: 'Contacts', icon: Users },
-    //   ]
-    // },
+    {
+      title: "Recruitment & Leads",
+      items: [
+        { tab: 'admin-applications', label: 'Applications', icon: FileText },
+        { tab: 'admin-positions', label: 'Positions', icon: Briefcase },
+        { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: TrendingUp },
+        { tab: 'admin-contacts', label: 'Contacts', icon: Users },
+      ]
+    },
     {
       title: "Account",
       items: [
@@ -272,12 +272,12 @@ export const Sidebar = ({ onSignOut }) => {
                     type="button"
                     onClick={() => handleNavClick(item.tab)}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-all duration-150 text-xs cursor-pointer text-left ${isActive
-                      ? "bg-indigo-50/90 text-indigo-700 font-semibold border-l-2 border-indigo-600"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium border-l-2 border-transparent"
+                      ? "bg-gradient-to-r from-[#0088cc] to-[#009ee3] text-white font-semibold shadow-xs"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium"
                       }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <Icon size={16} className={`shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                      <Icon size={16} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
                       <span className="truncate">{item.label}</span>
                     </div>
 
@@ -295,18 +295,16 @@ export const Sidebar = ({ onSignOut }) => {
 
         {/* Footer with Role indicator & Logout matching KT-admin */}
         <div className="p-3 border-t border-slate-100 bg-white shrink-0">
-          <div className="mb-2 px-2.5 py-2 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-between">
-            <div className="min-w-0">
-              <span className="text-[10px] uppercase font-semibold text-slate-400 block tracking-wider leading-none mb-1">Role</span>
-              <span className="text-xs font-semibold text-indigo-700 truncate block">
-                {roleLabels[userRole] || (userRole ? userRole.toUpperCase() : '')}
+          <div className="mb-2 p-2.5 rounded-lg border border-slate-200 bg-white">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 block tracking-wider leading-none mb-1">Role</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800">
+                {roleLabels[userRole] || 'Administrator'}
+              </span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#0088cc] text-white lowercase">
+                {userRole || 'admin'}
               </span>
             </div>
-            {userRole && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 uppercase font-mono">
-                {userRole === 'admin' ? 'ADMIN' : userRole === 'team_leader' ? 'TL' : userRole === 'hr' ? 'HR' : 'EMP'}
-              </span>
-            )}
           </div>
 
           <button
@@ -315,9 +313,9 @@ export const Sidebar = ({ onSignOut }) => {
               handleCheckOut();
               if (onSignOut) onSignOut();
             }}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-rose-600 hover:bg-rose-50/80 transition-colors cursor-pointer"
+            className="w-full flex items-center gap-2 px-1 py-1 text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
           >
-            <LogOut size={16} className="shrink-0" />
+            <LogOut size={16} className="shrink-0 text-rose-500" />
             <span>Log Out</span>
           </button>
         </div>

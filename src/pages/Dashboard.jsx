@@ -746,29 +746,28 @@ export default function Dashboard() {
         <>
           {confirmationDialog}
           {/* Unified Page Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 tracking-tight">
-                Dashboard
-              </h1>
-            </div>
+          <div className="mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Dashboard
+            </h1>
           </div>
 
-          {/* Unified Stat Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Unified Stat Grid matching reference image */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {[
-              { label: "Total Employees", value: dashboardCounts.employeeCount, accent: "border-l-indigo-600" },
-              { label: "Total Projects", value: dashboardCounts.projectCount, accent: "border-l-amber-500" },
-              { label: "Total Team Leads", value: dashboardCounts.teamLeadCount, accent: "border-l-purple-500" },
+              { label: "TOTAL EMPLOYEES", value: dashboardCounts.employeeCount },
+              { label: "TOTAL PROJECTS", value: dashboardCounts.projectCount },
+              { label: "TOTAL TEAM LEADS", value: dashboardCounts.teamLeadCount },
             ].map((item, idx) => (
               <div
                 key={idx}
-                className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+                className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
               >
-                <div className="flex items-start justify-between">
-                  <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-                  <p className="text-xl font-bold text-slate-900">{item.value}</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
                 </div>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
               </div>
             ))}
 
@@ -777,64 +776,65 @@ export default function Dashboard() {
               type="button"
               ref={absentCardRef}
               onClick={openAbsentDetails}
-              className="bg-white border-l-4 border-l-rose-500 rounded-xl p-4 transition-all shadow-xs text-left cursor-pointer group"
+              className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between text-left cursor-pointer transition-all hover:border-slate-200"
             >
-              <div className="flex items-start justify-between">
-                <p className="text-2xs font-semibold text-rose-600 uppercase tracking-wider mt-1">Absent Today</p>
-                <p className="text-xl font-bold text-slate-900">{absentRecords.length}</p>
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">ABSENT TODAY</p>
               </div>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{absentRecords.length}</p>
             </button>
           </div>
 
-          {/* Corporate Events & Celebrations */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 items-stretch gap-5 sm:gap-6">
+          {/* Corporate Events & Celebrations matching reference image */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
 
             {/* Holidays */}
-            <div className="flex flex-col h-full bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/50">
+            <div className="bg-white rounded-xl border border-slate-100 shadow-xs p-5">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
-                    <UmbrellaIcon className="h-4 w-4 -rotate-12" />
+                  <div className="w-7 h-7 rounded-lg bg-[#e0f2fe] flex items-center justify-center text-[#004b73]">
+                    <UmbrellaIcon className="h-4 w-4" />
                   </div>
-                  <h2 className="text-sm font-semibold text-slate-900">Upcoming Holidays</h2>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                    {upcomingHolidays.length}
-                  </span>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900">Holidays</h2>
                 </div>
+                <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
+                  upcoming
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-slate-300 text-[9px] text-slate-400 font-mono">i</span>
+                </span>
               </div>
 
-              <div className="p-4 sm:p-5 flex-1 flex flex-col justify-center overflow-y-auto">
+              <div>
                 {upcomingHolidays.length === 0 ? (
-                  <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                  <div className="text-center py-6 text-xs text-slate-400">
                     No upcoming holidays
                   </div>
                 ) : (
-                  <div className="flex items-start gap-4 overflow-x-auto pb-1">
+                  <div className="flex items-start gap-6 overflow-x-auto pb-1">
                     {upcomingHolidays.map((holiday) => {
                       const parts = (holiday.date || "").trim().split(" ");
-                      const day = parts[0] || "";
-                      const month = parts.slice(1).join(" ") || "";
+                      const day = parts[0] || "14";
+                      const month = (parts.slice(1).join(" ") || "JAN").substring(0, 3).toUpperCase();
+                      const dayName = holiday.day || "Saturday";
 
                       return (
                         <div
                           key={holiday.id}
-                          className="flex flex-col items-center text-center w-16 sm:w-20 shrink-0 group"
+                          className="flex flex-col items-center text-center shrink-0 w-20"
                         >
-                          <div className="h-12 w-12 rounded-xl bg-emerald-100/70 border border-emerald-200/80 text-emerald-800 flex flex-col items-center justify-center shadow-xs transition-transform duration-200 group-hover:scale-105">
-                            <span className="text-xs font-extrabold text-emerald-900 leading-none">
+                          <div className="w-12 h-12 rounded-full bg-[#004b73] text-white flex flex-col items-center justify-center shadow-xs">
+                            <span className="text-xs sm:text-sm font-bold leading-tight">
                               {day}
                             </span>
-                            {month && (
-                              <span className="text-[8px] font-bold text-emerald-700 uppercase tracking-wider leading-none mt-0.5">
-                                {month}
-                              </span>
-                            )}
+                            <span className="text-[8px] font-bold uppercase tracking-wider leading-none mt-0.5">
+                              {month}
+                            </span>
                           </div>
-                          <p className="text-[11px] font-semibold text-slate-800 mt-1.5 truncate w-full" title={holiday.name}>
+                          <span className="text-[10px] text-slate-400 font-medium mt-1.5">
+                            {dayName}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-800 truncate w-full" title={holiday.name}>
                             {holiday.name}
-                          </p>
-                          <span className="text-[10px] font-semibold text-emerald-600 mt-0.5">
-                            Public
                           </span>
                         </div>
                       );
@@ -845,48 +845,52 @@ export default function Dashboard() {
             </div>
 
             {/* Birthdays */}
-            <div className="flex flex-col h-full bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/50">
+            <div className="bg-white rounded-xl border border-slate-100 shadow-xs p-5">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
+                  <div className="w-7 h-7 rounded-lg bg-[#e0f2fe] flex items-center justify-center text-[#004b73]">
                     <Cake className="h-4 w-4" />
                   </div>
-                  <h2 className="text-sm font-semibold text-slate-900">Upcoming Birthdays</h2>
-                  <span className="text-[10px] font-bold text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded-full">
-                    {birthdays.length}
-                  </span>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900">Birthdays</h2>
                 </div>
+                <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
+                  upcoming
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-slate-300 text-[9px] text-slate-400 font-mono">i</span>
+                </span>
               </div>
 
-              <div className="p-4 sm:p-5 flex-1 flex flex-col justify-center overflow-y-auto">
+              <div>
                 {birthdays.length === 0 ? (
-                  <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                  <div className="text-center py-6 text-xs text-slate-400">
                     No birthdays this month
                   </div>
                 ) : (
-                  <div className="flex items-start gap-4 overflow-x-auto pb-1">
+                  <div className="flex items-start gap-6 overflow-x-auto pb-1">
                     {birthdays.map((person) => {
-                      const initials = person.name
-                        .trim()
-                        .split(/\s+/)
-                        .map((word) => word.charAt(0).toUpperCase())
-                        .slice(0, 2)
-                        .join("");
+                      const bDate = person.dob ? new Date(person.dob) : null;
+                      const day = bDate && !isNaN(bDate.getTime()) ? bDate.getDate() : "14";
+                      const month = bDate && !isNaN(bDate.getTime()) ? bDate.toLocaleString('default', { month: 'short' }).toUpperCase() : "JAN";
+                      const dayName = bDate && !isNaN(bDate.getTime()) ? bDate.toLocaleString('default', { weekday: 'long' }) : "Saturday";
 
                       return (
                         <div
                           key={person.id}
-                          className="flex flex-col items-center text-center w-16 sm:w-20 shrink-0 group"
+                          className="flex flex-col items-center text-center shrink-0 w-20"
                         >
-                          <div className="h-12 w-12 rounded-xl bg-purple-100/70 border border-purple-200/80 text-purple-700 font-bold text-xs flex items-center justify-center shadow-xs transition-transform duration-200 group-hover:scale-105">
-                            {initials}
+                          <div className="w-12 h-12 rounded-full bg-[#004b73] text-white flex flex-col items-center justify-center shadow-xs">
+                            <span className="text-xs sm:text-sm font-bold leading-tight">
+                              {day}
+                            </span>
+                            <span className="text-[8px] font-bold uppercase tracking-wider leading-none mt-0.5">
+                              {month}
+                            </span>
                           </div>
-                          <p className="text-[11px] font-semibold text-slate-800 mt-1.5 truncate w-full" title={person.name}>
+                          <span className="text-[10px] text-slate-400 font-medium mt-1.5">
+                            {dayName}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-800 truncate w-full" title={person.name}>
                             {person.name}
-                          </p>
-                          <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                            {formatBirthdayDate(person.dob)}
-                          </p>
+                          </span>
                         </div>
                       );
                     })}
@@ -896,28 +900,30 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Present Today Grid */}
-          <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/50">
+          {/* Present Today matching reference image */}
+          <div className="bg-white rounded-xl border border-slate-100 shadow-xs p-5">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <h2 className="text-sm font-semibold text-slate-900">Present Today</h2>
+                <div className="w-7 h-7 rounded-lg bg-[#e0f2fe] flex items-center justify-center text-[#004b73]">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">Present Today</h2>
               </div>
-              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full">
+              <span className="bg-[#004b73] text-white text-xs font-semibold px-3 py-1 rounded-md shadow-xs">
                 {presentRecords.length} Active
               </span>
             </div>
 
-            <div className="p-4 sm:p-5 max-h-[320px] overflow-y-auto">
+            <div className="overflow-x-auto pb-1">
               {presentRecords.length === 0 ? (
-                <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                <div className="text-center py-6 text-xs text-slate-400">
                   No present records logged today
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                <div className="flex items-center gap-4">
                   {presentRecords.map((record, index) => {
                     const displayName = record.employee?.name || record.employeeName || record.user?.name || record.name || "N/A";
-                    const role = record.employee?.role || record.role || record.user?.role || "N/A";
+                    const role = record.employee?.role || record.role || record.user?.role || "Team Lead";
                     const initials = displayName
                       .split(" ")
                       .map((word) => word.charAt(0).toUpperCase())
@@ -927,15 +933,17 @@ export default function Dashboard() {
                     return (
                       <div
                         key={record._id || record.id || index}
-                        className="flex flex-col items-center p-2.5 rounded-lg bg-slate-50/60 border border-slate-100 hover:border-emerald-300 transition-all text-center"
+                        className="bg-[#f8fafc] border border-slate-100 rounded-xl p-4 flex flex-col items-center text-center w-28 sm:w-32 shrink-0 transition-transform hover:scale-102"
                       >
-                        <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-semibold shrink-0">
+                        <div className="w-11 h-11 rounded-full bg-[#004b73] text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs">
                           {initials}
                         </div>
-                        <p className="mt-1.5 text-xs font-medium text-slate-800 truncate w-full">
+                        <p className="mt-2 text-xs font-bold text-slate-900 truncate w-full" title={displayName}>
                           {displayName}
                         </p>
-                        <p className="text-[10px] text-slate-400 truncate w-full">{role}</p>
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate w-full">
+                          {role}
+                        </p>
                       </div>
                     );
                   })}
