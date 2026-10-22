@@ -25,7 +25,8 @@ import {
   BadgeCheck,
   Loader2,
   FolderOpen,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from '../../utils/roleFilters';
 import { getTaskProgress } from '../../utils/taskUtils';
@@ -273,6 +274,7 @@ export default function Members() {
   const [attendanceStatusMap, setAttendanceStatusMap] = useState({});
   const [memberInsights, setMemberInsights] = useState({ projects: [], tasks: [], dailyUpdates: [] });
   const [memberInsightsLoading, setMemberInsightsLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -731,7 +733,7 @@ const fetchAllMembers = async () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1003,81 +1005,55 @@ const fetchAllMembers = async () => {
           </div>
         </div>
 
-        {/* Quick Stat Chips */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedRole('all')}
-            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              selectedRole === 'all'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 shadow-xs'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Total</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-              selectedRole === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-            }`}>
-              {members.length}
-            </span>
-          </button>
-
+        {/* Header Right Actions */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="h-10 px-3.5 bg-white border border-slate-200/80 rounded-lg shadow-xs text-xs sm:text-sm flex items-center gap-2">
+            <Users className="h-4 w-4 text-slate-400" />
+            <span className="text-slate-500">Total:</span>
+            <span className="font-bold text-slate-900">{members.length}</span>
+          </div>
 
           <button
             type="button"
-            onClick={() => setSelectedRole('tl')}
-            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              selectedRole === 'tl'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-amber-50 text-amber-700 hover:bg-amber-100/80 border border-amber-200/80 shadow-xs'
-            }`}
+            onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={loading}
+            title="Refresh team members"
+            className="h-10 px-3.5 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 rounded-lg shadow-xs text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
           >
-            <Star className="w-3.5 h-3.5" />
-            <span>Leads</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-              selectedRole === 'tl' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
-            }`}>
-              {members.filter(m => m.roleType === 'tl').length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedRole('hr')}
-            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              selectedRole === 'hr'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-purple-50 text-purple-700 hover:bg-purple-100/80 border border-purple-200/80 shadow-xs'
-            }`}
-          >
-            <BadgeCheck className="w-3.5 h-3.5" />
-            <span>HR</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-              selectedRole === 'hr' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
-            }`}>
-              {members.filter(m => m.roleType === 'hr').length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedRole('employee')}
-            className={`h-9 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              selectedRole === 'employee'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-blue-50 text-blue-700 hover:bg-blue-100/80 border border-blue-200/80 shadow-xs'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Employees</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
-              selectedRole === 'employee' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
-            }`}>
-              {members.filter(m => m.roleType === 'employee').length}
-            </span>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#0088cc]' : 'text-slate-500'}`} />
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
           </button>
         </div>
+      </div>
+
+      {/* 4 METRIC CARDS (UI Standard Design, Clickable to Filter) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {[
+          { key: 'all', label: 'TOTAL MEMBERS', value: members.length },
+          { key: 'tl', label: 'TEAM LEADS', value: members.filter(m => m.roleType === 'tl').length },
+          { key: 'hr', label: 'HR EXECUTIVES', value: members.filter(m => m.roleType === 'hr').length },
+          { key: 'employee', label: 'EMPLOYEES', value: members.filter(m => m.roleType === 'employee').length },
+        ].map((item) => {
+          const isSelected = selectedRole === item.key;
+          return (
+            <div
+              key={item.key}
+              onClick={() => setSelectedRole(selectedRole === item.key && item.key !== 'all' ? 'all' : item.key)}
+              title={`Click to filter by ${item.label}`}
+              className={`bg-white rounded-xl shadow-xs border p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
+                isSelected
+                  ? 'border-[#0088cc] ring-2 ring-[#0088cc]/20 shadow-xs'
+                  : 'border-slate-100 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-1.5 h-7 rounded-full ${isSelected ? 'bg-[#0088cc]' : 'bg-[#004b73]'}`} />
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
+              </div>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
+            </div>
+          );
+        })}
       </div>
 
       {/* Filters Section */}
