@@ -1513,8 +1513,8 @@ const getDesignation = (lead) => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Team Leads Directory</h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">Manage team leads and member assignments with live database sync</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Team Leads Directory</h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">Manage team leads and member assignments with live database sync</p>
         </div>
         <button
           type="button"
@@ -1530,20 +1530,29 @@ const getDesignation = (lead) => {
       </div>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Team Leads</p>
-          <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">{teamLeads.length}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        <div className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL TEAM LEADS</p>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900">{teamLeads.length}</p>
         </div>
-        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Employees</p>
-          <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
+        <div className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL EMPLOYEES</p>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900">
             {employees.filter((employee) => employee.role?.toLowerCase().trim() === "employee").length}
           </p>
         </div>
-        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Members</p>
-          <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
+        <div className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL MEMBERS</p>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900">
             {teamLeads.length + employees.filter((employee) => employee.role?.toLowerCase().trim() === "employee").length}
           </p>
         </div>

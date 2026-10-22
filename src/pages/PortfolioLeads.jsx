@@ -168,10 +168,10 @@ export default function PortfolioLeads() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Portfolio Leads
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
             Manage and track all your portfolio inquiries in one place
           </p>
         </div>
@@ -179,15 +179,15 @@ export default function PortfolioLeads() {
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <button
             onClick={fetchLeads}
-            className="h-10 px-3.5 bg-white rounded-lg shadow-xs border border-slate-200/80 hover:bg-slate-50 transition-colors text-slate-700 flex items-center gap-2 text-xs sm:text-sm font-medium"
+            className="h-10 px-3.5 bg-white rounded-lg shadow-xs border border-slate-200/80 hover:bg-slate-50 transition-colors text-slate-700 flex items-center gap-2 text-xs sm:text-sm font-medium cursor-pointer"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4 text-[#0088cc]" />
             <span>Refresh</span>
           </button>
           <div className="h-10 flex items-center gap-2 px-3.5 bg-white rounded-lg shadow-xs border border-slate-200/80">
             <div className="flex -space-x-1.5">
-              <div className="h-5 w-5 rounded-full bg-blue-500 border border-white flex items-center justify-center text-[8px] font-bold text-white">AK</div>
-              <div className="h-5 w-5 rounded-full bg-purple-500 border border-white flex items-center justify-center text-[8px] font-bold text-white">RJ</div>
+              <div className="h-5 w-5 rounded-full bg-[#0088cc] border border-white flex items-center justify-center text-[8px] font-bold text-white">AK</div>
+              <div className="h-5 w-5 rounded-full bg-[#004b73] border border-white flex items-center justify-center text-[8px] font-bold text-white">RJ</div>
               <div className="h-5 w-5 rounded-full bg-emerald-500 border border-white flex items-center justify-center text-[8px] font-bold text-white">+2</div>
             </div>
             <span className="text-xs font-medium text-slate-600">Team</span>
@@ -196,21 +196,22 @@ export default function PortfolioLeads() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {[
-          { label: "Total Leads", value: stats.total, accent: "border-l-indigo-600" },
-          { label: "High Priority", value: stats.highPriority, accent: "border-l-rose-500" },
-          { label: "Proposal Sent", value: stats.proposalSent, accent: "border-l-blue-500" },
-          { label: "Closed Deals", value: stats.closed, accent: "border-l-emerald-500" }
+          { label: "TOTAL LEADS", value: stats.total },
+          { label: "HIGH PRIORITY", value: stats.highPriority },
+          { label: "PROPOSAL SENT", value: stats.proposalSent },
+          { label: "CLOSED DEALS", value: stats.closed }
         ].map((item, idx) => (
           <div
             key={idx}
-            className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+            className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
           >
-            <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900">{item.value}</p>
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
             </div>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
           </div>
         ))}
       </div>
@@ -222,13 +223,13 @@ export default function PortfolioLeads() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                 <div className="relative flex-1 group">
-                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-[#0088cc] transition-colors" />
                   <input
                     type="text"
                     placeholder="Search by name, email, or project..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all duration-200 placeholder:text-slate-400"
+                    className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] outline-none transition-all duration-200 placeholder:text-slate-400"
                   />
                   {searchTerm && (
                     <button

@@ -74,11 +74,13 @@ export default function OfficeSettings() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-indigo-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+              <Building2 className="w-4 h-4" />
+            </div>
             <span>Office Attendance & Schedule Settings</span>
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
             Configure official work timings, late grace allowances, office geofencing coordinates, and check-in parameters.
           </p>
         </div>
@@ -296,7 +298,7 @@ export default function OfficeSettings() {
           <button
             type="submit"
             disabled={isSaving}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0088cc] hover:bg-[#0077b3] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors disabled:opacity-50"
           >
             <Save size={14} />
             <span>{isSaving ? "Saving Settings..." : "Save Office Configuration"}</span>

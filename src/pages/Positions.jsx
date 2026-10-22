@@ -212,13 +212,13 @@ export default function Positions() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Positions
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500 flex items-center gap-2">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 flex items-center gap-2">
             <span>Manage all job positions and openings</span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
-              <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-[#e0f2fe] text-[#004b73] rounded-full text-xs font-medium">
+              <span className="w-1.5 h-1.5 bg-[#0088cc] rounded-full"></span>
               {positions.length} active
             </span>
           </p>
@@ -229,7 +229,7 @@ export default function Positions() {
             setFormData(initialFormState);
             setShowModal(true);
           }}
-          className="h-10 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-xs flex items-center gap-2 font-medium text-xs sm:text-sm cursor-pointer"
+          className="h-10 px-4 bg-[#0088cc] text-white rounded-lg hover:bg-[#0077b3] transition-colors shadow-xs flex items-center gap-2 font-medium text-xs sm:text-sm cursor-pointer"
         >
           <Plus className="h-4 w-4" />
           Create Position
@@ -237,21 +237,22 @@ export default function Positions() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {[
-          { label: "Total", value: stats.total, accent: "border-l-indigo-600" },
-          { label: "Full-time", value: stats.fullTime, accent: "border-l-emerald-500" },
-          { label: "Part-time", value: stats.partTime, accent: "border-l-purple-500" },
-          { label: "Contract", value: stats.contract, accent: "border-l-amber-500" }
+          { label: "TOTAL POSITIONS", value: stats.total },
+          { label: "FULL-TIME", value: stats.fullTime },
+          { label: "PART-TIME", value: stats.partTime },
+          { label: "CONTRACT", value: stats.contract }
         ].map((item, idx) => (
           <div
             key={idx}
-            className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+            className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
           >
-            <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900">{item.value}</p>
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
             </div>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
           </div>
         ))}
       </div>
@@ -265,14 +266,14 @@ export default function Positions() {
             placeholder="Search positions, categories, locations..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-xs sm:text-sm"
+            className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] outline-none transition text-xs sm:text-sm"
           />
         </div>
         <div className="flex gap-2.5">
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="h-10 px-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition text-xs sm:text-sm"
+            className="h-10 px-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] outline-none transition text-xs sm:text-sm"
           >
             <option value="all">All Types</option>
             <option value="full-time">Full-time</option>
@@ -739,7 +740,7 @@ export default function Positions() {
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm shadow-blue-200"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-[#0088cc] hover:bg-[#0077b3] rounded-lg transition-colors shadow-xs cursor-pointer"
               >
                 {editId ? "Update Position" : "Create Position"}
               </button>

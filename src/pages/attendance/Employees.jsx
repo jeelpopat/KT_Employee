@@ -596,7 +596,7 @@ export default function Employees() {
       {/* ================= HEADER ================= */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Employees
           </h1>
 
@@ -628,7 +628,7 @@ export default function Employees() {
             title="Refresh employee directory"
             className="h-10 px-3.5 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 rounded-lg shadow-xs flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-[#0088cc]" : "text-slate-500"}`} />
             <span className="hidden xs:inline">{loading ? "Refreshing..." : "Refresh"}</span>
           </button>
 
@@ -638,7 +638,7 @@ export default function Employees() {
               resetForm();
               setShowModal(true);
             }}
-            className="h-10 px-4 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-xs text-xs sm:text-sm font-medium rounded-lg cursor-pointer"
+            className="h-10 px-4 bg-[#0088cc] text-white hover:bg-[#0077b3] transition-colors flex items-center gap-2 shadow-xs text-xs sm:text-sm font-medium rounded-lg cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             Add Employee

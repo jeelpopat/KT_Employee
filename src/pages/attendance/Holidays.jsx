@@ -559,7 +559,7 @@ export default function Holidays() {
       {confirmationDialog}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <span>📅</span> Holiday Calendar
           </h1>
           <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">Manage holiday schedules and office closure dates</p>
@@ -592,7 +592,7 @@ export default function Holidays() {
             onClick={() => {
               openAddHolidayModal();
             }}
-            className="h-10 px-4 text-xs sm:text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="h-10 px-4 text-xs sm:text-sm font-medium bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <span>+ Add Holiday</span>
           </button>
@@ -808,7 +808,7 @@ export default function Holidays() {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 text-sm rounded-xl disabled:cursor-not-allowed disabled:opacity-70 transition-colors shadow-xs hover:shadow cursor-pointer flex items-center justify-center gap-2"
+                      className="flex-1 bg-[#0088cc] hover:bg-[#0077b3] text-white font-semibold py-2.5 px-4 text-sm rounded-xl disabled:cursor-not-allowed disabled:opacity-70 transition-colors shadow-xs hover:shadow cursor-pointer flex items-center justify-center gap-2"
                     >
                       {isSubmitting && (
                         <Loader2 className="w-4 h-4 animate-spin text-white" />

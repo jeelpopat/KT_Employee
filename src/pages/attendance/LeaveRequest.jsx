@@ -1537,7 +1537,7 @@ export default function LeaveRequest() {
       ==================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Leave Requests
           </h1>
           <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">

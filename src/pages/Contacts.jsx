@@ -398,10 +398,10 @@ export default function Contacts() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Contacts
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
             Manage contact inquiries and messages
           </p>
         </div>
@@ -409,24 +409,24 @@ export default function Contacts() {
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Stats card */}
           <div className="px-3 sm:px-4 py-2 bg-white rounded-lg shadow-xs border border-slate-200/80 flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 rounded-lg bg-indigo-50">
-              <Users className="h-4 w-4 text-indigo-500" />
+            <div className="p-1.5 rounded-lg bg-[#e0f2fe] text-[#004b73]">
+              <Users className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-[10px] sm:text-xs text-gray-400 font-medium">Total</p>
-              <p className="text-sm sm:text-base font-bold text-gray-900">{filteredContacts.length}</p>
+              <p className="text-[10px] sm:text-xs text-slate-400 font-medium">Total</p>
+              <p className="text-sm sm:text-base font-bold text-slate-900">{filteredContacts.length}</p>
             </div>
           </div>
 
           {/* Live status */}
-          <div className="px-3 sm:px-4 py-2 bg-green-50 rounded-lg border border-green-200 flex items-center gap-2 sm:gap-3">
+          <div className="px-3 sm:px-4 py-2 bg-emerald-50 rounded-lg border border-emerald-200 flex items-center gap-2 sm:gap-3">
             <div className="relative">
-              <div className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75" />
-              <div className="relative h-2 w-2 rounded-full bg-green-500" />
+              <div className="absolute inset-0 rounded-full animate-ping bg-emerald-400 opacity-75" />
+              <div className="relative h-2 w-2 rounded-full bg-emerald-500" />
             </div>
             <div>
-              <p className="text-[10px] sm:text-xs text-green-600 font-medium">Status</p>
-              <p className="text-xs sm:text-sm font-bold text-green-700">Live</p>
+              <p className="text-[10px] sm:text-xs text-emerald-600 font-medium">Status</p>
+              <p className="text-xs sm:text-sm font-bold text-emerald-700">Live</p>
             </div>
           </div>
         </div>
@@ -435,23 +435,23 @@ export default function Contacts() {
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search contacts..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all text-xs sm:text-sm"
+            className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all text-xs sm:text-sm"
           />
         </div>
 
               {/* Mobile filter toggle */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="sm:hidden px-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-gray-600 flex items-center gap-2 justify-center"
+                className="sm:hidden px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 flex items-center gap-2 justify-center"
               >
                 <span>Filter</span>
-                <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">{services.length - 1}</span>
+                <span className="text-xs bg-[#e0f2fe] text-[#004b73] px-2 py-0.5 rounded-full">{services.length - 1}</span>
               </button>
 
               {/* Desktop filters */}
@@ -460,10 +460,10 @@ export default function Contacts() {
                   <button
                     key={service}
                     onClick={() => setFilterService(service)}
-                    className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
+                    className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
                       filterService === service
-                        ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200/50"
-                        : "bg-white text-gray-600 border border-gray-200 hover:border-indigo-200 hover:text-indigo-600"
+                        ? "bg-[#0088cc] text-white shadow-xs font-semibold"
+                        : "bg-white text-slate-600 border border-slate-200/80 hover:border-slate-300 hover:text-slate-900"
                     }`}
                   >
                     {service === "all" ? "All" : service}
@@ -474,7 +474,7 @@ export default function Contacts() {
 
             {/* Mobile filters dropdown */}
             {mobileMenuOpen && (
-              <div className="sm:hidden mt-3 bg-white rounded-2xl border border-gray-200 p-3 shadow-lg">
+              <div className="sm:hidden mt-3 bg-white rounded-xl border border-slate-200 p-3 shadow-lg">
                 <div className="flex flex-wrap gap-2">
                   {services.map((service) => (
                     <button
@@ -483,10 +483,10 @@ export default function Contacts() {
                         setFilterService(service);
                         setMobileMenuOpen(false);
                       }}
-                      className={`px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                      className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                         filterService === service
-                          ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200/50"
-                          : "bg-gray-50 text-gray-600 border border-gray-200 hover:border-indigo-200 hover:text-indigo-600"
+                          ? "bg-[#0088cc] text-white shadow-xs font-semibold"
+                          : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-900"
                       }`}
                     >
                       {service === "all" ? "All" : service}
@@ -500,7 +500,7 @@ export default function Contacts() {
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden p-4 sm:p-5 lg:p-6">
           {loading ? (
             <div className="flex justify-center items-center py-16 sm:py-20">
-              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-[#0088cc]" />
             </div>
           ) : filteredContacts.length === 0 ? (
             <div className="text-center py-12 sm:py-16 md:py-20">

@@ -1644,12 +1644,9 @@ export default function AttendanceLogs() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Attendance Logs
           </h1>
-          {/* <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
-            Inspect detailed attendance logs and history for your team
-          </p> */}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1687,7 +1684,7 @@ export default function AttendanceLogs() {
             title="Refresh attendance records"
             className="h-10 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg shadow-xs flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-indigo-600' : 'text-slate-500'}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#0088cc]' : 'text-slate-500'}`} />
             <span className="hidden xs:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
@@ -1766,21 +1763,22 @@ export default function AttendanceLogs() {
       )}
 
       {/* STATS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {[
-          { label: "On Time", value: onTimeCount, accent: "border-l-emerald-500" },
-          { label: "Late", value: lateCount, accent: "border-l-amber-500" },
-          { label: "Half Day", value: halfDayCount, accent: "border-l-blue-500" },
-          { label: "Absent", value: absentCount, accent: "border-l-rose-500" }
+          { label: "ON TIME", value: onTimeCount },
+          { label: "LATE", value: lateCount },
+          { label: "HALF DAY", value: halfDayCount },
+          { label: "ABSENT", value: absentCount }
         ].map((item, idx) => (
           <div
             key={idx}
-            className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+            className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
           >
-            <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900">{item.value}</p>
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
             </div>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
           </div>
         ))}
       </div>

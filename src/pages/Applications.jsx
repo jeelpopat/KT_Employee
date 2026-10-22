@@ -226,24 +226,24 @@ export default function Applications() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Applications
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
             Manage and track all candidate applications
           </p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="px-3 py-2 bg-white border border-slate-200/80 rounded-lg shadow-xs">
-            <span className="text-xs sm:text-sm text-gray-600">Total: </span>
-            <span className="font-semibold text-gray-900">{applications.length}</span>
+            <span className="text-xs sm:text-sm text-slate-600">Total: </span>
+            <span className="font-semibold text-slate-900">{applications.length}</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full bg-green-400 opacity-75 rounded-full"></span>
-              <span className="relative inline-flex h-2 w-2 bg-green-500 rounded-full"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full bg-emerald-400 opacity-75 rounded-full"></span>
+              <span className="relative inline-flex h-2 w-2 bg-emerald-500 rounded-full"></span>
             </span>
-            <span className="text-[10px] sm:text-xs font-medium text-green-700">Live</span>
+            <span className="text-[10px] sm:text-xs font-medium text-emerald-700">Live</span>
           </div>
         </div>
       </div>
@@ -252,7 +252,7 @@ export default function Applications() {
       <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex justify-center items-center py-16 sm:py-20">
-            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-[#0088cc]" />
           </div>
         ) : applications.length === 0 ? (
           <div className="text-center py-12 sm:py-16">
@@ -613,7 +613,7 @@ export default function Applications() {
               </button>
               <button
                 onClick={scheduleInterview}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-blue-700 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-[#0088cc] hover:bg-[#0077b3] rounded-lg transition-colors shadow-xs cursor-pointer"
               >
                 Schedule
               </button>

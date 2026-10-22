@@ -2207,7 +2207,7 @@ export default function Adjustments() {
       ====================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Adjustments
           </h1>
           <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
@@ -2778,7 +2778,7 @@ export default function Adjustments() {
                   submitting ||
                   loading
                 }
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white font-medium text-sm px-6 py-2.5 transition-colors shadow-2xs cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#0088cc] hover:bg-[#0077b3] disabled:opacity-50 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors shadow-xs cursor-pointer"
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>

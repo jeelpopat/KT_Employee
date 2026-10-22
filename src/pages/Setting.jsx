@@ -57,11 +57,13 @@ export default function Setting() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <SettingsIcon className="w-6 h-6 text-indigo-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+              <SettingsIcon className="w-4 h-4" />
+            </div>
             <span>System & Workspace Settings</span>
           </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
             Manage general organization information, portal security rules, notification triggers, and user interface preferences.
           </p>
         </div>
@@ -88,11 +90,11 @@ export default function Setting() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-sm">
             <div
-              className="p-3 rounded-xl border text-left flex flex-col gap-2 border-indigo-600 bg-indigo-50/40 text-indigo-900 ring-1 ring-indigo-600"
+              className="p-3 rounded-xl border text-left flex flex-col gap-2 border-[#0088cc] bg-[#e0f2fe]/40 text-slate-900 ring-1 ring-[#0088cc]"
             >
               <div className="flex items-center justify-between">
-                <Sun size={18} className="text-indigo-600" />
-                <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                <Sun size={18} className="text-[#004b73]" />
+                <span className="w-2 h-2 rounded-full bg-[#0088cc]"></span>
               </div>
               <div>
                 <p className="text-xs font-semibold">Light Theme</p>
@@ -207,7 +209,7 @@ export default function Setting() {
           <button
             type="submit"
             disabled={isSaving}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0088cc] hover:bg-[#0077b3] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors disabled:opacity-50"
           >
             <Save size={14} />
             <span>{isSaving ? "Saving..." : "Save Workspace Settings"}</span>

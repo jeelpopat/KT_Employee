@@ -992,8 +992,8 @@ const fetchAllMembers = async () => {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Team Members</h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Team Members</h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
             Manage and overview all staff, team leads, and employees.
           </p>
         </div>
@@ -1085,7 +1085,7 @@ const fetchAllMembers = async () => {
               placeholder="Search members by name, email, designation..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white transition-all placeholder:text-slate-400"
+              className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white transition-all placeholder:text-slate-400"
             />
           </div>
           
@@ -1104,7 +1104,7 @@ const fetchAllMembers = async () => {
                     }
                   }
                 }}
-                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
+                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 <option value="all">All Departments</option>
                 {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
@@ -1128,7 +1128,7 @@ const fetchAllMembers = async () => {
                     if (deducedDept) setSelectedDepartment(deducedDept);
                   }
                 }}
-                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
+                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 <option value="all">All Roles</option>
                 {selectedDepartment !== 'all' && EMPLOYEE_DEPARTMENTS_ROLES[selectedDepartment] ? (
@@ -1157,7 +1157,7 @@ const fetchAllMembers = async () => {
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
+                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 {roles.map(role => (
                   <option key={role} value={role}>
@@ -1173,7 +1173,7 @@ const fetchAllMembers = async () => {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white appearance-none cursor-pointer font-medium text-slate-700"
+                className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 {statuses.map(status => (
                   <option key={status} value={status}>

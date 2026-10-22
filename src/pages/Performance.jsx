@@ -1570,12 +1570,12 @@ const Performance = () => {
       {/* ==================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
-            <BarChart3 size={20} />
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <BarChart3 size={18} />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 {isAdmin
                   ? "Performance Management"
                   : isTL
@@ -1642,7 +1642,7 @@ const Performance = () => {
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 shadow-xs cursor-pointer disabled:opacity-60 transition"
           >
-            <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : "text-slate-400"} />
+            <RefreshCw size={13} className={loading ? "animate-spin text-[#0088cc]" : "text-slate-400"} />
             <span>{loading ? "Refreshing..." : "Sync"}</span>
           </button>
         </div>
@@ -1652,44 +1652,42 @@ const Performance = () => {
       {/* 2. TOP METRIC CARDS (4 STATS FULL WIDTH) */}
       {/* ==================================================== */}
       {!metrics.isPersonal ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {[
-            { label: metrics.totalEmployeesLabel || (isTL ? "Team Evaluated" : "Total Evaluated"), value: metrics.totalEmployees, accent: "border-l-indigo-600" },
-            { label: "Excellent (≥ 80%)", value: `${metrics.excellentCount}`, accent: "border-l-emerald-500" },
-            { label: "Good (50% - 79%)", value: `${metrics.goodCount}`, accent: "border-l-blue-500" },
-            { label: "Needs Improvement (< 50%)", value: `${metrics.needsImprovementCount}`, accent: "border-l-amber-500" }
+            { label: (metrics.totalEmployeesLabel || (isTL ? "Team Evaluated" : "Total Evaluated")).toUpperCase(), value: metrics.totalEmployees },
+            { label: "EXCELLENT (≥ 80%)", value: `${metrics.excellentCount}` },
+            { label: "GOOD (50% - 79%)", value: `${metrics.goodCount}` },
+            { label: "NEEDS IMPROVEMENT (< 50%)", value: `${metrics.needsImprovementCount}` }
           ].map((item, idx) => (
             <div
               key={idx}
-              className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+              className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
             >
-              <div className="flex items-start justify-between">
-                <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-                <p className="text-xl font-bold text-slate-900">{item.value}</p>
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
               </div>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {[
-            { label: "Latest Score", value: `${metrics.latestScore}%`, accent: "border-l-indigo-600" },
-            {
-              label: "Current Standing",
-              value: metrics.ratingLabel,
-              accent: metrics.ratingLabel === "Excellent" ? "border-l-emerald-500" : metrics.ratingLabel === "Good" ? "border-l-blue-500" : "border-l-amber-500"
-            },
-            { label: "Average Score", value: `${metrics.averageScore}%`, accent: "border-l-purple-500" },
-            { label: "Evaluations", value: metrics.totalReviews, accent: "border-l-amber-500" }
+            { label: "LATEST SCORE", value: `${metrics.latestScore}%` },
+            { label: "CURRENT STANDING", value: metrics.ratingLabel },
+            { label: "AVERAGE SCORE", value: `${metrics.averageScore}%` },
+            { label: "EVALUATIONS", value: metrics.totalReviews }
           ].map((item, idx) => (
             <div
               key={idx}
-              className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+              className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
             >
-              <div className="flex items-start justify-between">
-                <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-                <p className="text-xl font-bold text-slate-900">{item.value}</p>
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
               </div>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
             </div>
           ))}
         </div>
@@ -1703,8 +1701,8 @@ const Performance = () => {
         {/* Header Row: Title & Action Buttons */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
-              <FileText size={18} />
+            <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+              <FileText size={16} />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
@@ -1731,7 +1729,7 @@ const Performance = () => {
                   type="button"
                   onClick={() => setTlViewScope("team")}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${tlViewScope === "team"
-                      ? "bg-white text-indigo-600 shadow-xs"
+                      ? "bg-white text-[#0088cc] shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                     }`}
                 >
@@ -1742,7 +1740,7 @@ const Performance = () => {
                   type="button"
                   onClick={() => setTlViewScope("my")}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${tlViewScope === "my"
-                      ? "bg-white text-indigo-600 shadow-xs"
+                      ? "bg-white text-[#0088cc] shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                     }`}
                 >
@@ -1756,7 +1754,7 @@ const Performance = () => {
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                className="h-10 px-4 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
               >
                 <Plus size={15} />
                 <span>Add Performance</span>
@@ -1774,7 +1772,7 @@ const Performance = () => {
               placeholder={isAdmin ? "Search by employee name, email or department..." : "Search evaluations or remarks..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all"
             />
           </div>
 
@@ -1784,7 +1782,7 @@ const Performance = () => {
               <select
                 value={toolbarPerfFilter}
                 onChange={(e) => setToolbarPerfFilter(e.target.value)}
-                className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none pr-8 font-normal"
+                className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer appearance-none pr-8 font-normal"
               >
                 <option value="all">All Performance</option>
                 <option value="excellent">Excellent (≥ 80%)</option>
@@ -1799,7 +1797,7 @@ const Performance = () => {
               <select
                 value={selectedMonthYear}
                 onChange={(e) => setSelectedMonthYear(e.target.value)}
-                className="h-10 pl-8 pr-8 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer appearance-none font-normal"
+                className="h-10 pl-8 pr-8 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer appearance-none font-normal"
               >
                 <option value="all">All Dates</option>
                 {monthYearOptions.map((opt) => (
@@ -1817,7 +1815,7 @@ const Performance = () => {
         {/* Table Container */}
         {loading ? (
           <div className="p-16 text-center">
-            <RefreshCw size={28} className="animate-spin text-indigo-600 mx-auto mb-3" />
+            <RefreshCw size={28} className="animate-spin text-[#0088cc] mx-auto mb-3" />
             <p className="text-xs font-semibold text-slate-500">Loading performance data...</p>
           </div>
         ) : filteredPerformances.length === 0 ? (
@@ -1839,7 +1837,7 @@ const Performance = () => {
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                className="mt-4 px-4 py-2 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
               >
                 <Plus size={14} />
                 <span>Add Performance</span>
@@ -2024,7 +2022,7 @@ const Performance = () => {
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center">
                   {isEditModalOpen ? <Edit3 size={16} /> : <Plus size={16} />}
                 </div>
                 <div>
@@ -2064,7 +2062,7 @@ const Performance = () => {
                     value={modalForm.employeeID}
                     onChange={(e) => handleSelectEmployee(e.target.value)}
                     required
-                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer pr-8 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] cursor-pointer pr-8 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                   >
                     <option value="">-- Choose Employee --</option>
                     {employees.map((emp) => (
@@ -2091,7 +2089,7 @@ const Performance = () => {
                     required
                     value={modalForm.date || ""}
                     onChange={(e) => setModalForm((prev) => ({ ...prev, date: e.target.value }))}
-                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer"
+                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer"
                   />
                 </div>
               </div>
@@ -2112,7 +2110,7 @@ const Performance = () => {
                       placeholder="e.g. 85"
                       value={modalForm.percentage}
                       onChange={(e) => handlePercentageChange(e.target.value)}
-                      className="w-full h-10 pl-3 pr-7 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+                      className="w-full h-10 pl-3 pr-7 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all"
                     />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
                       %
@@ -2134,7 +2132,7 @@ const Performance = () => {
                       placeholder="e.g. 8.5"
                       value={modalForm.rating}
                       onChange={(e) => handleRatingChange(e.target.value)}
-                      className="w-full h-10 pl-3 pr-9 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+                      className="w-full h-10 pl-3 pr-9 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all"
                     />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
                       / 10
@@ -2159,7 +2157,7 @@ const Performance = () => {
                       const val = e.target.value;
                       setModalForm((prev) => ({ ...prev, feedback: val }));
                     }}
-                    className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 resize-none transition-all"
+                    className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] resize-none transition-all"
                   />
                   <span className="absolute bottom-2.5 right-3 text-[10px] text-slate-400 font-medium">
                     {(modalForm.feedback || "").length}/500
@@ -2183,7 +2181,7 @@ const Performance = () => {
                       const val = e.target.value;
                       setModalForm((prev) => ({ ...prev, remarks: val, remark: val }));
                     }}
-                    className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 resize-none transition-all"
+                    className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] resize-none transition-all"
                   />
                   <span className="absolute bottom-2.5 right-3 text-[10px] text-slate-400 font-medium">
                     {(modalForm.remarks || "").length}/500
@@ -2209,7 +2207,7 @@ const Performance = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+                  className="px-4 py-2 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
                 >
                   {submitting && <RefreshCw size={13} className="animate-spin" />}
                   <span>{isEditModalOpen ? "Update Record" : "Submit Record"}</span>
@@ -2228,7 +2226,7 @@ const Performance = () => {
           <div className="bg-white border border-slate-200/80 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center">
                   <FileText size={16} />
                 </div>
                 <div>
@@ -2298,7 +2296,7 @@ const Performance = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedFeedbackModal(null)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium cursor-pointer shadow-xs transition"
+                  className="px-4 py-2 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg text-xs font-medium cursor-pointer shadow-xs transition"
                 >
                   Close
                 </button>

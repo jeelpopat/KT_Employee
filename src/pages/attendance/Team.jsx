@@ -1959,7 +1959,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 });
                 setShowProjectModal(true);
               }}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 sm:px-5 sm:py-2 rounded-xl shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 transition-all duration-200 flex items-center justify-center gap-2 font-semibold text-xs cursor-pointer active:scale-95"
+              className="bg-[#0088cc] hover:bg-[#0077b3] text-white px-4 py-2 sm:px-5 sm:py-2 rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 font-semibold text-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               New Project
@@ -1971,7 +1971,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
               disabled={isDailyReportsLoading}
               className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all text-xs font-semibold flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isDailyReportsLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-[#0088cc] ${isDailyReportsLoading ? 'animate-spin' : ''}`} />
               <span>Refresh Reports</span>
             </button>
           )}
@@ -1980,21 +1980,22 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         {activeMainTab === 'projects' && (
           <>
             {/* KPI Metrics Dashboard Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
               {[
-                { label: "Total Projects", value: totalProjectsCount, accent: "border-l-indigo-600" },
-                { label: "Total Tasks", value: totalTasksCount, accent: "border-l-blue-500" },
-                { label: "In Progress", value: inProgressTasksCount, accent: "border-l-amber-500" },
-                { label: "Completed", value: completedTasksCount, accent: "border-l-emerald-500" }
+                { label: "TOTAL PROJECTS", value: totalProjectsCount },
+                { label: "TOTAL TASKS", value: totalTasksCount },
+                { label: "IN PROGRESS", value: inProgressTasksCount },
+                { label: "COMPLETED", value: completedTasksCount }
               ].map((item, idx) => (
                 <div
                   key={idx}
-                  className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+                  className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
                 >
-                  <div className="flex items-start justify-between">
-                    <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-                    <p className="text-xl font-bold text-slate-900">{item.value}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
                   </div>
+                  <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
                 </div>
               ))}
             </div>

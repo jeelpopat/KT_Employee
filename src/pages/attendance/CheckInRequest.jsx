@@ -1246,7 +1246,7 @@ export default function CheckInRequest() {
       ===================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Check-In Requests
           </h1>
           <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
@@ -1387,7 +1387,7 @@ export default function CheckInRequest() {
                     e.target.value
                   )
                 }
-                className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-slate-400"
+                className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all placeholder:text-slate-400"
               />
             </div>
 

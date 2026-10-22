@@ -680,7 +680,41 @@ export const AdminScreenshotPortal = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
-      
+      {/* Standard Unified Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Screenshot Monitoring
+          </h1>
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
+            Work activity and workstation screenshot monitoring
+          </p>
+        </div>
+        {isAdminOrHr && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchScreenshots(true)}
+              disabled={isRefreshing}
+              className="h-10 px-3.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium flex items-center gap-1.5 border border-slate-200 transition cursor-pointer shadow-xs disabled:opacity-50"
+              title="Refresh Screenshot Feed"
+            >
+              <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-[#0088cc]' : 'text-slate-400'} />
+              <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+            </button>
+            <button
+              onClick={() => {
+                fetchSettings();
+                setIsSettingsModalOpen(true);
+              }}
+              className="h-10 px-4 rounded-lg bg-[#0088cc] hover:bg-[#0077b3] text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            >
+              <Settings size={14} />
+              <span>Settings</span>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Upper section shown in screenshot (Kept for Employee & TL, hidden for Admin & HR) */}
       {!isAdminOrHr && (
         <>
