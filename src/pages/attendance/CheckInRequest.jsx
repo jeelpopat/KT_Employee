@@ -1288,91 +1288,41 @@ export default function CheckInRequest() {
         </div>
       </div>
 
+      {/* ===================================================
+          3 METRIC CARDS (UI Standard Design)
+      =================================================== */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        {[
+          { key: "pending", label: "PENDING", value: pendingCount },
+          { key: "approved", label: "APPROVED", value: approvedCount },
+          { key: "rejected", label: "REJECTED", value: rejectedCount },
+        ].map((item) => {
+          const isSelected = filterStatus === item.key;
+          return (
+            <div
+              key={item.key}
+              onClick={() => setFilterStatus(filterStatus === item.key ? "all" : item.key)}
+              title={`Click to filter by ${item.label}`}
+              className={`bg-white rounded-xl shadow-xs border p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
+                isSelected
+                  ? "border-[#0088cc] ring-2 ring-[#0088cc]/20 shadow-xs"
+                  : "border-slate-100 hover:border-slate-300"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-1.5 h-7 rounded-full ${isSelected ? "bg-[#0088cc]" : "bg-[#004b73]"}`} />
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
+              </div>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
+            </div>
+          );
+        })}
+      </div>
+
       {/* =====================================================
           MAIN CARD
       ===================================================== */}
       <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
-
-        {/* ===================================================
-            STATS (Clickable to Filter by Status)
-        =================================================== */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-4 border-b border-slate-200/80">
-
-          {/* Pending */}
-          <div
-            onClick={() => setFilterStatus(filterStatus === "pending" ? "all" : "pending")}
-            title="Click to filter Pending requests"
-            className={`transition-all rounded-lg p-2.5 sm:p-3 text-center border cursor-pointer select-none ${
-              filterStatus === "pending"
-                ? "bg-amber-100/90 border-amber-400 ring-2 ring-amber-400/30 shadow-xs"
-                : "bg-amber-50/70 border-amber-200/80 hover:bg-amber-100/60"
-            }`}
-          >
-            <div className="flex items-center justify-center gap-1 text-amber-700 text-[10px] sm:text-xs font-bold uppercase">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">
-                Pending
-              </span>
-              <span className="xs:hidden">
-                Pend
-              </span>
-            </div>
-
-            <p className="text-base sm:text-xl font-bold text-amber-700 mt-0.5">
-              {pendingCount}
-            </p>
-          </div>
-
-          {/* Approved */}
-          <div
-            onClick={() => setFilterStatus(filterStatus === "approved" ? "all" : "approved")}
-            title="Click to filter Approved requests"
-            className={`transition-all rounded-lg p-2.5 sm:p-3 text-center border cursor-pointer select-none ${
-              filterStatus === "approved"
-                ? "bg-emerald-100/90 border-emerald-400 ring-2 ring-emerald-400/30 shadow-xs"
-                : "bg-emerald-50/70 border-emerald-200/80 hover:bg-emerald-100/60"
-            }`}
-          >
-            <div className="flex items-center justify-center gap-1 text-emerald-700 text-[10px] sm:text-xs font-bold uppercase">
-              <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">
-                Approved
-              </span>
-              <span className="xs:hidden">
-                Appr
-              </span>
-            </div>
-
-            <p className="text-base sm:text-xl font-bold text-emerald-700 mt-0.5">
-              {approvedCount}
-            </p>
-          </div>
-
-          {/* Rejected */}
-          <div
-            onClick={() => setFilterStatus(filterStatus === "rejected" ? "all" : "rejected")}
-            title="Click to filter Rejected requests"
-            className={`transition-all rounded-lg p-2.5 sm:p-3 text-center border cursor-pointer select-none ${
-              filterStatus === "rejected"
-                ? "bg-rose-100/90 border-rose-400 ring-2 ring-rose-400/30 shadow-xs"
-                : "bg-rose-50/70 border-rose-200/80 hover:bg-rose-100/60"
-            }`}
-          >
-            <div className="flex items-center justify-center gap-1 text-rose-700 text-[10px] sm:text-xs font-bold uppercase">
-              <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">
-                Rejected
-              </span>
-              <span className="xs:hidden">
-                Rej
-              </span>
-            </div>
-
-            <p className="text-base sm:text-xl font-bold text-rose-700 mt-0.5">
-              {rejectedCount}
-            </p>
-          </div>
-        </div>
 
         {/* ===================================================
             SEARCH
