@@ -1106,6 +1106,23 @@ export const ProfileView = () => {
         className="hidden" 
       />
 
+      {/* Standard Unified Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <User size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              My Profile
+            </h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+              Manage your personal details, credentials, and verification documents
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Profile Header Card */}
       <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs relative overflow-hidden">
         
@@ -1261,7 +1278,7 @@ export const ProfileView = () => {
           onClick={() => setActiveTab('details')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'details'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-[#0088cc] text-[#004b73]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -1274,7 +1291,7 @@ export const ProfileView = () => {
           onClick={() => setActiveTab('documents')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'documents'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-[#0088cc] text-[#004b73]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -1282,7 +1299,7 @@ export const ProfileView = () => {
           <span>Documents & Identity</span>
           <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
             activeTab === 'documents'
-              ? 'bg-indigo-600 text-white'
+              ? 'bg-[#004b73] text-white'
               : 'bg-slate-100 text-slate-600'
           }`}>
             {documents.length}
@@ -1294,7 +1311,7 @@ export const ProfileView = () => {
           onClick={() => setActiveTab('security')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'security'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-[#0088cc] text-[#004b73]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -1546,7 +1563,8 @@ export const ProfileView = () => {
                   <button 
                     type="submit" 
                     disabled={isSaving}
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-70"
+                    className="px-6 py-2.5 btn-brand-primary text-white rounded-lg text-sm font-semibold flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-70"
+                    style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                   >
                     {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                     {isSaving ? 'Saving...' : 'Save Changes'}
@@ -2183,7 +2201,8 @@ export const ProfileView = () => {
                 <button 
                   type="submit" 
                   disabled={isPasswordSaving}
-                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-md text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-70"
+                  className="px-6 py-2.5 btn-brand-primary text-white rounded-lg text-sm font-semibold flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-70"
+                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                 >
                   {isPasswordSaving ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
                   {isPasswordSaving ? 'Updating...' : 'Update Password'}
@@ -2523,7 +2542,8 @@ export const ProfileView = () => {
                 <button
                   type="submit"
                   disabled={isSubmittingNewDoc || !newDocForm.file}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer disabled:opacity-60 transition-colors shadow-xs"
+                  className="px-5 py-2 btn-brand-primary text-white rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer disabled:opacity-60 transition shadow-xs"
+                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                 >
                   {isSubmittingNewDoc ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   {isSubmittingNewDoc ? 'Uploading...' : 'Save & Upload'}

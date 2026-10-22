@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Briefcase } from "lucide-react";
 import Toast from "../components/common/Toast";
 
 const INITIAL_ROUND_FORM = {
@@ -225,13 +226,18 @@ export default function Applications() {
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Applications
-          </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
-            Manage and track all candidate applications
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Briefcase size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Applications
+            </h1>
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
+              Manage and track all candidate applications
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="px-3 py-2 bg-white border border-slate-200/80 rounded-lg shadow-xs">
@@ -362,7 +368,8 @@ export default function Applications() {
                               setSelectedApp(app);
                               setShowInterviewModal(true);
                             }}
-                            className="px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-white rounded-lg shadow-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                           >
                             {interviewLoading === app._id ? "..." : "Schedule"}
                           </button>
@@ -447,7 +454,8 @@ export default function Applications() {
                           setSelectedApp(app);
                           setShowInterviewModal(true);
                         }}
-                        className="w-full px-4 py-2.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold text-white rounded-lg shadow-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                       >
                         {interviewLoading === app._id ? "Processing..." : "Schedule Interview"}
                       </button>
@@ -735,7 +743,8 @@ export default function Applications() {
               </button>
               <button
                 onClick={addRound}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 border border-green-700 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white btn-brand-primary rounded-lg transition-all shadow-xs cursor-pointer"
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 Add Round
               </button>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calendar } from 'lucide-react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 
 const API_BASE = 'https://kt-backend-yzr4.onrender.com/api/holiday';
@@ -557,12 +557,19 @@ export default function Holidays() {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {confirmationDialog}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>📅</span> Holiday Calendar
-          </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">Manage holiday schedules and office closure dates</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Calendar size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Holiday Calendar
+            </h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+              Manage official holiday schedules and company closure dates
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">

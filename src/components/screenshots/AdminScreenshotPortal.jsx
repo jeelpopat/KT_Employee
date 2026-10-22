@@ -682,13 +682,18 @@ export const AdminScreenshotPortal = () => {
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Standard Unified Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Screenshot Monitoring
-          </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
-            Work activity and workstation screenshot monitoring
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Camera size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Screenshot Monitoring
+            </h1>
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
+              Work activity and workstation screenshot monitoring
+            </p>
+          </div>
         </div>
         {isAdminOrHr && (
           <div className="flex items-center gap-2">

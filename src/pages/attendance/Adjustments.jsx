@@ -2205,28 +2205,33 @@ export default function Adjustments() {
       {/* ======================================================
           HEADER
       ====================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Adjustments
-          </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
-            Apply direct attendance adjustments and configure rules
-          </p>
-          {/* Current Settings Pills */}
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
-              Start: <b className="text-slate-900">{attendanceSettings.officeStartTime}</b>
-            </span>
-            <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
-              Late: <b className="text-slate-900">{attendanceSettings.lateAfter}</b>
-            </span>
-            <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
-              Absent: <b className="text-slate-900">{attendanceSettings.absentAfter}</b>
-            </span>
-            <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
-              End: <b className="text-slate-900">{attendanceSettings.officeEndTime}</b>
-            </span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0 mt-0.5">
+            <Settings size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Adjustments
+            </h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+              Apply direct attendance adjustments and configure office rules
+            </p>
+            {/* Current Settings Pills */}
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+                Start: <b className="text-slate-900">{attendanceSettings.officeStartTime}</b>
+              </span>
+              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+                Late: <b className="text-slate-900">{attendanceSettings.lateAfter}</b>
+              </span>
+              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+                Absent: <b className="text-slate-900">{attendanceSettings.absentAfter}</b>
+              </span>
+              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+                End: <b className="text-slate-900">{attendanceSettings.officeEndTime}</b>
+              </span>
+            </div>
           </div>
         </div>
 

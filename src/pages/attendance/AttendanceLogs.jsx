@@ -1642,11 +1642,19 @@ export default function AttendanceLogs() {
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
 
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Attendance Logs
-          </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Clock size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Attendance Logs
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Daily employee attendance records, shift timelines and break details.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1691,7 +1699,8 @@ export default function AttendanceLogs() {
           {/* EXPORT */}
           <button
             onClick={() => setShowExportOptions(true)}
-            className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1 rounded-lg shadow-xs flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+            className="h-10 btn-brand-primary text-white px-4 py-1 rounded-lg shadow-xs flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium transition-all cursor-pointer"
+            style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
           >
             <FileSpreadsheet className="h-4 w-4" />
             <span>Export Excel</span>

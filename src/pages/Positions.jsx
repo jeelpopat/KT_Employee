@@ -211,17 +211,22 @@ export default function Positions() {
 
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Positions
-          </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 flex items-center gap-2">
-            <span>Manage all job positions and openings</span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-[#e0f2fe] text-[#004b73] rounded-full text-xs font-medium">
-              <span className="w-1.5 h-1.5 bg-[#0088cc] rounded-full"></span>
-              {positions.length} active
-            </span>
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Briefcase size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Positions
+            </h1>
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 flex items-center gap-2">
+              <span>Manage all job positions and openings</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-[#e0f2fe] text-[#004b73] rounded-full text-xs font-medium">
+                <span className="w-1.5 h-1.5 bg-[#0088cc] rounded-full"></span>
+                {positions.length} active
+              </span>
+            </p>
+          </div>
         </div>
         <button
           onClick={() => {

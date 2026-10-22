@@ -1244,21 +1244,26 @@ export default function CheckInRequest() {
       {/* =====================================================
           HEADER
       ===================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Check-In Requests
-          </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
-            Manage employee attendance approvals
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Clock size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Check-In Requests
+            </h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+              Review and approve or reject employee punch-in attendance requests
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Total */}
           <div className="h-10 bg-white border border-slate-200/80 px-3.5 py-1 rounded-lg shadow-xs text-xs sm:text-sm flex items-center">
-            <span className="text-gray-500">Total: </span>
-            <span className="ml-1.5 font-bold text-gray-900">
+            <span className="text-slate-500">Total: </span>
+            <span className="ml-1.5 font-bold text-slate-900">
               {totalCount}
             </span>
           </div>
@@ -1275,7 +1280,7 @@ export default function CheckInRequest() {
             onClick={() => fetchPendingRequests()}
             disabled={loading}
             title="Refresh from Database"
-            className="h-10 px-3 py-1 bg-white border border-slate-200/80 rounded-lg shadow-xs text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="h-10 px-3.5 py-1 bg-white border border-slate-200/80 rounded-lg shadow-xs text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <RefreshCw className={`h-3.5 w-3.5 text-slate-600 ${loading ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>

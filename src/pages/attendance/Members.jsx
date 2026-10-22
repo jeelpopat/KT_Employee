@@ -990,12 +990,17 @@ const fetchAllMembers = async () => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Team Members</h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">
-            Manage and overview all staff, team leads, and employees.
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Users size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Team Members</h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+              Manage and overview all staff, team leads, and employees
+            </p>
+          </div>
         </div>
 
         {/* Quick Stat Chips */}

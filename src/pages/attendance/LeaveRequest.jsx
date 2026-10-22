@@ -1535,34 +1535,54 @@ export default function LeaveRequest() {
       {/* ====================================================
           HEADER
       ==================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Leave Requests
-          </h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
-            Review and manage leave applications
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <CalendarDays size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Leave Requests
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Review, approve, or reject employee leave applications
+            </p>
+          </div>
         </div>
 
-        {/* <div className="flex flex-wrap items-center gap-2">
-           {currentRole && (
-            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200/80 rounded-lg px-3 py-2 shadow-xs">
-              <ShieldCheck className="w-4 h-4 text-blue-600" />
-              <span className="text-xs text-blue-600">Role</span>
-              <span className="text-xs font-bold text-blue-800">
-                {formatRole(currentRole)}
-              </span>
-            </div>
-          )} 
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Refresh Button */}
+          <button
+            onClick={() => fetchLeaves()}
+            disabled={loading}
+            title="Refresh from Database"
+            className="h-10 px-3.5 py-1 bg-white border border-slate-200/80 rounded-lg shadow-xs text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 text-slate-600 ${loading ? "animate-spin text-[#0088cc]" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
+      </div>
 
-          <div className="bg-white border border-slate-200/80 rounded-lg px-3.5 py-2 shadow-xs">
-            <span className="text-xs text-gray-500">Total</span>
-            <span className="ml-2 text-sm font-bold text-gray-900">
-              {requests.length}
-            </span>
+      {/* 4 METRIC CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {[
+          { label: "TOTAL REQUESTS", value: requests.length },
+          { label: "PENDING", value: requests.filter((r) => isPending(r.approvalStatus || r.status)).length },
+          { label: "APPROVED", value: requests.filter((r) => isApproved(r.approvalStatus || r.status)).length },
+          { label: "REJECTED", value: requests.filter((r) => isRejected(r.approvalStatus || r.status)).length }
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
+            </div>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
           </div>
-        </div> */}
+        ))}
       </div>
 
       {/* ====================================================

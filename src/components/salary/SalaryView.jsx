@@ -2160,33 +2160,32 @@ export const SalaryView = () => {
       )}
 
       {/* ==================================================== */}
+      {/* ==================================================== */}
       {/* 1. TOP HEADER SECTION */}
       {/* ==================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shadow-xs">
-            <Wallet size={20} />
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Wallet size={18} />
           </div>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                {isAdmin ? 'Salary & Payroll Processing' : isTL ? 'Team Lead Compensation & Payslips' : 'My Salary & Payslip Statements'}
-              </h2>
-              {/* <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-200">
-                {isAdmin ? 'Admin' : isTL ? 'Team Lead' : 'Employee'}
-              </span> */}
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              {isAdmin ? 'Salary & Payroll' : isTL ? 'Team Lead Compensation' : 'My Salary & Payslips'}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              {isAdmin ? 'Manage salary structures, process monthly disbursements and track payslips.' : 'View your compensation details, breakdown, and download monthly payslip statements.'}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Admin Tabs */}
           {isAdmin && (
-            <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold border border-slate-200">
               <button
                 onClick={() => setAdminViewMode('processed-payrolls')}
                 className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'processed-payrolls'
-                  ? 'bg-white text-indigo-600 shadow-xs'
+                  ? 'bg-white text-[#0088cc] shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
@@ -2196,7 +2195,7 @@ export const SalaryView = () => {
               <button
                 onClick={() => setAdminViewMode('salary-structures')}
                 className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'salary-structures'
-                  ? 'bg-white text-indigo-600 shadow-xs'
+                  ? 'bg-white text-[#0088cc] shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
@@ -2210,9 +2209,10 @@ export const SalaryView = () => {
           {isAdmin && adminViewMode === 'processed-payrolls' && (
             <button
               onClick={() => openProcessPayrollModal()}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              className="h-10 px-4 btn-brand-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
             >
-              <Plus size={14} />
+              <Plus size={15} />
               <span>Process Payroll</span>
             </button>
           )}
@@ -2220,9 +2220,10 @@ export const SalaryView = () => {
           {isAdmin && adminViewMode === 'salary-structures' && (
             <button
               onClick={() => openCreateStructureModal()}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              className="h-10 px-4 btn-brand-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
             >
-              <Plus size={14} />
+              <Plus size={15} />
               <span>Create Structure</span>
             </button>
           )}

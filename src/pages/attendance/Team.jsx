@@ -1911,6 +1911,23 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {confirmationDialog}
+
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <ListTodo size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Task Management
+            </h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+              Organize projects, assign tasks to members, and track daily progress
+            </p>
+          </div>
+        </div>
+      </div>
         
         {/* Top Action & Navigation Tabs Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mt-1 sm:-mt-2 mb-1">
@@ -3465,7 +3482,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 py-3 font-semibold text-white shadow-sm transition-colors cursor-pointer"
+                  className="w-full sm:flex-1 rounded-lg text-white py-3 font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer"
+                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                 >
                   {editingTask ? "Update Task" : "Create Task"}
                 </button>

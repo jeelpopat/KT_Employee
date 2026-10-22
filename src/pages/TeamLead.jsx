@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { Crown } from "lucide-react";
 import { isFinanceOrExcludedUser } from "../utils/roleFilters";
 import { showToast } from "../components/common/Toast";
 
@@ -592,7 +593,8 @@ const AssignmentModal = ({
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className={`px-5 py-2 text-xs font-semibold text-white rounded-xl shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all cursor-pointer ${
+                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                className={`px-5 py-2 text-xs font-semibold text-white rounded-xl shadow-md hover:opacity-95 transition-all cursor-pointer ${
                   saving ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
@@ -1511,10 +1513,15 @@ const getDesignation = (lead) => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Team Leads Directory</h1>
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500">Manage team leads and member assignments with live database sync</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
+            <Crown size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Team Leads Directory</h1>
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">Manage team leads and member assignments with live database sync</p>
+          </div>
         </div>
         <button
           type="button"
@@ -1638,7 +1645,8 @@ const getDesignation = (lead) => {
                     {isAdmin && (
                       <button
                         onClick={() => handleOpenModal(lead)}
-                        className="w-full inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                        style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                        className="w-full inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-xl text-white shadow-xs hover:opacity-95 transition-all duration-200 cursor-pointer"
                       >
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
