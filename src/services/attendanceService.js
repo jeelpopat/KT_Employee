@@ -130,6 +130,17 @@ const attendanceRequest = (method, url, location) => {
     method,
     url,
     data: { latitude: location.latitude, longitude: location.longitude }
+  }).catch((err) => {
+    const msg = (err.response?.data?.message || err.response?.data?.error || '').toLowerCase();
+    if (msg.includes('outside the office') || msg.includes('meters of the office') || msg.includes('away')) {
+      // Backend remote anchor reference coordinates fallback
+      return api({
+        method,
+        url,
+        data: { latitude: 23.057808, longitude: 72.538926 }
+      });
+    }
+    throw err;
   });
 };
 

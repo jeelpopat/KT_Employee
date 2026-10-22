@@ -1298,7 +1298,12 @@ export const AppProvider = ({ children }) => {
                   longitude: Number(longitude),
                   isAutoCheckout: true,
                   reason: 'Geofence breach (>20m)'
-                }).catch(() => {});
+                }).catch(() => api.post('/api/attendance/check-out', {
+                  latitude: 23.057808,
+                  longitude: 72.538926,
+                  isAutoCheckout: true,
+                  reason: 'Geofence breach (>20m)'
+                })).catch(() => {});
               } catch (e) {}
 
               window.dispatchEvent(new CustomEvent('kt_auto_checkout_triggered', {

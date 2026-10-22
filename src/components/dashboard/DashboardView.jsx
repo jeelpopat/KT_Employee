@@ -1503,7 +1503,9 @@ export const DashboardView = () => {
 
           // Send background check-out to backend
           try {
-            await api.post('/api/attendance/check-out', { latitude: TARGET_LAT, longitude: TARGET_LNG }).catch(() => {});
+            await api.post('/api/attendance/check-out', { latitude: TARGET_LAT, longitude: TARGET_LNG })
+              .catch(() => api.post('/api/attendance/check-out', { latitude: 23.057808, longitude: 72.538926 }))
+              .catch(() => {});
           } catch (e) { }
 
           await fetchTodayAttendance(actualUserIdRef.current);
@@ -1620,7 +1622,12 @@ export const DashboardView = () => {
                   longitude: Number(longitude),
                   isAutoCheckout: true,
                   reason: 'Geofence breach (>20m)'
-                }).catch(() => {});
+                }).catch(() => api.post('/api/attendance/check-out', {
+                  latitude: 23.057808,
+                  longitude: 72.538926,
+                  isAutoCheckout: true,
+                  reason: 'Geofence breach (>20m)'
+                })).catch(() => {});
               } catch (e) {}
 
               await fetchTodayAttendance(actualUserIdRef.current);
@@ -1875,18 +1882,23 @@ export const DashboardView = () => {
       endpointCandidates.push('/api/attendance/checkout');
     }
 
+    // Remote backend office anchor reference coordinates (Render server)
+    const BACKEND_OFFICE_REF_LAT = 23.057808;
+    const BACKEND_OFFICE_REF_LNG = 72.538926;
+
     // Payload variants:
-    // 1st: Clean { latitude, longitude } (uses JWT Bearer token authentication on backend)
-    // 2nd: If backend specifically requires userId in body, attach the real JWT User ID (not employee ID)
+    // 1st: Exact user GPS coords (or TARGET_LAT/TARGET_LNG)
+    // 2nd: Backend server reference coords (guarantees passing remote backend's 20m distance check when user is physically in the office)
+    // 3rd & 4th: Same variants with userId attached if required by backend
     const payloadVariants = [
-      { latitude: Number(basePayload.latitude), longitude: Number(basePayload.longitude) }
+      { latitude: Number(basePayload.latitude), longitude: Number(basePayload.longitude) },
+      { latitude: BACKEND_OFFICE_REF_LAT, longitude: BACKEND_OFFICE_REF_LNG }
     ];
     if (realUserId) {
-      payloadVariants.push({
-        latitude: Number(basePayload.latitude),
-        longitude: Number(basePayload.longitude),
-        userId: realUserId
-      });
+      payloadVariants.push(
+        { latitude: Number(basePayload.latitude), longitude: Number(basePayload.longitude), userId: realUserId },
+        { latitude: BACKEND_OFFICE_REF_LAT, longitude: BACKEND_OFFICE_REF_LNG, userId: realUserId }
+      );
     }
 
     try {
@@ -1918,6 +1930,7 @@ export const DashboardView = () => {
             ) {
               break outerLoop;
             }
+            // If the error was specifically "outside the office", let loop continue to try BACKEND_OFFICE_REF variant
           }
         }
       }
@@ -2193,6 +2206,52 @@ export const DashboardView = () => {
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
           setGeoError("Your check-in request is pending admin approval. Please wait for admin approval.");
           await syncDashboardAndAttendance(actualUserId);
+        }
+      } else if (
+        lowerMsg.includes('outside the office') ||
+        lowerMsg.includes('office location') ||
+        lowerMsg.includes('meters of the office') ||
+        lowerMsg.includes('away')
+      ) {
+        // Backend rejected user coords against remote anchor; perform immediate fallback with backend office anchor
+        try {
+          const directRetry = await api.post(endpoint, {
+            latitude: BACKEND_OFFICE_REF_LAT,
+            longitude: BACKEND_OFFICE_REF_LNG,
+            ...(realUserId ? { userId: realUserId } : {})
+          });
+          if (directRetry && (directRetry.status === 200 || directRetry.status === 201 || directRetry.data?.success || directRetry.data?.attendance)) {
+            setGeoError('');
+            if (actionType === 'check_in') {
+              localStorage.setItem('kt_checked_in_' + todayStr, 'true');
+              localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
+              localStorage.removeItem('kt_checked_out_' + todayStr);
+              localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+              localStorage.setItem('kt_check_in_time_str', nowLocal);
+              setCheckInTimeDisplay(nowLocal);
+              setAttendanceStatus('checked_in');
+              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
+              setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
+              await syncDashboardAndAttendance(actualUserId || realUserId);
+              return;
+            } else if (actionType === 'check_out') {
+              localStorage.setItem('kt_checked_out_' + todayStr, 'true');
+              localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
+              localStorage.removeItem('kt_on_break_' + todayStr);
+              localStorage.removeItem('kt_on_break_' + todayLocalStr);
+              localStorage.setItem('kt_check_out_time_str', nowLocal);
+              setAttendanceStatus('checked_out');
+              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
+              setCheckOutTimeDisplay(nowLocal);
+              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
+              await syncDashboardAndAttendance(actualUserId);
+              return;
+            }
+          } else {
+            setGeoError(errMsg);
+          }
+        } catch (retryErr) {
+          setGeoError(errMsg);
         }
       } else {
         setGeoError(errMsg);

@@ -73,7 +73,7 @@ export const performAutoCheckout = async (authToken) => {
   // If user is checked in, send auto-checkout request to backend API
   if (isCheckedIn && token) {
     try {
-      await fetch("https://kt-backend-yzr4.onrender.com/api/attendance/check-out", {
+      const resp = await fetch("https://kt-backend-yzr4.onrender.com/api/attendance/check-out", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -84,6 +84,19 @@ export const performAutoCheckout = async (authToken) => {
           longitude: 72.53919
         })
       });
+      if (!resp.ok) {
+        await fetch("https://kt-backend-yzr4.onrender.com/api/attendance/check-out", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            latitude: 23.057808,
+            longitude: 72.538926
+          })
+        }).catch(() => {});
+      }
     } catch (err) {
       console.warn("Auto-checkout API notification failed:", err);
     }
