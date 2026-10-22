@@ -227,7 +227,7 @@ const Performance = () => {
   const [toolbarPerfFilter, setToolbarPerfFilter] = useState("all");
   const [selectedMonthYear, setSelectedMonthYear] = useState("all");
 
-  // Add / Edit Form State (aligned with backend fields: employeeID, performancePercentage, rating, feedback, remarks)
+  // Add / Edit Form State (aligned with backend fields: employeeID, performancePercentage, rating, feedback, remarks, date)
   const [modalForm, setModalForm] = useState({
     employeeID: "",
     employeeName: "",
@@ -236,7 +236,8 @@ const Performance = () => {
     rating: "",
     feedback: "",
     remarks: "",
-    remark: ""
+    remark: "",
+    date: new Date().toLocaleDateString("en-CA")
   });
 
   // ============================================================
@@ -855,9 +856,26 @@ const Performance = () => {
   // Format date as M/D/YYYY
   const formatRowDate = (dateVal) => {
     if (!dateVal) return "—";
+    if (typeof dateVal === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateVal.trim())) {
+      const [y, m, d] = dateVal.trim().split("-");
+      return `${parseInt(m, 10)}/${parseInt(d, 10)}/${y}`;
+    }
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return "—";
     return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+  };
+
+  const formatRowDateToInput = (dateVal) => {
+    if (!dateVal) return "";
+    if (typeof dateVal === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateVal.trim())) {
+      return dateVal.trim();
+    }
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
   };
 
   // ============================================================
@@ -1204,7 +1222,8 @@ const Performance = () => {
       rating: "",
       feedback: "",
       remarks: "",
-      remark: ""
+      remark: "",
+      date: new Date().toLocaleDateString("en-CA")
     });
     setIsAddModalOpen(true);
   };
@@ -1218,6 +1237,7 @@ const Performance = () => {
     const rawRating = perf.rating !== undefined && perf.rating !== null ? String(perf.rating) : "";
     const existingRemarks = perf.remarks || perf.remark || "";
     const existingFeedback = perf.feedback || "";
+    const existingDate = formatRowDateToInput(perf.date || perf.createdAt || "") || new Date().toLocaleDateString("en-CA");
 
     setModalForm({
       employeeID: String(perf.employeeID?._id || perf.employeeID || perf.employee?._id || ""),
@@ -1227,7 +1247,8 @@ const Performance = () => {
       rating: rawRating,
       feedback: existingFeedback,
       remarks: existingRemarks,
-      remark: existingRemarks
+      remark: existingRemarks,
+      date: existingDate
     });
     setIsEditModalOpen(true);
   };
@@ -1260,6 +1281,8 @@ const Performance = () => {
     const empType = empRole.includes("lead") || empRole === "tl" ? "Team Leader" : "Employee";
     const feedbackText = (modalForm.feedback || "").trim();
     const remarksText = (modalForm.remarks || modalForm.remark || "").trim();
+    const selectedDate = modalForm.date ? modalForm.date : new Date().toLocaleDateString("en-CA");
+    const isoDateTime = selectedDate ? new Date(`${selectedDate}T12:00:00.000Z`).toISOString() : new Date().toISOString();
 
     const evaluatorId = String(getRealAuthUserId(user) || user?._id || user?.id || "");
     const evaluatorName = String(user?.name || user?.fullName || "Admin").trim();
@@ -1285,7 +1308,9 @@ const Performance = () => {
         feedback: feedbackText,
         submittedBy: evaluatorId,
         evaluatorName: evaluatorName,
-        evaluatorRole: evaluatorRole
+        evaluatorRole: evaluatorRole,
+        date: selectedDate,
+        createdAt: isoDateTime
       };
 
       if (isEditModalOpen && editingRecord) {
@@ -1312,7 +1337,9 @@ const Performance = () => {
           percentage: pct,
           remarks: remarksText,
           remark: remarksText,
-          feedback: feedbackText
+          feedback: feedbackText,
+          date: selectedDate,
+          createdAt: isoDateTime
         };
         updateInPersistentStore(updatedData);
 
@@ -1387,7 +1414,9 @@ const Performance = () => {
                   ...payload,
                   remarks: remarksText,
                   remark: remarksText,
-                  feedback: feedbackText
+                  feedback: feedbackText,
+                  date: selectedDate,
+                  createdAt: isoDateTime
                 }),
               }
             );
@@ -1404,7 +1433,8 @@ const Performance = () => {
           remarks: remarksText,
           remark: remarksText,
           feedback: feedbackText,
-          createdAt: new Date().toISOString()
+          date: selectedDate,
+          createdAt: isoDateTime
         };
         saveToPersistentStore(createdRecord);
 
@@ -1421,7 +1451,8 @@ const Performance = () => {
         rating: "",
         feedback: "",
         remarks: "",
-        remark: ""
+        remark: "",
+        date: new Date().toLocaleDateString("en-CA")
       });
     } catch (err) {
       console.error("Submit error:", err);
@@ -2008,6 +2039,22 @@ const Performance = () => {
                   <ChevronDown
                     size={14}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                  />
+                </div>
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Date *
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    required
+                    value={modalForm.date || ""}
+                    onChange={(e) => setModalForm((prev) => ({ ...prev, date: e.target.value }))}
+                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer"
                   />
                 </div>
               </div>
