@@ -1105,24 +1105,56 @@ const EmployeeRequests = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 shadow-xs border border-slate-200/80">
-            <Users className="h-4 w-4 text-[#0088cc]" />
-            <span className="text-xs sm:text-sm font-medium text-slate-700">
-              {stats.total} Total
+            <Users className="h-4 w-4 text-slate-400" />
+            <span className="text-xs sm:text-sm text-slate-500">Total:</span>
+            <span className="text-xs sm:text-sm font-bold text-slate-900">
+              {stats.total}
             </span>
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3.5 py-2 border border-amber-200/80 shadow-xs">
-            <Clock className="h-4 w-4 text-amber-600" />
-            <span className="text-xs sm:text-sm font-medium text-amber-700">
-              {stats.pending} Pending
+          <div className="flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 shadow-xs border border-slate-200/80">
+            <Clock className="h-4 w-4 text-slate-400" />
+            <span className="text-xs sm:text-sm text-slate-500">Pending:</span>
+            <span className="text-xs sm:text-sm font-bold text-slate-900">
+              {stats.pending}
             </span>
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 border border-emerald-200/80 shadow-xs">
-            <CheckCircle className="h-4 w-4 text-emerald-600" />
-            <span className="text-xs sm:text-sm font-medium text-emerald-700">
-              {stats.approved} Approved
+          <div className="flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 shadow-xs border border-slate-200/80">
+            <CheckCircle className="h-4 w-4 text-slate-400" />
+            <span className="text-xs sm:text-sm text-slate-500">Approved:</span>
+            <span className="text-xs sm:text-sm font-bold text-slate-900">
+              {stats.approved}
             </span>
           </div>
         </div>
+      </div>
+
+      {/* 3 METRIC CARDS (UI Standard Design, Clickable to Filter) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        {[
+          { key: 'all', label: 'TOTAL REQUESTS', value: stats.total },
+          { key: 'pending', label: 'PENDING', value: stats.pending },
+          { key: 'approved', label: 'APPROVED', value: stats.approved },
+        ].map((item) => {
+          const isSelected = filterStatus === item.key;
+          return (
+            <div
+              key={item.key}
+              onClick={() => setFilterStatus(filterStatus === item.key && item.key !== 'all' ? 'all' : item.key)}
+              title={`Click to filter by ${item.label}`}
+              className={`bg-white rounded-xl shadow-xs border p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
+                isSelected
+                  ? 'border-[#0088cc] ring-2 ring-[#0088cc]/20 shadow-xs'
+                  : 'border-slate-100 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-1.5 h-7 rounded-full ${isSelected ? 'bg-[#0088cc]' : 'bg-[#004b73]'}`} />
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
+              </div>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
+            </div>
+          );
+        })}
       </div>
 
       {/* Search and Filter Card */}

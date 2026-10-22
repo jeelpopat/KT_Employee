@@ -1269,9 +1269,10 @@ export default function CheckInRequest() {
           </div>
 
           {/* Pending */}
-          <div className="h-10 bg-amber-50 border border-amber-200/80 px-3.5 py-1 rounded-lg shadow-xs text-xs sm:text-sm flex items-center">
-            <span className="text-amber-700 font-medium">
-              {pendingCount} Pending
+          <div className="h-10 bg-white border border-slate-200/80 px-3.5 py-1 rounded-lg shadow-xs text-xs sm:text-sm flex items-center">
+            <span className="text-slate-500">Pending: </span>
+            <span className="ml-1.5 font-bold text-slate-900">
+              {pendingCount}
             </span>
           </div>
 
