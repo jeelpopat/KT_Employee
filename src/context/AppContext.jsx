@@ -2,6 +2,14 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import api, { clearApiCache } from '../api/axios.js';
 import { validateUserSession, performAutoCheckout, clearAuth, normalizeRole } from '../utils/auth.js';
 import { getProgressForStatus } from '../utils/taskUtils.js';
+import {
+  TARGET_LAT,
+  TARGET_LNG,
+  GEOFENCE_RADIUS_METERS,
+  AUTO_CHECKOUT_RADIUS_METERS,
+  calculateDistanceInMeters
+} from '../services/attendanceService.js';
+import { showToast } from '../components/common/Toast.jsx';
 
 import {
   getMonitoringSettings,
@@ -1190,6 +1198,130 @@ export const AppProvider = ({ children }) => {
     };
     setNotifications(prev => [newNotif, ...prev]);
   };
+
+  // --- App-Wide Background Geofence Auto-Checkout Monitor (20m Perimeter) ---
+  // Continuously monitors employee location while working.
+  // If employee moves outside 20m office perimeter -> AUTO CHECKOUT
+  // CRITICAL REQUIREMENT: When user is ON BREAK (downstairs for tea/lunch/snacks) -> DO NOT CHECK OUT!
+  const consecutiveGeofenceBreachesRef = useRef(0);
+  const isAutoCheckingOutRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+
+    const isLocalhost = (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.endsWith('.local')
+    );
+
+    const monitorGeofencePerimeter = () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayLocalStr = new Date().toLocaleDateString('en-CA');
+
+      // 1. Break Exception Check (CRITICAL)
+      const isUserOnBreak = (
+        attendanceStatus === 'on_break' ||
+        localStorage.getItem('kt_on_break_' + todayStr) === 'true' ||
+        localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true'
+      );
+
+      // If user is on break (downstairs for lunch/tea), NEVER auto-checkout!
+      if (isUserOnBreak) {
+        consecutiveGeofenceBreachesRef.current = 0;
+        return;
+      }
+
+      // 2. Only active workers (checked_in) are subject to 20m perimeter enforcement
+      const isWorking = (
+        attendanceStatus === 'checked_in' ||
+        (localStorage.getItem('kt_checked_in_' + todayStr) === 'true' &&
+         localStorage.getItem('kt_checked_out_' + todayStr) !== 'true')
+      );
+
+      if (!isWorking || isAutoCheckingOutRef.current) {
+        consecutiveGeofenceBreachesRef.current = 0;
+        return;
+      }
+
+      if (isLocalhost) {
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+
+          console.log(`[GEOFENCE LOCATION] AppContext | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${dist.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m | Status: ${attendanceStatus}`);
+
+          // Re-verify break state
+          if (
+            attendanceStatus === 'on_break' ||
+            localStorage.getItem('kt_on_break_' + todayStr) === 'true'
+          ) {
+            consecutiveGeofenceBreachesRef.current = 0;
+            return;
+          }
+
+          if (dist > AUTO_CHECKOUT_RADIUS_METERS) {
+            consecutiveGeofenceBreachesRef.current += 1;
+            console.warn(`[GEOFENCE ALERT] AppContext | Out of 20m office perimeter: ${dist.toFixed(1)}m (Breach ${consecutiveGeofenceBreachesRef.current}/2)`);
+
+            if (consecutiveGeofenceBreachesRef.current >= 2 || (accuracy && accuracy <= 20 && dist > 35)) {
+              isAutoCheckingOutRef.current = true;
+              console.warn(`[GEOFENCE AUTO-CHECKOUT] AppContext | Confirmed exit beyond 20m. Triggering auto-checkout.`);
+
+              const nowFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+              localStorage.setItem('kt_checked_out_' + todayStr, 'true');
+              localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
+              localStorage.setItem('kt_auto_checked_out_' + todayStr, 'true');
+              localStorage.setItem('kt_is_auto_checkout', 'true');
+              localStorage.setItem('kt_check_out_time_str', nowFormatted);
+              localStorage.removeItem('kt_checked_in_' + todayStr);
+              localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+              localStorage.removeItem('kt_on_break_' + todayStr);
+              localStorage.removeItem('kt_on_break_' + todayLocalStr);
+
+              handleCheckOut();
+
+              const checkoutReason = `Auto-Checkout: You moved outside the 20m office perimeter (${Math.round(dist)}m away). Automatic checkout recorded.`;
+              try {
+                showToast(checkoutReason, 'warning');
+              } catch (e) {}
+
+              // Send check-out to backend API
+              try {
+                await api.post('/api/attendance/check-out', {
+                  latitude: Number(latitude),
+                  longitude: Number(longitude),
+                  isAutoCheckout: true,
+                  reason: 'Geofence breach (>20m)'
+                }).catch(() => {});
+              } catch (e) {}
+
+              window.dispatchEvent(new CustomEvent('kt_auto_checkout_triggered', {
+                detail: { latitude, longitude, distance: dist }
+              }));
+
+              isAutoCheckingOutRef.current = false;
+              consecutiveGeofenceBreachesRef.current = 0;
+            }
+          } else {
+            consecutiveGeofenceBreachesRef.current = 0;
+          }
+        },
+        (err) => {
+          console.warn('[GEOFENCE LOCATION] AppContext GPS tracking notice:', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    };
+
+    const intervalId = setInterval(monitorGeofencePerimeter, 12000);
+    return () => clearInterval(intervalId);
+  }, [attendanceStatus, handleCheckOut]);
 
   // Task Actions
   const handleUpdateTaskStatus = async (taskId, status) => {

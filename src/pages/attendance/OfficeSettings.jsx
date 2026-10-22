@@ -14,9 +14,9 @@ export default function OfficeSettings() {
     fullDayHours: 8.5,
     autoCheckOutTime: "23:59",
     geofenceEnabled: true,
-    latitude: "21.1702",
-    longitude: "72.8311",
-    radiusMeters: 100,
+    latitude: "23.05829",
+    longitude: "72.53919",
+    radiusMeters: 20,
     officeWifiSsid: "Kevalon-Office-5G",
     requireWifiForCheckIn: false,
     weekendDays: ["Saturday", "Sunday"]

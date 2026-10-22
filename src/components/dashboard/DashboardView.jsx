@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
+import { showToast } from '../common/Toast.jsx';
 import {
   computeNineHourTimeline,
   getQuickActionStatusConfig,
@@ -22,10 +23,11 @@ import {
   parseTimeToMinutes
 } from '../../utils/timelineUtils.js';
 
-// --- Geofencing Configuration (Office Location & 70 Meter Strict Radius) ---
-const TARGET_LAT = 23.057808;
-const TARGET_LNG = 72.538926;
-const GEOFENCE_RADIUS_METERS = 70; // Allowed strictly within 70 meters
+// --- Geofencing Configuration (Office Location & 20 Meter Strict Radius) ---
+const TARGET_LAT = 23.05829;
+const TARGET_LNG = 72.53919;
+const GEOFENCE_RADIUS_METERS = 20; // Allowed strictly within 20 meters
+const AUTO_CHECKOUT_RADIUS_METERS = 20; // Auto checkout outside 20 meters
 
 const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   const R = 6371000; // Earth radius in meters
@@ -1513,8 +1515,146 @@ export const DashboardView = () => {
     return () => clearInterval(autoTimer);
   }, [fetchTodayAttendance, setGlobalAttendanceStatus]);
 
+  // --- Continuous Geofence Auto-Checkout Monitor (20m Perimeter) ---
+  // If user is checked in and moves outside 20m radius -> AUTO CHECKOUT
+  // CRITICAL REQUIREMENT: When user takes a break and goes downstairs/niche -> DO NOT AUTO CHECKOUT!
+  const consecutiveBreachCountRef = useRef(0);
+  const isPerformingAutoCheckoutRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+
+    const isLocalhost = (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.endsWith('.local')
+    );
+
+    const checkGeofenceAutoCheckout = () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayLocalStr = new Date().toLocaleDateString('en-CA');
+
+      // 1. Break Exception Check (CRITICAL)
+      const isUserOnBreak = (
+        attendanceStatusRef.current === 'on_break' ||
+        localStorage.getItem('kt_on_break_' + todayStr) === 'true' ||
+        localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true'
+      );
+
+      // If user is on break (downstairs for lunch/tea), NEVER auto-checkout!
+      if (isUserOnBreak) {
+        consecutiveBreachCountRef.current = 0;
+        return;
+      }
+
+      // 2. Only active workers (checked_in) are subject to 20m perimeter enforcement
+      const isWorking = (
+        attendanceStatusRef.current === 'checked_in' ||
+        (localStorage.getItem('kt_checked_in_' + todayStr) === 'true' &&
+         localStorage.getItem('kt_checked_out_' + todayStr) !== 'true')
+      );
+
+      if (!isWorking || isPerformingAutoCheckoutRef.current) {
+        consecutiveBreachCountRef.current = 0;
+        return;
+      }
+
+      // In local dev, skip live GPS auto-checkout to avoid locking out developers
+      if (isLocalhost) {
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+
+          console.log(`[GEOFENCE LOCATION] Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${dist.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m | Status: ${attendanceStatusRef.current}`);
+
+          // Re-verify break state (in case user clicked Break In while GPS was reading)
+          if (
+            attendanceStatusRef.current === 'on_break' ||
+            localStorage.getItem('kt_on_break_' + todayStr) === 'true'
+          ) {
+            consecutiveBreachCountRef.current = 0;
+            return;
+          }
+
+          if (dist > AUTO_CHECKOUT_RADIUS_METERS) {
+            consecutiveBreachCountRef.current += 1;
+            console.warn(`[GEOFENCE ALERT] Out of 20m office bounds: ${dist.toFixed(1)}m (Breach ${consecutiveBreachCountRef.current}/2)`);
+
+            // Verify with 2 consecutive checks or high confidence fix
+            if (consecutiveBreachCountRef.current >= 2 || (accuracy && accuracy <= 20 && dist > 35)) {
+              isPerformingAutoCheckoutRef.current = true;
+              console.warn(`[GEOFENCE AUTO-CHECKOUT] Outside 20m perimeter (${dist.toFixed(1)}m). Triggering automatic checkout.`);
+
+              const nowIso = new Date().toISOString();
+              const nowLocal = formatISOToLocalTime(nowIso);
+
+              localStorage.setItem('kt_checked_out_' + todayStr, 'true');
+              localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
+              localStorage.setItem('kt_auto_checked_out_' + todayStr, 'true');
+              localStorage.setItem('kt_is_auto_checkout', 'true');
+              localStorage.setItem('kt_check_out_time_str', nowLocal);
+              localStorage.removeItem('kt_checked_in_' + todayStr);
+              localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+              localStorage.removeItem('kt_on_break_' + todayStr);
+              localStorage.removeItem('kt_on_break_' + todayLocalStr);
+
+              setAttendanceStatus('checked_out');
+              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
+              setCheckOutTimeDisplay(nowLocal);
+              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
+
+              const checkoutReason = `Auto-Checkout: You moved outside the 20m office perimeter (${Math.round(dist)}m away). Automatic checkout recorded.`;
+              setGeoError(checkoutReason);
+              try {
+                showToast(checkoutReason, 'warning');
+              } catch (e) {}
+
+              // Send check-out to backend API
+              try {
+                await api.post('/api/attendance/check-out', {
+                  latitude: Number(latitude),
+                  longitude: Number(longitude),
+                  isAutoCheckout: true,
+                  reason: 'Geofence breach (>20m)'
+                }).catch(() => {});
+              } catch (e) {}
+
+              await fetchTodayAttendance(actualUserIdRef.current);
+              isPerformingAutoCheckoutRef.current = false;
+              consecutiveBreachCountRef.current = 0;
+            }
+          } else {
+            // Inside 20m
+            consecutiveBreachCountRef.current = 0;
+          }
+        },
+        (err) => {
+          console.warn('[GEOFENCE LOCATION] GPS location tracking error:', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    };
+
+    const geofenceInterval = setInterval(checkGeofenceAutoCheckout, 10000);
+
+    // Also listen to external auto-checkout events dispatched by AppContext or tabs
+    const handleExternalAutoCheckout = () => {
+      fetchTodayAttendance(actualUserIdRef.current);
+    };
+    window.addEventListener('kt_auto_checkout_triggered', handleExternalAutoCheckout);
+
+    return () => {
+      clearInterval(geofenceInterval);
+      window.removeEventListener('kt_auto_checkout_triggered', handleExternalAutoCheckout);
+    };
+  }, [fetchTodayAttendance, setGlobalAttendanceStatus]);
+
   // --- Robust Geolocation & Verification ---
-  const verifyLocationAndExecute = (actionCallback) => {
+  const verifyLocationAndExecute = (actionCallback, actionType = 'check_in') => {
     setGeoError('');
     setIsActionLoading(true);
 
@@ -1539,7 +1679,7 @@ export const DashboardView = () => {
       return;
     }
 
-    // Production strict 70-meter geofence check
+    // Production strict 20-meter geofence check
     if (!navigator.geolocation) {
       setGeoError("Location tracking is not supported by your browser.");
       setIsActionLoading(false);
@@ -1548,17 +1688,39 @@ export const DashboardView = () => {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const { latitude, longitude } = position.coords;
+        const { latitude, longitude, accuracy } = position.coords;
         const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
 
-        if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
-          actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
-        } else {
-          setGeoError(
-            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Check In, Break In, Break Out, and Check Out are strictly allowed within 70 meters of office premises.`
-          );
-          setIsActionLoading(false);
+        console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
+
+        // Check-in strictly requires <= 20 meters
+        if (actionType === 'check_in') {
+          if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
+            actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
+          } else {
+            setGeoError(
+              `Office Location Error: You are ${Math.round(distanceMeters)}m away. Check-in is strictly allowed within 20 meters of office premises.`
+            );
+            setIsActionLoading(false);
+          }
+          return;
         }
+
+        // Resuming work requires returning within 20 meters of office
+        if (actionType === 'break_end') {
+          if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
+            actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
+          } else {
+            setGeoError(
+              `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return to the office within 20 meters to resume work.`
+            );
+            setIsActionLoading(false);
+          }
+          return;
+        }
+
+        // Break start and check out are always allowed
+        actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
       },
       (error) => {
         let errorMsg = "Location permission and GPS coordinates are required to mark attendance.";
@@ -1963,7 +2125,7 @@ export const DashboardView = () => {
         longitude: Number(lng)
       };
       await handleAttendanceAction('/api/attendance/check-in', payload, 'check_in');
-    });
+    }, 'check_in');
   };
 
   const onStartBreakClick = () => {
@@ -1985,7 +2147,7 @@ export const DashboardView = () => {
         longitude: Number(lng)
       };
       await handleAttendanceAction('/api/attendance/break/start', payload, 'break_start');
-    });
+    }, 'break_start');
   };
 
   const onResumeWorkClick = () => {
@@ -1996,7 +2158,7 @@ export const DashboardView = () => {
         longitude: Number(lng)
       };
       await handleAttendanceAction('/api/attendance/break/end', payload, 'break_end');
-    });
+    }, 'break_end');
   };
 
   const onCheckOutClick = () => {
@@ -2007,7 +2169,7 @@ export const DashboardView = () => {
         longitude: Number(lng)
       };
       await handleAttendanceAction('/api/attendance/check-out', payload, 'check_out');
-    });
+    }, 'check_out');
   };
 
   const formatDateDayMonth = (isoString) => {

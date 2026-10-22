@@ -80,8 +80,8 @@ export const performAutoCheckout = async (authToken) => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          latitude: 23.057808,
-          longitude: 72.538926
+          latitude: 23.05829,
+          longitude: 72.53919
         })
       });
     } catch (err) {

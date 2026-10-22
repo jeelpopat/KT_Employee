@@ -25,11 +25,12 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
   );
 });
 
-const TARGET_LAT = 23.057808;
-const TARGET_LNG = 72.538926;
-const GEOFENCE_RADIUS_METERS = 70;
+export const TARGET_LAT = 23.05829;
+export const TARGET_LNG = 72.53919;
+export const GEOFENCE_RADIUS_METERS = 20;
+export const AUTO_CHECKOUT_RADIUS_METERS = 20;
 
-const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
+export const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   const R = 6371000;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
@@ -50,8 +51,11 @@ const attendanceRequest = (method, url, location) => {
 
   if (!isLocalhost && location?.latitude && location?.longitude) {
     const dist = calculateDistanceInMeters(location.latitude, location.longitude, TARGET_LAT, TARGET_LNG);
-    if (dist > GEOFENCE_RADIUS_METERS) {
-      return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). Actions only allowed within 70m.`));
+    const isCheckIn = url.includes('check-in') || url.includes('checkin');
+    const isBreakEnd = url.includes('break/end') || url.includes('break-out');
+    if ((isCheckIn || isBreakEnd) && dist > GEOFENCE_RADIUS_METERS) {
+      const actionName = isCheckIn ? 'Check-in' : 'Resuming work';
+      return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is strictly allowed within 20m of office coordinates.`));
     }
   }
   return api({
