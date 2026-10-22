@@ -1315,7 +1315,7 @@ export const AppProvider = ({ children }) => {
         (err) => {
           console.warn('[GEOFENCE LOCATION] AppContext GPS tracking notice:', err.message);
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
       );
     };
 

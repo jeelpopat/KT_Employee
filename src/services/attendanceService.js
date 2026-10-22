@@ -11,17 +11,75 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
     return;
   }
 
+  let settled = false;
+  let watchId = null;
+
+  const handleSuccess = ({ coords }) => {
+    if (settled) return;
+    settled = true;
+    if (watchId !== null) {
+      try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
+    }
+    try {
+      localStorage.setItem('kt_last_gps_lat', String(coords.latitude));
+      localStorage.setItem('kt_last_gps_lng', String(coords.longitude));
+      localStorage.setItem('kt_last_gps_ts', String(Date.now()));
+    } catch (e) {}
+    resolve({ latitude: Number(coords.latitude), longitude: Number(coords.longitude) });
+  };
+
+  const handleError = (error) => {
+    if (settled) return;
+    settled = true;
+    if (watchId !== null) {
+      try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
+    }
+    try {
+      const savedLat = parseFloat(localStorage.getItem('kt_last_gps_lat'));
+      const savedLng = parseFloat(localStorage.getItem('kt_last_gps_lng'));
+      const savedTs = parseInt(localStorage.getItem('kt_last_gps_ts') || '0', 10);
+      if (!isNaN(savedLat) && !isNaN(savedLng) && (Date.now() - savedTs < 30 * 60 * 1000)) {
+        resolve({ latitude: savedLat, longitude: savedLng });
+        return;
+      }
+    } catch (e) {}
+
+    const messages = {
+      1: 'Location permission was denied. Please allow location access and try again.',
+      2: 'Your location could not be determined. Please turn on location services.',
+      3: 'Location request timed out. Please try again.'
+    };
+    reject(new Error(messages[error?.code] || error?.message || 'Unable to determine your location.'));
+  };
+
+  // Stage 1: Quick high accuracy attempt with 4s timeout & 60s cache
   navigator.geolocation.getCurrentPosition(
-    ({ coords }) => resolve({ latitude: Number(coords.latitude), longitude: Number(coords.longitude) }),
-    (error) => {
-      const messages = {
-        1: 'Location permission was denied. Please allow location access and try again.',
-        2: 'Your location could not be determined. Please turn on location services.',
-        3: 'Location request timed out. Please try again.'
-      };
-      reject(new Error(messages[error.code] || 'Unable to determine your location.'));
+    handleSuccess,
+    (err1) => {
+      if (err1.code === 1) return handleError(err1); // Permission denied
+      // Stage 2: Standard accuracy (instant on Windows/WiFi)
+      navigator.geolocation.getCurrentPosition(
+        handleSuccess,
+        (err2) => {
+          if (err2.code === 1) return handleError(err2);
+          // Stage 3: watchPosition fallback
+          try {
+            watchId = navigator.geolocation.watchPosition(
+              handleSuccess,
+              (err3) => handleError(err2 || err1),
+              { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+            );
+            setTimeout(() => {
+              if (!settled) handleError(err2 || err1);
+            }, 5000);
+          } catch (e) {
+            handleError(err2 || err1);
+          }
+        },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+      );
     },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
   );
 });
 

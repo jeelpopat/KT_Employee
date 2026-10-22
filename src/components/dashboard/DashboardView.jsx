@@ -1635,7 +1635,7 @@ export const DashboardView = () => {
         (err) => {
           console.warn('[GEOFENCE LOCATION] GPS location tracking error:', err.message);
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
       );
     };
 
@@ -1686,59 +1686,139 @@ export const DashboardView = () => {
       return;
     }
 
+    const handleLocationSuccess = (position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+
+      // Cache this successfully acquired location
+      try {
+        localStorage.setItem('kt_last_gps_lat', String(latitude));
+        localStorage.setItem('kt_last_gps_lng', String(longitude));
+        localStorage.setItem('kt_last_gps_accuracy', String(accuracy || 0));
+        localStorage.setItem('kt_last_gps_ts', String(Date.now()));
+      } catch (e) {}
+
+      console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
+
+      // Check-in strictly requires <= 20 meters
+      if (actionType === 'check_in') {
+        if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
+          actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
+        } else {
+          setGeoError(
+            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Check-in is strictly allowed within 20 meters of office premises.`
+          );
+          setIsActionLoading(false);
+        }
+        return;
+      }
+
+      // Resuming work requires returning within 20 meters of office
+      if (actionType === 'break_end') {
+        if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
+          actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
+        } else {
+          setGeoError(
+            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return to the office within 20 meters to resume work.`
+          );
+          setIsActionLoading(false);
+        }
+        return;
+      }
+
+      // Break start and check out are always allowed
+      actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
+    };
+
+    const handleLocationFailure = (error) => {
+      // Check if recent valid location fix exists from earlier today (within 30 minutes)
+      try {
+        const savedLat = parseFloat(localStorage.getItem('kt_last_gps_lat'));
+        const savedLng = parseFloat(localStorage.getItem('kt_last_gps_lng'));
+        const savedAcc = parseFloat(localStorage.getItem('kt_last_gps_accuracy') || '10');
+        const savedTs = parseInt(localStorage.getItem('kt_last_gps_ts') || '0', 10);
+        const isRecent = Date.now() - savedTs < 30 * 60 * 1000;
+        if (!isNaN(savedLat) && !isNaN(savedLng) && isRecent) {
+          console.warn("[GEOFENCE LOCATION] Fallback to recent validated device location fix:", savedLat, savedLng);
+          handleLocationSuccess({
+            coords: { latitude: savedLat, longitude: savedLng, accuracy: savedAcc }
+          });
+          return;
+        }
+      } catch (e) {}
+
+      let errorMsg = "Location permission and GPS coordinates are required to mark attendance.";
+      switch (error?.code) {
+        case 1:
+          errorMsg = "Location permission denied. Please allow location access in your browser settings.";
+          break;
+        case 2:
+          errorMsg = "Location unavailable. Please make sure location services are enabled on your device.";
+          break;
+        case 3:
+          errorMsg = "Location request timed out. Please check your network/location settings and try again.";
+          break;
+        default:
+          errorMsg = error?.message || "Failed to acquire location. Please try again.";
+          break;
+      }
+      setGeoError(errorMsg);
+      setIsActionLoading(false);
+    };
+
+    let settled = false;
+    let watchId = null;
+
+    const onPos = (pos) => {
+      if (settled) return;
+      settled = true;
+      if (watchId !== null) {
+        try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
+      }
+      handleLocationSuccess(pos);
+    };
+
+    const onFinalFail = (err) => {
+      if (settled) return;
+      settled = true;
+      if (watchId !== null) {
+        try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
+      }
+      handleLocationFailure(err);
+    };
+
+    // Multi-tier resilient acquisition:
+    // Stage 1: Quick attempt with 60s cache allowed (instant 0ms response if location was queried recently)
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+      onPos,
+      (err1) => {
+        if (err1.code === 1) return onFinalFail(err1); // Permission denied - fail fast
 
-        console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
+        // Stage 2: Standard accuracy (uses Wi-Fi / cell triangulation - instant on Windows/laptops/desktops)
+        navigator.geolocation.getCurrentPosition(
+          onPos,
+          (err2) => {
+            if (err2.code === 1) return onFinalFail(err2);
 
-        // Check-in strictly requires <= 20 meters
-        if (actionType === 'check_in') {
-          if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
-            actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
-          } else {
-            setGeoError(
-              `Office Location Error: You are ${Math.round(distanceMeters)}m away. Check-in is strictly allowed within 20 meters of office premises.`
-            );
-            setIsActionLoading(false);
-          }
-          return;
-        }
+            // Stage 3: Watch stream fallback
+            try {
+              watchId = navigator.geolocation.watchPosition(
+                onPos,
+                (err3) => onFinalFail(err2 || err1),
+                { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+              );
 
-        // Resuming work requires returning within 20 meters of office
-        if (actionType === 'break_end') {
-          if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
-            actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
-          } else {
-            setGeoError(
-              `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return to the office within 20 meters to resume work.`
-            );
-            setIsActionLoading(false);
-          }
-          return;
-        }
-
-        // Break start and check out are always allowed
-        actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
+              setTimeout(() => {
+                if (!settled) onFinalFail(err2 || err1);
+              }, 5000);
+            } catch (e) {
+              onFinalFail(err2 || err1);
+            }
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+        );
       },
-      (error) => {
-        let errorMsg = "Location permission and GPS coordinates are required to mark attendance.";
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMsg = "Location permission denied. Please allow location access in your browser/device settings.";
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMsg = "Location unavailable. Please enable device GPS/location.";
-            break;
-          case error.TIMEOUT:
-            errorMsg = "Timeout: Failed to acquire GPS location in time. Please check your signal and try again.";
-            break;
-        }
-        setGeoError(errorMsg);
-        setIsActionLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
     );
   };
 
