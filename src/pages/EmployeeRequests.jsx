@@ -1356,6 +1356,7 @@ const EmployeeRequests = () => {
 
       // 4. Update the user document on backend to reject and clear TL data (NEVER call /api/users/approve on revoke)
       try {
+<<<<<<< HEAD
         const rejectPayload = {
           id: userId,
           userId,
@@ -1409,6 +1410,50 @@ const EmployeeRequests = () => {
             }).catch(() => {});
           }
         }
+=======
+        await fetch(endpoint, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            id: userId,
+            userId,
+            _id: user?._id || userId,
+            email: user?.email,
+            isActive: false,
+            isApproved: false,
+            approved: false,
+            status: 'rejected',
+            teamLead: null,
+            teamLeadId: null,
+            assignedTL: null,
+            teamLeader: null,
+            teamLeadName: null,
+            teamLeadEmail: null
+          }),
+        });
+
+        // Also call /api/users/approve with status: rejected to ensure teamLead fields are cleared on MongoDB user doc
+        await fetch('https://kt-backend-yzr4.onrender.com/api/users/approve', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            id: userId,
+            userId,
+            _id: user?._id || userId,
+            email: user?.email,
+            isActive: false,
+            isApproved: false,
+            approved: false,
+            status: 'rejected',
+            teamLead: null,
+            teamLeadId: null,
+            assignedTL: null,
+            teamLeader: null,
+            teamLeadName: null,
+            teamLeadEmail: null
+          })
+        }).catch(() => {});
+>>>>>>> 3a71a04ee1355d10738747d3bf48ebdb3d3dea8f
       } catch (uErr) {
         console.warn('User status update error:', uErr);
       }
@@ -1449,6 +1494,7 @@ const EmployeeRequests = () => {
             ...item,
             isApproved: false,
             approved: false,
+            isActive: false,
             status: 'rejected',
             teamLead: null,
             teamLeadId: null,
