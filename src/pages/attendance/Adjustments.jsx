@@ -193,6 +193,17 @@ export default function Adjustments() {
     }
   }, []);
 
+  // Prevent background scrolling when Rules Setting modal is open
+  useEffect(() => {
+    if (showSettings) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showSettings]);
+
   // ============================================================
   // OPEN SETTINGS
   // ============================================================
@@ -255,6 +266,22 @@ export default function Adjustments() {
       tempSettings.officeStartTime
     ) {
       showToast("Late After time must be greater than Office Start Time.", "error");
+      return;
+    }
+
+    if (
+      tempSettings.halfDayAfter &&
+      tempSettings.halfDayAfter <= tempSettings.lateAfter
+    ) {
+      showToast("Half Day After time must be greater than Late After time.", "error");
+      return;
+    }
+
+    if (
+      tempSettings.halfDayAfter &&
+      tempSettings.absentAfter <= tempSettings.halfDayAfter
+    ) {
+      showToast("Absent After time must be greater than Half Day After time.", "error");
       return;
     }
 
@@ -1809,13 +1836,13 @@ export default function Adjustments() {
       ====================================================== */}
 
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
 
-          <div className="w-full max-w-2xl bg-white rounded-xl border border-slate-200/80 shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-2xl bg-white rounded-xl border border-slate-200/80 shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col animate-fade-in">
 
             {/* Header */}
 
-            <div className="flex items-center justify-between border-b border-gray-200 px-4 sm:px-5 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 sm:px-5 py-3.5 shrink-0 bg-white">
 
               <div className="flex items-center gap-3">
 
@@ -1852,7 +1879,7 @@ export default function Adjustments() {
 
             {/* Body */}
 
-            <div className="p-4 sm:p-5 space-y-5">
+            <div className="p-4 sm:p-5 space-y-5 overflow-y-auto flex-1 overscroll-contain">
 
               {/* Timing Section */}
 
@@ -1922,6 +1949,32 @@ export default function Adjustments() {
 
                     <p className="text-[11px] text-gray-400 mt-1">
                       Check-in after this time is late
+                    </p>
+                  </div>
+
+                  {/* Half Day */}
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                      Half Day After
+                    </label>
+
+                    <input
+                      type="time"
+                      value={
+                        tempSettings.halfDayAfter || "10:30"
+                      }
+                      onChange={(e) =>
+                        handleSettingChange(
+                          "halfDayAfter",
+                          e.target.value
+                        )
+                      }
+                      className="w-full bg-white border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Check-in after this time is half day
                     </p>
                   </div>
 
@@ -2095,7 +2148,7 @@ export default function Adjustments() {
                   Current Configuration
                 </p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
 
                   <div>
                     <span className="text-gray-400 block">
@@ -2117,6 +2170,18 @@ export default function Adjustments() {
                     <span className="font-medium text-gray-700">
                       {
                         tempSettings.lateAfter
+                      }
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 block">
+                      Half Day
+                    </span>
+
+                    <span className="font-medium text-gray-700">
+                      {
+                        tempSettings.halfDayAfter || "10:30"
                       }
                     </span>
                   </div>
@@ -2153,7 +2218,7 @@ export default function Adjustments() {
 
             {/* Footer */}
 
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 border-t border-gray-200 px-4 sm:px-5 py-4 bg-gray-50">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 border-t border-gray-200 px-4 sm:px-5 py-3.5 bg-gray-50 shrink-0">
 
               <button
                 type="button"
@@ -2224,6 +2289,9 @@ export default function Adjustments() {
               </span>
               <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
                 Late: <b className="text-slate-900">{attendanceSettings.lateAfter}</b>
+              </span>
+              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
+                Half Day: <b className="text-slate-900">{attendanceSettings.halfDayAfter || "10:30"}</b>
               </span>
               <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
                 Absent: <b className="text-slate-900">{attendanceSettings.absentAfter}</b>

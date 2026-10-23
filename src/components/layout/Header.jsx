@@ -65,7 +65,7 @@ export const Header = ({ onSignOut }) => {
   const [employeeTab, setEmployeeTab] = useState('unread'); // 'unread' | 'all' | 'read'
   const previousEmployeeUnreadRef = useRef(0);
 
-  // --- Click Outside Event Listener ---
+  // --- Click Outside & Scroll Event Listeners ---
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -82,12 +82,33 @@ export const Header = ({ onSignOut }) => {
       }
     };
 
+    const handleWindowScroll = (event) => {
+      // If the scroll target is inside the notifications container, allow user to scroll the notification list
+      if (
+        notificationRef.current &&
+        notificationRef.current.contains(event.target)
+      ) {
+        return;
+      }
+      // If the scroll target is inside the profile menu, allow it
+      if (
+        profileMenuRef.current &&
+        profileMenuRef.current.contains(event.target)
+      ) {
+        return;
+      }
+      setIsNotificationsOpen(false);
+      setIsProfileMenuOpen(false);
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside);
+    window.addEventListener('scroll', handleWindowScroll, true);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('scroll', handleWindowScroll, true);
     };
   }, []);
 
@@ -374,14 +395,6 @@ export const Header = ({ onSignOut }) => {
     const id = item.id || item._id;
     if (!item.isRead) {
       handleAdminMarkAsRead(id);
-    }
-    setIsNotificationsOpen(false);
-    if (item.link) {
-      navigate(item.link);
-      const targetTab = pathToTab[item.link] || pathToTab[item.link.replace(/^\//, '')];
-      if (targetTab && setCurrentTab) {
-        setCurrentTab(targetTab);
-      }
     }
   };
 
@@ -883,11 +896,6 @@ export const Header = ({ onSignOut }) => {
                                         <Trash2 size={12} />
                                       </button>
                                     </>
-                                  )}
-                                  {item.link && (
-                                    <span className="text-indigo-600 font-medium flex items-center gap-0.5 text-[10px]">
-                                      Open <ExternalLink size={10} />
-                                    </span>
                                   )}
                                 </div>
                               </div>

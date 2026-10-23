@@ -573,10 +573,51 @@ export const fetchEmployeeTeamLead = async () => {
       );
       if (hasIdentity) return data;
     }
-    return null;
   } catch (err) {
     console.warn("Notice fetching employee team lead:", err.response?.data?.message || err.message);
-    return null;
   }
+
+  // Fallback 1: Check localStorage kt_user_assigned_tl
+  try {
+    const userIdent = getLoggedInUserIdentifiers();
+    const { ids, emails } = userIdent;
+    const userTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
+    for (const id of ids) {
+      if (userTLMap[id] && userTLMap[id].name) return userTLMap[id];
+    }
+    for (const email of emails) {
+      if (userTLMap[email] && userTLMap[email].name) return userTLMap[email];
+    }
+  } catch {}
+
+  // Fallback 2: Check backend GET /api/teamLead/team
+  try {
+    const teams = await fetchTeamsList();
+    const userIdent = getLoggedInUserIdentifiers();
+    const { ids, emails } = userIdent;
+    for (const team of teams) {
+      const emps = Array.isArray(team.employees) ? team.employees : [];
+      const matches = emps.some(e => {
+        if (!e) return false;
+        if (typeof e === 'string' || typeof e === 'number') {
+          return ids.has(String(e).toLowerCase().trim());
+        }
+        if (typeof e === 'object') {
+          const eId = String(e._id || e.id || e.userId || '').toLowerCase().trim();
+          const eEmail = String(e.email || '').toLowerCase().trim();
+          if (eId && ids.has(eId)) return true;
+          if (eEmail && emails.has(eEmail)) return true;
+        }
+        return false;
+      });
+      if (matches) {
+        const lead = team.teamLead || team.teamLeadUser || team.teamLeadEmployee || team.lead;
+        if (lead && typeof lead === 'object') return lead;
+        if (lead) return { _id: lead, name: team.teamLeadName || 'Team Lead' };
+      }
+    }
+  } catch {}
+
+  return null;
 };
 

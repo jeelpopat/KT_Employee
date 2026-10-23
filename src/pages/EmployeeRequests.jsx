@@ -28,6 +28,35 @@ import {
 } from 'lucide-react';
 import api from '../api/axios';
 import { isFinanceOrExcludedUser, filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../utils/roleFilters';
+import { fetchTeamsList } from '../utils/teamLeadUtils';
+
+// Helper to determine if a user has the role of Team Leader (TL)
+export const isTeamLeadUser = (u) => {
+  if (!u) return false;
+  if (isFinanceOrExcludedUser(u)) return false;
+  const role = String(u.role || '').toLowerCase().trim();
+  const desig = typeof u.designation === 'object'
+    ? String(u.designation?.designationName || u.designation?.name || u.designation?.title || '').toLowerCase().trim()
+    : String(u.designation || '').toLowerCase().trim();
+  return (
+    u.isTeamLead === true ||
+    u.isTeamLeader === true ||
+    role === 'team lead' ||
+    role === 'team_leader' ||
+    role === 'team leader' ||
+    role === 'tl' ||
+    role === 'teamlead' ||
+    role.includes('team lead') ||
+    role.includes('team_leader') ||
+    (role.includes('lead') && !role.includes('clean') && !role.includes('plead')) ||
+    desig === 'team lead' ||
+    desig === 'team_leader' ||
+    desig === 'team leader' ||
+    desig === 'tl' ||
+    desig.includes('team lead') ||
+    desig.includes('team leader')
+  );
+};
 
 const EmployeeRequests = () => {
   const [users, setUsers] = useState([]);
@@ -59,6 +88,7 @@ const EmployeeRequests = () => {
   const [teamLeads, setTeamLeads] = useState([]);
   const [loadingTeamLeads, setLoadingTeamLeads] = useState(false);
   const [selectedTeamLeadId, setSelectedTeamLeadId] = useState('');
+  const [backendTeams, setBackendTeams] = useState([]);
 
   // Fetch users from API
   const fetchUsers = async (isSilent = false) => {
@@ -274,7 +304,21 @@ const EmployeeRequests = () => {
   };
 
 
-  // Fetch Available Team Leads ONLY from https://kt-backend-yzr4.onrender.com/api/employee/list
+  // Fetch Backend Teams from GET https://kt-backend-yzr4.onrender.com/api/teamLead/team
+  const fetchBackendTeams = async () => {
+    try {
+      const teams = await fetchTeamsList();
+      if (Array.isArray(teams)) {
+        setBackendTeams(teams);
+        return teams;
+      }
+    } catch (err) {
+      console.warn('Notice loading backend teams:', err?.message);
+    }
+    return [];
+  };
+
+  // Fetch Available Team Leads from https://kt-backend-yzr4.onrender.com/api/employee/list and users roster
   const fetchTeamLeads = async () => {
     setLoadingTeamLeads(true);
     try {
@@ -286,7 +330,7 @@ const EmployeeRequests = () => {
 
       const leads = [];
 
-      // Query ONLY https://kt-backend-yzr4.onrender.com/api/employee/list
+      // Query https://kt-backend-yzr4.onrender.com/api/employee/list
       try {
         let empList = [];
         try {
@@ -301,27 +345,7 @@ const EmployeeRequests = () => {
         // Filter ONLY employees who are Team Leads
         const employeeTLs = (empList || []).filter((emp) => {
           if (!emp || isFinanceOrExcludedUser(emp)) return false;
-          const role = String(emp.role || '').toLowerCase().trim();
-          const desig = typeof emp.designation === 'object'
-            ? String(emp.designation?.designationName || emp.designation?.name || '').toLowerCase().trim()
-            : String(emp.designation || '').toLowerCase().trim();
-
-          return (
-            emp.isTeamLead === true ||
-            emp.isTeamLeader === true ||
-            role === 'team lead' ||
-            role === 'team_leader' ||
-            role === 'team leader' ||
-            role === 'tl' ||
-            role.includes('team lead') ||
-            role.includes('lead') ||
-            desig === 'team lead' ||
-            desig === 'team_leader' ||
-            desig === 'team leader' ||
-            desig === 'tl' ||
-            desig.includes('team lead') ||
-            desig.includes('lead')
-          );
+          return isTeamLeadUser(emp);
         });
 
         leads.push(...employeeTLs);
@@ -329,7 +353,15 @@ const EmployeeRequests = () => {
         console.warn('Could not fetch employees for TLs:', err?.message);
       }
 
-      // Deduplicate leads by identifier or normalized name (strictly from employee/list)
+      // Also include any user from users state or allUsers who is marked as Team Lead
+      try {
+        if (Array.isArray(users) && users.length > 0) {
+          const userTLs = users.filter(u => u && !isFinanceOrExcludedUser(u) && isTeamLeadUser(u));
+          leads.push(...userTLs);
+        }
+      } catch {}
+
+      // Deduplicate leads by identifier or normalized name
       const seen = new Set();
       const uniqueLeads = [];
       for (const item of leads) {
@@ -365,7 +397,7 @@ const EmployeeRequests = () => {
       setTeamLeads(uniqueLeads);
       return uniqueLeads;
     } catch (err) {
-      console.error('Failed to load team leads from employee/list:', err);
+      console.error('Failed to load team leads:', err);
       setTeamLeads([]);
       return [];
     } finally {
@@ -373,10 +405,13 @@ const EmployeeRequests = () => {
     }
   };
 
-  // Initial load of metadata: fetch companies, initial branches, FY & team leads
+  // Initial load of metadata: fetch companies, initial branches, FY, team leads & live teams
   const fetchApprovalMetadata = async () => {
     try {
-      await fetchTeamLeads();
+      await Promise.all([
+        fetchTeamLeads(),
+        fetchBackendTeams()
+      ]);
       const compList = await fetchCompanies();
       if (compList && compList.length > 0) {
         const firstCompId = compList[0]._id || compList[0].id;
@@ -395,28 +430,41 @@ const EmployeeRequests = () => {
     fetchUsers(false);
     fetchApprovalMetadata();
 
-    // Silent auto-refresh every 8s for new employee join requests
+    // Silent auto-refresh every 8s for new employee join requests and team updates
     const interval = setInterval(() => {
       fetchUsers(true);
+      fetchBackendTeams();
     }, 8000);
 
     const handleFocus = () => {
       fetchUsers(true);
+      fetchBackendTeams();
     };
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         fetchUsers(true);
+        fetchBackendTeams();
       }
+    };
+
+    // Real-time synchronization when TL is reassigned or updated from TeamLead page
+    const handleTeamAssignmentUpdated = () => {
+      fetchBackendTeams();
+      fetchUsers(true);
     };
 
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("kt_team_assignment_updated", handleTeamAssignmentUpdated);
+    window.addEventListener("storage", handleTeamAssignmentUpdated);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("kt_team_assignment_updated", handleTeamAssignmentUpdated);
+      window.removeEventListener("storage", handleTeamAssignmentUpdated);
     };
   }, []);
 
@@ -459,12 +507,136 @@ const EmployeeRequests = () => {
     return null;
   };
 
-  // Resolver for Assigned Team Lead (Live and Dynamic only)
+  // Resolver for Assigned Team Lead (Live and Dynamic only, prioritized for updates from Team Lead page)
   const getAssignedTeamLead = (userObj) => {
     if (!userObj) return null;
-    const userId = String(getUserIdentifier(userObj, 0));
 
-    // 1. Direct user properties
+    // Critical: If the user themselves is a Team Lead, they do NOT have a Team Lead assigned!
+    if (isTeamLeadUser(userObj)) {
+      return null;
+    }
+
+    const userId = String(getUserIdentifier(userObj, 0));
+    const userIds = [
+      userObj._id,
+      userObj.id,
+      userObj.userId,
+      userObj.userID,
+      userObj.employeeId,
+      userObj.employeeID,
+      userObj.empId,
+      userId
+    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+    const userEmails = [
+      userObj.email,
+      userObj.user?.email
+    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+    // 1. HIGHEST PRIORITY: Live backend teams from GET /api/teamLead/team
+    // When TL is changed in TeamLead page, this guarantees the updated TL name is immediately reflected here!
+    if (Array.isArray(backendTeams) && backendTeams.length > 0) {
+      for (const team of backendTeams) {
+        if (!team) continue;
+        const teamEmployees = Array.isArray(team.employees) ? team.employees : [];
+        const isMember = teamEmployees.some(emp => {
+          if (!emp) return false;
+          if (typeof emp === 'string' || typeof emp === 'number') {
+            const empStr = String(emp).toLowerCase().trim();
+            return userIds.includes(empStr);
+          }
+          if (typeof emp === 'object') {
+            const empIds = [
+              emp._id,
+              emp.id,
+              emp.userId,
+              emp.userID,
+              emp.employeeId,
+              emp.employeeID
+            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+            if (empIds.some(id => userIds.includes(id))) return true;
+
+            const empEmail = String(emp.email || '').toLowerCase().trim();
+            if (empEmail && userEmails.includes(empEmail)) return true;
+          }
+          return false;
+        });
+
+        if (isMember) {
+          const rawTL = team.teamLead || team.teamLeadUser || team.teamLeadEmployee || team.lead;
+          if (rawTL && typeof rawTL === 'object') {
+            return {
+              id: rawTL._id || rawTL.id || rawTL.userId || null,
+              name: rawTL.name || rawTL.fullName || (rawTL.firstName ? `${rawTL.firstName} ${rawTL.lastName || ''}`.trim() : null),
+              email: rawTL.email || null,
+              department: rawTL.department || null,
+              designation: rawTL.designation || null
+            };
+          }
+          if (rawTL) {
+            const rawTLId = String(rawTL).toLowerCase().trim();
+            const matched = teamLeads.find(tl =>
+              String(tl._id).toLowerCase().trim() === rawTLId ||
+              String(tl.userId || '').toLowerCase().trim() === rawTLId ||
+              String(tl.id || '').toLowerCase().trim() === rawTLId
+            );
+            if (matched) {
+              return {
+                id: matched._id || matched.id,
+                name: matched.name || matched.fullName,
+                email: matched.email || null,
+                department: matched.department || null,
+                designation: matched.designation || null
+              };
+            }
+            return {
+              id: rawTL,
+              name: team.teamLeadName || 'Team Lead',
+              email: null
+            };
+          }
+        }
+      }
+    }
+
+    // 2. PRIORITY 2: Check localStorage 'kt_user_assigned_tl' (synced in real-time by TeamLead page onSave)
+    try {
+      const savedUserTL = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
+      for (const id of userIds) {
+        if (savedUserTL[id] && savedUserTL[id].name) {
+          return savedUserTL[id];
+        }
+      }
+      for (const email of userEmails) {
+        if (savedUserTL[email] && savedUserTL[email].name) {
+          return savedUserTL[email];
+        }
+      }
+    } catch { }
+
+    // 3. PRIORITY 3: Check localStorage 'teamLeadAssignedEmployees'
+    try {
+      const assignments = JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}');
+      for (const [tlId, empIds] of Object.entries(assignments)) {
+        if (Array.isArray(empIds) && empIds.some(eId => userIds.includes(String(eId).toLowerCase().trim()))) {
+          const match = teamLeads.find(tl =>
+            String(tl._id).toLowerCase().trim() === String(tlId).toLowerCase().trim() ||
+            String(tl.userId || '').toLowerCase().trim() === String(tlId).toLowerCase().trim()
+          );
+          if (match) {
+            return {
+              id: tlId,
+              name: match.name || match.fullName || null,
+              email: match.email || null,
+              department: match.department || null,
+              designation: match.designation || null
+            };
+          }
+        }
+      }
+    } catch { }
+
+    // 4. PRIORITY 4: User object direct properties (only if no live team assignment found above)
     if (userObj.teamLeadName) {
       return {
         id: userObj.teamLeadId || userObj.teamLead || null,
@@ -497,34 +669,6 @@ const EmployeeRequests = () => {
         };
       }
     }
-
-    // 2. Check localStorage 'kt_user_assigned_tl'
-    try {
-      const savedUserTL = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
-      if (savedUserTL[userId]) {
-        return savedUserTL[userId];
-      }
-      if (userObj._id && savedUserTL[String(userObj._id)]) {
-        return savedUserTL[String(userObj._id)];
-      }
-    } catch { }
-
-    // 3. Check localStorage 'teamLeadAssignedEmployees'
-    try {
-      const assignments = JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}');
-      for (const [tlId, empIds] of Object.entries(assignments)) {
-        if (Array.isArray(empIds) && empIds.some(eId => String(eId) === userId || String(eId) === String(userObj._id))) {
-          const match = teamLeads.find(tl => String(tl._id) === String(tlId) || String(tl.userId) === String(tlId));
-          if (match) {
-            return {
-              id: tlId,
-              name: match.name || match.fullName || null,
-              email: match.email || null
-            };
-          }
-        }
-      }
-    } catch { }
 
     return null;
   };
@@ -581,16 +725,22 @@ const EmployeeRequests = () => {
     setApprovalError('');
     setApprovingUser(user);
 
-    // 1. Ensure Team Leads are loaded and pre-fill existing TL if available
-    let currentTLs = teamLeads;
-    if (!currentTLs || currentTLs.length === 0) {
-      currentTLs = await fetchTeamLeads();
-    }
-    const existingTL = getAssignedTeamLead(user);
-    if (existingTL?.id && currentTLs.some(t => String(t._id || t.userId || t.id) === String(existingTL.id))) {
-      setSelectedTeamLeadId(String(existingTL.id));
-    } else {
+    // If applicant role is Team Lead, TL assignment is not applicable
+    const isApplicantTL = isTeamLeadUser(user);
+    if (isApplicantTL) {
       setSelectedTeamLeadId('');
+    } else {
+      // 1. Ensure Team Leads are loaded and pre-fill existing TL if available
+      let currentTLs = teamLeads;
+      if (!currentTLs || currentTLs.length === 0) {
+        currentTLs = await fetchTeamLeads();
+      }
+      const existingTL = getAssignedTeamLead(user);
+      if (existingTL?.id && currentTLs.some(t => String(t._id || t.userId || t.id) === String(existingTL.id))) {
+        setSelectedTeamLeadId(String(existingTL.id));
+      } else {
+        setSelectedTeamLeadId('');
+      }
     }
 
     // 2. Ensure companies are loaded
@@ -678,9 +828,11 @@ const EmployeeRequests = () => {
     if (e) e.preventDefault();
     if (!approvingUser) return;
 
-    // Strict validation: Team Leader, Company Name, Branch, and Financial Year are all mandatory!
+    const isApplicantTL = isTeamLeadUser(approvingUser);
+
+    // Strict validation: Team Leader (only if not applicant TL), Company Name, Branch, and Financial Year are mandatory!
     const missingFields = [];
-    if (!selectedTeamLeadId || !String(selectedTeamLeadId).trim()) {
+    if (!isApplicantTL && (!selectedTeamLeadId || !String(selectedTeamLeadId).trim())) {
       missingFields.push('Team Leader (TL)');
     }
     if (!selectedCompanyId || !String(selectedCompanyId).trim()) {
@@ -695,7 +847,7 @@ const EmployeeRequests = () => {
 
     if (missingFields.length > 0) {
       setApprovalError(
-        `Cannot approve employee: ${missingFields.join(', ')} ${missingFields.length === 1 ? 'is' : 'are'} required. Please assign a Team Leader and all Company details before approving.`
+        `Cannot approve employee: ${missingFields.join(', ')} ${missingFields.length === 1 ? 'is' : 'are'} required. Please complete all required details before approving.`
       );
       return;
     }
@@ -704,8 +856,8 @@ const EmployeeRequests = () => {
     setSubmittingApproval(true);
     setApprovalError('');
 
-    // Find selected Team Lead record (dynamic only)
-    const selectedTL = selectedTeamLeadId
+    // Find selected Team Lead record (dynamic only, null if applicant is TL)
+    const selectedTL = (!isApplicantTL && selectedTeamLeadId)
       ? teamLeads.find(t =>
         String(t._id) === String(selectedTeamLeadId) ||
         String(t.userId) === String(selectedTeamLeadId) ||
@@ -764,13 +916,13 @@ const EmployeeRequests = () => {
       isApproved: true,
       approved: true,
       status: 'approved',
-      // Assigned Team Lead Details (dynamically passed or null if no data)
-      teamLead: selectedTeamLeadId || null,
-      teamLeadId: selectedTeamLeadId || null,
-      assignedTL: selectedTeamLeadId || null,
-      teamLeader: selectedTeamLeadId || null,
-      teamLeadName: tlNameVal || null,
-      teamLeadEmail: tlEmailVal || null,
+      // Assigned Team Lead Details (only set if not applicant TL)
+      teamLead: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
+      teamLeadId: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
+      assignedTL: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
+      teamLeader: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
+      teamLeadName: (!isApplicantTL && tlNameVal) ? tlNameVal : null,
+      teamLeadEmail: (!isApplicantTL && tlEmailVal) ? tlEmailVal : null,
       // Bank & Payout Details (if previously recorded)
       ...bankData,
       ...(Object.keys(bankData).length > 0 ? { bankDetails: { ...bankData } } : {})
@@ -810,23 +962,138 @@ const EmployeeRequests = () => {
         }
       }
 
-      // 2. Notify team lead create-team endpoint for linkage if TL was selected
-      if (selectedTeamLeadId) {
+      // 2. Synchronize Team Lead and Team Linkage via backend API: POST /api/teamLead/create-team
+      let resolvedEmpRecordId = null;
+      if (selectedTeamLeadId && !isApplicantTL) {
         try {
           const token = getAuthToken();
           const headers = {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {})
           };
+
+          // Step A: Fetch current teams from backend to ensure we merge and preserve existing members
+          let currentTeams = [];
+          try {
+            const teamRes = await api.get('/api/teamLead/team', { headers });
+            currentTeams = teamRes.data?.data || teamRes.data?.teams || (Array.isArray(teamRes.data) ? teamRes.data : []);
+          } catch {
+            try {
+              const fetchTeamsRes = await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/team', { headers });
+              if (fetchTeamsRes.ok) {
+                const tData = await fetchTeamsRes.json().catch(() => ({}));
+                currentTeams = tData?.data || tData?.teams || (Array.isArray(tData) ? tData : []);
+              }
+            } catch {}
+          }
+          if (!Array.isArray(currentTeams)) currentTeams = [];
+
+          // Step B: Find matching employee record in /api/employee/list (to get employee _id as well as user _id)
+          try {
+            const empRes = await api.get('/api/employee/list', { headers });
+            const empList = empRes.data?.employees || empRes.data?.data || (Array.isArray(empRes.data) ? empRes.data : []);
+            const matchedEmp = (empList || []).find(e => {
+              if (!e) return false;
+              const eEmail = (e.email || '').toLowerCase().trim();
+              const uEmail = (approvingUser?.email || '').toLowerCase().trim();
+              if (eEmail && uEmail && eEmail === uEmail) return true;
+              const eUserId = String(e.userId || e.userID || '').toLowerCase().trim();
+              if (eUserId && eUserId === String(userId).toLowerCase().trim()) return true;
+              const eCode = String(e.employeeID || e.employeeCode || '').trim();
+              const uCode = String(approvingUser?.employeeID || approvingUser?.employeeCode || '').trim();
+              if (eCode && uCode && eCode === uCode) return true;
+              return false;
+            });
+            if (matchedEmp?._id) {
+              resolvedEmpRecordId = String(matchedEmp._id);
+            }
+          } catch (e) {
+            console.warn('Employee list lookup notice:', e?.message);
+          }
+
+          const employeeIdentifiersToAdd = [resolvedEmpRecordId, String(userId)].filter(Boolean);
+
+          // Step C: If employee was already in another Team Lead's team in currentTeams, remove them from that other team lead
+          const targetTLIds = [
+            selectedTeamLeadId,
+            selectedTL?._id,
+            selectedTL?.id,
+            selectedTL?.userId
+          ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+          for (const team of currentTeams) {
+            const rawLead = team.teamLead || team.lead || team.teamLeadId;
+            const leadIdStr = String(typeof rawLead === 'object' ? (rawLead._id || rawLead.id || rawLead.userId) : rawLead).toLowerCase().trim();
+            const isThisTargetTeam = targetTLIds.includes(leadIdStr);
+
+            if (!isThisTargetTeam && Array.isArray(team.employees)) {
+              const prevCount = team.employees.length;
+              const remainingEmps = team.employees.filter(emp => {
+                const empStr = String(typeof emp === 'object' ? (emp._id || emp.id || emp.userId) : emp).toLowerCase().trim();
+                return !employeeIdentifiersToAdd.map(x => x.toLowerCase().trim()).includes(empStr);
+              });
+
+              if (remainingEmps.length !== prevCount) {
+                // Employee was in another team lead; remove and update that team lead via create-team
+                try {
+                  const otherLeadBackendId = typeof rawLead === 'object' ? (rawLead._id || rawLead.id) : rawLead;
+                  await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                      teamLead: otherLeadBackendId,
+                      employees: remainingEmps.map(e => typeof e === 'object' ? String(e._id || e.id) : String(e))
+                    })
+                  }).catch(() => {});
+                } catch {}
+              }
+            }
+          }
+
+          // Step D: Find existing team document for target team lead and merge members
+          const targetTeamDoc = currentTeams.find(t => {
+            const rawLead = t.teamLead || t.lead || t.teamLeadId;
+            const leadIdStr = String(typeof rawLead === 'object' ? (rawLead._id || rawLead.id || rawLead.userId) : rawLead).toLowerCase().trim();
+            return targetTLIds.includes(leadIdStr);
+          });
+
+          const existingTargetMembers = Array.isArray(targetTeamDoc?.employees)
+            ? targetTeamDoc.employees.map(e => typeof e === 'object' ? String(e._id || e.id) : String(e))
+            : [];
+
+          const mergedTargetMembers = Array.from(new Set([
+            ...existingTargetMembers,
+            ...employeeIdentifiersToAdd
+          ]));
+
+          // Step E: Call POST https://kt-backend-yzr4.onrender.com/api/teamLead/create-team
+          const backendTLId = targetTeamDoc?.teamLead?._id || selectedTL?._id || selectedTeamLeadId;
           await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
             method: 'POST',
             headers,
             body: JSON.stringify({
-              teamLead: selectedTeamLeadId,
-              employees: [userId]
+              teamLead: backendTLId,
+              employees: mergedTargetMembers
             })
-          }).catch(() => { });
-        } catch { }
+          }).catch(() => {});
+
+          // Step F: Also send to alternative TL ID if distinct
+          if (selectedTL?.userId && String(selectedTL.userId) !== String(backendTLId)) {
+            await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                teamLead: selectedTL.userId,
+                employees: mergedTargetMembers
+              })
+            }).catch(() => {});
+          }
+
+          // Step G: Refresh local backendTeams
+          await fetchBackendTeams();
+        } catch (linkErr) {
+          console.warn('Backend team linkage notice:', linkErr?.message);
+        }
       }
 
       if (isSuccess) {
@@ -834,49 +1101,48 @@ const EmployeeRequests = () => {
         const resolvedBranchName = resData?.data?.branchName || branchNameVal;
 
         // Persist TL assignment in localStorage for seamless cross-panel continuity if assigned
-        if (selectedTeamLeadId) {
+        if (selectedTeamLeadId && !isApplicantTL) {
+          const allUserIdentifiers = [
+            String(userId),
+            approvingUser?._id ? String(approvingUser._id) : null,
+            resolvedEmpRecordId,
+            approvingUser?.email ? String(approvingUser.email).trim().toLowerCase() : null,
+            approvingUser?.employeeID ? String(approvingUser.employeeID).trim() : null
+          ].filter(Boolean);
+
           try {
             const currentAssignments = JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}');
-            const existingList = currentAssignments[selectedTeamLeadId] || [];
-            const isUserAlreadyAssigned = (list) => {
-              if (!Array.isArray(list)) return false;
-              return list.some(existingId => {
-                if (String(existingId) === String(userId)) return true;
-                const matched = users.find(u => String(u._id) === String(existingId) || String(u.id) === String(existingId));
-                if (matched) {
-                  const sameEmail = matched.email && approvingUser?.email && matched.email.toLowerCase().trim() === approvingUser.email.toLowerCase().trim();
-                  const sameCode = matched.employeeID && approvingUser?.employeeID && matched.employeeID === approvingUser.employeeID;
-                  if (sameEmail || sameCode) return true;
-                }
-                return false;
-              });
-            };
+            const targetIds = [selectedTeamLeadId, selectedTL?._id, selectedTL?.userId].filter(Boolean).map(String);
 
-            if (!isUserAlreadyAssigned(existingList)) {
-              currentAssignments[selectedTeamLeadId] = [...existingList, userId];
-            }
-            if (selectedTL?._id && String(selectedTL._id) !== String(selectedTeamLeadId)) {
-              const altList = currentAssignments[selectedTL._id] || [];
-              if (!isUserAlreadyAssigned(altList)) {
-                currentAssignments[selectedTL._id] = [...altList, userId];
-              }
-            }
+            targetIds.forEach(tId => {
+              const existingList = currentAssignments[tId] || [];
+              const updatedList = Array.from(new Set([...existingList, ...allUserIdentifiers]));
+              currentAssignments[tId] = updatedList;
+            });
+
             localStorage.setItem('teamLeadAssignedEmployees', JSON.stringify(currentAssignments));
             localStorage.setItem('kt_assigned_employees', JSON.stringify(currentAssignments));
           } catch { }
 
-          // Persist User -> Team Lead mapping
+          // Persist User -> Team Lead mapping for all identifiers
           try {
             const currentTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
-            currentTLMap[userId] = {
+            const tlRecord = {
               id: selectedTeamLeadId,
               teamLeadId: selectedTeamLeadId,
               name: tlNameVal,
               email: tlEmailVal,
               assignedAt: new Date().toISOString()
             };
+            allUserIdentifiers.forEach(id => {
+              currentTLMap[id] = tlRecord;
+            });
             localStorage.setItem('kt_user_assigned_tl', JSON.stringify(currentTLMap));
           } catch { }
+
+          // Broadcast events for cross-tab and cross-page real-time synchronization
+          window.dispatchEvent(new Event('kt_team_assignment_updated'));
+          window.dispatchEvent(new Event('storage'));
         }
 
         // Persist User -> Bank Details mapping (if details exist)
@@ -906,12 +1172,12 @@ const EmployeeRequests = () => {
               financialYearId: selectedFinancialYearId || null,
               financialYearLabel: fyLabelVal || null,
               yearLabel: fyLabelVal || null,
-              teamLead: selectedTeamLeadId || null,
-              teamLeadId: selectedTeamLeadId || null,
-              assignedTL: selectedTeamLeadId || null,
-              teamLeader: selectedTeamLeadId || null,
-              teamLeadName: tlNameVal || null,
-              teamLeadEmail: tlEmailVal || null,
+              teamLead: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
+              teamLeadId: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
+              assignedTL: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
+              teamLeader: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
+              teamLeadName: (!isApplicantTL && tlNameVal) ? tlNameVal : null,
+              teamLeadEmail: (!isApplicantTL && tlEmailVal) ? tlEmailVal : null,
               ...bankData,
               ...(Object.keys(bankData).length > 0 ? { bankDetails: { ...bankData } } : {})
             };
@@ -919,9 +1185,11 @@ const EmployeeRequests = () => {
         );
 
         const approvedName = approvingUser?.name || approvingUser?.fullName || (approvingUser?.email ? approvingUser.email.split('@')[0] : 'User');
-        const successMsg = tlNameVal
-          ? `Approved ${approvedName} and assigned Team Lead "${tlNameVal}" successfully!`
-          : `Approved ${approvedName} successfully!`;
+        const successMsg = isApplicantTL
+          ? `Approved Team Leader ${approvedName} successfully!`
+          : tlNameVal
+            ? `Approved ${approvedName} and assigned Team Lead "${tlNameVal}" successfully!`
+            : `Approved ${approvedName} successfully!`;
         setSuccessNotification(successMsg);
         setTimeout(() => setSuccessNotification(''), 4500);
         setApprovingUser(null);
@@ -1045,16 +1313,35 @@ const EmployeeRequests = () => {
     };
   };
 
-  const filteredUsers = users
-    .filter(user => {
-      if (isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return false;
+  // 1. Base users matching search & excluding non-eligible users
+  const baseUsers = users.filter((user) => {
+    if (isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return false;
 
-      const searchMatch = user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user?.department?.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.trim().toLowerCase();
+    const searchMatch = !term ||
+      user?.name?.toLowerCase().includes(term) ||
+      user?.email?.toLowerCase().includes(term) ||
+      user?.department?.toLowerCase().includes(term);
 
-      if (!searchMatch) return false;
+    return searchMatch;
+  });
 
+  // 2. Consistent Stats computed across all eligible users (never disappears on tab click)
+  const stats = {
+    total: baseUsers.length,
+    pending: baseUsers.filter((u) => {
+      const isApproved = u?.isApproved === true || u?.approved === true || u?.status === 'approved';
+      return !isApproved;
+    }).length,
+    approved: baseUsers.filter((u) => {
+      const isApproved = u?.isApproved === true || u?.approved === true || u?.status === 'approved';
+      return isApproved;
+    }).length,
+  };
+
+  // 3. Filtered users according to active filter tab
+  const filteredUsers = baseUsers
+    .filter((user) => {
       const isApproved = user?.isApproved === true || user?.approved === true || user?.status === 'approved';
       if (filterStatus === 'approved') return isApproved;
       if (filterStatus === 'pending') return !isApproved;
@@ -1065,18 +1352,6 @@ const EmployeeRequests = () => {
       const dateB = new Date(b.createdAt || b.date || 0);
       return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
     });
-
-  const stats = {
-    total: filteredUsers.length,
-    pending: filteredUsers.filter(u => {
-      const isApproved = u?.isApproved === true || u?.approved === true || u?.status === 'approved';
-      return !isApproved;
-    }).length,
-    approved: filteredUsers.filter(u => {
-      const isApproved = u?.isApproved === true || u?.approved === true || u?.status === 'approved';
-      return isApproved;
-    }).length
-  };
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
@@ -1319,6 +1594,16 @@ const EmployeeRequests = () => {
                       Assigned TL
                     </span>
                   </div>
+                ) : isTeamLeadUser(user) ? (
+                  <div className="mt-2.5 flex items-center justify-between gap-2 p-2 rounded-lg bg-purple-50/70 border border-purple-200/80 text-xs text-purple-900">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Crown size={14} className="text-purple-600 shrink-0" />
+                      <span className="font-bold text-[11px] text-purple-800">Team Leader</span>
+                    </div>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 shrink-0">
+                      Lead Role
+                    </span>
+                  </div>
                 ) : (
                   <div className="mt-2.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-500 font-medium">
                     <AlertCircle size={13} className="shrink-0 text-slate-400" />
@@ -1387,9 +1672,13 @@ const EmployeeRequests = () => {
                     <div className="mt-2 sm:mt-3 space-y-1.5 sm:space-y-2 rounded-lg bg-slate-50/50 p-2 sm:p-3">
                       {/* Team Lead in details */}
                       <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                        <Crown className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500 shrink-0" />
+                        <Crown className={`h-3 w-3 sm:h-4 sm:w-4 ${isTeamLeadUser(user) ? 'text-purple-600' : 'text-amber-500'} shrink-0`} />
                         <span className="text-slate-700 font-medium truncate">
-                          Team Lead: <span className="font-bold text-slate-900">{assignedTL?.name || 'No data'}</span>
+                          {isTeamLeadUser(user) ? (
+                            <>Role: <span className="font-bold text-purple-800">Team Leader (Lead Role)</span></>
+                          ) : (
+                            <>Team Lead: <span className="font-bold text-slate-900">{assignedTL?.name || 'No data'}</span></>
+                          )}
                         </span>
                       </div>
 
@@ -1600,83 +1889,101 @@ const EmployeeRequests = () => {
               {/* ==================================================== */}
               {/* SECTION 1: ASSIGN TEAM LEAD (DYNAMIC - BLUE THEME) */}
               {/* ==================================================== */}
-              <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/90 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1 rounded-md bg-blue-100 text-blue-700">
-                      <Crown size={15} />
+              {isTeamLeadUser(approvingUser) ? (
+                <div className="p-3.5 rounded-xl bg-purple-50/80 border border-purple-200/90 space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-purple-100 text-purple-700 shrink-0">
+                      <Crown size={16} />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-                        <span>1. Assign Team Lead (TL)</span>
-                        <span className="text-rose-500 font-bold">*</span>
-                        <span className="text-rose-600 font-semibold text-[10px] lowercase bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">required</span>
-                      </label>
-
+                      <h4 className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>Applicant Role: Team Leader (TL)</span>
+                        <span className="text-[10px] font-semibold bg-purple-200/80 text-purple-900 px-1.5 py-0.5 rounded">Lead Account</span>
+                      </h4>
+                      <p className="text-xs text-purple-700 mt-0.5">
+                        This employee is registering as a Team Leader. TL assignment is not required.
+                      </p>
                     </div>
                   </div>
-                  {loadingTeamLeads && (
-                    <span className="flex items-center gap-1 text-[11px] text-blue-700 font-medium">
-                      <Loader2 size={12} className="animate-spin" />
-                      <span>Loading TLs...</span>
-                    </span>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/90 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded-md bg-blue-100 text-blue-700">
+                        <Crown size={15} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
+                          <span>1. Assign Team Lead (TL)</span>
+                          <span className="text-rose-500 font-bold">*</span>
+                          <span className="text-rose-600 font-semibold text-[10px] lowercase bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">required</span>
+                        </label>
+                      </div>
+                    </div>
+                    {loadingTeamLeads && (
+                      <span className="flex items-center gap-1 text-[11px] text-blue-700 font-medium">
+                        <Loader2 size={12} className="animate-spin" />
+                        <span>Loading TLs...</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <Crown size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
+                    <select
+                      value={selectedTeamLeadId}
+                      onChange={(e) => {
+                        setSelectedTeamLeadId(e.target.value);
+                        if (approvalError) setApprovalError('');
+                      }}
+                      disabled={submittingApproval || loadingTeamLeads}
+                      className={`w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white rounded-xl focus:outline-none focus:ring-2 transition text-slate-900 font-medium ${!selectedTeamLeadId && approvalError
+                        ? 'border-2 border-rose-400 ring-2 ring-rose-100 focus:border-rose-600 focus:ring-rose-200'
+                        : 'border border-blue-300 focus:ring-blue-500/20 focus:border-blue-600'
+                        }`}
+                    >
+                      <option value="">
+                        -- {loadingTeamLeads ? 'Loading Team Leads...' : teamLeads.length === 0 ? 'No Team Leads available' : 'Select Team Leader (Required) *'} --
+                      </option>
+                      {teamLeads.map((tl) => {
+                        const tlId = String(tl._id || tl.id || tl.userId);
+                        const tlName = tl.name || tl.fullName || 'Team Lead';
+                        const desig = tl.designation || tl.department || tl.role || '';
+                        return (
+                          <option key={tlId} value={tlId}>
+                            {tlName} {desig ? `(${desig})` : ''} {tl.email ? `• ${tl.email}` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {selectedTeamLeadId ? (() => {
+                    const currentTL = teamLeads.find(t => String(t._id || t.id || t.userId) === String(selectedTeamLeadId));
+                    if (!currentTL) return null;
+                    return (
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-blue-200 text-xs shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <UserCheck size={14} className="text-blue-600" />
+                          <span className="font-semibold text-slate-800">{currentTL.name || currentTL.fullName}</span>
+                          {currentTL.department && (
+                            <span className="text-[10px] text-slate-500">Dept: {currentTL.department}</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-blue-800 uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-200">
+                          {currentTL.designation || 'Team Lead'}
+                        </span>
+                      </div>
+                    );
+                  })() : (
+                    <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
+                      <AlertCircle size={13} className="shrink-0 text-rose-500" />
+                      <span>Team Leader must be assigned before approval</span>
+                    </p>
                   )}
                 </div>
-
-                <div className="relative">
-                  <Crown size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
-                  <select
-                    value={selectedTeamLeadId}
-                    onChange={(e) => {
-                      setSelectedTeamLeadId(e.target.value);
-                      if (approvalError) setApprovalError('');
-                    }}
-                    disabled={submittingApproval || loadingTeamLeads}
-                    className={`w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white rounded-xl focus:outline-none focus:ring-2 transition text-slate-900 font-medium ${!selectedTeamLeadId && approvalError
-                      ? 'border-2 border-rose-400 ring-2 ring-rose-100 focus:border-rose-600 focus:ring-rose-200'
-                      : 'border border-blue-300 focus:ring-blue-500/20 focus:border-blue-600'
-                      }`}
-                  >
-                    <option value="">
-                      -- {loadingTeamLeads ? 'Loading Team Leads...' : teamLeads.length === 0 ? 'No Team Leads available' : 'Select Team Leader (Required) *'} --
-                    </option>
-                    {teamLeads.map((tl) => {
-                      const tlId = String(tl._id || tl.id || tl.userId);
-                      const tlName = tl.name || tl.fullName || 'Team Lead';
-                      const desig = tl.designation || tl.department || tl.role || '';
-                      return (
-                        <option key={tlId} value={tlId}>
-                          {tlName} {desig ? `(${desig})` : ''} {tl.email ? `• ${tl.email}` : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-
-                {selectedTeamLeadId ? (() => {
-                  const currentTL = teamLeads.find(t => String(t._id || t.id || t.userId) === String(selectedTeamLeadId));
-                  if (!currentTL) return null;
-                  return (
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-blue-200 text-xs shadow-xs">
-                      <div className="flex items-center gap-2">
-                        <UserCheck size={14} className="text-blue-600" />
-                        <span className="font-semibold text-slate-800">{currentTL.name || currentTL.fullName}</span>
-                        {currentTL.department && (
-                          <span className="text-[10px] text-slate-500">Dept: {currentTL.department}</span>
-                        )}
-                      </div>
-                      <span className="text-[10px] font-bold text-blue-800 uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-200">
-                        {currentTL.designation || 'Team Lead'}
-                      </span>
-                    </div>
-                  );
-                })() : (
-                  <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
-                    <AlertCircle size={13} className="shrink-0 text-rose-500" />
-                    <span>Team Leader must be assigned before approval</span>
-                  </p>
-                )}
-              </div>
+              )}
 
               {/* ==================================================== */}
               {/* SECTION 2: ORGANIZATION DETAILS */}
@@ -1867,11 +2174,17 @@ const EmployeeRequests = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={submittingApproval || !selectedTeamLeadId || !selectedCompanyId || !selectedBranchId || !selectedFinancialYearId}
+                    disabled={
+                      submittingApproval ||
+                      (!isTeamLeadUser(approvingUser) && !selectedTeamLeadId) ||
+                      !selectedCompanyId ||
+                      !selectedBranchId ||
+                      !selectedFinancialYearId
+                    }
                     className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     title={
-                      !selectedTeamLeadId || !selectedCompanyId || !selectedBranchId || !selectedFinancialYearId
-                        ? 'Please select TL, Company Name, Branch, and Financial Year to approve'
+                      (!isTeamLeadUser(approvingUser) && !selectedTeamLeadId) || !selectedCompanyId || !selectedBranchId || !selectedFinancialYearId
+                        ? 'Please fill in all required details to approve'
                         : 'Confirm and Approve Employee'
                     }
                   >
@@ -1952,6 +2265,20 @@ const EmployeeRequests = () => {
                           </div>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase shrink-0">
                             Assigned TL
+                          </span>
+                        </div>
+                      ) : isTeamLeadUser(selectedUser) ? (
+                        <div className="flex items-center gap-2 sm:gap-3 rounded-lg bg-purple-50/80 px-2 sm:px-3 py-2 border border-purple-200">
+                          <Crown className="h-4 w-4 text-purple-600 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] sm:text-xs text-purple-700 font-bold uppercase tracking-wider">Role: Team Leader</p>
+                            <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                              {selectedUser.name || selectedUser.fullName || 'Team Leader'} (Lead Role)
+                            </p>
+                            <p className="text-[10px] text-slate-500">This account is a Team Leader</p>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800 uppercase shrink-0">
+                            Team Leader
                           </span>
                         </div>
                       ) : (

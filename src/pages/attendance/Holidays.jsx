@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Calendar } from 'lucide-react';
+import { Loader2, Calendar, Edit2, Trash2 } from 'lucide-react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 
 const API_BASE = 'https://kt-backend-yzr4.onrender.com/api/holiday';
@@ -657,34 +657,35 @@ export default function Holidays() {
                             </td>
                             <td className="px-3 sm:px-4 py-2.5">
                               <span className="inline-flex items-center gap-2">
-                                <img
-                                  src={getHolidayPhoto(holiday.title).src}
-                                  alt={getHolidayPhoto(holiday.title).alt}
-                                  className="h-5 w-5 sm:h-6 sm:w-6 object-cover border border-slate-300 rounded"
-                                />
-                                <span className="text-slate-700 font-medium text-[11px] sm:text-sm truncate max-w-[100px] sm:max-w-[200px]">
+                                <span className="text-slate-800 font-semibold text-xs sm:text-sm">
                                   {holiday.title}
                                 </span>
                                 {isWeekend && (
-                                  <span className="hidden xs:inline-block text-[9px] sm:text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 border border-slate-300 rounded">
+                                  <span className="hidden xs:inline-block text-[9px] sm:text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 border border-slate-200 rounded-full font-medium">
                                     Weekend
                                   </span>
                                 )}
                               </span>
                             </td>
                             <td className="px-3 sm:px-4 py-2.5 text-right">
-                              <div className="flex justify-end gap-1.5 sm:gap-2">
+                              <div className="flex items-center justify-end gap-1 sm:gap-1.5">
                                 <button
+                                  type="button"
                                   onClick={() => handleEdit(holiday)}
-                                  className="text-blue-600 hover:text-blue-800 font-medium text-[11px] sm:text-sm transition-colors"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 border border-transparent hover:border-blue-100 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                                  title="Edit holiday"
                                 >
-                                  Edit
+                                  <Edit2 size={13} />
+                                  <span>Edit</span>
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleDelete(holiday.id)}
-                                  className="text-red-500 hover:text-red-700 font-medium text-[11px] sm:text-sm transition-colors"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-transparent hover:border-rose-100 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                                  title="Delete holiday"
                                 >
-                                  Delete
+                                  <Trash2 size={13} />
+                                  <span>Delete</span>
                                 </button>
                               </div>
                             </td>

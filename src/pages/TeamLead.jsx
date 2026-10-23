@@ -1368,27 +1368,38 @@ const getDesignation = (lead) => {
       try {
         localStorage.setItem('kt_assigned_employees', JSON.stringify(nextAssignedEmployees));
         
-        // Also sync kt_user_assigned_tl
+        // Also sync kt_user_assigned_tl for all possible employee keys (empId, userId, email, employeeID)
         const userTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
         const targetLeadName = getUserName(targetLeadObj) || 'Team Lead';
         const targetLeadEmail = getUserEmail(targetLeadObj) || '';
 
         cleanEmployeeIds.forEach((empId) => {
-          userTLMap[String(empId)] = {
-            id: targetLeadId,
-            name: targetLeadName,
-            email: targetLeadEmail
-          };
           const matched = findEmployeeByIdOrUser(empId, employees);
-          if (matched?._id) {
-            userTLMap[String(matched._id)] = {
+          const allIdentifiers = [
+            String(empId).trim(),
+            matched?._id ? String(matched._id).trim() : null,
+            matched?.id ? String(matched.id).trim() : null,
+            matched?.userId ? String(matched.userId).trim() : null,
+            matched?.userID ? String(matched.userID).trim() : null,
+            matched?.user?._id ? String(matched.user._id).trim() : null,
+            matched?.email ? String(matched.email).trim().toLowerCase() : null,
+            matched?.user?.email ? String(matched.user.email).trim().toLowerCase() : null,
+            matched?.employeeID ? String(matched.employeeID).trim() : null,
+            matched?.employeeCode ? String(matched.employeeCode).trim() : null
+          ].filter(Boolean);
+
+          allIdentifiers.forEach((ident) => {
+            userTLMap[ident] = {
               id: targetLeadId,
+              teamLeadId: targetLeadId,
               name: targetLeadName,
-              email: targetLeadEmail
+              email: targetLeadEmail,
+              assignedAt: new Date().toISOString()
             };
-          }
+          });
         });
         localStorage.setItem('kt_user_assigned_tl', JSON.stringify(userTLMap));
+        window.dispatchEvent(new Event('kt_team_assignment_updated'));
       } catch (e) {
         console.warn('Storage sync note:', e);
       }
@@ -1432,6 +1443,33 @@ const getDesignation = (lead) => {
         }
       }
 
+      // 6. Asynchronously sync user document teamLead fields if possible
+      cleanEmployeeIds.forEach(async (empId) => {
+        try {
+          const matched = findEmployeeByIdOrUser(empId, employees);
+          const uId = matched?.userId || matched?.userID || matched?.user?._id || empId;
+          if (uId && String(uId).match(/^[0-9a-fA-F]{24}$/)) {
+            await axios.put(
+              `${BASE_URL}/users/approve`,
+              {
+                id: uId,
+                userId: uId,
+                _id: uId,
+                teamLead: targetLeadId,
+                teamLeadId: targetLeadId,
+                assignedTL: targetLeadId,
+                teamLeader: targetLeadId,
+                teamLeadName: targetLeadName,
+                teamLeadEmail: targetLeadEmail
+              },
+              { headers }
+            ).catch(() => {});
+          }
+        } catch {}
+      });
+
+      window.dispatchEvent(new Event('kt_team_assignment_updated'));
+
       showToast("Assignments saved successfully! Each employee is assigned to at most 1 Team Lead.", "success");
     } catch (error) {
       console.error('Error saving assignments:', error);
@@ -1460,13 +1498,21 @@ const getDesignation = (lead) => {
       }
     };
 
+    const handleTeamAssignmentUpdated = () => {
+      if (!modalOpen) fetchTeamLeads(true);
+    };
+
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('kt_team_assignment_updated', handleTeamAssignmentUpdated);
+    window.addEventListener('storage', handleTeamAssignmentUpdated);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('kt_team_assignment_updated', handleTeamAssignmentUpdated);
+      window.removeEventListener('storage', handleTeamAssignmentUpdated);
     };
   }, [modalOpen]);
 

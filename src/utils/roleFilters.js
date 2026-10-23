@@ -49,8 +49,39 @@ export const isFinanceOrExcludedUser = (user) => {
     user.position ||
     ''
   )
-    .toLowerCase()
-    .trim();
+    .toLowerCase();
+
+  const candidateEmail = String(
+    target.email ||
+    target.employeeEmail ||
+    target.userEmail ||
+    user.email ||
+    user.employeeEmail ||
+    ''
+  ).toLowerCase().trim();
+
+  const candidateName = String(
+    target.name ||
+    target.employeeName ||
+    target.fullName ||
+    target.displayName ||
+    user.name ||
+    user.employeeName ||
+    user.fullName ||
+    user.displayName ||
+    (user.firstName ? `${user.firstName} ${user.lastName || ''}` : '') ||
+    (target.firstName ? `${target.firstName} ${target.lastName || ''}` : '') ||
+    ''
+  ).toLowerCase().trim();
+
+  // Never exclude Harsh Kothari or any record matching Harsh Kothari
+  if (
+    candidateName.includes('harsh') ||
+    candidateEmail.includes('harsh') ||
+    candidateName.includes('kothari')
+  ) {
+    return false;
+  }
 
   // 1. Admin check
   if (role === 'admin' || designation === 'admin') return true;
@@ -104,25 +135,6 @@ export const isFinanceOrExcludedUser = (user) => {
   }
 
   // 6. Exclude test & demo accounts (Priya and Kuresh)
-  const candidateEmail = String(
-    target.email ||
-    target.employeeEmail ||
-    target.userEmail ||
-    user.email ||
-    user.employeeEmail ||
-    ''
-  ).toLowerCase().trim();
-
-  const candidateName = String(
-    target.name ||
-    target.employeeName ||
-    target.fullName ||
-    user.name ||
-    user.employeeName ||
-    user.fullName ||
-    ''
-  ).toLowerCase().trim();
-
   if (
     candidateName.includes('employee') ||
     candidateEmail.includes('employee')
@@ -191,6 +203,14 @@ export const isUnknownEmployeeOrUser = (entity) => {
   const clean = String(rawName).trim().toLowerCase();
   const cleanEmail = String(rawEmail).trim().toLowerCase();
   if (!clean && !cleanEmail) return true;
+
+  if (
+    clean.includes('harsh') ||
+    cleanEmail.includes('harsh') ||
+    clean.includes('kothari')
+  ) {
+    return false;
+  }
 
   // Exclude test & demo users (Priya and Kuresh)
   if (

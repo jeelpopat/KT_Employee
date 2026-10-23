@@ -552,23 +552,48 @@ export default function Employees() {
   // =========================
   const filteredEmployees = employees.filter((emp) => {
     if (isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
-    const fullName = `${emp.firstName || ""} ${emp.lastName || ""
-      }`.toLowerCase();
 
-    const search = searchTerm.toLowerCase();
+    const fullName = String(
+      emp.name ||
+      emp.fullName ||
+      `${emp.firstName || ""} ${emp.lastName || ""}`.trim()
+    ).toLowerCase();
+
+    const search = searchTerm.trim().toLowerCase();
+
+    const rawDesig = typeof emp?.designation === 'object'
+      ? (emp.designation?.name || emp.designation?.designationName || emp.designation?.title || '')
+      : String(emp?.designation || emp?.position || '');
+
+    const rawDept = typeof emp?.department === 'object'
+      ? (emp.department?.name || emp.department?.departmentName || emp.department?.title || '')
+      : String(emp?.departmentName || emp?.department || '');
 
     const matchesSearch =
+      !search ||
       fullName.includes(search) ||
       emp.email?.toLowerCase().includes(search) ||
-      emp.designation?.toLowerCase().includes(search) ||
-      emp.department?.toLowerCase?.().includes(search);
+      rawDesig.toLowerCase().includes(search) ||
+      rawDept.toLowerCase().includes(search);
 
+    const rawStatus = String(emp.employeeStatus || emp.status || (emp.isActive === false ? "Inactive" : "Active")).trim().toLowerCase();
     const matchesStatus =
-      filterStatus === "all" || emp.employeeStatus === filterStatus;
+      filterStatus === "all" ||
+      (filterStatus.toLowerCase() === "active" ? (rawStatus === "active" || !rawStatus) : rawStatus === filterStatus.toLowerCase());
 
-    const empRole = String(emp.role || "").trim().toLowerCase();
-    const isEmpTL = emp.isTeamLead || empRole === "team lead" || empRole === "teamlead";
-    const isEmpHR = empRole === "hr";
+    const empRole = String(emp.role || emp.userRole || emp.userId?.role || "").trim().toLowerCase();
+    const desigLower = rawDesig.toLowerCase();
+    const isEmpTL = Boolean(
+      emp.isTeamLead ||
+      emp.isTeamLeader ||
+      empRole === "team lead" ||
+      empRole === "teamlead" ||
+      empRole === "tl" ||
+      desigLower.includes("team lead") ||
+      desigLower.includes("teamlead") ||
+      desigLower.includes("tl")
+    );
+    const isEmpHR = empRole === "hr" || desigLower.includes("hr");
 
     const matchesRole =
       filterRole === "all" ||
@@ -620,7 +645,9 @@ export default function Employees() {
             </span>
 
             <span className="font-semibold text-gray-900 text-xs sm:text-sm">
-              {employees.length}
+              {filteredEmployees.length !== employees.length
+                ? `${filteredEmployees.length} / ${employees.length}`
+                : employees.length}
             </span>
           </div>
 
