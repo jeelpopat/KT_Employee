@@ -1114,6 +1114,16 @@ const EmployeeRequests = () => {
             const currentAssignments = JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}');
             const targetIds = [selectedTeamLeadId, selectedTL?._id, selectedTL?.userId].filter(Boolean).map(String);
 
+            // Clean this employee out of all other team leads in localStorage
+            Object.keys(currentAssignments).forEach(otherTlId => {
+              if (!targetIds.map(x => String(x).toLowerCase().trim()).includes(String(otherTlId).toLowerCase().trim())) {
+                const list = currentAssignments[otherTlId];
+                if (Array.isArray(list)) {
+                  currentAssignments[otherTlId] = list.filter(id => !allUserIdentifiers.map(x => String(x).toLowerCase().trim()).includes(String(id).toLowerCase().trim()));
+                }
+              }
+            });
+
             targetIds.forEach(tId => {
               const existingList = currentAssignments[tId] || [];
               const updatedList = Array.from(new Set([...existingList, ...allUserIdentifiers]));
@@ -1221,21 +1231,199 @@ const EmployeeRequests = () => {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      const response = await fetch(endpoint, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({
-          id: userId,
-          userId,
-          _id: user?._id,
-          email: user?.email
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`${action === 'approve' ? 'Approval' : 'Rejection'} failed`);
+      // 1. Resolve all identifiers for this user
+      let empRecordId = null;
+      try {
+        const empRes = await api.get('/api/employee/list', { headers });
+        const empList = empRes.data?.employees || empRes.data?.data || (Array.isArray(empRes.data) ? empRes.data : []);
+        const matchedEmp = (empList || []).find(e => {
+          if (!e) return false;
+          const eEmail = (e.email || '').toLowerCase().trim();
+          const uEmail = (user?.email || '').toLowerCase().trim();
+          if (eEmail && uEmail && eEmail === uEmail) return true;
+          const eUserId = String(e.userId || e.userID || '').toLowerCase().trim();
+          if (eUserId && eUserId === String(userId).toLowerCase().trim()) return true;
+          const eCode = String(e.employeeID || e.employeeCode || '').trim();
+          const uCode = String(user?.employeeID || user?.employeeCode || '').trim();
+          if (eCode && uCode && eCode === uCode) return true;
+          return false;
+        });
+        if (matchedEmp?._id) {
+          empRecordId = String(matchedEmp._id);
+        }
+      } catch (e) {
+        console.warn('Employee lookup note during revoke:', e?.message);
       }
 
+      const allUserIdentifiers = [
+        String(userId),
+        user?._id ? String(user._id) : null,
+        user?.id ? String(user.id) : null,
+        user?.userId ? String(user.userId) : null,
+        user?.userID ? String(user.userID) : null,
+        empRecordId,
+        user?.employeeID ? String(user.employeeID).trim() : null,
+        user?.employeeCode ? String(user.employeeCode).trim() : null,
+        user?.email ? String(user.email).trim().toLowerCase() : null
+      ].filter(Boolean);
+
+      const userIdentifierStrs = allUserIdentifiers.map(x => String(x).toLowerCase().trim());
+
+      // 2. Fetch current backend teams: GET https://kt-backend-yzr4.onrender.com/api/teamLead/team
+      let currentTeams = [];
+      try {
+        const teamRes = await api.get('/api/teamLead/team', { headers });
+        currentTeams = teamRes.data?.data || teamRes.data?.teams || (Array.isArray(teamRes.data) ? teamRes.data : []);
+      } catch {
+        try {
+          const fetchTeamsRes = await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/team', { headers });
+          if (fetchTeamsRes.ok) {
+            const tData = await fetchTeamsRes.json().catch(() => ({}));
+            currentTeams = tData?.data || tData?.teams || (Array.isArray(tData) ? tData : []);
+          }
+        } catch {}
+      }
+      if (!Array.isArray(currentTeams)) currentTeams = [];
+
+      // 3. REMOVE user from all teams via POST https://kt-backend-yzr4.onrender.com/api/teamLead/create-team
+      for (const team of currentTeams) {
+        if (!Array.isArray(team.employees) || team.employees.length === 0) continue;
+
+        const isUserInTeam = team.employees.some(emp => {
+          if (!emp) return false;
+          if (typeof emp === 'string' || typeof emp === 'number') {
+            return userIdentifierStrs.includes(String(emp).toLowerCase().trim());
+          }
+          if (typeof emp === 'object') {
+            const empIds = [
+              emp._id,
+              emp.id,
+              emp.userId,
+              emp.userID,
+              emp.employeeId,
+              emp.employeeID
+            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+            if (empIds.some(id => userIdentifierStrs.includes(id))) return true;
+
+            const empEmail = String(emp.email || '').toLowerCase().trim();
+            if (empEmail && userIdentifierStrs.includes(empEmail)) return true;
+          }
+          return false;
+        });
+
+        if (isUserInTeam) {
+          const remainingEmployees = team.employees.filter(emp => {
+            if (!emp) return false;
+            if (typeof emp === 'string' || typeof emp === 'number') {
+              return !userIdentifierStrs.includes(String(emp).toLowerCase().trim());
+            }
+            if (typeof emp === 'object') {
+              const empIds = [
+                emp._id,
+                emp.id,
+                emp.userId,
+                emp.userID,
+                emp.employeeId,
+                emp.employeeID
+              ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+              if (empIds.some(id => userIdentifierStrs.includes(id))) return false;
+
+              const empEmail = String(emp.email || '').toLowerCase().trim();
+              if (empEmail && userIdentifierStrs.includes(empEmail)) return false;
+            }
+            return true;
+          });
+
+          const rawLead = team.teamLead || team.lead || team.teamLeadId;
+          const leadId = typeof rawLead === 'object' ? (rawLead._id || rawLead.id || rawLead.userId) : rawLead;
+
+          if (leadId) {
+            try {
+              await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  teamLead: leadId,
+                  employees: remainingEmployees.map(e => typeof e === 'object' ? String(e._id || e.id || e.userId) : String(e))
+                })
+              }).catch(() => {});
+            } catch (err) {
+              console.warn('Team Lead update during revoke error:', err);
+            }
+          }
+        }
+      }
+
+      // 4. Update the user document on backend to clear status AND clear TL data
+      try {
+        await fetch(endpoint, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            id: userId,
+            userId,
+            _id: user?._id || userId,
+            email: user?.email,
+            teamLead: null,
+            teamLeadId: null,
+            assignedTL: null,
+            teamLeader: null,
+            teamLeadName: null,
+            teamLeadEmail: null
+          }),
+        });
+
+        // Also call /api/users/approve with status: rejected to ensure teamLead fields are cleared on MongoDB user doc
+        await fetch('https://kt-backend-yzr4.onrender.com/api/users/approve', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            id: userId,
+            userId,
+            _id: user?._id || userId,
+            email: user?.email,
+            isApproved: false,
+            approved: false,
+            status: 'rejected',
+            teamLead: null,
+            teamLeadId: null,
+            assignedTL: null,
+            teamLeader: null,
+            teamLeadName: null,
+            teamLeadEmail: null
+          })
+        }).catch(() => {});
+      } catch (uErr) {
+        console.warn('User status update error:', uErr);
+      }
+
+      // 5. Remove user from localStorage
+      try {
+        const currentTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
+        allUserIdentifiers.forEach(id => {
+          delete currentTLMap[id];
+        });
+        localStorage.setItem('kt_user_assigned_tl', JSON.stringify(currentTLMap));
+      } catch {}
+
+      try {
+        const currentAssignments = JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}');
+        Object.keys(currentAssignments).forEach(tlId => {
+          const list = currentAssignments[tlId];
+          if (Array.isArray(list)) {
+            currentAssignments[tlId] = list.filter(id => !userIdentifierStrs.includes(String(id).toLowerCase().trim()));
+          }
+        });
+        localStorage.setItem('teamLeadAssignedEmployees', JSON.stringify(currentAssignments));
+        localStorage.setItem('kt_assigned_employees', JSON.stringify(currentAssignments));
+      } catch {}
+
+      // 6. Broadcast real-time events & refresh backendTeams
+      window.dispatchEvent(new Event('kt_team_assignment_updated'));
+      window.dispatchEvent(new Event('storage'));
+      await fetchBackendTeams();
+
+      // 7. Update React state
       setUsers((prevUsers) =>
         prevUsers.map((item, index) => {
           const itemId = getUserIdentifier(item, index);
@@ -1243,17 +1431,22 @@ const EmployeeRequests = () => {
 
           return {
             ...item,
-            isApproved: action === 'approve',
-            approved: action === 'approve',
-            status: action === 'approve' ? 'approved' : 'rejected',
+            isApproved: false,
+            approved: false,
+            status: 'rejected',
+            teamLead: null,
+            teamLeadId: null,
+            assignedTL: null,
+            teamLeader: null,
+            teamLeadName: null,
+            teamLeadEmail: null
           };
         })
       );
 
-      if (action === 'reject') {
-        setSuccessNotification(`Rejected / revoked access for ${user?.name || 'user'}.`);
-        setTimeout(() => setSuccessNotification(''), 4000);
-      }
+      const userName = user?.name || user?.fullName || 'user';
+      setSuccessNotification(`Revoked access and removed Team Lead data for ${userName}.`);
+      setTimeout(() => setSuccessNotification(''), 4000);
     } catch (err) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -1759,16 +1952,15 @@ const EmployeeRequests = () => {
                       e.stopPropagation();
                       handleApproveClick(user);
                     }}
-                    disabled={isApproved}
                     className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isApproved
-                      ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+                      ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98] border border-blue-200/80'
                       : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
                       }`}
                   >
                     {isApproved ? (
                       <span className="flex items-center justify-center gap-1.5">
-                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
-                        Approved
+                        <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+                        Change TL / Edit
                       </span>
                     ) : (
                       <span className="flex items-center justify-center gap-1.5">
@@ -2467,7 +2659,20 @@ const EmployeeRequests = () => {
                   </p>
                 </div>
 
-                {!selectedUser?.isApproved && (
+                {selectedUser?.isApproved ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const u = selectedUser;
+                      setSelectedUser(null);
+                      handleApproveClick(u);
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <UserCheck size={16} />
+                    <span>Change Team Lead / Edit Assignment</span>
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => {
