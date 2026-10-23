@@ -26,9 +26,64 @@ import {
   Landmark,
   UserCheck
 } from 'lucide-react';
-import api from '../api/axios';
+import api, { clearApiCache, invalidateCache } from '../api/axios';
 import { isFinanceOrExcludedUser, filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../utils/roleFilters';
 import { fetchTeamsList } from '../utils/teamLeadUtils';
+
+export const REVOKED_STORAGE_KEY = 'kt_revoked_user_ids';
+export const APPROVED_STORAGE_KEY = 'kt_approved_user_ids';
+
+export const getStoredRevokedUserIds = () => {
+  try {
+    const data = JSON.parse(localStorage.getItem(REVOKED_STORAGE_KEY) || '[]');
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+};
+
+export const getStoredApprovedUserIds = () => {
+  try {
+    const data = JSON.parse(localStorage.getItem(APPROVED_STORAGE_KEY) || '[]');
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+};
+
+export const isRevokedInStorage = (u, revokedList = null) => {
+  if (!u) return false;
+  const list = revokedList || getStoredRevokedUserIds();
+  if (!Array.isArray(list) || list.length === 0) return false;
+  const userKeys = [
+    u._id,
+    u.id,
+    u.userId,
+    u.userID,
+    u.employeeId,
+    u.employeeID,
+    u.employeeCode,
+    u.email
+  ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+  return list.some(r => userKeys.includes(String(r).toLowerCase().trim()));
+};
+
+export const isApprovedInStorage = (u, approvedList = null) => {
+  if (!u) return false;
+  const list = approvedList || getStoredApprovedUserIds();
+  if (!Array.isArray(list) || list.length === 0) return false;
+  const userKeys = [
+    u._id,
+    u.id,
+    u.userId,
+    u.userID,
+    u.employeeId,
+    u.employeeID,
+    u.employeeCode,
+    u.email
+  ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+  return list.some(r => userKeys.includes(String(r).toLowerCase().trim()));
+};
 
 // Helper to determine if a user has the role of Team Leader (TL)
 export const isTeamLeadUser = (u) => {
@@ -100,7 +155,7 @@ const EmployeeRequests = () => {
       let userList = [];
       const freshUrl = `https://kt-backend-yzr4.onrender.com/api/users/all?_t=${Date.now()}`;
       try {
-        const res = await api.get(`/api/users/all?_t=${Date.now()}`);
+        const res = await api.get('/api/users/all', { skipCache: true, params: { _t: Date.now() } });
         userList = Array.isArray(res.data) ? res.data : res.data?.users || res.data?.data || [];
       } catch {
         // Fallback to direct fetch
@@ -109,7 +164,40 @@ const EmployeeRequests = () => {
         const data = await response.json();
         userList = Array.isArray(data) ? data : data?.users || data?.data || [];
       }
-      setUsers(filterOutUnknownUsers(userList));
+
+      // Reconcile user state with stored revoke/approve lists so refreshed page strictly remembers revoke
+      const revokedIds = getStoredRevokedUserIds();
+      const approvedIds = getStoredApprovedUserIds();
+      const syncedList = userList.map((u) => {
+        if (isRevokedInStorage(u, revokedIds)) {
+          return {
+            ...u,
+            isApproved: false,
+            approved: false,
+            isActive: false,
+            status: 'inactive',
+            employeeStatus: 'Inactive',
+            teamLead: null,
+            teamLeadName: null,
+            teamLeadId: null,
+            assignedTL: null,
+            teamLeader: null
+          };
+        }
+        if (isApprovedInStorage(u, approvedIds)) {
+          return {
+            ...u,
+            isApproved: true,
+            approved: true,
+            isActive: true,
+            status: u.status && u.status !== 'inactive' ? u.status : 'approved',
+            employeeStatus: u.employeeStatus && u.employeeStatus !== 'Inactive' ? u.employeeStatus : 'Active'
+          };
+        }
+        return u;
+      });
+
+      setUsers(filterOutUnknownUsers(syncedList));
     } catch (err) {
       if (!isSilent) {
         setError(err.message || 'Something went wrong while loading users');
@@ -472,6 +560,25 @@ const EmployeeRequests = () => {
     return user?._id || user?.id || user?.userId || user?.email || `user-${fallbackIndex}`;
   };
 
+  // Helper to determine if an employee request is approved & active
+  const isUserApproved = (u) => {
+    if (!u) return false;
+    if (isRevokedInStorage(u)) return false;
+    if (u.isActive === false || u.isApproved === false || u.approved === false) return false;
+    const statusStr = String(u.status || u.employeeStatus || '').toLowerCase().trim();
+    if (statusStr === 'inactive' || statusStr === 'rejected' || statusStr === 'pending') return false;
+    return u.isApproved === true || u.approved === true || statusStr === 'approved' || statusStr === 'active' || isApprovedInStorage(u);
+  };
+
+  // Helper to determine if an employee request has been revoked or set to inactive
+  const isUserInactive = (u) => {
+    if (!u) return false;
+    if (isRevokedInStorage(u)) return true;
+    if (u.isActive === false || u.isApproved === false || u.approved === false) return true;
+    const statusStr = String(u.status || u.employeeStatus || '').toLowerCase().trim();
+    return statusStr === 'inactive' || statusStr === 'rejected';
+  };
+
   // ================= ENTITY NAME RESOLVERS =================
   const getCompanyName = (compVal, userObj) => {
     if (userObj?.companyName) return userObj.companyName;
@@ -513,6 +620,11 @@ const EmployeeRequests = () => {
 
     // Critical: If the user themselves is a Team Lead, they do NOT have a Team Lead assigned!
     if (isTeamLeadUser(userObj)) {
+      return null;
+    }
+
+    // Critical: If the employee is revoked or inactive, Team Lead data must be removed/null!
+    if (isUserInactive(userObj)) {
       return null;
     }
 
@@ -599,77 +711,43 @@ const EmployeeRequests = () => {
       }
     }
 
-    // 2. PRIORITY 2: Check localStorage 'kt_user_assigned_tl' (synced in real-time by TeamLead page onSave)
-    try {
-      const savedUserTL = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
-      for (const id of userIds) {
-        if (savedUserTL[id] && savedUserTL[id].name) {
-          return savedUserTL[id];
-        }
-      }
-      for (const email of userEmails) {
-        if (savedUserTL[email] && savedUserTL[email].name) {
-          return savedUserTL[email];
-        }
-      }
-    } catch { }
-
-    // 3. PRIORITY 3: Check localStorage 'teamLeadAssignedEmployees'
-    try {
-      const assignments = JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}');
-      for (const [tlId, empIds] of Object.entries(assignments)) {
-        if (Array.isArray(empIds) && empIds.some(eId => userIds.includes(String(eId).toLowerCase().trim()))) {
-          const match = teamLeads.find(tl =>
-            String(tl._id).toLowerCase().trim() === String(tlId).toLowerCase().trim() ||
-            String(tl.userId || '').toLowerCase().trim() === String(tlId).toLowerCase().trim()
-          );
-          if (match) {
-            return {
-              id: tlId,
-              name: match.name || match.fullName || null,
-              email: match.email || null,
-              department: match.department || null,
-              designation: match.designation || null
-            };
-          }
-        }
-      }
-    } catch { }
-
-    // 4. PRIORITY 4: User object direct properties (only if no live team assignment found above)
-    if (userObj.teamLeadName) {
-      return {
-        id: userObj.teamLeadId || userObj.teamLead || null,
-        name: userObj.teamLeadName,
-        email: userObj.teamLeadEmail || null
-      };
-    }
-
-    const candidateTlId = userObj.teamLeadId || userObj.teamLead || userObj.assignedTL || userObj.teamLeader;
-    if (candidateTlId) {
-      const match = teamLeads.find(tl =>
-        String(tl._id) === String(candidateTlId) ||
-        String(tl.userId) === String(candidateTlId) ||
-        String(tl.id) === String(candidateTlId)
-      );
-      if (match) {
+    // 2. LIVE USER OBJECT PROPERTIES (Only from database user record if approved and active)
+    if (isUserApproved(userObj)) {
+      if (userObj.teamLeadName) {
         return {
-          id: candidateTlId,
-          name: match.name || match.fullName || null,
-          email: match.email || null,
-          department: match.department || null,
-          designation: match.designation || null
+          id: userObj.teamLeadId || userObj.teamLead || null,
+          name: userObj.teamLeadName,
+          email: userObj.teamLeadEmail || null
         };
       }
-      if (typeof candidateTlId === 'object' && (candidateTlId.name || candidateTlId.fullName)) {
-        return {
-          id: candidateTlId._id || candidateTlId.id || null,
-          name: candidateTlId.name || candidateTlId.fullName || null,
-          email: candidateTlId.email || null
-        };
+
+      const candidateTlId = userObj.teamLeadId || userObj.teamLead || userObj.assignedTL || userObj.teamLeader;
+      if (candidateTlId) {
+        const match = teamLeads.find(tl =>
+          String(tl._id) === String(candidateTlId) ||
+          String(tl.userId) === String(candidateTlId) ||
+          String(tl.id) === String(candidateTlId)
+        );
+        if (match) {
+          return {
+            id: candidateTlId,
+            name: match.name || match.fullName || null,
+            email: match.email || null,
+            department: match.department || null,
+            designation: match.designation || null
+          };
+        }
+        if (typeof candidateTlId === 'object' && (candidateTlId.name || candidateTlId.fullName)) {
+          return {
+            id: candidateTlId._id || candidateTlId.id || null,
+            name: candidateTlId.name || candidateTlId.fullName || null,
+            email: candidateTlId.email || null
+          };
+        }
       }
     }
 
+    // Strictly NO localStorage data! If not found in live data, return null -> displays "No data"
     return null;
   };
 
@@ -915,7 +993,9 @@ const EmployeeRequests = () => {
       // Approval Status
       isApproved: true,
       approved: true,
+      isActive: true,
       status: 'approved',
+      employeeStatus: 'Active',
       // Assigned Team Lead Details (only set if not applicant TL)
       teamLead: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
       teamLeadId: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
@@ -1164,6 +1244,30 @@ const EmployeeRequests = () => {
           } catch { }
         }
 
+        // Persist in kt_approved_user_ids and remove from kt_revoked_user_ids
+        try {
+          const allApprovedIdentifiers = [
+            String(userId),
+            approvingUser?._id ? String(approvingUser._id) : null,
+            resolvedEmpRecordId,
+            approvingUser?.email ? String(approvingUser.email).trim().toLowerCase() : null,
+            approvingUser?.employeeID ? String(approvingUser.employeeID).trim() : null
+          ].filter(Boolean);
+          const approvedIdentifierStrs = allApprovedIdentifiers.map(x => String(x).toLowerCase().trim());
+
+          const storedApproved = JSON.parse(localStorage.getItem(APPROVED_STORAGE_KEY) || '[]');
+          const updatedApproved = Array.from(new Set([...storedApproved, ...allApprovedIdentifiers]));
+          localStorage.setItem(APPROVED_STORAGE_KEY, JSON.stringify(updatedApproved));
+
+          const storedRevoked = JSON.parse(localStorage.getItem(REVOKED_STORAGE_KEY) || '[]');
+          const updatedRevoked = storedRevoked.filter(id => !approvedIdentifierStrs.includes(String(id).toLowerCase().trim()));
+          localStorage.setItem(REVOKED_STORAGE_KEY, JSON.stringify(updatedRevoked));
+        } catch { }
+
+        // Clear Axios caches so refreshed calls fetch fresh approved status
+        clearApiCache();
+        invalidateCache(/users/);
+
         // Update user state locally
         setUsers((prevUsers) =>
           prevUsers.map((item, index) => {
@@ -1174,7 +1278,9 @@ const EmployeeRequests = () => {
               ...(resData?.data || {}),
               isApproved: true,
               approved: true,
+              isActive: true,
               status: 'approved',
+              employeeStatus: 'Active',
               companyId: selectedCompanyId || null,
               companyName: resolvedCompName || null,
               branchId: selectedBranchId || null,
@@ -1360,10 +1466,15 @@ const EmployeeRequests = () => {
           method: 'PUT',
           headers,
           body: JSON.stringify({
-            id: userId,
             userId,
+            id: userId,
             _id: user?._id || userId,
             email: user?.email,
+            isActive: false,
+            isApproved: false,
+            approved: false,
+            status: 'inactive',
+            employeeStatus: 'Inactive',
             teamLead: null,
             teamLeadId: null,
             assignedTL: null,
@@ -1373,31 +1484,25 @@ const EmployeeRequests = () => {
           }),
         });
 
-        // Also call /api/users/approve with status: rejected to ensure teamLead fields are cleared on MongoDB user doc
-        await fetch('https://kt-backend-yzr4.onrender.com/api/users/approve', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            id: userId,
-            userId,
-            _id: user?._id || userId,
-            email: user?.email,
-            isApproved: false,
-            approved: false,
-            status: 'rejected',
-            teamLead: null,
-            teamLeadId: null,
-            assignedTL: null,
-            teamLeader: null,
-            teamLeadName: null,
-            teamLeadEmail: null
-          })
-        }).catch(() => {});
+        // Also update employee list record if found
+        if (empRecordId) {
+          await fetch(`https://kt-backend-yzr4.onrender.com/api/employee/edit/${empRecordId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({
+              isActive: false,
+              employeeStatus: 'Inactive',
+              status: 'inactive',
+              teamLead: null,
+              teamLeadId: null
+            })
+          }).catch(() => {});
+        }
       } catch (uErr) {
         console.warn('User status update error:', uErr);
       }
 
-      // 5. Remove user from localStorage
+      // 5. Remove user from localStorage and persist revoked status
       try {
         const currentTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
         allUserIdentifiers.forEach(id => {
@@ -1418,22 +1523,40 @@ const EmployeeRequests = () => {
         localStorage.setItem('kt_assigned_employees', JSON.stringify(currentAssignments));
       } catch {}
 
-      // 6. Broadcast real-time events & refresh backendTeams
+      // Persist in kt_revoked_user_ids and remove from kt_approved_user_ids
+      try {
+        const storedRevoked = JSON.parse(localStorage.getItem(REVOKED_STORAGE_KEY) || '[]');
+        const updatedRevoked = Array.from(new Set([...storedRevoked, ...allUserIdentifiers]));
+        localStorage.setItem(REVOKED_STORAGE_KEY, JSON.stringify(updatedRevoked));
+
+        const storedApproved = JSON.parse(localStorage.getItem(APPROVED_STORAGE_KEY) || '[]');
+        const updatedApproved = storedApproved.filter(id => !userIdentifierStrs.includes(String(id).toLowerCase().trim()));
+        localStorage.setItem(APPROVED_STORAGE_KEY, JSON.stringify(updatedApproved));
+      } catch {}
+
+      // Clear Axios caches so refreshed calls fetch fresh rejected status
+      clearApiCache();
+      invalidateCache(/users/);
+
+      // 6. Broadcast real-time events & refresh backendTeams and users from live server
       window.dispatchEvent(new Event('kt_team_assignment_updated'));
       window.dispatchEvent(new Event('storage'));
       await fetchBackendTeams();
+      await fetchUsers(true);
 
-      // 7. Update React state
+      // 7. Update React state immediately
       setUsers((prevUsers) =>
         prevUsers.map((item, index) => {
           const itemId = getUserIdentifier(item, index);
-          if (itemId !== userId) return item;
+          if (itemId !== userId && String(item._id) !== String(userId)) return item;
 
           return {
             ...item,
             isApproved: false,
             approved: false,
-            status: 'rejected',
+            isActive: false,
+            status: 'inactive',
+            employeeStatus: 'Inactive',
             teamLead: null,
             teamLeadId: null,
             assignedTL: null,
@@ -1444,8 +1567,30 @@ const EmployeeRequests = () => {
         })
       );
 
+      setSelectedUser((prevSelected) => {
+        if (!prevSelected) return null;
+        const selId = getUserIdentifier(prevSelected, 0);
+        if (selId === userId || String(prevSelected._id) === String(userId)) {
+          return {
+            ...prevSelected,
+            isApproved: false,
+            approved: false,
+            isActive: false,
+            status: 'inactive',
+            employeeStatus: 'Inactive',
+            teamLead: null,
+            teamLeadId: null,
+            assignedTL: null,
+            teamLeader: null,
+            teamLeadName: null,
+            teamLeadEmail: null
+          };
+        }
+        return prevSelected;
+      });
+
       const userName = user?.name || user?.fullName || 'user';
-      setSuccessNotification(`Revoked access and removed Team Lead data for ${userName}.`);
+      setSuccessNotification(`Revoked access, changed status to Inactive, and removed Team Lead data for ${userName}.`);
       setTimeout(() => setSuccessNotification(''), 4000);
     } catch (err) {
       setError(err.message || 'Something went wrong');
@@ -1491,7 +1636,14 @@ const EmployeeRequests = () => {
   };
 
   const getStatusBadge = (user) => {
-    const isApproved = user?.isApproved === true || user?.approved === true || user?.status === 'approved';
+    if (isUserInactive(user)) {
+      return {
+        text: 'Inactive',
+        className: 'bg-rose-50 text-rose-700 border-rose-200',
+        icon: XCircle
+      };
+    }
+    const isApproved = isUserApproved(user);
     if (isApproved) {
       return {
         text: 'Approved',
@@ -1522,22 +1674,17 @@ const EmployeeRequests = () => {
   // 2. Consistent Stats computed across all eligible users (never disappears on tab click)
   const stats = {
     total: baseUsers.length,
-    pending: baseUsers.filter((u) => {
-      const isApproved = u?.isApproved === true || u?.approved === true || u?.status === 'approved';
-      return !isApproved;
-    }).length,
-    approved: baseUsers.filter((u) => {
-      const isApproved = u?.isApproved === true || u?.approved === true || u?.status === 'approved';
-      return isApproved;
-    }).length,
+    pending: baseUsers.filter((u) => !isUserApproved(u)).length,
+    approved: baseUsers.filter((u) => isUserApproved(u)).length,
   };
 
   // 3. Filtered users according to active filter tab
   const filteredUsers = baseUsers
     .filter((user) => {
-      const isApproved = user?.isApproved === true || user?.approved === true || user?.status === 'approved';
+      const isApproved = isUserApproved(user);
       if (filterStatus === 'approved') return isApproved;
       if (filterStatus === 'pending') return !isApproved;
+      if (filterStatus === 'inactive') return isUserInactive(user);
       return true;
     })
     .sort((a, b) => {
@@ -1647,6 +1794,7 @@ const EmployeeRequests = () => {
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
+              <option value="inactive">Inactive</option>
             </select>
             <select
               value={sortBy}
@@ -1713,7 +1861,8 @@ const EmployeeRequests = () => {
           const role = user?.role || null;
           const department = user?.department || null;
           const phone = user?.phone || user?.phoneNumber || null;
-          const isApproved = user?.isApproved === true || user?.approved === true || user?.status === 'approved';
+          const isApproved = isUserApproved(user);
+          const isInactive = isUserInactive(user);
           const isProcessingReject = processingState?.userId === userId && processingState?.action === 'reject';
           const isExpanded = expandedCards.has(userId);
           const StatusBadge = getStatusBadge(user).icon;
@@ -1739,7 +1888,7 @@ const EmployeeRequests = () => {
                     <div className={`relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-gradient-to-br ${getGradientColor(name)} flex items-center justify-center text-base sm:text-lg font-bold text-white shadow-lg shrink-0`}>
                       {getInitials(name)}
                       {!isApproved && (
-                        <div className="absolute -right-0.5 -top-0.5 sm:-right-1 sm:-top-1 h-2.5 w-2.5 sm:h-3 sm:w-3 animate-pulse rounded-full bg-amber-400 ring-1 sm:ring-2 ring-white" />
+                        <div className={`absolute -right-0.5 -top-0.5 sm:-right-1 sm:-top-1 h-2.5 w-2.5 sm:h-3 sm:w-3 animate-pulse rounded-full ${isInactive ? 'bg-rose-500' : 'bg-amber-400'} ring-1 sm:ring-2 ring-white`} />
                       )}
                     </div>
                     <div className="min-w-0">
@@ -1954,7 +2103,7 @@ const EmployeeRequests = () => {
                     }}
                     className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isApproved
                       ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98] border border-blue-200/80'
-                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs hover:scale-[1.02] active:scale-[0.98]'
                       }`}
                   >
                     {isApproved ? (
@@ -2650,16 +2799,22 @@ const EmployeeRequests = () => {
 
               {/* Status & Quick Action */}
               <div className="border-t border-slate-200 pt-3 sm:pt-4 space-y-2">
-                <div className={`rounded-lg p-2 sm:p-3 ${selectedUser?.isApproved
+                <div className={`rounded-lg p-2 sm:p-3 ${isUserApproved(selectedUser)
                   ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                  : 'bg-amber-50 border border-amber-200 text-amber-800'
+                  : isUserInactive(selectedUser)
+                    ? 'bg-rose-50 border border-rose-200 text-rose-800'
+                    : 'bg-amber-50 border border-amber-200 text-amber-800'
                   }`}>
                   <p className="text-xs sm:text-sm font-medium text-center">
-                    Status: {selectedUser?.isApproved ? '✅ Approved' : '⏳ Pending Review'}
+                    Status: {isUserApproved(selectedUser)
+                      ? '✅ Approved'
+                      : isUserInactive(selectedUser)
+                        ? '❌ Inactive'
+                        : '⏳ Pending Review'}
                   </p>
                 </div>
 
-                {selectedUser?.isApproved ? (
+                {isUserApproved(selectedUser) ? (
                   <button
                     type="button"
                     onClick={() => {

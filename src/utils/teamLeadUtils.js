@@ -577,20 +577,7 @@ export const fetchEmployeeTeamLead = async () => {
     console.warn("Notice fetching employee team lead:", err.response?.data?.message || err.message);
   }
 
-  // Fallback 1: Check localStorage kt_user_assigned_tl
-  try {
-    const userIdent = getLoggedInUserIdentifiers();
-    const { ids, emails } = userIdent;
-    const userTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
-    for (const id of ids) {
-      if (userTLMap[id] && userTLMap[id].name) return userTLMap[id];
-    }
-    for (const email of emails) {
-      if (userTLMap[email] && userTLMap[email].name) return userTLMap[email];
-    }
-  } catch {}
-
-  // Fallback 2: Check backend GET /api/teamLead/team
+  // Fallback: Check live backend GET /api/teamLead/team
   try {
     const teams = await fetchTeamsList();
     const userIdent = getLoggedInUserIdentifiers();
@@ -618,6 +605,7 @@ export const fetchEmployeeTeamLead = async () => {
     }
   } catch {}
 
+  // If not found in live backend data, return null (never fall back to stale localStorage)
   return null;
 };
 
