@@ -1176,19 +1176,9 @@ export default function LeaveRequest() {
         leaveTypeLabel.includes(search) ||
         reason.includes(search);
 
-      const isHalf = Boolean(
-        request.isHalfDay ||
-        request.totalDays === 0.5 ||
-        request.rawLeave?.isHalfDay ||
-        request.rawLeave?.totalDays === 0.5 ||
-        normalizedLeaveType.includes("half")
-      );
-
       const matchesType =
         filterType === "all" ||
-        (filterType === "half day" || filterType === "half-day"
-          ? isHalf
-          : normalizedLeaveType === filterType);
+        normalizedLeaveType === filterType;
 
       return (
         matchesSearch &&
@@ -1201,14 +1191,10 @@ export default function LeaveRequest() {
     filterType,
   ]);
 
-  const availableLeaveTypes = useMemo(() => {
-    const types = new Set(
-      requests.map((request) => normalizeLeaveType(request.leaveType)).filter(Boolean)
-    );
-    // Always include Half Day option in filter options
-    types.add("half day");
-    return [...types].sort();
-  }, [requests]);
+  const availableLeaveTypes = useMemo(
+    () => [...new Set(requests.map((request) => normalizeLeaveType(request.leaveType)).filter(Boolean))].sort(),
+    [requests]
+  );
 
   // ==========================================================
   // DATE
@@ -1581,10 +1567,10 @@ export default function LeaveRequest() {
       {/* 4 METRIC CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {[
-          { label: "TOTAL REQUESTS", value: filteredRequests.length },
-          { label: "PENDING", value: filteredRequests.filter((r) => isPending(r.approvalStatus || r.status)).length },
-          { label: "APPROVED", value: filteredRequests.filter((r) => isApproved(r.approvalStatus || r.status)).length },
-          { label: "REJECTED", value: filteredRequests.filter((r) => isRejected(r.approvalStatus || r.status)).length }
+          { label: "TOTAL REQUESTS", value: requests.length },
+          { label: "PENDING", value: requests.filter((r) => isPending(r.approvalStatus || r.status)).length },
+          { label: "APPROVED", value: requests.filter((r) => isApproved(r.approvalStatus || r.status)).length },
+          { label: "REJECTED", value: requests.filter((r) => isRejected(r.approvalStatus || r.status)).length }
         ].map((item, idx) => (
           <div
             key={idx}
@@ -1592,12 +1578,7 @@ export default function LeaveRequest() {
           >
             <div className="flex items-center gap-3">
               <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
-                {filterType !== "all" && (
-                  <p className="text-[10px] text-blue-600 font-medium">({formatLeaveType(filterType)})</p>
-                )}
-              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
             </div>
             <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
           </div>
@@ -1671,10 +1652,10 @@ export default function LeaveRequest() {
             MAIN CARD
         ==================================================== */}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
 
         {/* ==================================================
-              SEARCH & FILTERS
+              SEARCH
           ================================================== */}
 
         <div className="p-4 border-b border-gray-200">
@@ -1708,19 +1689,11 @@ export default function LeaveRequest() {
                       !previous
                   )
                 }
-                className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                  filterType !== "all"
-                    ? "bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs font-semibold"
-                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                }`}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium"
               >
-                <Filter className="w-4 h-4 text-slate-500" />
+                <Filter className="w-4 h-4" />
 
-                <span>
-                  {filterType !== "all"
-                    ? `Type: ${formatLeaveType(filterType)}`
-                    : "Filters"}
-                </span>
+                Filters
 
                 <ChevronDown
                   className={`w-4 h-4 transition ${showFilters
@@ -1731,26 +1704,12 @@ export default function LeaveRequest() {
               </button>
 
               {showFilters && (
-                <div className="absolute right-0 top-full z-50 mt-2 min-w-[220px] w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5 animate-fade-in">
-                  <div className="flex items-center justify-between border-b border-gray-100 px-3.5 py-2.5 bg-gray-50/80">
-                    <p className="text-xs font-semibold text-gray-700">
-                      Leave Type
-                    </p>
-                    {filterType !== "all" && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilterType("all");
-                          setShowFilters(false);
-                        }}
-                        className="text-[11px] text-blue-600 hover:text-blue-800 font-medium hover:underline cursor-pointer"
-                      >
-                        Reset
-                      </button>
-                    )}
-                  </div>
+                <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <p className="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-600">
+                    Leave Type
+                  </p>
 
-                  <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5">
+                  <div className="max-h-72 overflow-y-auto p-1.5">
                     {[{ value: "all", label: "All Types" }, ...availableLeaveTypes.map((type) => ({
                       value: type,
                       label: formatLeaveType(type),
@@ -1762,14 +1721,14 @@ export default function LeaveRequest() {
                           setFilterType(option.value);
                           setShowFilters(false);
                         }}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition cursor-pointer ${filterType === option.value
+                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm transition ${filterType === option.value
                           ? "bg-blue-50 font-semibold text-blue-700"
                           : "text-gray-700 hover:bg-gray-50"
                           }`}
                       >
-                        <span className="truncate pr-2">{option.label}</span>
+                        {option.label}
                         {filterType === option.value && (
-                          <Check className="h-4 w-4 shrink-0 text-blue-600" />
+                          <Check className="h-4 w-4" />
                         )}
                       </button>
                     ))}
@@ -1778,27 +1737,6 @@ export default function LeaveRequest() {
               )}
             </div>
           </div>
-
-          {/* ACTIVE FILTER BADGE */}
-          {filterType !== "all" && (
-            <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-gray-100 text-xs">
-              <span className="text-gray-500 font-medium">Applied Filter:</span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-                <span>{formatLeaveType(filterType)}</span>
-                <button
-                  type="button"
-                  onClick={() => setFilterType("all")}
-                  className="p-0.5 hover:bg-blue-200 rounded-full cursor-pointer text-blue-800 transition-colors"
-                  title="Clear filter"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </span>
-              <span className="text-gray-400 text-[11px]">
-                ({filteredRequests.length} results)
-              </span>
-            </div>
-          )}
         </div>
 
         {/* ==================================================

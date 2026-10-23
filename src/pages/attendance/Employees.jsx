@@ -949,7 +949,7 @@ export default function Employees() {
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                              emp.employeeStatus === "Inactive" || emp.status === "inactive" || emp.isActive === false
+                              emp.employeeStatus === "Inactive"
                                 ? "text-rose-600"
                                 : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                 ? "text-amber-600"
@@ -958,16 +958,14 @@ export default function Employees() {
                           >
                             <span
                               className={`h-2 w-2 rounded-full ${
-                                emp.employeeStatus === "Inactive" || emp.status === "inactive" || emp.isActive === false
+                                emp.employeeStatus === "Inactive"
                                   ? "bg-rose-500"
                                   : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                   ? "bg-amber-500"
                                   : "bg-emerald-500"
                               }`}
                             />
-                            {emp.isActive === false || emp.status === "inactive" || emp.employeeStatus === "Inactive"
-                              ? "Inactive"
-                              : emp.employeeStatus || "Active"}
+                            {emp.employeeStatus || "Active"}
                           </span>
                         </td>
 
@@ -1089,7 +1087,7 @@ export default function Employees() {
                       <div className="flex flex-col items-end gap-1 ml-2 flex-shrink-0">
                         <span
                           className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                            emp.employeeStatus === "Inactive" || emp.status === "inactive" || emp.isActive === false
+                            emp.employeeStatus === "Inactive"
                               ? "text-rose-600"
                               : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                               ? "text-amber-600"
@@ -1098,16 +1096,14 @@ export default function Employees() {
                         >
                           <span
                             className={`h-2 w-2 rounded-full ${
-                              emp.employeeStatus === "Inactive" || emp.status === "inactive" || emp.isActive === false
+                              emp.employeeStatus === "Inactive"
                                 ? "bg-rose-500"
                                 : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                 ? "bg-amber-500"
                                 : "bg-emerald-500"
                             }`}
                           />
-                          {emp.isActive === false || emp.status === "inactive" || emp.employeeStatus === "Inactive"
-                            ? "Inactive"
-                            : emp.employeeStatus || "Active"}
+                          {emp.employeeStatus || "Active"}
                         </span>
 
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
@@ -1237,7 +1233,7 @@ export default function Employees() {
                     <div className="flex flex-col items-end gap-0.5 ml-1 flex-shrink-0">
                       <span
                         className={`inline-flex items-center gap-1 text-[11px] font-medium ${
-                          emp.employeeStatus === "Inactive" || emp.status === "inactive" || emp.isActive === false
+                          emp.employeeStatus === "Inactive"
                             ? "text-rose-600"
                             : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                             ? "text-amber-600"
@@ -1246,16 +1242,14 @@ export default function Employees() {
                       >
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${
-                            emp.employeeStatus === "Inactive" || emp.status === "inactive" || emp.isActive === false
+                            emp.employeeStatus === "Inactive"
                               ? "bg-rose-500"
                               : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                               ? "bg-amber-500"
                               : "bg-emerald-500"
                           }`}
                         />
-                        {emp.isActive === false || emp.status === "inactive" || emp.employeeStatus === "Inactive"
-                          ? "Inactive"
-                          : emp.employeeStatus || "Active"}
+                        {emp.employeeStatus || "Active"}
                       </span>
 
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500">

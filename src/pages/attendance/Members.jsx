@@ -443,6 +443,16 @@ const fetchAllMembers = async () => {
           .toLowerCase()
           .trim();
 
+        const roleType =
+          role === 'hr'
+            ? 'hr'
+            : role === 'teamlead' ||
+              role === 'team lead' ||
+              role === 'team_lead' ||
+              role === 'tl'
+            ? 'tl'
+            : 'employee';
+
         // --------------------------------------
         // NAME
         // --------------------------------------
@@ -460,70 +470,45 @@ const fetchAllMembers = async () => {
         // --------------------------------------
         // DESIGNATION
         // --------------------------------------
-        let designation = '';
+        let designation =
+          roleType === 'hr'
+            ? 'HR'
+            : roleType === 'tl'
+            ? 'Team Lead'
+            : 'Employee';
 
         if (employee?.designation) {
-          if (typeof employee.designation === 'object') {
+          if (
+            typeof employee.designation === 'object'
+          ) {
             designation =
-              employee.designation?.name ||
               employee.designation?.designationName ||
-              employee.designation?.title ||
-              '';
+              employee.designation?.name ||
+              designation;
           } else {
             designation = employee.designation;
           }
         }
 
-        if (!designation && employee?.designationName) {
+        if (employee?.designationName) {
           designation = employee.designationName;
         }
 
-        if (!designation && employee?.position) {
-          designation = employee.position;
-        }
-
-        if (!designation && user?.designation) {
-          if (typeof user.designation === 'object') {
+        if (user?.designation) {
+          if (
+            typeof user.designation === 'object'
+          ) {
             designation =
-              user.designation?.name ||
               user.designation?.designationName ||
-              user.designation?.title ||
-              '';
+              user.designation?.name ||
+              designation;
           } else {
             designation = user.designation;
           }
         }
 
-        if (!designation && user?.designationName) {
+        if (user?.designationName) {
           designation = user.designationName;
-        }
-
-        const desigRaw = String(designation || '').toLowerCase();
-
-        const isTL = Boolean(
-          user?.isTeamLead ||
-          user?.isTeamLeader ||
-          employee?.isTeamLead ||
-          employee?.isTeamLeader ||
-          role === 'teamlead' ||
-          role === 'team lead' ||
-          role === 'team_lead' ||
-          role === 'tl' ||
-          desigRaw.includes('team lead') ||
-          desigRaw.includes('teamlead') ||
-          desigRaw.includes('tl')
-        );
-
-        const isHR =
-          role === 'hr' ||
-          role === 'human resources' ||
-          desigRaw.includes('hr') ||
-          desigRaw.includes('human resource');
-
-        const roleType = isHR ? 'hr' : isTL ? 'tl' : 'employee';
-
-        if (!designation) {
-          designation = roleType === 'hr' ? 'HR' : roleType === 'tl' ? 'Team Lead' : 'Employee';
         }
 
         // --------------------------------------
@@ -647,7 +632,6 @@ const fetchAllMembers = async () => {
           employeeId: finalEmployeeId,
 
           name: fullName,
-          fullName: fullName,
 
           firstName:
             employee?.firstName ||
@@ -700,109 +684,23 @@ const fetchAllMembers = async () => {
           role: role,
 
           roleType,
-          isTeamLead: isTL,
 
           initials: getInitials(fullName),
 
           avatarColor:
-            getAvatarColor(index),
-          rawEmployee: employee,
-          rawUser: user
+            getAvatarColor(index)
         };
       })
       .filter(Boolean);
 
-    const matchedEmployeeIds = new Set();
-    allMembers.forEach(m => {
-      if (m.rawEmployee) {
-        const eid = String(m.rawEmployee._id || m.rawEmployee.id || m.rawEmployee.employeeID || m.rawEmployee.employeeId || '');
-        if (eid) matchedEmployeeIds.add(eid);
-        if (m.rawEmployee.email) matchedEmployeeIds.add(String(m.rawEmployee.email).toLowerCase().trim());
-      }
-      if (m.email && m.email !== 'No email') {
-        matchedEmployeeIds.add(String(m.email).toLowerCase().trim());
-      }
-    });
-
-    const extraMembers = employeesList
-      .filter((emp) => {
-        if (!emp || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
-        const eid = String(emp._id || emp.id || emp.employeeID || emp.employeeId || '');
-        const email = String(emp.email || '').toLowerCase().trim();
-        if (eid && matchedEmployeeIds.has(eid)) return false;
-        if (email && matchedEmployeeIds.has(email)) return false;
-        const name = String(emp.name || emp.fullName || [emp.firstName, emp.lastName].filter(Boolean).join(' ')).trim();
-        if (!name || isUnknownEmployeeOrUser(name)) return false;
-        return true;
-      })
-      .map((emp, idx) => {
-        const rawDesig = typeof emp?.designation === 'object'
-          ? (emp.designation?.name || emp.designation?.designationName || emp.designation?.title || '')
-          : String(emp?.designation || emp?.designationName || emp?.position || '');
-        const desigLower = rawDesig.toLowerCase();
-
-        const role = String(emp?.role || emp?.userRole || '').toLowerCase().trim();
-        const isTL = Boolean(
-          emp?.isTeamLead ||
-          emp?.isTeamLeader ||
-          role === 'teamlead' ||
-          role === 'team lead' ||
-          role === 'team_lead' ||
-          role === 'tl' ||
-          desigLower.includes('team lead') ||
-          desigLower.includes('teamlead') ||
-          desigLower.includes('tl')
-        );
-        const isHR = role === 'hr' || desigLower.includes('hr');
-        const roleType = isHR ? 'hr' : isTL ? 'tl' : 'employee';
-
-        const fullName = [emp.firstName, emp.lastName].filter(Boolean).join(' ') || emp.name || emp.fullName || 'Unnamed Employee';
-
-        const rawDept = typeof emp?.department === 'object'
-          ? (emp.department?.name || emp.department?.departmentName || emp.department?.title || '')
-          : String(emp?.departmentName || emp?.department || 'Unassigned');
-
-        return {
-          id: emp._id || emp.id || `emp-${idx}`,
-          userId: emp.userID || emp.userId || '',
-          employeeId: emp.employeeID || emp.employeeId || `EMP${String(allMembers.length + idx + 1).padStart(4, '0')}`,
-          name: fullName,
-          fullName: fullName,
-          firstName: emp.firstName || '',
-          lastName: emp.lastName || '',
-          email: emp.email || 'No email',
-          mobile: emp.mobile || emp.phone || emp.phoneNumber || 'N/A',
-          phone: emp.phone || emp.phoneNumber || 'N/A',
-          dob: formatDate(emp.dob || emp.dateOfBirth),
-          bloodGroup: emp.bloodGroup || 'N/A',
-          currentAddress: emp.address || emp.currentAddress || 'N/A',
-          permanentAddress: emp.permanentAddress || emp.permanent_address || 'N/A',
-          designation: rawDesig || (roleType === 'hr' ? 'HR' : roleType === 'tl' ? 'Team Lead' : 'Employee'),
-          department: rawDept || 'Unassigned',
-          status: emp.employeeStatus || emp.status || 'Active',
-          currentAction: emp.currentAction || 'Available',
-          skills: Array.isArray(emp.skills) ? emp.skills : [],
-          joiningDate: formatDate(emp.joiningDate),
-          role: role,
-          roleType,
-          isTeamLead: isTL,
-          initials: getInitials(fullName),
-          avatarColor: getAvatarColor(allMembers.length + idx),
-          rawEmployee: emp,
-          rawUser: null
-        };
-      });
-
-    const finalMembers = [...allMembers, ...extraMembers];
-
     console.log(
       'FINAL MEMBERS:',
-      finalMembers
+      allMembers
     );
 
     if (isMounted) {
-      setMembers(finalMembers);
-      setFilteredMembers(finalMembers);
+      setMembers(allMembers);
+      setFilteredMembers(allMembers);
     }
 
   } catch (err) {
@@ -888,15 +786,13 @@ const fetchAllMembers = async () => {
     let filtered = members;
 
     if (searchTerm) {
-      const q = searchTerm.trim().toLowerCase();
-      filtered = filtered.filter(member => {
-        const name = String(member.name || member.fullName || `${member.firstName || ''} ${member.lastName || ''}`).toLowerCase();
-        const email = String(member.email || '').toLowerCase();
-        const dept = String(member.department || '').toLowerCase();
-        const desig = String(member.designation || '').toLowerCase();
-        const empId = String(member.employeeId || '').toLowerCase();
-        return name.includes(q) || email.includes(q) || dept.includes(q) || desig.includes(q) || empId.includes(q);
-      });
+      const q = searchTerm.toLowerCase();
+      filtered = filtered.filter(member =>
+        member.name?.toLowerCase().includes(q) ||
+        member.email?.toLowerCase().includes(q) ||
+        member.department?.toLowerCase().includes(q) ||
+        member.designation?.toLowerCase().includes(q)
+      );
     }
 
     if (selectedDepartment !== 'all') {
@@ -912,42 +808,15 @@ const fetchAllMembers = async () => {
     }
 
     if (selectedRole !== 'all') {
-      filtered = filtered.filter(member => {
-        const desig = String(member.designation || '').toLowerCase();
-        const roleStr = String(member.role || '').toLowerCase();
-        const isTL = Boolean(
-          member.roleType === 'tl' ||
-          member.isTeamLead ||
-          member.isTeamLeader ||
-          roleStr === 'team lead' ||
-          roleStr === 'teamlead' ||
-          roleStr === 'tl' ||
-          desig.includes('team lead') ||
-          desig.includes('teamlead') ||
-          desig.includes('tl')
-        );
-        const isHR = Boolean(
-          member.roleType === 'hr' ||
-          roleStr === 'hr' ||
-          desig.includes('hr') ||
-          desig.includes('human resource')
-        );
-
-        if (selectedRole === 'tl') return isTL;
-        if (selectedRole === 'hr') return isHR;
-        if (selectedRole === 'employee') return !isTL && !isHR;
-        return member.roleType === selectedRole;
-      });
+      filtered = filtered.filter(member =>
+        member.roleType === selectedRole
+      );
     }
 
     if (selectedStatus !== 'all') {
-      filtered = filtered.filter(member => {
-        const rawStatus = String(member.status || '').trim().toLowerCase();
-        if (selectedStatus.toLowerCase() === 'active') {
-          return rawStatus === 'active' || rawStatus === 'active now' || !rawStatus;
-        }
-        return rawStatus === selectedStatus.toLowerCase();
-      });
+      filtered = filtered.filter(member =>
+        String(member.status || '').toLowerCase() === selectedStatus.toLowerCase()
+      );
     }
 
     setFilteredMembers(filtered);
@@ -1089,14 +958,8 @@ const fetchAllMembers = async () => {
     }
   };
 
-  const roles = ['all', 'tl', 'hr', 'employee'];
-  const uniqueStatuses = Array.from(new Set(
-    members
-      .map(m => String(m.status || 'Active').trim().toLowerCase())
-      .filter(Boolean)
-  ));
-  if (!uniqueStatuses.includes('active')) uniqueStatuses.unshift('active');
-  const statuses = ['all', ...uniqueStatuses];
+  const roles = ['all', ...new Set(members.map(m => m.roleType).filter(Boolean))];
+  const statuses = ['all', ...new Set(members.map(m => String(m.status || '').toLowerCase()))];
 
   const getRoleLabel = (role) => {
     const labels = {
@@ -1161,9 +1024,9 @@ const fetchAllMembers = async () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {[
           { key: 'all', label: 'TOTAL MEMBERS', value: members.length },
-          { key: 'tl', label: 'TEAM LEADS', value: members.filter(m => m.roleType === 'tl' || m.isTeamLead || String(m.designation || '').toLowerCase().includes('team lead')).length },
-          { key: 'hr', label: 'HR EXECUTIVES', value: members.filter(m => m.roleType === 'hr' || String(m.designation || '').toLowerCase().includes('hr')).length },
-          { key: 'employee', label: 'EMPLOYEES', value: members.filter(m => (m.roleType === 'employee' || !m.roleType) && !m.isTeamLead && !String(m.designation || '').toLowerCase().includes('team lead') && !String(m.designation || '').toLowerCase().includes('hr')).length },
+          { key: 'tl', label: 'TEAM LEADS', value: members.filter(m => m.roleType === 'tl').length },
+          { key: 'hr', label: 'HR EXECUTIVES', value: members.filter(m => m.roleType === 'hr').length },
+          { key: 'employee', label: 'EMPLOYEES', value: members.filter(m => m.roleType === 'employee').length },
         ].map((item) => {
           const isSelected = selectedRole === item.key;
           return (
@@ -1298,12 +1161,9 @@ const fetchAllMembers = async () => {
           </div>
         </div>
 
-        {/* Clear Filters shortcut and count */}
-        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs text-slate-500">
-          <div>
-            Showing <span className="font-semibold text-slate-800">{filteredMembers.length}</span> of <span className="font-semibold text-slate-800">{members.length}</span> members
-          </div>
-          {(selectedDepartment !== 'all' || selectedEmployeeRole !== 'all' || selectedRole !== 'all' || selectedStatus !== 'all' || searchTerm) && (
+        {/* Clear Filters shortcut */}
+        {(selectedDepartment !== 'all' || selectedEmployeeRole !== 'all' || selectedRole !== 'all' || selectedStatus !== 'all' || searchTerm) && (
+          <div className="flex justify-end pt-0.5">
             <button
               type="button"
               onClick={() => {
@@ -1313,12 +1173,12 @@ const fetchAllMembers = async () => {
                 setSelectedStatus('all');
                 setSearchTerm('');
               }}
-              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors cursor-pointer"
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
             >
               Clear all filters
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
         {/* Content */}

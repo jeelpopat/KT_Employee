@@ -231,18 +231,9 @@ const AssignmentModal = ({
     return null;
   };
 
-  // Available Employees: Purely active employees (NOT team lead, NOT admin, NOT finance, NOT current lead, NOT inactive) - Deduplicated
+  // Available Employees: Purely employees (NOT team lead, NOT admin, NOT finance, NOT current lead) - Deduplicated
   const availableEmployees = getDistinctAssignedEmployees(
     (employees || []).filter((emp) => {
-      if (!emp) return false;
-      if (emp.isActive === false) return false;
-      const statusStr = String(emp.status || emp.employeeStatus || '').toLowerCase().trim();
-      if (statusStr === 'inactive' || statusStr === 'rejected') return false;
-      try {
-        const revoked = JSON.parse(localStorage.getItem('kt_revoked_user_ids') || '[]');
-        const keys = [emp._id, emp.id, emp.userId, emp.employeeId, emp.employeeID, emp.email].filter(Boolean).map(x => String(x).toLowerCase().trim());
-        if (revoked.some(r => keys.includes(String(r).toLowerCase().trim()))) return false;
-      } catch {}
       if (isCurrentLead(emp)) return false;
       if (isFinanceOrExcludedUser(emp)) return false;
       const role = (emp.role || emp.designation || '').toLowerCase().trim();
@@ -1139,6 +1130,7 @@ const getDesignation = (lead) => {
         }
       });
 
+      const savedEmployeeAssignments = loadSavedEmployeeAssignments();
       const employeeAssignments = {};
       const globallyAssignedEmpKeys = new Set();
 
@@ -1160,32 +1152,37 @@ const getDesignation = (lead) => {
           typeof lead.teamLead === 'string' ? lead.teamLead : null
         ].filter(Boolean).map(String);
 
-        // Check if any employee directly references this lead in live database
+        // Check if any employee directly references this lead
         const directlyAssignedEmployees = (fetchedEmployees || [])
           .filter(emp => emp && allAssociatedIds.some(id => String(emp.teamLeadId) === id || String(emp.teamLead) === id))
           .map(emp => String(emp._id));
 
-        // Strictly LIVE backend data (GET /api/teamLead/team & live employee records)
-        // Never pull or merge stale records from localStorage!
-        const mergedLiveEmployees = [...apiEmployees, ...directlyAssignedEmployees];
+        const savedEmps = allAssociatedIds.flatMap(id => savedEmployeeAssignments[id] || []);
+
+        const mergedLiveEmployees = [...apiEmployees, ...directlyAssignedEmployees, ...savedEmps];
         const distinctAssigned = getDistinctAssignedEmployees(mergedLiveEmployees, fetchedEmployees);
 
-        // Exclude employees who are inactive or revoked
-        const activeLiveEmployees = distinctAssigned.filter((emp) => {
-          if (!emp) return false;
-          if (emp.isActive === false) return false;
-          const statusStr = String(emp.status || emp.employeeStatus || '').toLowerCase().trim();
-          if (statusStr === 'inactive' || statusStr === 'rejected') return false;
-          try {
-            const revoked = JSON.parse(localStorage.getItem('kt_revoked_user_ids') || '[]');
-            const keys = [emp._id, emp.id, emp.userId, emp.employeeId, emp.employeeID, emp.email].filter(Boolean).map(x => String(x).toLowerCase().trim());
-            if (revoked.some(r => keys.includes(String(r).toLowerCase().trim()))) return false;
-          } catch {}
+        // Filter out employees who are assigned to a DIFFERENT lead in savedEmployeeAssignments
+        // to prevent stale backend data from reclaiming an employee that was transferred
+        const filteredLiveEmployees = distinctAssigned.filter((emp) => {
+          const empKey = getCanonicalEmployeeKey(emp, fetchedEmployees);
+          if (!empKey) return false;
+
+          const isSavedToAnotherLead = Object.entries(savedEmployeeAssignments).some(([otherId, list]) => {
+            if (allAssociatedIds.includes(String(otherId))) return false;
+            if (!Array.isArray(list)) return false;
+            return list.some(item => getCanonicalEmployeeKey(item, fetchedEmployees) === empKey);
+          });
+
+          if (isSavedToAnotherLead) {
+            return false;
+          }
+
           return true;
         });
 
         // Strictly enforce 1 TL per employee across the whole system
-        const singleTlEmployees = activeLiveEmployees.filter((emp) => {
+        const singleTlEmployees = filteredLiveEmployees.filter((emp) => {
           const empKey = getCanonicalEmployeeKey(emp, fetchedEmployees);
           if (!empKey) return false;
           if (globallyAssignedEmpKeys.has(empKey)) {
