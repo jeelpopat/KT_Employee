@@ -1354,45 +1354,61 @@ const EmployeeRequests = () => {
         }
       }
 
-      // 4. Update the user document on backend to clear status AND clear TL data
+      // 4. Update the user document on backend to reject and clear TL data (NEVER call /api/users/approve on revoke)
       try {
-        await fetch(endpoint, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            id: userId,
-            userId,
-            _id: user?._id || userId,
-            email: user?.email,
-            teamLead: null,
-            teamLeadId: null,
-            assignedTL: null,
-            teamLeader: null,
-            teamLeadName: null,
-            teamLeadEmail: null
-          }),
-        });
+        const rejectPayload = {
+          id: userId,
+          userId,
+          _id: user?._id || userId,
+          email: user?.email,
+          isApproved: false,
+          approved: false,
+          status: 'rejected',
+          isActive: false,
+          employeeStatus: 'Inactive',
+          teamLead: null,
+          teamLeadId: null,
+          assignedTL: null,
+          teamLeader: null,
+          teamLeadName: null,
+          teamLeadEmail: null
+        };
 
-        // Also call /api/users/approve with status: rejected to ensure teamLead fields are cleared on MongoDB user doc
-        await fetch('https://kt-backend-yzr4.onrender.com/api/users/approve', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            id: userId,
-            userId,
-            _id: user?._id || userId,
-            email: user?.email,
-            isApproved: false,
-            approved: false,
-            status: 'rejected',
-            teamLead: null,
-            teamLeadId: null,
-            assignedTL: null,
-            teamLeader: null,
-            teamLeadName: null,
-            teamLeadEmail: null
-          })
-        }).catch(() => {});
+        try {
+          await api.put('/api/users/reject', rejectPayload);
+        } catch (axiosErr) {
+          console.warn('Axios reject error, trying direct fetch:', axiosErr?.message);
+          await fetch(endpoint, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(rejectPayload),
+          });
+        }
+
+        // Also update employee list record if found
+        if (empRecordId) {
+          try {
+            await api.put(`/api/employee/edit/${empRecordId}`, {
+              isActive: false,
+              employeeStatus: 'Inactive',
+              status: 'inactive',
+              teamLead: null,
+              teamLeadId: null
+            });
+          } catch {
+            await fetch(`https://kt-backend-yzr4.onrender.com/api/employee/edit/${empRecordId}`, {
+              method: 'PUT',
+              headers,
+              body: JSON.stringify({
+                isActive: false,
+                employeeStatus: 'Inactive',
+                status: 'inactive',
+                teamLead: null,
+                teamLeadId: null
+              })
+            }).catch(() => {});
+          }
+        }
       } catch (uErr) {
         console.warn('User status update error:', uErr);
       }
