@@ -80,6 +80,44 @@ const buildAssignedMemberList = (proj, membersData) => {
   return list;
 };
 
+const matchesUserAssignment = (assignment, userIdentifiers) => {
+  if (!assignment || !userIdentifiers) return false;
+  if (Array.isArray(assignment)) {
+    return assignment.some(value => matchesUserAssignment(value, userIdentifiers));
+  }
+  if (typeof assignment !== 'object') {
+    const value = String(assignment).trim().toLowerCase();
+    return userIdentifiers.ids.has(value) || userIdentifiers.emails.has(value);
+  }
+
+  const idValues = [
+    assignment._id,
+    assignment.id,
+    assignment.userId,
+    assignment.employeeId,
+    assignment.employeeID,
+    assignment.empId
+  ].filter(Boolean);
+  const ids = idValues
+    .filter(value => typeof value !== 'object')
+    .map(value => String(value).trim().toLowerCase());
+  const emails = [
+    assignment.email,
+    assignment.user?.email,
+    assignment.employee?.email,
+    assignment.profile?.email
+  ]
+    .filter(Boolean)
+    .map(value => String(value).trim().toLowerCase());
+
+  return ids.some(id => userIdentifiers.ids.has(id)) ||
+    emails.some(email => userIdentifiers.emails.has(email)) ||
+    (assignment.user && matchesUserAssignment(assignment.user, userIdentifiers)) ||
+    (assignment.employee && matchesUserAssignment(assignment.employee, userIdentifiers)) ||
+    (assignment.profile && matchesUserAssignment(assignment.profile, userIdentifiers)) ||
+    idValues.some(value => typeof value === 'object' && matchesUserAssignment(value, userIdentifiers));
+};
+
 export const ProjectView = () => {
   const { user, userRole, setSelectedTask } = useApp();
 
@@ -89,7 +127,16 @@ export const ProjectView = () => {
   const isAdmin = isAdminRole(normalizedRole, user);
   const isTL = !isAdmin && isTeamLeadRole(normalizedRole, user);
   const isEmployee = !isAdmin && !isTL && normalizedRole === 'employee';
-  const userIdentifiers = useMemo(() => getLoggedInUserIdentifiers(user), [user]);
+  const userIdentifiers = useMemo(() => {
+    const identifiers = getLoggedInUserIdentifiers(user);
+    const ids = new Set(identifiers.ids);
+    [
+      user?.employeeID,
+      user?.employee?.employeeID,
+      user?.profile?.employeeID
+    ].filter(Boolean).forEach(id => ids.add(String(id).trim().toLowerCase()));
+    return { ...identifiers, ids };
+  }, [user]);
 
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -358,11 +405,28 @@ export const ProjectView = () => {
     fetchLiveProjectsAndTasks();
   }, []);
 
-  // For TL: strictly only show projects assigned to that Team Lead
+  // Scope non-admin views to projects assigned to the signed-in user.
   const accessibleProjects = useMemo(() => {
-    if (!isTL) return projects;
-    return projects.filter((p) => isProjectAssignedToLead(p, userIdentifiers));
-  }, [projects, isTL, userIdentifiers]);
+    if (isEmployee) {
+      return projects.filter(project => {
+        const projectEmployees = [
+          ...(Array.isArray(project.employees) ? project.employees : []),
+          ...(Array.isArray(project.members?.employees) ? project.members.employees : []),
+          ...(Array.isArray(project.allAssigned) ? project.allAssigned.filter(member => !member.isLead) : [])
+        ];
+        const isAssignedToProject = projectEmployees.some(member =>
+          matchesUserAssignment(member, userIdentifiers)
+        );
+        const isAssignedToProjectTask = (project.tasks || []).some(task =>
+          matchesUserAssignment(task.assignedEmployee, userIdentifiers)
+        );
+
+        return isAssignedToProject || isAssignedToProjectTask;
+      });
+    }
+    if (isTL) return projects.filter(project => isProjectAssignedToLead(project, userIdentifiers));
+    return projects;
+  }, [projects, isEmployee, isTL, userIdentifiers]);
 
   // Filter projects by search, status, and assignment
   const filteredProjects = useMemo(() => {
@@ -492,6 +556,7 @@ export const ProjectView = () => {
     );
   };
 
+
   const getPriorityBadge = (priority = 'medium') => {
     const p = String(priority).toLowerCase();
     if (p === 'high' || p === 'urgent' || p === 'critical') {
@@ -577,7 +642,12 @@ export const ProjectView = () => {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
           {/* Assignment Filter Pills */}
-          {!isTL ? (
+          {isEmployee ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold">
+              <UserCheck size={14} />
+              <span>My Assigned Projects ({accessibleProjects.length})</span>
+            </div>
+          ) : !isTL ? (
             <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs">
               <button
                 onClick={() => setAssignedFilter('all')}
@@ -1397,4 +1467,3 @@ export const ProjectView = () => {
     </div>
   );
 };
-
