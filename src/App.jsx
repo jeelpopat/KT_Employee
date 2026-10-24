@@ -176,7 +176,8 @@ const MainLayout = ({ handleSignOut }) => {
     }
   };
 
-  const requiresTeamLeadScreenCapture = userRole === 'team_leader' && !isScreenSharingActive;
+  const requiresEmployeeScreenCapture =
+    (userRole === 'employee' || userRole === 'team_leader') && !isScreenSharingActive;
 
   const handleEnableScreenCapture = async () => {
     setStartingScreenCapture(true);
@@ -198,7 +199,7 @@ const MainLayout = ({ handleSignOut }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <div inert={requiresTeamLeadScreenCapture}>
+      <div inert={requiresEmployeeScreenCapture}>
         <Suspense fallback={<div className="h-16 border-b border-[#00334d] bg-[#003d5b]" />}>
           <Header onSignOut={handleLayoutSignOut} />
         </Suspense>
@@ -222,7 +223,7 @@ const MainLayout = ({ handleSignOut }) => {
           <InactivityAlertModal />
         </Suspense>
       </div>
-      {requiresTeamLeadScreenCapture && (
+      {requiresEmployeeScreenCapture && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
           role="dialog"
@@ -239,7 +240,7 @@ const MainLayout = ({ handleSignOut }) => {
                 Enable device screen monitoring
               </h2>
               <p id="screen-capture-description" className="mt-2 text-sm leading-6 text-slate-600">
-                To continue as a Team Leader, allow screen sharing. Your browser will ask you to choose a screen and confirm sharing. Screenshots are captured only while monitoring is active and your work session is checked in.
+                To continue as an Employee or Team Leader, allow screen sharing. Your browser will ask you to choose a screen and confirm sharing. Screenshots are captured only while monitoring is active and your work session is checked in.
               </p>
             </div>
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
