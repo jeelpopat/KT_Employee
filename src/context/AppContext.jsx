@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import api, { clearApiCache } from '../api/axios.js';
-import { validateUserSession, performAutoCheckout, clearAuth, normalizeRole } from '../utils/auth.js';
+import { clearAuth, normalizeRole } from '../utils/auth.js';
 import { getProgressForStatus } from '../utils/taskUtils.js';
 import {
   TARGET_LAT,
@@ -1892,52 +1892,6 @@ export const AppProvider = ({ children }) => {
       setCurrentTabState('dashboard');
     }
   };
-
-  // Sync role and fresh user profile on initial mount
-  useEffect(() => {
-    let isMounted = true;
-
-    const initRoleAndUser = async () => {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-      if (token) {
-        try {
-          const validation = await validateUserSession();
-          if (!isMounted) return;
-
-          if (!validation.isValid && validation.shouldLogout) {
-            console.warn('Initial session validation failed in context:', validation.reason);
-            await performAutoCheckout(token);
-            clearAuth();
-            setUser(null);
-            setUserRole('');
-            window.location.href = '/';
-            return;
-          }
-
-          if (validation.user) {
-            const pData = validation.user;
-            const resolved = resolveEmployeeName(pData);
-            if (resolved) {
-              pData.name = resolved;
-              pData.fullName = resolved;
-            }
-            setUser(pData);
-            if (validation.role) {
-              setUserRole(validation.role);
-            }
-          }
-        } catch (e) {
-          console.warn('Error validating initial profile in context:', e);
-        }
-      }
-    };
-
-    initRoleAndUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const loginUser = async (userData, token) => {
     // Clear any previous role so stale roles from other accounts don't linger

@@ -1405,9 +1405,7 @@ export default function LeaveRequest() {
       return <StatusBadge status={leave?.adminStatus || "Pending"} />;
     }
 
-    const isActioning = actioningId === leave.id;
     const loggedRole = normalizeRole(currentRole);
-    const ApproveIcon = Check;
     let relevantStatus = leave?.adminStatus;
     if (loggedRole === "teamlead") relevantStatus = leave?.teamLeadStatus;
     else if (loggedRole === "hr") relevantStatus = leave?.hrStatus;
@@ -1416,62 +1414,24 @@ export default function LeaveRequest() {
 
     if (currentStatus === "Approved") {
       return (
-        <div className="flex items-center gap-1.5 whitespace-nowrap">
-          {loggedRole === "admin" ? (
-            <span
-              aria-label="Approved"
-              title="Approved"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700"
-            >
-              <Check className="w-4 h-4 stroke-[2.5]" />
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-              Approved
-            </span>
-          )}
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              openActionModal(leave, "rejected");
-            }}
-            disabled={isActioning}
-            title="Reject Leave"
-            className="w-7 h-7 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 flex items-center justify-center transition active:scale-90 disabled:opacity-50"
-          >
-            <X className="w-3.5 h-3.5 stroke-[2.5]" />
-          </button>
-        </div>
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+          Approved
+        </span>
       );
     }
 
     if (currentStatus === "Rejected") {
       return (
-        <div className="flex items-center gap-1.5 whitespace-nowrap">
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-            <XCircle className="w-3.5 h-3.5 text-rose-600" />
-            Rejected
-          </span>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              openActionModal(leave, "approved");
-            }}
-            disabled={isActioning}
-            aria-label="Approve Leave"
-            title="Approve Leave"
-            className="w-7 h-7 shrink-0 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 flex items-center justify-center transition active:scale-90 disabled:opacity-50"
-          >
-            <ApproveIcon className="w-3.5 h-3.5 stroke-[2.5]" />
-          </button>
-        </div>
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+          Rejected
+        </span>
       );
     }
+
+    const isActioning = actioningId === leave.id;
+    const ApproveIcon = Check;
 
     return (
       <div className="flex items-center gap-2 whitespace-nowrap">

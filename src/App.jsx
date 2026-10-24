@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
-import { validateUserSession, performAutoCheckout, clearAuth, isTokenExpired } from './utils/auth.js';
+import { performAutoCheckout, clearAuth, isTokenExpired } from './utils/auth.js';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
@@ -227,7 +227,6 @@ export default function App() {
     if (!token || isTokenExpired(token)) {
       return false;
     }
-    // Must be verified by backend before allowing entry; prevents dummy auto-login
     return false;
   });
 
@@ -242,7 +241,7 @@ export default function App() {
     return 'login';
   });
 
-  // Verify user validity, active status, and same role on every page refresh
+  // Keep the existing session when its locally stored token is still valid.
   useEffect(() => {
     let isMounted = true;
 
@@ -266,30 +265,9 @@ export default function App() {
         return;
       }
 
-      try {
-        const result = await validateUserSession();
-        if (!isMounted) return;
-
-        if (result.isValid) {
-          setIsAuthenticated(true);
-        } else if (result.shouldLogout) {
-          console.warn('Session verification rejected on refresh:', result.reason);
-          await performAutoCheckout(token);
-          clearAuth();
-          setIsAuthenticated(false);
-        } else {
-          setIsAuthenticated(true);
-        }
-      } catch (err) {
-        console.warn('Session verification notice on refresh:', err);
-        // On network or unexpected error, do NOT checkout or logout
-        if (isMounted) {
-          setIsAuthenticated(true);
-        }
-      } finally {
-        if (isMounted) {
-          setIsCheckingAuth(false);
-        }
+      if (isMounted) {
+        setIsAuthenticated(true);
+        setIsCheckingAuth(false);
       }
     };
 

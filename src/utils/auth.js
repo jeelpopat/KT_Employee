@@ -515,6 +515,11 @@ export const setupAuthInterceptor = () => {
   if (isInterceptorInitialized) return;
   isInterceptorInitialized = true;
 
+  const isStoredTokenExpired = () => {
+    const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+    return Boolean(token) && isTokenExpired(token);
+  };
+
   // 1. Intercept window.fetch
   if (typeof window !== "undefined" && window.fetch) {
     const originalFetch = window.fetch;
@@ -522,11 +527,9 @@ export const setupAuthInterceptor = () => {
       const response = await originalFetch.apply(this, args);
       
       const requestUrl = args[0];
-      if (response.status === 401 && !isAuthEndpoint(requestUrl)) {
-        if (localStorage.getItem("token") || localStorage.getItem("isAuthenticated") === "true") {
-          console.warn("Session expired or unauthorized (401). Auto-checking out and redirecting to login...");
-          triggerLogout("401 Unauthorized fetch response");
-        }
+      if (response.status === 401 && !isAuthEndpoint(requestUrl) && isStoredTokenExpired()) {
+        console.warn("Session token expired (401). Auto-checking out and redirecting to login...");
+        triggerLogout("401 Unauthorized fetch response");
       }
       return response;
     };
@@ -537,11 +540,9 @@ export const setupAuthInterceptor = () => {
     (response) => response,
     (error) => {
       const requestUrl = error?.config?.url;
-      if (error?.response?.status === 401 && !isAuthEndpoint(requestUrl)) {
-        if (localStorage.getItem("token") || localStorage.getItem("isAuthenticated") === "true") {
-          console.warn("Axios: Session expired or unauthorized (401). Auto-checking out and redirecting to login...");
-          triggerLogout("401 Unauthorized axios response");
-        }
+      if (error?.response?.status === 401 && !isAuthEndpoint(requestUrl) && isStoredTokenExpired()) {
+        console.warn("Axios: Session token expired (401). Auto-checking out and redirecting to login...");
+        triggerLogout("401 Unauthorized axios response");
       }
       return Promise.reject(error);
     }
