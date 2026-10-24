@@ -1067,23 +1067,13 @@ const EmployeeRequests = () => {
           ]));
 
           // Step E: Call POST https://kt-backend-yzr4.onrender.com/api/teamLead/create-team
-          const backendTLId = targetTeamDoc?.teamLead?._id || selectedTL?._id || selectedTeamLeadId;
-          await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              teamLead: backendTLId,
-              employees: mergedTargetMembers
-            })
-          }).catch(() => {});
-
-          // Step F: Also send to alternative TL ID if distinct
-          if (selectedTL?.userId && String(selectedTL.userId) !== String(backendTLId)) {
+          const backendTLId = targetTeamDoc?.teamLead?._id || targetTeamDoc?.teamLead || selectedTL?._id || selectedTeamLeadId;
+          if (backendTLId) {
             await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
               method: 'POST',
               headers,
               body: JSON.stringify({
-                teamLead: selectedTL.userId,
+                teamLead: backendTLId,
                 employees: mergedTargetMembers
               })
             }).catch(() => {});
@@ -1356,7 +1346,6 @@ const EmployeeRequests = () => {
 
       // 4. Update the user document on backend to reject and clear TL data (NEVER call /api/users/approve on revoke)
       try {
-<<<<<<< HEAD
         const rejectPayload = {
           id: userId,
           userId,
@@ -1410,50 +1399,6 @@ const EmployeeRequests = () => {
             }).catch(() => {});
           }
         }
-=======
-        await fetch(endpoint, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            id: userId,
-            userId,
-            _id: user?._id || userId,
-            email: user?.email,
-            isActive: false,
-            isApproved: false,
-            approved: false,
-            status: 'rejected',
-            teamLead: null,
-            teamLeadId: null,
-            assignedTL: null,
-            teamLeader: null,
-            teamLeadName: null,
-            teamLeadEmail: null
-          }),
-        });
-
-        // Also call /api/users/approve with status: rejected to ensure teamLead fields are cleared on MongoDB user doc
-        await fetch('https://kt-backend-yzr4.onrender.com/api/users/approve', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            id: userId,
-            userId,
-            _id: user?._id || userId,
-            email: user?.email,
-            isActive: false,
-            isApproved: false,
-            approved: false,
-            status: 'rejected',
-            teamLead: null,
-            teamLeadId: null,
-            assignedTL: null,
-            teamLeader: null,
-            teamLeadName: null,
-            teamLeadEmail: null
-          })
-        }).catch(() => {});
->>>>>>> 3a71a04ee1355d10738747d3bf48ebdb3d3dea8f
       } catch (uErr) {
         console.warn('User status update error:', uErr);
       }
