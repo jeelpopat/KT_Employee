@@ -12,6 +12,44 @@ import {
   fetchEmployeeTeamLead
 } from '../../utils/teamLeadUtils.js';
 
+const matchesEmployeeAssignment = (assignment, identifiers) => {
+  if (!assignment || !identifiers) return false;
+  if (Array.isArray(assignment)) {
+    return assignment.some(value => matchesEmployeeAssignment(value, identifiers));
+  }
+  if (typeof assignment !== 'object') {
+    const value = String(assignment).trim().toLowerCase();
+    return identifiers.ids.has(value) || identifiers.emails.has(value);
+  }
+
+  const values = [
+    assignment._id,
+    assignment.id,
+    assignment.userId,
+    assignment.employeeId,
+    assignment.employeeID,
+    assignment.empId
+  ].filter(Boolean);
+  const ids = values
+    .filter(value => typeof value !== 'object')
+    .map(value => String(value).trim().toLowerCase());
+  const emails = [
+    assignment.email,
+    assignment.user?.email,
+    assignment.employee?.email,
+    assignment.profile?.email
+  ]
+    .filter(Boolean)
+    .map(value => String(value).trim().toLowerCase());
+
+  return ids.some(id => identifiers.ids.has(id)) ||
+    emails.some(email => identifiers.emails.has(email)) ||
+    values.some(value => typeof value === 'object' && matchesEmployeeAssignment(value, identifiers)) ||
+    matchesEmployeeAssignment(assignment.user, identifiers) ||
+    matchesEmployeeAssignment(assignment.employee, identifiers) ||
+    matchesEmployeeAssignment(assignment.profile, identifiers);
+};
+
 export const DailyReportView = () => {
   const { user } = useApp();
   
@@ -57,25 +95,32 @@ export const DailyReportView = () => {
     try {
       let projs = [];
       let tsks = [];
+      const role = deriveUserRole(user);
+      const isEmployee = isEmployeeRole(role, user);
+      const userIdentifiers = getLoggedInUserIdentifiers(user);
+      [
+        user?.employeeID,
+        user?.employee?.employeeID,
+        user?.profile?.employeeID
+      ].filter(Boolean).forEach(id => userIdentifiers.ids.add(String(id).trim().toLowerCase()));
 
       // 1. Primary Live API call for projects: GET /api/projectManage/project/all
       try {
         const pResponse = await api.get('/api/projectManage/project/all');
         const pData = pResponse.data?.data || pResponse.data?.projects || pResponse.data || [];
         if (Array.isArray(pData) && pData.length > 0) {
-          let list = pData;
-          const role = deriveUserRole(user);
-          if (isTeamLeadRole(role, user)) {
-            const userIdent = getLoggedInUserIdentifiers(user);
-            const tlProjs = list.filter(p => isProjectAssignedToLead(p, userIdent));
-            if (tlProjs.length > 0) list = tlProjs;
-          }
-          projs = list.map(p => ({
+          let list = pData.map(p => ({
             ...p,
             _id: p._id || p.id,
             name: p.projectName || p.name || 'Project',
             projectName: p.projectName || p.name || 'Project'
           }));
+          if (isTeamLeadRole(role, user)) {
+            const userIdent = getLoggedInUserIdentifiers(user);
+            const tlProjs = list.filter(p => isProjectAssignedToLead(p, userIdent));
+            if (tlProjs.length > 0) list = tlProjs;
+          }
+          projs = list;
         }
       } catch (err) {
         console.warn("Notice loading projects from /api/projectManage/project/all:", err.message);
@@ -92,6 +137,51 @@ export const DailyReportView = () => {
         console.warn("Notice loading tasks from /api/projectManage/task/all:", tErr.message);
       }
 
+      if (isEmployee && projs.length > 0) {
+        const taskProjectIds = new Set(
+          tsks
+            .filter(task => matchesEmployeeAssignment(task.assignedEmployee, userIdentifiers))
+            .map(task => String(
+              task.projectId?._id || task.projectId?.id ||
+              (typeof task.projectId === 'object' ? '' : task.projectId) ||
+              task.project?._id || task.project
+            ).toLowerCase())
+            .filter(Boolean)
+        );
+
+        projs = (await Promise.all(projs.map(async project => {
+          const projectId = String(project._id || '').toLowerCase();
+          const embeddedEmployees = [
+            ...(Array.isArray(project.employees) ? project.employees : []),
+            ...(Array.isArray(project.members?.employees) ? project.members.employees : [])
+          ];
+          const embeddedAssignment = embeddedEmployees.some(member =>
+            matchesEmployeeAssignment(member, userIdentifiers)
+          );
+          if (embeddedAssignment || taskProjectIds.has(projectId)) return project;
+
+          if (embeddedEmployees.length > 0 || !projectId) return null;
+
+          try {
+            const membersResponse = await api.get(`/api/projectManage/project/members/${project._id}`);
+            const membersData = membersResponse.data?.data || membersResponse.data?.members || {};
+            const projectEmployees = [
+              ...(Array.isArray(membersData?.employees) ? membersData.employees : []),
+              ...(Array.isArray(membersData?.members) ? membersData.members : [])
+            ];
+            return projectEmployees.some(member =>
+              matchesEmployeeAssignment(member, userIdentifiers)
+            ) ? project : null;
+          } catch (membersError) {
+            console.warn(
+              `Notice loading members for project ${project._id}:`,
+              membersError.response?.data?.message || membersError.message
+            );
+            return null;
+          }
+        }))).filter(Boolean);
+      }
+
       // Fallback: If projects still empty, try legacy task fallback or assigned-meta
       if (projs.length === 0) {
         try {
@@ -101,6 +191,7 @@ export const DailyReportView = () => {
             if (tsks.length === 0) tsks = liveTasks;
             const projectMap = new Map();
             liveTasks.forEach(t => {
+              if (isEmployee && !matchesEmployeeAssignment(t.assignedEmployee, userIdentifiers)) return;
               if (t.projectId) {
                 const p = t.projectId;
                 const pId = typeof p === 'object' ? p._id : p;
@@ -128,6 +219,7 @@ export const DailyReportView = () => {
               name: p.projectName || p.name || 'Project',
               projectName: p.projectName || p.name || 'Project'
             }));
+            // The assigned-meta endpoint returns projects scoped to the signed-in employee.
           }
           if (Array.isArray(mData.tasks) && mData.tasks.length > 0 && tsks.length === 0) {
             tsks = mData.tasks;
