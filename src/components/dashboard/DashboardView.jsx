@@ -29,6 +29,40 @@ const TARGET_LNG = 72.53919;
 const GEOFENCE_RADIUS_METERS = 20; // Allowed strictly within 20 meters
 const AUTO_CHECKOUT_RADIUS_METERS = 20; // Auto checkout outside 20 meters
 
+const getUniqueBreaks = (breaks) => {
+  const uniqueBreaks = [];
+
+  breaks.forEach((breakItem) => {
+    const startTime = breakItem.startTime || breakItem.breakStart || breakItem.start;
+    const endTime = breakItem.endTime || breakItem.breakEnd || breakItem.end;
+    if (!startTime && !endTime) return;
+
+    const normalizeTime = (time) => {
+      const minutes = parseTimeToMinutes(time);
+      if (minutes !== null) return String(minutes);
+      const parsedTime = new Date(time).getTime();
+      return Number.isNaN(parsedTime) ? String(time).trim().toLowerCase() : String(parsedTime);
+    };
+    const startKey = startTime ? normalizeTime(startTime) : null;
+    const endKey = endTime ? normalizeTime(endTime) : null;
+    const existingBreak = uniqueBreaks.find((item) => (
+      (startKey && item.startKey === startKey) ||
+      ((!startKey || !item.startKey) && endKey && item.endKey === endKey)
+    ));
+
+    if (existingBreak) {
+      existingBreak.startTime = existingBreak.startTime || startTime;
+      existingBreak.endTime = existingBreak.endTime || endTime;
+      existingBreak.startKey = existingBreak.startKey || startKey;
+      existingBreak.endKey = existingBreak.endKey || endKey;
+    } else {
+      uniqueBreaks.push({ startTime, endTime, startKey, endKey });
+    }
+  });
+
+  return uniqueBreaks.map(({ startTime, endTime }) => ({ startTime, endTime }));
+};
+
 const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   const R = 6371000; // Earth radius in meters
   const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -564,10 +598,10 @@ export const DashboardView = () => {
       : [];
     const singleBreak = (ta?.breakStart || ta?.breakEnd) ? [{ startTime: ta.breakStart, endTime: ta.breakEnd }] : [];
 
-    const breaksList = [...rawBreaks, ...sessionBreaks, ...singleBreak].map(b => ({
+    const breaksList = getUniqueBreaks([...rawBreaks, ...sessionBreaks, ...singleBreak].map(b => ({
       startTime: b.startTime || b.breakStart || b.start,
       endTime: b.endTime || b.breakEnd || b.end
-    })).filter(b => b.startTime || b.endTime);
+    })));
 
     const yellowSegments = (segments || []).filter(s => s.type === 'yellow');
     const localBreakCount = parseInt(
@@ -619,11 +653,9 @@ export const DashboardView = () => {
       localStorage.removeItem('kt_on_break_' + todayLocalStr);
     }
 
-    // Breaks taken today (Maximum 2 breaks allowed per day)
-    // When backend data is loaded, backend breaksList/yellowSegments is authoritative!
+    // Break records are authoritative; use timeline segments only when no records exist.
     const backendBreakCount = Math.max(
-      breaksList.length,
-      yellowSegments.length,
+      breaksList.length || yellowSegments.length,
       isOnBreak ? 1 : 0
     );
     const totalBreaksTakenToday = isRejected ? 0 : (
