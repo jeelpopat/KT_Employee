@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Users,
   CheckCircle,
@@ -63,6 +63,7 @@ const EmployeeRequests = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [processingState, setProcessingState] = useState(null);
+  const usersFetchSequenceRef = useRef(0);
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -92,6 +93,7 @@ const EmployeeRequests = () => {
 
   // Fetch users from API
   const fetchUsers = async (isSilent = false) => {
+    const fetchSequence = ++usersFetchSequenceRef.current;
     try {
       if (!isSilent) {
         setLoading(true);
@@ -109,7 +111,9 @@ const EmployeeRequests = () => {
         const data = await response.json();
         userList = Array.isArray(data) ? data : data?.users || data?.data || [];
       }
-      setUsers(filterOutUnknownUsers(userList));
+      if (fetchSequence === usersFetchSequenceRef.current) {
+        setUsers(filterOutUnknownUsers(userList));
+      }
     } catch (err) {
       if (!isSilent) {
         setError(err.message || 'Something went wrong while loading users');
@@ -1328,79 +1332,93 @@ const EmployeeRequests = () => {
           const leadId = typeof rawLead === 'object' ? (rawLead._id || rawLead.id || rawLead.userId) : rawLead;
 
           if (leadId) {
+            const teamPayload = {
+              teamLead: leadId,
+              employees: remainingEmployees.map(e => typeof e === 'object' ? String(e._id || e.id || e.userId) : String(e))
+            };
             try {
-              await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
+              const response = await api.post('/api/teamLead/create-team', teamPayload, { headers });
+              if (response.data?.success === false) {
+                throw new Error(response.data?.message || 'Failed to update Team Lead members.');
+              }
+            } catch (apiError) {
+              const response = await fetch('https://kt-backend-yzr4.onrender.com/api/teamLead/create-team', {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({
-                  teamLead: leadId,
-                  employees: remainingEmployees.map(e => typeof e === 'object' ? String(e._id || e.id || e.userId) : String(e))
-                })
-              }).catch(() => {});
-            } catch (err) {
-              console.warn('Team Lead update during revoke error:', err);
+                body: JSON.stringify(teamPayload)
+              });
+              const responseData = await response.json().catch(() => ({}));
+              if (!response.ok || responseData?.success === false) {
+                throw new Error(responseData?.message || apiError.response?.data?.message || 'Failed to update Team Lead members.');
+              }
             }
           }
         }
       }
 
-      // 4. Update the user document on backend to reject and clear TL data (NEVER call /api/users/approve on revoke)
-      try {
-        const rejectPayload = {
-          id: userId,
-          userId,
-          _id: user?._id || userId,
-          email: user?.email,
-          isApproved: false,
-          approved: false,
-          status: 'rejected',
-          isActive: false,
-          employeeStatus: 'Inactive',
-          teamLead: null,
-          teamLeadId: null,
-          assignedTL: null,
-          teamLeader: null,
-          teamLeadName: null,
-          teamLeadEmail: null
-        };
+      // Revoke returns the request to pending; reject keeps the employee inactive.
+      const isRevoking = action === 'revoke';
+      const statusPayload = {
+        id: userId,
+        userId,
+        _id: user?._id || userId,
+        email: user?.email,
+        isApproved: false,
+        approved: false,
+        status: isRevoking ? 'pending' : 'rejected',
+        isActive: isRevoking,
+        employeeStatus: isRevoking ? 'Active' : 'Inactive',
+        teamLead: null,
+        teamLeadId: null,
+        assignedTL: null,
+        teamLeader: null,
+        teamLeadName: null,
+        teamLeadEmail: null
+      };
 
+      try {
+        const response = await api.put('/api/users/reject', statusPayload);
+        if (response.data?.success === false) {
+          throw new Error(response.data?.message || 'Failed to update employee request.');
+        }
+      } catch (axiosErr) {
+        console.warn('Axios reject error, trying direct fetch:', axiosErr?.message);
+        const response = await fetch(endpoint, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(statusPayload),
+        });
+        const responseData = await response.json().catch(() => ({}));
+        if (!response.ok || responseData?.success === false) {
+          throw new Error(responseData?.message || axiosErr.response?.data?.message || 'Failed to update employee request.');
+        }
+      }
+
+      // Also update employee list record if found
+      if (empRecordId) {
+        const employeeStatusPayload = {
+          isActive: isRevoking,
+          employeeStatus: isRevoking ? 'Active' : 'Inactive',
+          status: isRevoking ? 'active' : 'inactive',
+          teamLead: null,
+          teamLeadId: null
+        };
         try {
-          await api.put('/api/users/reject', rejectPayload);
-        } catch (axiosErr) {
-          console.warn('Axios reject error, trying direct fetch:', axiosErr?.message);
-          await fetch(endpoint, {
+          const response = await api.put(`/api/employee/edit/${empRecordId}`, employeeStatusPayload);
+          if (response.data?.success === false) {
+            throw new Error(response.data?.message || 'Failed to update employee status.');
+          }
+        } catch (apiError) {
+          const response = await fetch(`https://kt-backend-yzr4.onrender.com/api/employee/edit/${empRecordId}`, {
             method: 'PUT',
             headers,
-            body: JSON.stringify(rejectPayload),
+            body: JSON.stringify(employeeStatusPayload)
           });
-        }
-
-        // Also update employee list record if found
-        if (empRecordId) {
-          try {
-            await api.put(`/api/employee/edit/${empRecordId}`, {
-              isActive: false,
-              employeeStatus: 'Inactive',
-              status: 'inactive',
-              teamLead: null,
-              teamLeadId: null
-            });
-          } catch {
-            await fetch(`https://kt-backend-yzr4.onrender.com/api/employee/edit/${empRecordId}`, {
-              method: 'PUT',
-              headers,
-              body: JSON.stringify({
-                isActive: false,
-                employeeStatus: 'Inactive',
-                status: 'inactive',
-                teamLead: null,
-                teamLeadId: null
-              })
-            }).catch(() => {});
+          const responseData = await response.json().catch(() => ({}));
+          if (!response.ok || responseData?.success === false) {
+            throw new Error(responseData?.message || apiError.response?.data?.message || 'Failed to update employee status.');
           }
         }
-      } catch (uErr) {
-        console.warn('User status update error:', uErr);
       }
 
       // 5. Remove user from localStorage
@@ -1430,6 +1448,7 @@ const EmployeeRequests = () => {
       await fetchBackendTeams();
 
       // 7. Update React state
+      usersFetchSequenceRef.current += 1;
       setUsers((prevUsers) =>
         prevUsers.map((item, index) => {
           const itemId = getUserIdentifier(item, index);
@@ -1439,8 +1458,9 @@ const EmployeeRequests = () => {
             ...item,
             isApproved: false,
             approved: false,
-            isActive: false,
-            status: 'rejected',
+            isActive: action === 'revoke',
+            employeeStatus: action === 'revoke' ? 'Active' : 'Inactive',
+            status: action === 'revoke' ? 'pending' : 'rejected',
             teamLead: null,
             teamLeadId: null,
             assignedTL: null,
@@ -1452,7 +1472,9 @@ const EmployeeRequests = () => {
       );
 
       const userName = user?.name || user?.fullName || 'user';
-      setSuccessNotification(`Revoked access and removed Team Lead data for ${userName}.`);
+      setSuccessNotification(action === 'revoke'
+        ? `Approval revoked and request returned to pending for ${userName}.`
+        : `Rejected access and removed Team Lead data for ${userName}.`);
       setTimeout(() => setSuccessNotification(''), 4000);
     } catch (err) {
       setError(err.message || 'Something went wrong');
@@ -1721,7 +1743,7 @@ const EmployeeRequests = () => {
           const department = user?.department || null;
           const phone = user?.phone || user?.phoneNumber || null;
           const isApproved = user?.isApproved === true || user?.approved === true || user?.status === 'approved';
-          const isProcessingReject = processingState?.userId === userId && processingState?.action === 'reject';
+          const isProcessingReject = processingState?.userId === userId && (processingState?.action === 'reject' || processingState?.action === 'revoke');
           const isExpanded = expandedCards.has(userId);
           const StatusBadge = getStatusBadge(user).icon;
 
@@ -1980,7 +2002,7 @@ const EmployeeRequests = () => {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleAction(user, 'reject');
+                      handleAction(user, isApproved ? 'revoke' : 'reject');
                     }}
                     disabled={isProcessingReject}
                     className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isProcessingReject
