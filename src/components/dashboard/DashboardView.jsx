@@ -23,6 +23,34 @@ import {
   parseTimeToMinutes
 } from '../../utils/timelineUtils.js';
 
+const isAttendanceApproved = (record) => {
+  if (!record || record.isRejected === true || record.isRejectedCheckIn === true) return false;
+
+  const statuses = [
+    record.approvalStatus,
+    record.adminStatus,
+    record.checkInStatus,
+    record.checkInApprovalStatus,
+    record.status,
+    record.attendanceStatus,
+    record.adminDecision
+  ].map(value => String(value || '').toLowerCase().trim());
+
+  if (statuses.some(status => status.includes('reject'))) return false;
+  if (statuses.some(status => status === 'approved' || status === 'accepted')) return true;
+
+  return record.isApproved === true ||
+    record.isApprovedCheckIn === true ||
+    Boolean(record.approvedCheckInTime || record.approvedBy || record.approverId) ||
+    Boolean(
+      record.checkInTime &&
+      record.effectiveCheckInTime &&
+      !record.rejectionReason &&
+      !record.rejectedBy &&
+      !statuses.some(status => status.includes('pending'))
+    );
+};
+
 // --- Geofencing Configuration (Office Location & 20 Meter Strict Radius) ---
 const TARGET_LAT = 23.05829;
 const TARGET_LNG = 72.53919;
@@ -410,11 +438,7 @@ export const DashboardView = () => {
     // Explicit approval recognition (must not be not_checked_in status)
     const isExplicitlyApproved = Boolean(
       !isRejected && !isNotCheckedInStatus && (
-        ta?.isApproved === true ||
-        approvalStatusLower === 'approved' ||
-        adminStatusLower === 'approved' ||
-        checkInStatusLower === 'approved' ||
-        statusLower === 'approved' ||
+        isAttendanceApproved(ta) ||
         isPresentStatus ||
         isCheckedOutStatus
       )
@@ -422,15 +446,17 @@ export const DashboardView = () => {
 
     // Explicit pending check
     const isExplicitlyPending = Boolean(
-      statusLower === 'pending' ||
-      statusLower.includes('pending') ||
-      approvalStatusLower === 'pending' ||
-      approvalStatusLower.includes('pending') ||
-      adminStatusLower === 'pending' ||
-      adminStatusLower.includes('pending') ||
-      checkInStatusLower === 'pending' ||
-      checkInStatusLower.includes('pending') ||
-      ta?.isApproved === false
+      !isExplicitlyApproved && (
+        statusLower === 'pending' ||
+        statusLower.includes('pending') ||
+        approvalStatusLower === 'pending' ||
+        approvalStatusLower.includes('pending') ||
+        adminStatusLower === 'pending' ||
+        adminStatusLower.includes('pending') ||
+        checkInStatusLower === 'pending' ||
+        checkInStatusLower.includes('pending') ||
+        ta?.isApproved === false
+      )
     );
 
     // If server confirms employee is active/working/approved/completed today, purge any stale local pending flag
@@ -1087,9 +1113,16 @@ export const DashboardView = () => {
           });
           if (myPending) {
             // ONLY consider pending if user does NOT already have an active/present session
-            const hasActiveWork = Boolean(
-              (timelineItem && (['present', 'late', 'half day', 'checked_in', 'working', 'active', 'on_break', 'completed', 'checked_out'].some(s => String(timelineItem.status || '').toLowerCase().includes(s)) || (timelineItem.checkInTime && timelineItem.checkInTime !== '--:--'))) ||
-              (adminRecord && (['present', 'late', 'half day', 'checked_in', 'working', 'active', 'on_break', 'completed', 'checked_out'].some(s => String(adminRecord.status || adminRecord.attendanceStatus || '').toLowerCase().includes(s)) || (adminRecord.checkInTime || adminRecord.approvedCheckInTime || adminRecord.punchIn || adminRecord.checkIn)))
+            const hasActiveWork = [todayDoc, timelineItem, adminRecord].some(record =>
+              record && (
+                isAttendanceApproved(record) ||
+                ['present', 'late', 'half day', 'checked_in', 'working', 'active', 'on_break', 'completed', 'checked_out']
+                  .some(status => String(record.status || record.attendanceStatus || '').toLowerCase().includes(status)) ||
+                Boolean(
+                  (record.checkInTime || record.approvedCheckInTime || record.punchIn || record.checkIn) &&
+                  (record.checkInTime || record.approvedCheckInTime || record.punchIn || record.checkIn) !== '--:--'
+                )
+              )
             );
             if (!hasActiveWork) {
               pendingDoc = myPending;
@@ -1131,7 +1164,10 @@ export const DashboardView = () => {
         mergedCheckOut = adminRecord?.checkOutTime || adminRecord?.punchOut || adminRecord?.checkOut || todayDoc?.outTime || timelineItem?.outTime || null;
       }
 
-      const mergedStatus = todayDoc?.status || timelineItem?.status || adminRecord?.status || adminRecord?.attendanceStatus;
+      const approvedRecord = [todayDoc, timelineItem, adminRecord].find(isAttendanceApproved);
+      const mergedStatus = approvedRecord
+        ? 'approved'
+        : todayDoc?.status || timelineItem?.status || adminRecord?.status || adminRecord?.attendanceStatus;
 
       const mergedSource = {
         date: todayDoc?.date || timelineItem?.date || adminRecord?.date || new Date().toISOString().split('T')[0],
@@ -1140,16 +1176,24 @@ export const DashboardView = () => {
         ...(todayDoc || {}),
         date: todayDoc?.date || timelineItem?.date || adminRecord?.date || new Date().toISOString().split('T')[0],
         status: mergedStatus,
-        approvalStatus: todayDoc?.approvalStatus || timelineItem?.approvalStatus || adminRecord?.approvalStatus,
-        adminStatus: todayDoc?.adminStatus || timelineItem?.adminStatus || adminRecord?.adminStatus,
-        checkInStatus: todayDoc?.checkInStatus || timelineItem?.checkInStatus || adminRecord?.checkInStatus,
+        approvalStatus: approvedRecord
+          ? 'approved'
+          : todayDoc?.approvalStatus || timelineItem?.approvalStatus || adminRecord?.approvalStatus,
+        adminStatus: approvedRecord
+          ? 'approved'
+          : todayDoc?.adminStatus || timelineItem?.adminStatus || adminRecord?.adminStatus,
+        checkInStatus: approvedRecord
+          ? 'approved'
+          : todayDoc?.checkInStatus || timelineItem?.checkInStatus || adminRecord?.checkInStatus,
         checkInTime: mergedCheckIn,
         checkOutTime: mergedCheckOut,
         breaks: rawBreaks,
         totalBreakTime: todayDoc?.totalBreakTime ?? timelineItem?.totalBreakTime ?? adminRecord?.totalBreakTime ?? adminRecord?.breakDuration,
         rejectionReason: todayDoc?.rejectionReason || timelineItem?.rejectionReason || adminRecord?.rejectionReason || todayDoc?.rejectReason || timelineItem?.rejectReason,
         isRejected: todayDoc?.isRejected ?? timelineItem?.isRejected ?? adminRecord?.isRejected,
-        isApproved: todayDoc?.isApproved ?? timelineItem?.isApproved ?? adminRecord?.isApproved,
+        isApproved: approvedRecord
+          ? true
+          : todayDoc?.isApproved ?? timelineItem?.isApproved ?? adminRecord?.isApproved,
         timelineSegments: (segments && segments.length > 0) ? segments : (todayDoc?.timelineSegments || timelineItem?.timelineSegments || adminRecord?.timelineSegments || [])
       };
 
@@ -2187,21 +2231,24 @@ export const DashboardView = () => {
       ) {
         // Query /api/attendance/today immediately with skipCache to get the actual approval/rejection state
         let isConfirmedRejected = false;
+        let isConfirmedApproved = false;
+        let freshAttendance = null;
         let rejectReasonMsg = '';
         try {
           const freshAtt = await api.get('/api/attendance/today', { skipCache: true });
-          const fData = freshAtt.data?.attendance || freshAtt.data?.data?.attendance || freshAtt.data?.data || freshAtt.data;
-          const fStatus = String(fData?.status || '').toLowerCase();
-          const fApprv = String(fData?.approvalStatus || '').toLowerCase();
-          const fAdmin = String(fData?.adminStatus || '').toLowerCase();
+          freshAttendance = freshAtt.data?.attendance || freshAtt.data?.data?.attendance || freshAtt.data?.data || freshAtt.data;
+          const fStatus = String(freshAttendance?.status || '').toLowerCase();
+          const fApprv = String(freshAttendance?.approvalStatus || '').toLowerCase();
+          const fAdmin = String(freshAttendance?.adminStatus || '').toLowerCase();
           isConfirmedRejected = Boolean(
-            fData?.isRejected === true ||
+            freshAttendance?.isRejected === true ||
             fStatus.includes('reject') ||
             fApprv.includes('reject') ||
             fAdmin.includes('reject') ||
             lowerMsg.includes('reject')
           );
-          rejectReasonMsg = fData?.rejectionReason || fData?.rejectReason || '';
+          isConfirmedApproved = !isConfirmedRejected && isAttendanceApproved(freshAttendance);
+          rejectReasonMsg = freshAttendance?.rejectionReason || freshAttendance?.rejectReason || '';
         } catch (fetchErr) {
           isConfirmedRejected = lowerMsg.includes('reject');
         }
@@ -2224,6 +2271,13 @@ export const DashboardView = () => {
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
           const finalReason = rejectReasonMsg ? `Your check-in request was rejected by admin: ${rejectReasonMsg}` : "Your check-in request has been rejected by admin.";
           setGeoError(finalReason);
+          await syncDashboardAndAttendance(actualUserId);
+        } else if (isConfirmedApproved) {
+          localStorage.removeItem('kt_attendance_pending_' + todayStr);
+          localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
+          localStorage.removeItem('kt_attendance_rejected_' + todayStr);
+          localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
+          applyAttendanceState(freshAttendance);
           await syncDashboardAndAttendance(actualUserId);
         } else {
           // Genuinely pending admin approval
