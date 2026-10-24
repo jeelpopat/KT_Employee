@@ -1,12 +1,13 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ShieldAlert } from 'lucide-react';
+import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
 import { performAutoCheckout, clearAuth, isTokenExpired } from './utils/auth.js';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
 import { ToastContainer, showToast } from './components/common/Toast.jsx';
+import { stopScreenCapture } from './services/monitoringService.js';
 
 // Lazy-load layout and views so unauthenticated users download ONLY the Login screen
 const Sidebar = lazy(() => import('./components/layout/Sidebar.jsx').then(m => ({ default: m.Sidebar })));
@@ -56,8 +57,24 @@ const TeamLeaveManagementView = lazy(() => import('./components/placeholders/Pla
 const ReportView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.ReportView })));
 
 const MainLayout = ({ handleSignOut }) => {
-  const { currentTab, userRole, setCurrentTab, isRoleAllowed: roleCheck } = useApp();
+  const {
+    currentTab,
+    userRole,
+    setCurrentTab,
+    isRoleAllowed: roleCheck,
+    isScreenSharingActive,
+    startScreenCapture
+  } = useApp();
+  const [startingScreenCapture, setStartingScreenCapture] = useState(false);
+  const [screenCaptureError, setScreenCaptureError] = useState('');
   const location = useLocation();
+
+  useEffect(() => () => stopScreenCapture(), []);
+
+  const handleLayoutSignOut = async () => {
+    stopScreenCapture();
+    await handleSignOut();
+  };
 
   // Synchronize URL route with currentTab
   useEffect(() => {
@@ -159,30 +176,107 @@ const MainLayout = ({ handleSignOut }) => {
     }
   };
 
+  const requiresTeamLeadScreenCapture = userRole === 'team_leader' && !isScreenSharingActive;
+
+  const handleEnableScreenCapture = async () => {
+    setStartingScreenCapture(true);
+    setScreenCaptureError('');
+    try {
+      await startScreenCapture();
+    } catch (error) {
+      if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+        setScreenCaptureError('Screen sharing was not allowed. Select a screen and choose Share in your browser to continue.');
+      } else if (error?.name === 'NotFoundError') {
+        setScreenCaptureError('No screen source is available. Connect a display or choose an available screen and try again.');
+      } else {
+        setScreenCaptureError(error?.message || 'Could not start screen sharing. Check browser support and try again.');
+      }
+    } finally {
+      setStartingScreenCapture(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <Suspense fallback={<div className="h-16 border-b border-[#00334d] bg-[#003d5b]" />}>
-        <Header onSignOut={handleSignOut} />
-      </Suspense>
-      <Suspense fallback={null}>
-        <Sidebar onSignOut={handleSignOut} />
-      </Suspense>
-      <div className="lg:pl-60 flex flex-col min-h-screen pt-16">
-        <main className="flex-1 p-3 pt-4 sm:p-5 sm:pt-6 lg:p-6 lg:pt-6">
-          <div className="page-content w-full">
-            <Suspense fallback={
-              <div className="flex items-center justify-center min-h-[350px]">
-                <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-              </div>
-            }>
-              {renderActiveTab()}
-            </Suspense>
-          </div>
-        </main>
+      <div inert={requiresTeamLeadScreenCapture}>
+        <Suspense fallback={<div className="h-16 border-b border-[#00334d] bg-[#003d5b]" />}>
+          <Header onSignOut={handleLayoutSignOut} />
+        </Suspense>
+        <Suspense fallback={null}>
+          <Sidebar onSignOut={handleLayoutSignOut} />
+        </Suspense>
+        <div className="lg:pl-60 flex flex-col min-h-screen pt-16">
+          <main className="flex-1 p-3 pt-4 sm:p-5 sm:pt-6 lg:p-6 lg:pt-6">
+            <div className="page-content w-full">
+              <Suspense fallback={
+                <div className="flex items-center justify-center min-h-[350px]">
+                  <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              }>
+                {renderActiveTab()}
+              </Suspense>
+            </div>
+          </main>
+        </div>
+        <Suspense fallback={null}>
+          <InactivityAlertModal />
+        </Suspense>
       </div>
-      <Suspense fallback={null}>
-        <InactivityAlertModal />
-      </Suspense>
+      {requiresTeamLeadScreenCapture && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="screen-capture-title"
+          aria-describedby="screen-capture-description"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+              <Monitor size={28} />
+            </div>
+            <div className="mt-4 text-center">
+              <h2 id="screen-capture-title" className="text-xl font-bold text-slate-900">
+                Enable device screen monitoring
+              </h2>
+              <p id="screen-capture-description" className="mt-2 text-sm leading-6 text-slate-600">
+                To continue as a Team Leader, allow screen sharing. Your browser will ask you to choose a screen and confirm sharing. Screenshots are captured only while monitoring is active and your work session is checked in.
+              </p>
+            </div>
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+              For privacy and browser security, this permission must be granted separately in each browser and cannot be opened automatically. Choose a screen in the browser prompt, then select <strong>Share</strong>.
+            </div>
+            {screenCaptureError && (
+              <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+                {screenCaptureError}
+              </p>
+            )}
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                onClick={handleLayoutSignOut}
+                disabled={startingScreenCapture}
+                className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Log out
+              </button>
+              <button
+                type="button"
+                onClick={handleEnableScreenCapture}
+                disabled={startingScreenCapture}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-sm transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {startingScreenCapture ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Camera size={18} />
+                )}
+                {startingScreenCapture ? 'Waiting for browser permission…' : 'Enable Screen Capture'}
+                {!startingScreenCapture && <ShieldCheck size={17} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

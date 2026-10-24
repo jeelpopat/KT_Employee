@@ -1045,16 +1045,17 @@ export const startScreenCapture = async () => {
     return activeScreenStream;
   }
 
+  if (typeof window !== 'undefined' && !window.isSecureContext) {
+    throw new Error('Screen sharing requires a secure HTTPS connection.');
+  }
+
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
-    throw new Error('Screen Capture API (getDisplayMedia) is not supported in this browser. Please use Chrome, Edge, or Firefox on desktop.');
+    throw new Error('Screen sharing is not supported in this browser. Please use a recent desktop browser with screen capture support.');
   }
 
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: {
-        cursor: 'always',
-        displaySurface: 'monitor'
-      },
+      video: true,
       audio: false
     });
 
