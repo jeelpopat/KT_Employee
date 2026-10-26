@@ -43,6 +43,20 @@ const DEPARTMENTS = [
   "HR"
 ];
 
+const isValidPerformanceDate = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12) return false;
+
+  const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= daysInMonth[month - 1];
+};
+
 // Storage keys for cross-role persistence and sync
 const PERF_CACHE_KEY = "kt_performance_all_records";
 const PERF_STORE_KEY = "kt_performance_records_store";
@@ -1341,6 +1355,11 @@ const Performance = () => {
     if (e) e.preventDefault();
     if (!isAdmin) return;
 
+    if (!isValidPerformanceDate(modalForm.date)) {
+      showNotification("Please enter a valid date with a four-digit year.", "error");
+      return;
+    }
+
     if (!modalForm.employeeID) {
       showNotification("Please select an employee", "error");
       return;
@@ -2147,7 +2166,23 @@ const Performance = () => {
                     type="date"
                     required
                     value={modalForm.date || ""}
-                    onChange={(e) => setModalForm((prev) => ({ ...prev, date: e.target.value }))}
+                    max="9999-12-31"
+                    onChange={(e) => {
+                      const input = e.currentTarget;
+                      const value = input.value;
+                      if (input.validity.badInput || (value && !isValidPerformanceDate(value))) {
+                        input.value = modalForm.date;
+                        showNotification("Please enter a valid date with a four-digit year.", "error");
+                        return;
+                      }
+                      setModalForm((prev) => ({ ...prev, date: value }));
+                    }}
+                    onBlur={(e) => {
+                      if (e.currentTarget.validity.badInput) {
+                        e.currentTarget.value = modalForm.date;
+                        showNotification("Please enter a valid date with a four-digit year.", "error");
+                      }
+                    }}
                     className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer"
                   />
                 </div>

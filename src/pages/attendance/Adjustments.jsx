@@ -56,6 +56,20 @@ export const formatDateForInput = (raw) => {
   return "";
 };
 
+const isValidDateInput = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12) return false;
+
+  const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= daysInMonth[month - 1];
+};
+
 export default function Adjustments() {
   // ============================================================
   // DEFAULT ATTENDANCE SETTINGS
@@ -1037,11 +1051,18 @@ export default function Adjustments() {
   const handleDateChange = (
     e
   ) => {
+    const input = e.currentTarget;
+    const value = input.value;
+    if (input.validity.badInput || (value && !isValidDateInput(value))) {
+      input.value = formatDateForInput(formData.date);
+      showToast("Please enter a valid date with a four-digit year.", "error");
+      return;
+    }
+
     setFormData(
       (prev) => ({
         ...prev,
-        date:
-          e.target.value,
+        date: value,
       })
     );
   };
@@ -1240,6 +1261,11 @@ export default function Adjustments() {
       !formData.date
     ) {
       showToast("Please select Employee and Date.", "error");
+      return;
+    }
+
+    if (!isValidDateInput(formData.date)) {
+      showToast("Please enter a valid date with a four-digit year.", "error");
       return;
     }
 
@@ -2389,9 +2415,16 @@ export default function Adjustments() {
                   value={
                     formatDateForInput(formData.date)
                   }
+                  max="9999-12-31"
                   onChange={
                     handleDateChange
                   }
+                  onBlur={(e) => {
+                    if (e.currentTarget.validity.badInput) {
+                      e.currentTarget.value = formatDateForInput(formData.date);
+                      showToast("Please enter a valid date with a four-digit year.", "error");
+                    }
+                  }}
                   disabled={
                     editMode
                   }

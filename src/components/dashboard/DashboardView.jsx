@@ -2557,7 +2557,7 @@ export const DashboardView = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
 
               {/* Timeline Legend */}
-              <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-medium text-slate-500">
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></span>
                   Working Time
@@ -2585,24 +2585,18 @@ export const DashboardView = () => {
               ))}
             </div>
 
-            {/* Status Transition Markers Below Timeline (Check In, Break In, Extra Break, Break Out, Check Out, 9h End) */}
-            <div className="mt-3 space-y-2.5">
-              {/* Positioned Marker Ticks & Timestamps along Timeline */}
-              <div className="relative w-full h-5">
+            {/* Status transition timestamps below the timeline */}
+            <div className="mt-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 {(nineHourTimeline.statusMarkers || []).map((marker) => {
-                  let alignClass = '-translate-x-1/2';
-                  if (marker.percent <= 3) alignClass = 'translate-x-0';
-                  else if (marker.percent >= 97) alignClass = '-translate-x-full';
-
                   return (
                     <div
-                      key={`tick-${marker.id}`}
-                      style={{ left: `${marker.percent}%` }}
-                      className={`absolute top-0 flex flex-col items-center ${alignClass} transition-all pointer-events-auto group cursor-help`}
+                      key={`time-${marker.id}`}
+                      className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 transition-colors pointer-events-auto group cursor-help"
                       title={`${marker.label}: ${marker.timeStr}`}
                     >
-                      <div className={`w-1 h-2 rounded-full ${marker.dotClass} mb-0.5`} />
-                      <span className="text-[10px] font-mono font-bold text-slate-700 leading-none">
+                      <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${marker.dotClass}`} />
+                      <span className="whitespace-nowrap text-[10px] font-mono font-bold leading-none text-slate-700">
                         {marker.timeStr}
                       </span>
                     </div>
