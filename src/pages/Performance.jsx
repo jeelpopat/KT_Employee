@@ -1730,19 +1730,25 @@ const Performance = () => {
           ].map((item, idx) => (
             <div
               key={idx}
-              className="relative flex items-center justify-between h-[52px] sm:h-[58px] bg-white rounded-[10px] px-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] border border-slate-200/80 overflow-hidden font-poppins"
+              className="relative flex items-center h-[80px] w-full"
             >
-              {/* Left thick accent bar matching reference */}
+              {/* Left card for the border: width: 22; height: 80; border-top-left-radius: 10px; border-bottom-left-radius: 10px; */}
               <div
-                className="absolute left-0 top-0 bottom-0 w-[5px] rounded-l-[10px]"
-                style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
+                className="absolute left-0 top-0 bottom-0 w-[22px] h-[80px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+                style={{ background: "#034665", opacity: 1 }}
               />
-              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none pl-1">
-                {item.label}
-              </p>
-              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
-                {item.value}
-              </p>
+              {/* Inner card: height: 80; border-radius: 10px; border-width: 0.2px; */}
+              <div
+                className="relative z-10 ml-[11px] flex-1 h-[80px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+                style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+              >
+                <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none">
+                  {item.label}
+                </p>
+                <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                  {item.value}
+                </p>
+              </div>
             </div>
           ))}
         </div>
@@ -1756,18 +1762,25 @@ const Performance = () => {
           ].map((item, idx) => (
             <div
               key={idx}
-              className="relative flex items-center justify-between h-[52px] sm:h-[58px] bg-white rounded-[10px] px-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] border border-slate-200/80 overflow-hidden font-poppins"
+              className="relative flex items-center h-[80px] w-full"
             >
+              {/* Left card for the border */}
               <div
-                className="absolute left-0 top-0 bottom-0 w-[5px] rounded-l-[10px]"
-                style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
+                className="absolute left-0 top-0 bottom-0 w-[22px] h-[80px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+                style={{ background: "#034665", opacity: 1 }}
               />
-              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none pl-1">
-                {item.label}
-              </p>
-              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
-                {item.value}
-              </p>
+              {/* Inner card */}
+              <div
+                className="relative z-10 ml-[11px] flex-1 h-[80px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+                style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+              >
+                <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none">
+                  {item.label}
+                </p>
+                <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                  {item.value}
+                </p>
+              </div>
             </div>
           ))}
         </div>

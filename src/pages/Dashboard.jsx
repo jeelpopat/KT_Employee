@@ -744,7 +744,7 @@ export default function Dashboard() {
                 {/* Left card for the border: width: 22; height: 80; border-top-left-radius: 10px; border-bottom-left-radius: 10px; */}
                 <div
                   className="absolute left-0 top-0 bottom-0 w-[22px] h-[80px] rounded-tl-[10px] rounded-bl-[10px] z-0"
-                  style={{ background: "linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)", opacity: 1 }}
+                  style={{ background: "#034665", opacity: 1 }}
                 />
                 {/* Inner card: height: 80; border-radius: 10px; border-width: 0.2px; */}
                 <div
@@ -771,7 +771,7 @@ export default function Dashboard() {
               {/* Left card for the border */}
               <div
                 className="absolute left-0 top-0 bottom-0 w-[22px] h-[80px] rounded-tl-[10px] rounded-bl-[10px] z-0"
-                style={{ background: "linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)", opacity: 1 }}
+                style={{ background: "#034665", opacity: 1 }}
               />
               {/* Inner card */}
               <div
