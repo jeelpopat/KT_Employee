@@ -37,18 +37,15 @@ const isAttendanceApproved = (record) => {
   ].map(value => String(value || '').toLowerCase().trim());
 
   if (statuses.some(status => status.includes('reject'))) return false;
-  if (statuses.some(status => status === 'approved' || status === 'accepted')) return true;
+  if (record.isApproved === false || statuses.some(status => status.includes('pending'))) return false;
+  if (
+    [record.approvalStatus, record.adminStatus, record.checkInStatus, record.checkInApprovalStatus, record.adminDecision, record.status]
+      .some(value => ['approved', 'accepted'].includes(String(value || '').toLowerCase().trim()))
+  ) return true;
 
   return record.isApproved === true ||
     record.isApprovedCheckIn === true ||
-    Boolean(record.approvedCheckInTime || record.approvedBy || record.approverId) ||
-    Boolean(
-      record.checkInTime &&
-      record.effectiveCheckInTime &&
-      !record.rejectionReason &&
-      !record.rejectedBy &&
-      !statuses.some(status => status.includes('pending'))
-    );
+    Boolean(record.approvedCheckInTime || record.approvedBy || record.approverId);
 };
 
 // --- Geofencing Configuration (Office Location & 20 Meter Strict Radius) ---
@@ -435,42 +432,53 @@ export const DashboardView = () => {
       'checked_out', 'checked-out', 'checked out', 'completed'
     ].includes(statusLower);
 
-    // Explicit approval recognition (must not be not_checked_in status)
+    const checkInApprovalStatusLower = String(ta?.checkInApprovalStatus || '').toLowerCase().trim();
+    const adminDecisionLower = String(ta?.adminDecision || '').toLowerCase().trim();
+    const hasExplicitPendingStatus = Boolean(
+      statusLower.includes('pending') ||
+      approvalStatusLower.includes('pending') ||
+      adminStatusLower.includes('pending') ||
+      checkInStatusLower.includes('pending') ||
+      checkInApprovalStatusLower.includes('pending') ||
+      adminDecisionLower.includes('pending') ||
+      ta?.isApproved === false
+    );
+    const hasExplicitApprovedStatus = Boolean(
+      ta?.isApproved === true ||
+      ta?.isApprovedCheckIn === true ||
+      [approvalStatusLower, adminStatusLower, checkInStatusLower, checkInApprovalStatusLower, adminDecisionLower]
+        .some(status => status === 'approved' || status === 'accepted') ||
+      ta?.approvedCheckInTime ||
+      ta?.approvedBy ||
+      ta?.approverId
+    );
+
+    // Generic attendance statuses and punch times are not proof of admin approval.
     const isExplicitlyApproved = Boolean(
-      !isRejected && !isNotCheckedInStatus && (
-        isAttendanceApproved(ta) ||
-        isPresentStatus ||
-        isCheckedOutStatus
-      )
+      !isRejected &&
+      !isNotCheckedInStatus &&
+      !hasExplicitPendingStatus &&
+      (hasExplicitApprovedStatus || isAttendanceApproved(ta))
     );
 
-    // Explicit pending check
     const isExplicitlyPending = Boolean(
-      !isExplicitlyApproved && (
-        statusLower === 'pending' ||
-        statusLower.includes('pending') ||
-        approvalStatusLower === 'pending' ||
-        approvalStatusLower.includes('pending') ||
-        adminStatusLower === 'pending' ||
-        adminStatusLower.includes('pending') ||
-        checkInStatusLower === 'pending' ||
-        checkInStatusLower.includes('pending') ||
-        ta?.isApproved === false
-      )
+      !isExplicitlyApproved && hasExplicitPendingStatus
     );
 
-    // If server confirms employee is active/working/approved/completed today, purge any stale local pending flag
-    if (isPresentStatus || isCheckedOutStatus || isExplicitlyApproved) {
+    // Only an explicit approval from the server may clear the local pending request.
+    if (isExplicitlyApproved) {
       localStorage.removeItem('kt_attendance_pending_' + todayStr);
       localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
     }
 
-    // Pending Approval Recognition (strictly when check-in requested and not approved or explicitly pending)
+    const hasUnapprovedAttendance = Boolean(
+      !isRejected &&
+      !isExplicitlyApproved &&
+      (localPending || hasExplicitPendingStatus || hasValidCheckInTime || isPresentStatus || isCheckedOutStatus)
+    );
+
     const isPendingApproval = Boolean(
-      !isRejected && (
-        isExplicitlyPending ||
-        (localPending && !isExplicitlyApproved && !isPresentStatus && !isCheckedOutStatus)
-      )
+      !isRejected && (isExplicitlyPending || hasUnapprovedAttendance)
     );
 
     const hasValidCheckOutTime = Boolean(
@@ -1113,17 +1121,7 @@ export const DashboardView = () => {
           });
           if (myPending) {
             // ONLY consider pending if user does NOT already have an active/present session
-            const hasActiveWork = [todayDoc, timelineItem, adminRecord].some(record =>
-              record && (
-                isAttendanceApproved(record) ||
-                ['present', 'late', 'half day', 'checked_in', 'working', 'active', 'on_break', 'completed', 'checked_out']
-                  .some(status => String(record.status || record.attendanceStatus || '').toLowerCase().includes(status)) ||
-                Boolean(
-                  (record.checkInTime || record.approvedCheckInTime || record.punchIn || record.checkIn) &&
-                  (record.checkInTime || record.approvedCheckInTime || record.punchIn || record.checkIn) !== '--:--'
-                )
-              )
-            );
+            const hasActiveWork = [todayDoc, timelineItem, adminRecord].some(isAttendanceApproved);
             if (!hasActiveWork) {
               pendingDoc = myPending;
               if (!todayDoc) todayDoc = {};
@@ -2174,24 +2172,10 @@ export const DashboardView = () => {
         lowerMsg.includes('already signed out');
 
       if ((actionType === 'check_in' && isAlreadyCheckedIn) || isAlreadyCheckedIn) {
-        // User is already checked in today: activate Break In and Check Out!
-        localStorage.setItem('kt_checked_in_' + todayStr, 'true');
-        localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
-        localStorage.removeItem('kt_checked_out_' + todayStr);
-        localStorage.removeItem('kt_checked_out_' + todayLocalStr);
-        const existingInStr = localStorage.getItem('kt_check_in_time_str');
-        if (!existingInStr || existingInStr === '--:--') {
-          localStorage.setItem('kt_check_in_time_str', nowLocal);
-          setCheckInTimeDisplay(nowLocal);
-        } else {
-          setCheckInTimeDisplay(existingInStr);
+        const existingAttendance = await syncDashboardAndAttendance(actualUserId || realUserId);
+        if (!existingAttendance) {
+          setGeoError('A check-in record already exists, but its approval status could not be verified. Please refresh or contact an admin.');
         }
-        setAttendanceStatus('checked_in');
-        if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
-        const curB = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
-        setActionsAvailable({ canCheckIn: false, canStartBreak: curB < 2, canEndBreak: false, canCheckOut: true });
-        setGeoError('');
-        await syncDashboardAndAttendance(actualUserId || realUserId);
       } else if ((actionType === 'break_start' && isAlreadyOnBreak) || isAlreadyOnBreak) {
         // User is already on break: activate ONLY Break Out
         localStorage.setItem('kt_on_break_' + todayStr, 'true');
@@ -2307,20 +2291,23 @@ export const DashboardView = () => {
             ...(realUserId ? { userId: realUserId } : {})
           });
           if (directRetry && (directRetry.status === 200 || directRetry.status === 201 || directRetry.data?.success || directRetry.data?.attendance)) {
-            setGeoError('');
             if (actionType === 'check_in') {
-              localStorage.setItem('kt_checked_in_' + todayStr, 'true');
-              localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
+              localStorage.setItem('kt_attendance_pending_' + todayStr, 'true');
+              localStorage.setItem('kt_attendance_pending_' + todayLocalStr, 'true');
+              localStorage.removeItem('kt_attendance_rejected_' + todayStr);
+              localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
+              localStorage.removeItem('kt_checked_in_' + todayStr);
+              localStorage.removeItem('kt_checked_in_' + todayLocalStr);
               localStorage.removeItem('kt_checked_out_' + todayStr);
               localStorage.removeItem('kt_checked_out_' + todayLocalStr);
-              localStorage.setItem('kt_check_in_time_str', nowLocal);
-              setCheckInTimeDisplay(nowLocal);
-              setAttendanceStatus('checked_in');
-              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
-              setActionsAvailable({ canCheckIn: false, canStartBreak: true, canEndBreak: false, canCheckOut: true });
+              setAttendanceStatus('pending');
+              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('pending');
+              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
+              setGeoError('Your check-in request is pending admin approval. Please wait for admin approval.');
               await syncDashboardAndAttendance(actualUserId || realUserId);
               return;
             } else if (actionType === 'check_out') {
+              setGeoError('');
               localStorage.setItem('kt_checked_out_' + todayStr, 'true');
               localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
               localStorage.removeItem('kt_on_break_' + todayStr);
