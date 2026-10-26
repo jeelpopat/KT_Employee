@@ -430,6 +430,7 @@ const Performance = () => {
   const fetchAllPerformances = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
+      let fetchedData = [];
       if (isAdmin || isTL) {
         let liveSucceeded = false;
         try {
@@ -470,15 +471,20 @@ const Performance = () => {
               return true;
             }));
 
-            // Update persistent cache so reviews remain synchronized
-            try {
-              localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(filteredPerfs));
-              localStorage.setItem(PERF_STORE_KEY, JSON.stringify(filteredPerfs));
-            } catch { }
+            if (isAdmin) {
+              // Update persistent cache so reviews remain synchronized
+              try {
+                localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(filteredPerfs));
+                localStorage.setItem(PERF_STORE_KEY, JSON.stringify(filteredPerfs));
+              } catch { }
 
-            setPerformances(filteredPerfs);
-            liveSucceeded = true;
-            return;
+              setPerformances(filteredPerfs);
+              liveSucceeded = true;
+              return;
+            }
+
+            // Team Leads also load their team-specific endpoints below; /all can be scoped to self.
+            fetchedData = filteredPerfs;
           }
         } catch {
           // If fetch fails or is forbidden, fall through to candidate endpoints
@@ -494,7 +500,6 @@ const Performance = () => {
 
       // Candidate endpoints for Employee & TL fallback
       const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").trim();
-      let fetchedData = [];
 
       const candidateEndpoints = [
         ...(isTL ? [
@@ -539,14 +544,8 @@ const Performance = () => {
       // If TL, also merge all real stored performances from persistent store
       if (isTL) {
         const stored = getStoredPerformances();
-        const mergedMap = new Map();
-        fetchedData.forEach((p) => mergedMap.set(String(p._id || `${p.employeeEmail}-${p.createdAt}`), p));
-        stored.forEach((p) => {
-          if (p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p)) {
-            mergedMap.set(String(p._id || `${p.employeeEmail}-${p.createdAt}`), p);
-          }
-        });
-        setPerformances(Array.from(mergedMap.values()));
+        const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
+        setPerformances(dedupePerformanceRecords([...fetchedData, ...validStored]));
       } else {
         setPerformances(dedupePerformanceRecords(fetchedData));
       }
