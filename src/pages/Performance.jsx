@@ -182,7 +182,7 @@ const purgeStalePerformances = () => {
         localStorage.removeItem(key);
       }
     });
-  } catch {}
+  } catch { }
 };
 
 // Run purge immediately on module execution
@@ -512,7 +512,7 @@ const Performance = () => {
             empIds.forEach(addTeamMemberIdentifiers);
           }
         });
-      } catch {}
+      } catch { }
 
       try {
         const userTLMap = JSON.parse(localStorage.getItem("kt_user_assigned_tl") || "{}");
@@ -521,7 +521,7 @@ const Performance = () => {
             addTeamMemberIdentifiers(uid);
           }
         });
-      } catch {}
+      } catch { }
 
       setTeamEmployeesScope(teamScope);
     } catch (err) {
@@ -562,8 +562,8 @@ const Performance = () => {
                     fetch(`https://kt-backend-yzr4.onrender.com/api/performance/delete/${perf._id}`, {
                       method: "DELETE",
                       headers
-                    }).catch(() => {});
-                  } catch {}
+                    }).catch(() => { });
+                  } catch { }
                 }
               });
             }
@@ -731,7 +731,7 @@ const Performance = () => {
       try {
         localStorage.removeItem(PERF_CACHE_KEY);
         localStorage.removeItem(PERF_STORE_KEY);
-      } catch {}
+      } catch { }
     }
     if (isAdmin || isTL) {
       fetchEmployees();
@@ -1515,7 +1515,7 @@ const Performance = () => {
                 newId = latest._id || latest.id;
               }
             }
-          } catch {}
+          } catch { }
         }
 
         if (newId && !String(newId).startsWith("perf-")) {
@@ -1670,34 +1670,30 @@ const Performance = () => {
               <button
                 type="button"
                 onClick={() => setTlViewScope("team")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  tlViewScope === "team"
-                    ? "bg-white text-indigo-600 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${tlViewScope === "team"
+                  ? "bg-white text-indigo-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 <Users size={14} />
                 <span>My Team</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  tlViewScope === "team" ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "bg-slate-200 text-slate-600"
-                }`}>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${tlViewScope === "team" ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "bg-slate-200 text-slate-600"
+                  }`}>
                   {teamPerformancesCount}
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => setTlViewScope("my")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  tlViewScope === "my"
-                    ? "bg-white text-indigo-600 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${tlViewScope === "my"
+                  ? "bg-white text-indigo-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 <User size={14} />
                 <span>My Review</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  tlViewScope === "my" ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "bg-slate-200 text-slate-600"
-                }`}>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${tlViewScope === "my" ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "bg-slate-200 text-slate-600"
+                  }`}>
                   {personalPerformancesCount}
                 </span>
               </button>
@@ -1730,16 +1726,16 @@ const Performance = () => {
           ].map((item, idx) => (
             <div
               key={idx}
-              className="relative flex items-center h-[80px] w-full"
+              className="relative flex items-center h-[60px] w-full"
             >
               {/* Left card for the border: width: 22; height: 80; border-top-left-radius: 10px; border-bottom-left-radius: 10px; */}
               <div
-                className="absolute left-0 top-0 bottom-0 w-[22px] h-[80px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+                className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
                 style={{ background: "#034665", opacity: 1 }}
               />
               {/* Inner card: height: 80; border-radius: 10px; border-width: 0.2px; */}
               <div
-                className="relative z-10 ml-[11px] flex-1 h-[80px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+                className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
                 style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
               >
                 <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none">
@@ -1762,16 +1758,16 @@ const Performance = () => {
           ].map((item, idx) => (
             <div
               key={idx}
-              className="relative flex items-center h-[80px] w-full"
+              className="relative flex items-center h-[60px] w-full"
             >
               {/* Left card for the border */}
               <div
-                className="absolute left-0 top-0 bottom-0 w-[22px] h-[80px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+                className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
                 style={{ background: "#034665", opacity: 1 }}
               />
               {/* Inner card */}
               <div
-                className="relative z-10 ml-[11px] flex-1 h-[80px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+                className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
                 style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
               >
                 <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none">
@@ -1938,6 +1934,8 @@ const Performance = () => {
                   <th className="py-3 px-4 text-left font-semibold">Department</th>
                   <th className="py-3 px-4 text-left font-semibold">Type</th>
                   <th className="py-3 px-4 text-left font-semibold">Performance</th>
+                  <th className="py-3 px-4 text-left font-semibold">Rating</th>
+                  <th className="py-3 px-4 text-left font-semibold">Feedback</th>
                   <th className="py-3 px-4 text-left font-semibold">Remark</th>
                   <th className="py-3 px-4 text-left font-semibold">Date</th>
                   <th className="py-3 px-4 text-center font-semibold">Action</th>
@@ -1951,6 +1949,8 @@ const Performance = () => {
                   const pct = getNumericPercentage(perf);
                   const dept = getDepartment(perf);
                   const empType = perf.employeeType || (perf.role ? (String(perf.role).toLowerCase().includes("lead") ? "Team Leader" : "Employee") : "Employee");
+                  const ratingVal = getRating(perf);
+                  const feedbackText = getFeedback(perf);
                   const remarksText = getRemarks(perf);
                   const dateFormatted = formatRowDate(perf.createdAt || perf.date);
 
@@ -2008,8 +2008,33 @@ const Performance = () => {
                         </div>
                       </td>
 
+                      {/* Rating */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap inline-block ${getRatingBadgeStyle(ratingVal)}`}>
+                          {ratingVal}
+                        </span>
+                      </td>
+
+                      {/* Feedback */}
+                      <td className="py-3.5 px-4 max-w-[200px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-slate-600 truncate font-normal" title={feedbackText}>
+                            {feedbackText}
+                          </span>
+                          {feedbackText && feedbackText !== "—" && feedbackText.length > 25 && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedFeedbackModal({ perf, field: "feedback" })}
+                              className="text-[11px] text-[#0088cc] hover:underline font-semibold shrink-0 cursor-pointer"
+                            >
+                              View
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
                       {/* Remark */}
-                      <td className="py-3.5 px-4 max-w-[220px]">
+                      <td className="py-3.5 px-4 max-w-[200px]">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-slate-600 truncate font-normal" title={remarksText}>
                             {remarksText}
