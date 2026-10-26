@@ -426,6 +426,38 @@ const formatIndianDate = (value) => {
   });
 };
 
+const formatTableDate = (value) => {
+  if (!value) return '—';
+  const parts = String(value).split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}/${parts[0]}`;
+  }
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${m}/${d}/${y}`;
+  }
+  return value;
+};
+
+const formatHeaderDate = (value) => {
+  if (!value) return '';
+  const parts = String(value).split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}-${m}-${y}`;
+  }
+  return value;
+};
+
 /* =========================================================
    PARSE TIME TO MINUTES
 ========================================================= */
@@ -667,17 +699,12 @@ const AttendanceTimeline = ({
   checkOut,
   approvalStatus,
 }) => {
-  const [
-    localHoveredSegment,
-    setLocalHoveredSegment,
-  ] = useState(null);
-
   // =========================================================
   // NEVER RUN TIMER UNTIL APPROVED AND VALID CHECK-IN EXISTS
   // =========================================================
   if (approvalStatus !== 'approved' || !checkIn || checkIn === '—' || checkIn === '--:--') {
     return (
-      <div className="w-full bg-slate-100/80 h-7 rounded-lg flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/60">
+      <div className="w-full bg-slate-50 h-7 rounded-md flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/50">
         {approvalStatus === 'pending'
           ? 'Pending approval'
           : approvalStatus === 'rejected'
@@ -697,128 +724,75 @@ const AttendanceTimeline = ({
 
   if (segments.length === 0) {
     return (
-      <div className="w-full bg-slate-100/80 h-7 rounded-lg flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/60">
+      <div className="w-full bg-slate-50 h-7 rounded-md flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/50">
         No timeline data available
       </div>
     );
   }
 
-  const getColorClass = (color) => {
-    switch (color) {
-      case 'blue':
-        return 'bg-gradient-to-r from-blue-500 to-blue-600';
-      case 'yellow':
-        return 'bg-gradient-to-r from-amber-400 to-amber-500';
-      case 'gray':
-        return 'bg-gradient-to-r from-slate-400 to-slate-500';
-      default:
-        return 'bg-slate-300';
-    }
-  };
-
-  const getHoverColor = (color) => {
-    switch (color) {
-      case 'blue':
-        return 'hover:brightness-105';
-      case 'yellow':
-        return 'hover:brightness-105';
-      case 'gray':
-        return 'hover:brightness-105';
-      default:
-        return '';
-    }
-  };
+  const hasValidCheckOut = Boolean(checkOut && checkOut !== '—' && checkOut !== '--:--');
+  const isBreakActive = Boolean(breaks && Array.isArray(breaks) && breaks.some((b) => b.startTime && !b.endTime));
+  const currentStatusLabel = hasValidCheckOut ? 'Completed' : (isBreakActive ? 'Break' : 'Working');
+  const currentStatusColor = hasValidCheckOut ? 'text-slate-500' : (isBreakActive ? 'text-[#eab308]' : 'text-[#0284c7]');
 
   return (
-    <div className="space-y-1.5 min-w-[280px]">
+    <div className="space-y-1 min-w-[280px] max-w-[420px] font-poppins">
+      {/* Top line: In, Out, and Working/Break Status */}
       <div className="flex items-center justify-between text-[11px] text-slate-500">
-        <div className="flex items-center gap-2 font-medium">
-          <span className="flex items-center gap-1 text-slate-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            In: <span className="font-semibold text-slate-900">{formatTime(checkIn)}</span>
+        <div className="flex items-center gap-2 font-normal">
+          <span className="flex items-center gap-1.5 text-slate-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <span>In: <strong className="font-semibold text-slate-700">{formatTime(checkIn)}</strong></span>
           </span>
-          <span className="text-slate-300">•</span>
-          <span className="flex items-center gap-1 text-slate-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            Out: <span className="font-semibold text-slate-900">{formatTime(checkOut)}</span>
+          <span className="flex items-center gap-1.5 text-slate-600 ml-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+            <span>Out: <strong className="font-semibold text-slate-700">{hasValidCheckOut ? formatTime(checkOut) : '-'}</strong></span>
           </span>
         </div>
 
-        <div className="flex items-center gap-1 text-[10px] text-slate-500">
-          {segments.map((seg, idx) => (
-            <span key={idx} className="flex items-center gap-1">
-              {idx > 0 && <span className="text-slate-300">→</span>}
-              <span
-                className={`font-medium ${
-                  seg.color === 'blue'
-                    ? 'text-blue-600'
-                    : seg.color === 'yellow'
-                      ? 'text-amber-600'
-                      : 'text-slate-500'
-                }`}
-              >
-                {seg.label}
-              </span>
-            </span>
-          ))}
-        </div>
+        <span className={`text-[11px] font-semibold ${currentStatusColor}`}>
+          {currentStatusLabel}
+        </span>
       </div>
 
-      <div className="relative w-full h-4 rounded-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-2xs">
+      {/* Middle line: Progress Bar */}
+      <div className="relative w-full h-2 rounded-full overflow-hidden bg-slate-200">
         {segments.map((segment, idx) => {
           const width =
             ((segment.end - segment.start) /
               totalDuration) *
             100;
 
-          const isHovered =
-            localHoveredSegment === idx;
-
           return (
             <div
               key={idx}
-              className={`
-                ${getColorClass(segment.color)}
-                ${getHoverColor(segment.color)}
-                h-full
-                absolute
-                top-0
-                left-0
-                flex
-                items-center
-                justify-center
-                text-white
-                text-[10px]
-                font-semibold
-                transition-all
-                duration-150
-                cursor-pointer
-                ${isHovered ? 'z-10 shadow-xs' : ''}
-              `}
+              className={`h-full absolute top-0 left-0 transition-all duration-150 rounded-full ${
+                segment.color === 'yellow'
+                  ? 'bg-[#eab308]'
+                  : segment.color === 'gray'
+                    ? 'bg-slate-400'
+                    : 'bg-[#0284c7]'
+              }`}
               style={{
-                width: `${width}%`,
-                left: `${((segment.start -
-                  segments[0].start) /
-                  totalDuration) *
-                  100
-                  }%`,
+                width: `${Math.min(100, Math.max(0, width))}%`,
+                left: `${Math.min(100, Math.max(0, ((segment.start - segments[0].start) / totalDuration) * 100))}%`,
               }}
-              onMouseEnter={() =>
-                setLocalHoveredSegment(idx)
-              }
-              onMouseLeave={() =>
-                setLocalHoveredSegment(null)
-              }
               title={`${segment.label}: ${segment.startTime} - ${segment.endTime}`}
-            >
-              {width > 14 && (
-                <span className="truncate px-1.5 text-[9px] font-bold">
-                  {segment.label}
-                </span>
-              )}
-            </div>
+            />
           );
         })}
+      </div>
+
+      {/* Bottom line: Check-In & Check-Out Icons */}
+      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+        <span className="flex items-center gap-1 text-emerald-600 font-medium">
+          <LogIn size={11} className="text-emerald-500" />
+          Check-In
+        </span>
+        <span className="flex items-center gap-1 text-rose-500 font-medium">
+          <LogOut size={11} className="text-rose-400" />
+          Check-Out
+        </span>
       </div>
     </div>
   );
@@ -1637,70 +1611,58 @@ export default function AttendanceLogs() {
      UI
   ========================================================= */
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-5 font-poppins">
 
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-            <Clock size={18} />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Attendance Logs
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Daily employee attendance records, shift timelines and break details.
-            </p>
-          </div>
+      {/* ==================================================== */}
+      {/* 1. HEADER SECTION */}
+      {/* ==================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 font-poppins">
+        <div>
+          <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
+            Attendance Logs
+          </h1>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          {/* DATE */}
-          <div className="h-10 flex items-center gap-2 bg-white border border-slate-200/80 rounded-lg px-3 py-1 shadow-xs">
-            <Calendar className="h-4 w-4 text-gray-500" />
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap font-poppins">
+          {/* DATE PICKER */}
+          <div className="relative flex items-center h-9 bg-white border border-slate-300 rounded-md px-3 shadow-2xs gap-2 font-poppins cursor-pointer hover:bg-slate-50 transition-colors">
+            <Calendar size={14} className="text-slate-700 shrink-0" />
+            <span className="text-xs font-medium text-slate-800 select-none">
+              {formatHeaderDate(selectedDate)}
+            </span>
             <input
               type="date"
               value={selectedDate}
-              onChange={(e) =>
-                setSelectedDate(
-                  e.target.value
-                )
-              }
-              className="text-xs sm:text-sm text-gray-700 focus:outline-none bg-transparent"
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
             />
           </div>
 
-          {/* TOTAL */}
-          <div className="h-10 bg-white border border-slate-200/80 rounded-lg px-3.5 py-1 shadow-xs flex items-center gap-1.5 sm:gap-2">
-            <Users className="h-4 w-4 text-gray-400" />
-            <span className="text-xs sm:text-sm text-gray-600 hidden xs:inline">
-              Total:
-            </span>
-            <span className="font-semibold text-gray-900 text-xs sm:text-sm">
-              {logs.length}
-            </span>
+          {/* TOTAL COUNT */}
+          <div className="h-9 bg-white border border-slate-300 rounded-md px-3 shadow-2xs flex items-center gap-1.5 font-poppins">
+            <Users size={14} className="text-slate-600" />
+            <span className="text-xs font-semibold text-slate-800">{logs.length}</span>
           </div>
 
-          {/* REFRESH */}
+          {/* SYNC / REFRESH */}
           <button
             type="button"
             onClick={() => fetchLogs()}
             disabled={loading}
             title="Refresh attendance records"
-            className="h-10 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg shadow-xs flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
+            className="h-9 w-9 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer font-poppins"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#0088cc]' : 'text-slate-500'}`} />
-            <span className="hidden xs:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
+            <RefreshCw size={13} className={loading ? 'animate-spin text-[#0088cc]' : 'text-slate-600'} />
           </button>
 
-          {/* EXPORT */}
+          {/* EXPORT EXCEL */}
           <button
+            type="button"
             onClick={() => setShowExportOptions(true)}
-            className="h-10 btn-brand-primary text-white px-4 py-1 rounded-lg shadow-xs flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium transition-all cursor-pointer"
-            style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+            className="h-9 px-3.5 text-white rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer font-poppins"
+            style={{ background: '#034665' }}
           >
-            <FileSpreadsheet className="h-4 w-4" />
+            <FileSpreadsheet size={15} />
             <span>Export Excel</span>
           </button>
         </div>
@@ -1708,26 +1670,26 @@ export default function AttendanceLogs() {
 
       {showExportOptions && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 font-poppins"
           role="presentation"
           onClick={() => !exportingMonth && setShowExportOptions(false)}
         >
           <div
-            className="w-full max-w-sm bg-white rounded-xl border border-slate-200/80 shadow-2xl overflow-hidden"
+            className="w-full max-w-sm bg-white rounded-xl border border-slate-200/80 shadow-2xl overflow-hidden font-poppins"
             role="dialog"
             aria-modal="true"
             aria-labelledby="attendance-export-title"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-              <h2 id="attendance-export-title" className="font-semibold text-gray-800">
+              <h2 id="attendance-export-title" className="font-semibold text-gray-800 text-sm">
                 Download Attendance
               </h2>
               <button
                 type="button"
                 onClick={() => setShowExportOptions(false)}
                 aria-label="Close export options"
-                className="p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 rounded-lg"
+                className="p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 rounded-lg cursor-pointer"
                 disabled={exportingMonth}
               >
                 <X className="h-5 w-5" />
@@ -1737,7 +1699,7 @@ export default function AttendanceLogs() {
               <button
                 type="button"
                 onClick={exportToExcel}
-                className="flex w-full items-center gap-3 border border-gray-200 rounded-lg px-3 py-3 text-left hover:bg-gray-50 transition-colors"
+                className="flex w-full items-center gap-3 border border-gray-200 rounded-lg px-3 py-3 text-left hover:bg-gray-50 transition-colors cursor-pointer"
                 disabled={exportingMonth}
               >
                 <Calendar className="h-5 w-5 text-emerald-600" />
@@ -1749,7 +1711,7 @@ export default function AttendanceLogs() {
               <button
                 type="button"
                 onClick={exportMonthToExcel}
-                className="flex w-full items-center gap-3 border border-gray-200 rounded-lg px-3 py-3 text-left hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-60"
+                className="flex w-full items-center gap-3 border border-gray-200 rounded-lg px-3 py-3 text-left hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-60 cursor-pointer"
                 disabled={exportingMonth}
               >
                 {exportingMonth ? (
@@ -1769,8 +1731,10 @@ export default function AttendanceLogs() {
         </div>
       )}
 
-      {/* STATS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      {/* ==================================================== */}
+      {/* 2. TOP METRICS ROW */}
+      {/* ==================================================== */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
         {[
           { label: "ON TIME", value: onTimeCount },
           { label: "LATE", value: lateCount },
@@ -1779,110 +1743,119 @@ export default function AttendanceLogs() {
         ].map((item, idx) => (
           <div
             key={idx}
-            className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
+            className="relative flex items-center h-[60px] w-full"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
+            {/* Left card for the border */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+              style={{ background: "#034665", opacity: 1 }}
+            />
+            {/* Inner card */}
+            <div
+              className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+              style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+            >
+              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none">
+                {item.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                {item.value}
+              </p>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
           </div>
         ))}
       </div>
 
       {/* ==================================================== */}
-      {/* 3. ATTENDANCE HISTORY CARD (MATCHING PERFORMANCE) */}
+      {/* 3. ATTENDANCE LOGS MAIN CONTAINER */}
       {/* ==================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4 font-poppins">
 
-        {/* Header Row: Title & Timeline Legend */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-              <FileText size={16} />
+        {/* Status Legend / Summary Icons */}
+        <div className="flex items-center gap-6 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-[4px] bg-[#0284c7] flex items-center justify-center shadow-2xs">
+              <Briefcase size={12} className="text-white" strokeWidth={2.5} />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Attendance Records
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Daily employee attendance records, shift timelines and break details
-              </p>
-            </div>
+            <span className="text-xs font-medium text-slate-800 font-poppins">Working</span>
           </div>
 
-          {/* Timeline Legend Pills */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/80">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              Working
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/80">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              Break
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-              <span className="w-2 h-2 rounded-full bg-slate-400" />
-              Idle
-            </span>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-[4px] bg-[#eab308] flex items-center justify-center shadow-2xs">
+              <Coffee size={12} className="text-white" strokeWidth={2.5} />
+            </div>
+            <span className="text-xs font-medium text-slate-800 font-poppins">Break</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-[4px] bg-[#94a3b8] flex items-center justify-center shadow-2xs">
+              <PauseCircle size={12} className="text-white" strokeWidth={2.5} />
+            </div>
+            <span className="text-xs font-medium text-slate-800 font-poppins">Idle</span>
           </div>
         </div>
 
-        {/* Filter Toolbar: Search + Status + Sort */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-1">
-          <div className="relative w-full md:flex-1 max-w-md">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        {/* Filter Toolbar: Search on left + Status & Sort dropdowns on right */}
+        <div className="flex flex-col md:flex-row items-end justify-between gap-3 pt-1 font-poppins">
+          <div className="relative w-full md:w-[320px] lg:w-[360px]">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search employee by name or email..."
+              placeholder="Search by employee name, email or department..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all"
+              className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] font-poppins transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
+          <div className="flex items-center gap-3 w-full md:w-auto flex-wrap justify-end font-poppins">
             {/* Status Filter */}
-            <div className="relative">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer appearance-none pr-8 font-normal"
-              >
-                <option value="all">All Status</option>
-                <option value="on time">On Time</option>
-                <option value="present">Present</option>
-                <option value="late">Late</option>
-                <option value="half day">Half Day</option>
-                <option value="absent">Absent</option>
-                <option value="on leave">On Leave</option>
-              </select>
-              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-500 font-medium font-poppins mb-1">Status</span>
+              <div className="relative">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="h-8 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] cursor-pointer appearance-none pr-7 font-poppins"
+                >
+                  <option value="all">All Status</option>
+                  <option value="on time">On Time</option>
+                  <option value="present">Present</option>
+                  <option value="late">Late</option>
+                  <option value="half day">Half Day</option>
+                  <option value="absent">Absent</option>
+                  <option value="on leave">On Leave</option>
+                </select>
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
             </div>
 
             {/* Sort Filter */}
-            <div className="relative">
-              <select
-                value={`${sortField}-${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split('-');
-                  setSortField(field);
-                  setSortOrder(order);
-                }}
-                className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer appearance-none pr-8 font-normal"
-              >
-                <option value="date-desc">Date (Newest)</option>
-                <option value="name-asc">Name (A-Z)</option>
-                <option value="name-desc">Name (Z-A)</option>
-              </select>
-              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-500 font-medium font-poppins mb-1">Sort By</span>
+              <div className="relative">
+                <select
+                  value={`${sortField}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [field, order] = e.target.value.split('-');
+                    setSortField(field);
+                    setSortOrder(order);
+                  }}
+                  className="h-8 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] cursor-pointer appearance-none pr-7 font-poppins"
+                >
+                  <option value="date-desc">Date (Newest)</option>
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                </select>
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>
 
         {/* ERROR */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2">
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-xs font-medium flex items-center gap-2 font-poppins">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span className="break-words">{error}</span>
           </div>
@@ -1890,13 +1863,13 @@ export default function AttendanceLogs() {
 
         {/* LOADING & TABLE */}
         {loading ? (
-          <div className="p-16 text-center">
+          <div className="p-16 text-center font-poppins">
             <RefreshCw size={28} className="animate-spin text-[#0088cc] mx-auto mb-3" />
             <p className="text-xs font-semibold text-slate-500">Loading attendance records...</p>
             <p className="text-[11px] text-slate-400 mt-1">Fetching latest team logs for {formatIndianDate(selectedDate)}</p>
           </div>
         ) : filteredAndSortedLogs.length === 0 ? (
-          <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50">
+          <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50 font-poppins">
             <Clock size={36} className="text-slate-300 mx-auto mb-3" />
             <p className="text-sm font-semibold text-slate-700">No attendance logs found</p>
             <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
@@ -1906,152 +1879,84 @@ export default function AttendanceLogs() {
             </p>
           </div>
         ) : (
-          <>
-            {/* Desktop Table */}
-            <div className="hidden xl:block overflow-x-auto border border-slate-200/80 rounded-lg">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200/80 bg-slate-50/80 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
-                    <th className="py-3 px-3 w-12 text-left">#</th>
-                    <th className="py-3 px-4">EMPLOYEE</th>
-                    <th
-                      className="py-3 px-4 cursor-pointer hover:text-slate-800 transition-colors"
-                      onClick={() => handleSort('date')}
+          <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
+                  <th className="py-3 px-4 w-12 text-left font-semibold">No.</th>
+                  <th className="py-3 px-4 text-left font-semibold">Employee</th>
+                  <th className="py-3 px-4 text-left font-semibold">Date</th>
+                  <th className="py-3 px-4 text-left font-semibold min-w-[320px]">TimeLine</th>
+                  <th className="py-3 px-4 text-left font-semibold whitespace-nowrap">Total Hours</th>
+                  <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Status</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100 font-poppins">
+                {filteredAndSortedLogs.map((log, index) => {
+                  return (
+                    <tr
+                      key={log.id}
+                      className="hover:bg-slate-50/60 transition-colors font-poppins cursor-pointer"
+                      onClick={() => setSelectedLog(log)}
                     >
-                      <div className="flex items-center gap-1">
-                        <span>DATE</span>
-                        <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-4 min-w-[320px]">TIMELINE</th>
-                    <th className="py-3 px-4 whitespace-nowrap">TOTAL HOURS</th>
-                    <th className="py-3 px-4 whitespace-nowrap">STATUS</th>
-                  </tr>
-                </thead>
+                      {/* No. */}
+                      <td className="py-3.5 px-4 text-slate-600 font-medium">
+                        {index + 1}
+                      </td>
 
-                <tbody className="divide-y divide-slate-100">
-                  {filteredAndSortedLogs.map((log, index) => {
-                    const badge = getStatusBadge(log.status);
-
-                    return (
-                      <tr
-                        key={log.id}
-                        className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
-                        onClick={() => setSelectedLog(log)}
-                      >
-                        <td className="py-3 px-3 text-slate-400 font-medium">
-                          {index + 1}
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`h-9 w-9 rounded-full ${log.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs`}
-                            >
-                              {getInitials(log.name)}
-                            </div>
-
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-800 text-xs sm:text-sm truncate group-hover:text-[#0088cc] transition-colors">
-                                {log.name}
-                              </p>
-                              <p className="text-[11px] text-slate-400 truncate">
-                                {log.email}
-                              </p>
-                            </div>
+                      {/* Employee (Avatar + Name + Email) */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded-full bg-[#034665] text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-2xs"
+                          >
+                            {getInitials(log.name)}
                           </div>
-                        </td>
 
-                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap font-medium text-xs">
-                          {formatIndianDate(log.date)}
-                        </td>
-
-                        <td className="py-3 px-4 min-w-[320px]">
-                          <AttendanceTimeline
-                            checkIn={log.checkIn}
-                            breaks={log.breaks}
-                            checkOut={log.checkOut}
-                            approvalStatus={log.approvalStatus}
-                          />
-                        </td>
-
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-200/60 font-mono">
-                            {log.totalHours}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.bg}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
-                            <span>{badge.label}</span>
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile / Tablet Cards */}
-            <div className="xl:hidden space-y-3">
-              {filteredAndSortedLogs.map((log) => {
-                const badge = getStatusBadge(log.status);
-
-                return (
-                  <div
-                    key={log.id}
-                    className="bg-white border border-slate-200/80 rounded-xl p-4 cursor-pointer hover:border-[#0088cc]/60 hover:shadow-xs transition-all space-y-3"
-                    onClick={() => setSelectedLog(log)}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className={`h-10 w-10 rounded-full ${log.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs`}
-                        >
-                          {getInitials(log.name)}
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-900 text-xs sm:text-[13px] block truncate">
+                              {log.name}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-normal block truncate">
+                              {log.email || "No email available"}
+                            </span>
+                          </div>
                         </div>
+                      </td>
 
-                        <div className="min-w-0">
-                          <h4 className="font-bold text-slate-900 text-sm truncate">
-                            {log.name}
-                          </h4>
-                          <p className="text-xs text-slate-400 truncate">
-                            {log.email}
-                          </p>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            {formatIndianDate(log.date)}
-                          </p>
-                        </div>
-                      </div>
+                      {/* Date */}
+                      <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap font-normal">
+                        {formatTableDate(log.date)}
+                      </td>
 
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shrink-0 ${badge.bg}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
-                        <span>{badge.label}</span>
-                      </span>
-                    </div>
+                      {/* TimeLine */}
+                      <td className="py-3.5 px-4 min-w-[320px]">
+                        <AttendanceTimeline
+                          checkIn={log.checkIn}
+                          breaks={log.breaks}
+                          checkOut={log.checkOut}
+                          approvalStatus={log.approvalStatus}
+                        />
+                      </td>
 
-                    <div>
-                      <AttendanceTimeline
-                        checkIn={log.checkIn}
-                        breaks={log.breaks}
-                        checkOut={log.checkOut}
-                        approvalStatus={log.approvalStatus}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                      <span className="text-slate-400 font-medium">Total Duration</span>
-                      <span className="font-semibold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200/60 font-mono">
+                      {/* Total Hours */}
+                      <td className="py-3.5 px-4 text-xs text-slate-800 whitespace-nowrap font-medium font-poppins">
                         {log.totalHours}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center">
+                          <Clock size={16} className="text-[#0284c7]" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

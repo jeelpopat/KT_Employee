@@ -1119,7 +1119,7 @@ const Performance = () => {
           latestScore: 0,
           averageScore: 0,
           totalReviews: 0,
-          ratingLabel: "Pending Evaluation",
+          ratingLabel: 0,
           ratingColor: "text-slate-500",
           latestDept: user?.department || "Development"
         };
