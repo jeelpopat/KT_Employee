@@ -29,6 +29,23 @@ const toValidObjectId = (id) => {
   return (hex + '000000000000000000000000').slice(0, 24);
 };
 
+const isPassportSizePhoto = (file) => new Promise((resolve, reject) => {
+  const imageUrl = URL.createObjectURL(file);
+  const image = new Image();
+  const cleanup = () => URL.revokeObjectURL(imageUrl);
+
+  image.onload = () => {
+    const aspectRatio = image.naturalWidth / image.naturalHeight;
+    cleanup();
+    resolve(Math.abs(aspectRatio - (7 / 9)) <= 0.02);
+  };
+  image.onerror = () => {
+    cleanup();
+    reject(new Error('Unable to read the selected image.'));
+  };
+  image.src = imageUrl;
+});
+
 export const ProfileView = () => {
   const { user: contextUser, updateUserProfile, userRole, roleDetails } = useApp();
   
@@ -453,11 +470,26 @@ export const ProfileView = () => {
 
     if (!file.type.startsWith('image/')) {
       showToast("Please upload a valid image file (PNG, JPG, WEBP).", "error");
+      e.target.value = '';
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       showToast("File size exceeds 5MB limit. Please choose a smaller image.", "error");
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      if (!(await isPassportSizePhoto(file))) {
+        showToast("Please upload a passport-size portrait photo with a 7:9 aspect ratio (35 x 45).", "error");
+        e.target.value = '';
+        return;
+      }
+    } catch (error) {
+      console.error("Could not validate profile photo:", error);
+      showToast("Could not read this image. Please select a valid photo.", "error");
+      e.target.value = '';
       return;
     }
 
@@ -665,11 +697,36 @@ export const ProfileView = () => {
 
     if (file.size > 15 * 1024 * 1024) {
       showToast("File size exceeds 15MB limit. Please upload a smaller file.", "error");
+      e.target.value = '';
       return;
     }
 
+    if (targetActionDocId === 'passport_photo') {
+      if (!file.type.startsWith('image/')) {
+        showToast("Please upload a passport-size photo in PNG, JPG, or WEBP format.", "error");
+        e.target.value = '';
+        return;
+      }
+
+      try {
+        if (!(await isPassportSizePhoto(file))) {
+          showToast("Please upload a passport-size portrait photo with a 7:9 aspect ratio (35 x 45).", "error");
+          e.target.value = '';
+          return;
+        }
+      } catch (error) {
+        console.error("Could not validate passport photo:", error);
+        showToast("Could not read this image. Please select a valid passport-size photo.", "error");
+        e.target.value = '';
+        return;
+      }
+    }
+
     const docToUpdate = documents.find(d => d.id === targetActionDocId);
-    if (!docToUpdate) return;
+    if (!docToUpdate) {
+      e.target.value = '';
+      return;
+    }
 
     setUploadingDocId(targetActionDocId);
     setDocFeedback({ type: '', text: '' });
