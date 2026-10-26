@@ -92,6 +92,7 @@ export const ProfileView = () => {
   const [documents, setDocuments] = useState([]);
   const [docFeedback, setDocFeedback] = useState({ type: '', text: '' });
   const [uploadingDocId, setUploadingDocId] = useState(null);
+  const [isDeletingPassportPhoto, setIsDeletingPassportPhoto] = useState(false);
   const [editingDocId, setEditingDocId] = useState(null);
   const [tempDocNumber, setTempDocNumber] = useState('');
 
@@ -1020,6 +1021,46 @@ export const ProfileView = () => {
 
     setDocFeedback({ type: 'success', text: `"${docToDelete.title}" has been removed.` });
     setTimeout(() => setDocFeedback({ type: '', text: '' }), 3000);
+  };
+
+  const handleDeletePassportPhoto = async () => {
+    const docToDelete = documents.find(d => d.id === 'passport_photo');
+    if (!docToDelete?.fileUrl) return;
+    if (!window.confirm('Are you sure you want to delete the passport size photo?')) return;
+
+    setIsDeletingPassportPhoto(true);
+    setDocFeedback({ type: '', text: '' });
+    try {
+      if (docToDelete.remoteId) {
+        await api.delete(`/api/document/${docToDelete.remoteId}`);
+      }
+
+      const updatedDocs = documents.map(doc => doc.id === 'passport_photo'
+        ? {
+            ...doc,
+            fileUrl: '',
+            fileName: '',
+            fileType: 'image/jpeg',
+            remoteId: null,
+            status: 'pending',
+            uploadedAt: 'Pending'
+          }
+        : doc
+      );
+      persistDocuments(updatedDocs);
+
+      if (docViewerModal.doc?.id === 'passport_photo') {
+        handleCloseDocViewer();
+      }
+
+      setDocFeedback({ type: 'success', text: 'Passport size photo deleted successfully.' });
+      setTimeout(() => setDocFeedback({ type: '', text: '' }), 3000);
+    } catch (error) {
+      console.error('Could not delete passport size photo:', error);
+      showToast('Could not delete the passport size photo. Please try again.', 'error');
+    } finally {
+      setIsDeletingPassportPhoto(false);
+    }
   };
 
   // --- Personal & Contact Form Save ---
@@ -2048,7 +2089,7 @@ export const ProfileView = () => {
                   </div>
 
                   {/* Action Buttons: View & Update/Upload */}
-                  <div className="grid grid-cols-2 gap-2 pt-4 border-t border-slate-100">
+                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={() => handleOpenDocViewer(passportPhotoDoc)}
@@ -2069,6 +2110,22 @@ export const ProfileView = () => {
                         <Upload size={14} />
                       )}
                       {uploadingDocId === passportPhotoDoc.id ? 'Uploading...' : 'Update'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDeletePassportPhoto}
+                      disabled={!passportPhotoDoc.fileUrl || isDeletingPassportPhoto || uploadingDocId === passportPhotoDoc.id}
+                      className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Delete passport size photo"
+                      aria-label="Delete passport size photo"
+                    >
+                      {isDeletingPassportPhoto ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                      Delete
                     </button>
                   </div>
                 </div>

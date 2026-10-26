@@ -434,22 +434,35 @@ const fetchAllMembers = async () => {
           employee
         );
 
-        const role = String(
-          user?.role ||
-          user?.userRole ||
-          employee?.role ||
-          ''
-        )
-          .toLowerCase()
-          .trim();
+        const getRoleText = (value) => {
+          if (value && typeof value === 'object') {
+            value = value.roleName || value.name || value.title || value.key || value.label || '';
+          }
+          return String(value || '').toLowerCase().trim();
+        };
+        const roleValues = [
+          user?.role,
+          user?.userRole,
+          user?.roleName,
+          employee?.role,
+          employee?.userRole,
+          employee?.roleName,
+          user?.designation,
+          user?.designationName,
+          employee?.designation,
+          employee?.designationName
+        ].map(getRoleText).filter(Boolean);
+        const role = roleValues[0] || '';
 
         const roleType =
-          role === 'hr'
+          roleValues.some(value => /\bhr\b|human resources?/i.test(value))
             ? 'hr'
-            : role === 'teamlead' ||
-              role === 'team lead' ||
-              role === 'team_lead' ||
-              role === 'tl'
+            : roleValues.some(value =>
+                value === 'teamlead' ||
+                value === 'team lead' ||
+                value === 'team_lead' ||
+                value === 'tl'
+              )
             ? 'tl'
             : 'employee';
 
@@ -1240,7 +1253,7 @@ const fetchAllMembers = async () => {
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-md border ${roleBadgeStyle}`}>
                           {getRoleIcon(member.roleType)}
-                          {member.roleType === 'tl' ? 'Lead' : 'Employee'}
+                          {member.roleType === 'tl' ? 'Lead' : member.roleType === 'hr' ? 'HR' : 'Employee'}
                         </span>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-md ${statusStyle.bg} ${statusStyle.text}`}>
                           {member.status}

@@ -37,7 +37,16 @@ export const Header = ({ onSignOut }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [headerProfileData, setHeaderProfileData] = useState(null);
-  const profilePhotoResetRef = useRef(false);
+  const profilePhotoResetKey = `user_profile_photo_reset_${user?.id || user?._id || user?.employeeId || 'current_user'}`;
+  const [isProfilePhotoReset, setIsProfilePhotoReset] = useState(() => {
+    try {
+      return localStorage.getItem(profilePhotoResetKey) === 'true';
+    } catch (error) {
+      console.warn('Could not read profile photo reset state:', error);
+      return false;
+    }
+  });
+  const profilePhotoResetRef = useRef(isProfilePhotoReset);
 
   // Refs for click-outside functionality
   const notificationRef = useRef(null);
@@ -594,9 +603,17 @@ export const Header = ({ onSignOut }) => {
   }, []);
 
   useEffect(() => {
+    try {
+      profilePhotoResetRef.current = localStorage.getItem(profilePhotoResetKey) === 'true';
+      setIsProfilePhotoReset(profilePhotoResetRef.current);
+    } catch (error) {
+      console.warn('Could not sync profile photo reset state:', error);
+    }
+
     const handleProfilePhotoUpdated = (event) => {
       if (!Object.prototype.hasOwnProperty.call(event.detail || {}, 'photoUrl')) return;
       profilePhotoResetRef.current = !event.detail.photoUrl;
+      setIsProfilePhotoReset(profilePhotoResetRef.current);
       if (profilePhotoResetRef.current) {
         setHeaderProfileData(null);
       }
@@ -604,7 +621,7 @@ export const Header = ({ onSignOut }) => {
 
     window.addEventListener('kt_profile_photo_updated', handleProfilePhotoUpdated);
     return () => window.removeEventListener('kt_profile_photo_updated', handleProfilePhotoUpdated);
-  }, []);
+  }, [profilePhotoResetKey]);
 
   const extractPhoto = (source) => {
     if (!source) return '';
@@ -638,7 +655,7 @@ export const Header = ({ onSignOut }) => {
     headerProfileData?.email ||
     headerProfileData?.employee?.email ||
     '';
-  const displayPhoto = extractPhoto(user) || extractPhoto(headerProfileData);
+  const displayPhoto = isProfilePhotoReset ? '' : extractPhoto(user) || extractPhoto(headerProfileData);
   const [headerImgError, setHeaderImgError] = useState(false);
 
   useEffect(() => {

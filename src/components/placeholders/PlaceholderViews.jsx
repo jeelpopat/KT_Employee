@@ -620,9 +620,10 @@ export const EmployeesView = () => {
       setIsLoading(true);
       try {
         // Fetch users and employee records
-        const [usersRes, empsRes] = await Promise.allSettled([
+        const [usersRes, empsRes, rolesRes] = await Promise.allSettled([
           api.get('/api/users/all'),
-          api.get('/api/employee/list')
+          api.get('/api/employee/list'),
+          api.get('/api/role')
         ]);
 
         const rawUsers = usersRes.status === 'fulfilled'
@@ -632,14 +633,116 @@ export const EmployeesView = () => {
         const rawEmps = empsRes.status === 'fulfilled'
           ? (empsRes.value.data?.employees || empsRes.value.data?.data || (Array.isArray(empsRes.value.data) ? empsRes.value.data : []))
           : [];
+        const rawRoles = rolesRes.status === 'fulfilled'
+          ? (rolesRes.value.data?.roles || rolesRes.value.data?.data || (Array.isArray(rolesRes.value.data) ? rolesRes.value.data : []))
+          : [];
+        const roleNamesById = new Map(
+          (Array.isArray(rawRoles) ? rawRoles : [])
+            .map(role => [
+              String(role?._id || role?.id || '').toLowerCase(),
+              String(role?.roleName || role?.name || role?.title || '').trim()
+            ])
+            .filter(([id, name]) => id && name)
+        );
+
+        const getDirectorySources = (u) => {
+          const sources = [];
+          const visited = new Set();
+          const relatedFields = [
+            'user',
+            'userID',
+            'userId',
+            'employee',
+            'employeeID',
+            'employeeId',
+            'profile',
+            'roleId',
+            'role',
+            'designation',
+            'department',
+            'position'
+          ];
+          const visit = (value, depth = 0) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value) || visited.has(value) || depth > 4) return;
+            visited.add(value);
+            sources.push(value);
+            relatedFields.forEach(field => visit(value[field], depth + 1));
+          };
+          visit(u);
+          return sources;
+        };
+
+        const getDirectoryText = (value) => {
+          if (value && typeof value === 'object') {
+            value = value.roleName || value.name || value.title || value.key || value.label || value.displayName || value._id || value.id || '';
+          }
+          return String(value || '').toLowerCase().trim();
+        };
+        const getDirectoryDisplayText = (value) => {
+          if (value && typeof value === 'object') {
+            value = value.roleName || value.name || value.title || value.label || value.displayName || '';
+          }
+          return String(value || '').trim();
+        };
+
+        const getDirectoryRole = (u) => {
+          const sources = getDirectorySources(u);
+          const roles = sources.flatMap(source => [
+            source.role,
+            source.userRole,
+            source.roleType,
+            source.roleName,
+            source.roleId,
+            source.designation,
+            source.designationName,
+            source.jobTitle,
+            source.position
+          ]).map(value => {
+            const text = getDirectoryText(value);
+            return roleNamesById.get(text) || text;
+          }).filter(Boolean);
+          const departments = sources.map(source =>
+            getDirectoryText(source.department || source.departmentName || source.dept)
+          );
+
+          if (
+            roles.some(role => /\bhr\b|human resources?/i.test(role)) ||
+            departments.some(department => /\bhr\b|human resources?/i.test(department))
+          ) {
+            return { category: 'HR', roleFull: 'HR Manager' };
+          }
+          if (roles.some(role =>
+            role.includes('team lead') ||
+            role.includes('team_lead') ||
+            role.includes('teamlead') ||
+            role === 'tl' ||
+            role.includes('lead')
+          )) {
+            return { category: 'TL', roleFull: 'Team Leader' };
+          }
+          if (roles.some(role => role.includes('admin') || role.includes('ceo'))) {
+            return { category: 'ADMIN', roleFull: 'Administrator' };
+          }
+          if (roles.some(role =>
+            role.includes('employee') ||
+            role === 'staff' ||
+            role.includes('developer') ||
+            role.includes('designer') ||
+            role.includes('engineer')
+          )) {
+            return { category: 'EMP', roleFull: 'Employee' };
+          }
+          return null;
+        };
 
         // Helper to identify Account, CA, and Finance users who must NOT be shown
         const isAccountOrCA = (u) => {
           if (!u) return false;
-          const role = String(u.role || '').toLowerCase().trim();
-          const dept = String(u.department || u.dept || '').toLowerCase().trim();
-          const desig = String(u.designation || '').toLowerCase().trim();
-          const name = String(u.fullName || u.name || '').toLowerCase().trim();
+          const sources = getDirectorySources(u);
+          const role = sources.map(source => getDirectoryText(source.role || source.userRole || source.roleType || source.roleName || source.roleId)).join(' ');
+          const dept = sources.map(source => getDirectoryText(source.department || source.dept || source.departmentName)).join(' ');
+          const desig = sources.map(source => getDirectoryText(source.designation || source.designationName || source.jobTitle || source.position)).join(' ');
+          const name = sources.map(source => getDirectoryText(source.fullName || source.name)).join(' ');
 
           // 1. Account / Accountant
           if (role.includes('account') || dept.includes('account') || desig.includes('account')) return true;
@@ -673,83 +776,52 @@ export const EmployeesView = () => {
         const isAllowedDirectoryRole = (u) => {
           if (!u) return false;
           if (isAccountOrCA(u)) return false;
-
-          const role = String(u.role || '').toLowerCase().trim();
-          const desig = String(u.designation || '').toLowerCase().trim();
-
-          const isEmployee =
-            role.includes('employee') ||
-            role === 'staff' ||
-            desig.includes('developer') ||
-            desig.includes('designer') ||
-            desig.includes('engineer');
-
-          const isTL =
-            role.includes('lead') ||
-            role.includes('tl') ||
-            role === 'team_leader' ||
-            desig.includes('team lead') ||
-            desig.includes('team leader');
-
-          const isHR =
-            role.includes('hr') ||
-            desig.includes('hr');
-
-          const isAdmin =
-            role.includes('admin') ||
-            role.includes('ceo') ||
-            desig.includes('ceo') ||
-            desig.includes('admin');
-
-          return isEmployee || isTL || isHR || isAdmin;
+          return Boolean(getDirectoryRole(u));
         };
 
-        const seenKeys = new Set();
+        const seenKeys = new Map();
         const combined = [];
 
         [...rawUsers, ...rawEmps].forEach((u) => {
           if (!isAllowedDirectoryRole(u)) return;
 
-          const emailKey = String(u.email || '').toLowerCase().trim();
-          const nameKey = String(u.name || u.fullName || '').toLowerCase().trim();
+          const sources = getDirectorySources(u);
+          const emailKey = sources.map(source => String(source.email || '').toLowerCase().trim()).find(Boolean) || '';
+          const nameKey = sources.map(source => String(source.name || source.fullName || '').toLowerCase().trim()).find(Boolean) || '';
           const uniqueKey = emailKey || nameKey;
+          const { category, roleFull } = getDirectoryRole(u);
 
-          if (uniqueKey && seenKeys.has(uniqueKey)) return;
-          if (uniqueKey) seenKeys.add(uniqueKey);
-
-          const roleStr = String(u.role || '').toLowerCase().trim();
-          const desigStr = String(u.designation || '').toLowerCase().trim();
-
-          let category = 'EMP';
-          let roleFull = 'Employee';
-
-          if (roleStr.includes('lead') || roleStr.includes('tl') || roleStr === 'team_leader' || desigStr.includes('team lead') || desigStr.includes('team leader')) {
-            category = 'TL';
-            roleFull = 'Team Leader';
-          } else if (roleStr.includes('hr') || desigStr.includes('hr')) {
-            category = 'HR';
-            roleFull = 'HR Manager';
-          } else if (roleStr.includes('admin') || roleStr.includes('ceo') || desigStr.includes('ceo') || desigStr.includes('admin')) {
-            category = 'ADMIN';
-            roleFull = u.designation || 'Administrator';
-          } else {
-            category = 'EMP';
-            roleFull = u.designation || 'Employee';
+          if (uniqueKey && seenKeys.has(uniqueKey)) {
+            const existingIndex = seenKeys.get(uniqueKey);
+            const existing = combined[existingIndex];
+            const categoryPriority = { EMP: 0, TL: 1, ADMIN: 2, HR: 3 };
+            if (categoryPriority[category] > categoryPriority[existing.role]) {
+              combined[existingIndex] = {
+                ...existing,
+                role: category,
+                roleFull,
+                rawRole: getDirectoryDisplayText(u.role || u.userRole || u.roleName),
+                designation: category === 'HR' ? 'HR' : roleFull
+              };
+            }
+            return;
           }
 
+          if (uniqueKey) seenKeys.set(uniqueKey, combined.length);
+
           combined.push({
-            id: u.employeeID || (u._id ? `EMP-${String(u._id).slice(-4).toUpperCase()}` : 'EMP'),
-            name: u.fullName || u.name || 'Company Member',
-            email: u.email || '',
-            phone: u.phone || u.phoneNumber || u.mobile || '',
+            id: sources.map(source => source.employeeID || source.employeeId || source._id).find(Boolean) || 'EMP',
+            name: sources.map(source => source.fullName || source.name).find(Boolean) || 'Company Member',
+            email: emailKey,
+            phone: sources.map(source => source.phone || source.phoneNumber || source.mobile).find(Boolean) || '',
             role: category,
             roleFull,
-            rawRole: u.role,
-            dept: u.department || (category === 'ADMIN' ? 'Management' : category === 'HR' ? 'Human Resources' : 'Technology'),
-            designation: u.designation || roleFull,
-            status: u.isActive !== false ? 'Active' : 'Inactive',
-            bloodGroup: u.bloodGroup,
-            address: u.address
+            rawRole: sources.map(source => getDirectoryDisplayText(source.role || source.userRole || source.roleName)).find(Boolean),
+            dept: sources.map(source => getDirectoryDisplayText(source.department || source.departmentName || source.dept)).find(Boolean) || (category === 'ADMIN' ? 'Management' : category === 'HR' ? 'Human Resources' : 'Technology'),
+            designation: sources.map(source => getDirectoryDisplayText(source.designation || source.designationName || source.jobTitle || source.position)).find(Boolean) || roleFull,
+            status: sources.every(source => source.isActive === false) ? 'Inactive' : 'Active',
+            bloodGroup: sources.map(source => source.bloodGroup).find(Boolean),
+            address: sources.map(source => source.address || source.currentAddress).find(Boolean)
           });
         });
 
