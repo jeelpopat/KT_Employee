@@ -316,6 +316,7 @@ const Performance = () => {
   // History Toolbar Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [toolbarPerfFilter, setToolbarPerfFilter] = useState("all");
+  const [toolbarDeptFilter, setToolbarDeptFilter] = useState("all");
   const [selectedMonthYear, setSelectedMonthYear] = useState("all");
 
   // Add / Edit Form State (aligned with backend fields: employeeID, performancePercentage, rating, feedback, remarks, date)
@@ -1215,13 +1216,21 @@ const Performance = () => {
       // Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
+        const dept = getDepartment(perf).toLowerCase();
         const matchesQuery =
           name.includes(q) ||
           email.includes(q) ||
+          dept.includes(q) ||
           feedbackText.includes(q) ||
           remarksText.includes(q) ||
           ratingText.includes(q);
         if (!matchesQuery) return false;
+      }
+
+      // Toolbar: Department Dropdown
+      if (toolbarDeptFilter !== "all") {
+        const dept = getDepartment(perf).toLowerCase();
+        if (!dept.includes(toolbarDeptFilter.toLowerCase())) return false;
       }
 
       // Toolbar: Performance Dropdown
@@ -1247,6 +1256,7 @@ const Performance = () => {
   }, [
     myPerformances,
     searchQuery,
+    toolbarDeptFilter,
     toolbarPerfFilter,
     selectedMonthYear
   ]);
@@ -1609,13 +1619,13 @@ const Performance = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-sans">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-poppins">
       {confirmationDialog}
 
       {/* Floating Toast Notification */}
       {notification.message && (
         <div
-          className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg border text-xs sm:text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${notification.type === "success"
+          className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg border text-xs sm:text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-4 font-poppins ${notification.type === "success"
             ? "bg-emerald-50 text-emerald-800 border-emerald-200"
             : notification.type === "error"
               ? "bg-rose-50 text-rose-800 border-rose-200"
@@ -1642,37 +1652,21 @@ const Performance = () => {
       {/* ==================================================== */}
       {/* 1. TOP HEADER */}
       {/* ==================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-            <BarChart3 size={18} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                {isAdmin
-                  ? "Performance Management"
-                  : isTL
-                    ? (tlViewScope === "team" ? "Team Members' Performance" : "My Performance")
-                    : "My Performance"}
-              </h1>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              {isAdmin
-                ? "Track and manage employee performance with ease."
-                : isTL
-                  ? (tlViewScope === "team"
-                      ? "Performance evaluations, ratings, and feedback for employees under your team."
-                      : "View your personal performance scores, evaluations, and supervisor remarks.")
-                  : "View your personal performance scores, evaluations, and supervisor remarks."}
-            </p>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-poppins">
+        <div>
+          <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
+            {isAdmin
+              ? "Performance Management"
+              : isTL
+                ? (tlViewScope === "team" ? "Team Members' Performance" : "My Performance")
+                : "My Performance"}
+          </h1>
         </div>
 
-        {/* Top Controls: TL Switcher + Sync / Refresh button */}
+        {/* Top Controls: TL Switcher + Sync button */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {isTL && (
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs font-poppins">
               <button
                 type="button"
                 onClick={() => setTlViewScope("team")}
@@ -1710,14 +1704,15 @@ const Performance = () => {
             </div>
           )}
 
+          {/* Outline Sync button matching reference design */}
           <button
             type="button"
             onClick={fetchAllPerformances}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 shadow-xs cursor-pointer disabled:opacity-60 transition"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-md text-xs font-medium border border-slate-300 shadow-2xs cursor-pointer disabled:opacity-60 transition font-poppins"
           >
-            <RefreshCw size={13} className={loading ? "animate-spin text-[#0088cc]" : "text-slate-400"} />
-            <span>{loading ? "Refreshing..." : "Sync"}</span>
+            <RefreshCw size={13} className={loading ? "animate-spin text-[#0088cc]" : "text-slate-600"} />
+            <span>Sync</span>
           </button>
         </div>
       </div>
@@ -1726,27 +1721,33 @@ const Performance = () => {
       {/* 2. TOP METRIC CARDS (4 STATS FULL WIDTH) */}
       {/* ==================================================== */}
       {!metrics.isPersonal ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
           {[
-            { label: (metrics.totalEmployeesLabel || (isTL ? "Team Evaluated" : "Total Evaluated")).toUpperCase(), value: metrics.totalEmployees },
-            { label: "EXCELLENT (≥ 80%)", value: `${metrics.excellentCount}` },
-            { label: "GOOD (50% - 79%)", value: `${metrics.goodCount}` },
-            { label: "NEEDS IMPROVEMENT (< 50%)", value: `${metrics.needsImprovementCount}` }
+            { label: "TOTAL EVALUATED", value: metrics.totalEmployees },
+            { label: "EXCELLENT", value: metrics.excellentCount },
+            { label: "GOOD", value: metrics.goodCount },
+            { label: "NEED IMPROVEMENT", value: metrics.needsImprovementCount }
           ].map((item, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
+              className="relative flex items-center justify-between h-[52px] sm:h-[58px] bg-white rounded-[10px] px-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] border border-slate-200/80 overflow-hidden font-poppins"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
-              </div>
-              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
+              {/* Left thick accent bar matching reference */}
+              <div
+                className="absolute left-0 top-0 bottom-0 w-[5px] rounded-l-[10px]"
+                style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
+              />
+              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none pl-1">
+                {item.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                {item.value}
+              </p>
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
           {[
             { label: "LATEST SCORE", value: `${metrics.latestScore}%` },
             { label: "CURRENT STANDING", value: metrics.ratingLabel },
@@ -1755,13 +1756,18 @@ const Performance = () => {
           ].map((item, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
+              className="relative flex items-center justify-between h-[52px] sm:h-[58px] bg-white rounded-[10px] px-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] border border-slate-200/80 overflow-hidden font-poppins"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
-              </div>
-              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
+              <div
+                className="absolute left-0 top-0 bottom-0 w-[5px] rounded-l-[10px]"
+                style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
+              />
+              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none pl-1">
+                {item.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                {item.value}
+              </p>
             </div>
           ))}
         </div>
@@ -1770,25 +1776,25 @@ const Performance = () => {
       {/* ==================================================== */}
       {/* 3. PERFORMANCE HISTORY CARD (FULL WIDTH) */}
       {/* ==================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4 font-poppins">
 
-        {/* Header Row: Title & Action Buttons */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Header Row: Title & Action Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-poppins">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-              <FileText size={16} />
+            <div className="w-9 h-9 rounded-lg bg-[#e8f1f5] text-[#034665] flex items-center justify-center shrink-0">
+              <FileText size={18} strokeWidth={2} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 font-poppins">
                 {isAdmin
                   ? "Performance History"
                   : isTL && tlViewScope === "team"
                     ? "Team Performance History"
                     : "My Performance History"}
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 font-normal font-poppins mt-0.5">
                 {isAdmin
-                  ? "View and manage employee performance records"
+                  ? "View and mange employee performance records"
                   : isTL && tlViewScope === "team"
                     ? "Performance evaluations and review remarks for your team members"
                     : "Personal performance evaluations and review remarks"}
@@ -1797,38 +1803,11 @@ const Performance = () => {
           </div>
 
           <div className="flex items-center gap-2.5 self-end sm:self-auto">
-            {isTL && (
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setTlViewScope("team")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${tlViewScope === "team"
-                      ? "bg-white text-[#0088cc] shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                    }`}
-                >
-                  <Users size={13} />
-                  <span>Team Members ({teamPerformancesCount})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTlViewScope("my")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${tlViewScope === "my"
-                      ? "bg-white text-[#0088cc] shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                    }`}
-                >
-                  <User size={13} />
-                  <span>My Performance ({personalPerformancesCount})</span>
-                </button>
-              </div>
-            )}
-
             {isAdmin && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="h-10 px-4 btn-brand-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+                className="h-9 px-4 text-white rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-all cursor-pointer font-poppins"
                 style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 <Plus size={15} />
@@ -1838,41 +1817,58 @@ const Performance = () => {
           </div>
         </div>
 
-        {/* Filter Toolbar: Search, Dept, Status, Month/Year */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-1">
-          <div className="relative w-full md:flex-1 max-w-md">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        {/* Filter Toolbar: Search, Dept, Performance, Month/Year */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-1 font-poppins">
+          <div className="relative w-full md:w-[320px] lg:w-[360px]">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder={isAdmin ? "Search by employee name, email or department..." : "Search evaluations or remarks..."}
+              placeholder="Search by employee name, email or department..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all"
+              className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] font-poppins transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
-            {/* Performance Dropdown */}
+          <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap justify-end font-poppins">
+            {/* All Departments */}
+            <div className="relative">
+              <select
+                value={toolbarDeptFilter}
+                onChange={(e) => setToolbarDeptFilter(e.target.value)}
+                className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] cursor-pointer appearance-none pr-7 font-poppins"
+              >
+                <option value="all">All Departments</option>
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept.toLowerCase()}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* All Performance */}
             <div className="relative">
               <select
                 value={toolbarPerfFilter}
                 onChange={(e) => setToolbarPerfFilter(e.target.value)}
-                className="h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer appearance-none pr-8 font-normal"
+                className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] cursor-pointer appearance-none pr-7 font-poppins"
               >
                 <option value="all">All Performance</option>
                 <option value="excellent">Excellent (≥ 80%)</option>
                 <option value="good">Good (50% - 79%)</option>
                 <option value="needs-improvement">Needs Improvement (&lt; 50%)</option>
               </select>
-              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
 
-            {/* Month/Year selector */}
+            {/* All Dates */}
             <div className="relative">
               <select
                 value={selectedMonthYear}
                 onChange={(e) => setSelectedMonthYear(e.target.value)}
-                className="h-10 pl-8 pr-8 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer appearance-none font-normal"
+                className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] cursor-pointer appearance-none pr-7 font-poppins"
               >
                 <option value="all">All Dates</option>
                 {monthYearOptions.map((opt) => (
@@ -1881,26 +1877,25 @@ const Performance = () => {
                   </option>
                 ))}
               </select>
-              <Calendar size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
         </div>
 
         {/* Table Container */}
         {loading ? (
-          <div className="p-16 text-center">
+          <div className="p-16 text-center font-poppins">
             <RefreshCw size={28} className="animate-spin text-[#0088cc] mx-auto mb-3" />
             <p className="text-xs font-semibold text-slate-500">Loading performance data...</p>
           </div>
         ) : filteredPerformances.length === 0 ? (
-          <div className="p-16 text-center">
+          <div className="p-16 text-center font-poppins">
             <Award size={36} className="text-slate-300 mx-auto mb-3" />
             <p className="text-sm font-semibold text-slate-700">
               No performance records found
             </p>
             <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-              {searchQuery || toolbarPerfFilter !== "all" || selectedMonthYear !== "all"
+              {searchQuery || toolbarDeptFilter !== "all" || toolbarPerfFilter !== "all" || selectedMonthYear !== "all"
                 ? "No performance records match your current filter criteria."
                 : isAdmin
                   ? "No employee performance evaluations recorded yet. Start by clicking 'Add Performance'."
@@ -1912,7 +1907,7 @@ const Performance = () => {
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="mt-4 px-4 py-2 btn-brand-primary text-white rounded-lg text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                className="mt-4 px-4 py-2 text-white rounded-md text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-all font-poppins"
                 style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
               >
                 <Plus size={14} />
@@ -1921,120 +1916,96 @@ const Performance = () => {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto border border-slate-200/80 rounded-lg">
+          <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200/80 bg-slate-50/80 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
-                  <th className="py-3 px-3 w-10 text-left">No.</th>
-                  <th className="py-3 px-4">EMPLOYEE</th>
-                  <th className="py-3 px-4">PERFORMANCE</th>
-                  <th className="py-3 px-3">RATING</th>
-                  <th className="py-3 px-4">FEEDBACK</th>
-                  <th className="py-3 px-4">REMARKS</th>
-                  <th className="py-3 px-3">EVALUATOR</th>
-                  <th className="py-3 px-3">DATE</th>
-                  {isAdmin && <th className="py-3 px-3 text-center">ACTIONS</th>}
+                <tr className="bg-[#f4f4f4] text-slate-800 text-xs font-semibold font-poppins">
+                  <th className="py-3 px-4 w-12 text-left font-semibold">No.</th>
+                  <th className="py-3 px-4 text-left font-semibold">Employee</th>
+                  <th className="py-3 px-4 text-left font-semibold">Department</th>
+                  <th className="py-3 px-4 text-left font-semibold">Type</th>
+                  <th className="py-3 px-4 text-left font-semibold">Performance</th>
+                  <th className="py-3 px-4 text-left font-semibold">Remark</th>
+                  <th className="py-3 px-4 text-left font-semibold">Date</th>
+                  <th className="py-3 px-4 text-center font-semibold">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 font-poppins">
                 {filteredPerformances.map((perf, index) => {
                   const rowNumber = index + 1;
                   const empName = getEmployeeDisplayName(perf);
                   const empEmail = getEmployeeEmail(perf);
                   const pct = getNumericPercentage(perf);
-                  const ratingVal = getRating(perf);
-                  const feedbackText = getFeedback(perf);
+                  const dept = getDepartment(perf);
+                  const empType = perf.employeeType || (perf.role ? (String(perf.role).toLowerCase().includes("lead") ? "Team Leader" : "Employee") : "Employee");
                   const remarksText = getRemarks(perf);
-                  const evaluatorInfo = getEvaluatorInfo(perf);
                   const dateFormatted = formatRowDate(perf.createdAt || perf.date);
-
-                  // Progress bar color based on percentage
-                  const barColor =
-                    pct >= 80 ? "bg-[#10B981]" : pct >= 50 ? "bg-[#2563EB]" : "bg-[#F59E0B]";
-
-                  // Avatar circle color
-                  const avatarStyle = getAvatarStyle();
 
                   return (
                     <tr
                       key={perf._id || index}
-                      className="hover:bg-slate-50/50 transition-colors"
+                      className="hover:bg-slate-50/60 transition-colors font-poppins"
                     >
-                      {/* Index */}
-                      <td className="py-3.5 px-3 text-slate-500 font-medium">
+                      {/* No. */}
+                      <td className="py-3.5 px-4 text-slate-600 font-medium">
                         {rowNumber}
                       </td>
 
-                      {/* Employee (Avatar + Name + Email) */}
+                      {/* Employee (Name + Subtext Email) */}
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-full ${avatarStyle.bg} ${avatarStyle.text} font-bold text-xs flex items-center justify-center shrink-0`}
-                          >
-                            {getInitials(empName)}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-bold text-slate-900 block truncate">
-                              {empName}
-                            </span>
-                            <span className="text-[11px] text-slate-400 block truncate">
-                              {empEmail || "No email available"}
-                            </span>
-                          </div>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-900 text-xs sm:text-[13px]">
+                            {empName}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-normal">
+                            {empEmail || "No email available"}
+                          </span>
                         </div>
                       </td>
 
-                      {/* Performance & Progress Bar */}
+                      {/* Department (Badge style) */}
                       <td className="py-3.5 px-4">
-                        <div>
-                          <span className="font-bold text-xs text-slate-900">
+                        <span className="inline-block px-3 py-1 rounded-[6px] text-xs font-medium bg-[#e6ecf0] text-[#2c6580]">
+                          {dept}
+                        </span>
+                      </td>
+
+                      {/* Type (Badge style) */}
+                      <td className="py-3.5 px-4">
+                        <span className="inline-block px-3 py-1 rounded-[6px] text-xs font-medium bg-[#e6ecf0] text-[#2c6580]">
+                          {empType}
+                        </span>
+                      </td>
+
+                      {/* Performance (Visual Progress Bar) */}
+                      <td className="py-3.5 px-4">
+                        <div className="w-24 sm:w-28">
+                          <span className="font-semibold text-xs text-slate-800 block mb-1">
                             {pct}%
                           </span>
-                          <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1.5">
+                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                             <div
-                              className={`h-full ${barColor} rounded-full transition-all duration-300`}
-                              style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                              className="h-full rounded-full transition-all duration-300"
+                              style={{
+                                width: `${Math.min(100, Math.max(0, pct))}%`,
+                                background: "linear-gradient(90deg, #034665 0%, #068DCB 100%)"
+                              }}
                             />
                           </div>
                         </div>
                       </td>
 
-                      {/* Rating */}
-                      <td className="py-3.5 px-3">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap inline-block ${getRatingBadgeStyle(ratingVal)}`}>
-                          {ratingVal}
-                        </span>
-                      </td>
-
-                      {/* Feedback */}
-                      <td className="py-3.5 px-4 max-w-[180px]">
+                      {/* Remark */}
+                      <td className="py-3.5 px-4 max-w-[220px]">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-xs text-slate-600 truncate" title={feedbackText}>
-                            {feedbackText}
-                          </p>
-                          {feedbackText && feedbackText !== "—" && feedbackText.length > 25 && (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedFeedbackModal({ perf, field: "feedback" })}
-                              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold shrink-0 cursor-pointer hover:underline"
-                            >
-                              View
-                            </button>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Remarks */}
-                      <td className="py-3.5 px-4 max-w-[180px]">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-xs text-slate-600 truncate" title={remarksText}>
+                          <span className="text-xs text-slate-600 truncate font-normal" title={remarksText}>
                             {remarksText}
-                          </p>
+                          </span>
                           {remarksText && remarksText !== "—" && remarksText.length > 25 && (
                             <button
                               type="button"
                               onClick={() => setSelectedFeedbackModal({ perf, field: "remarks" })}
-                              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold shrink-0 cursor-pointer hover:underline"
+                              className="text-[11px] text-[#0088cc] hover:underline font-semibold shrink-0 cursor-pointer"
                             >
                               View
                             </button>
@@ -2042,44 +2013,36 @@ const Performance = () => {
                         </div>
                       </td>
 
-                      {/* Evaluator */}
-                      <td className="py-3.5 px-3 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-slate-900 text-xs truncate max-w-[120px]" title={evaluatorInfo.name}>
-                            {evaluatorInfo.name}
-                          </span>
-                          <span className="text-[10px] text-slate-400 capitalize">{evaluatorInfo.role}</span>
-                        </div>
-                      </td>
-
                       {/* Date */}
-                      <td className="py-3.5 px-3 text-xs text-slate-500 whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap font-normal">
                         {dateFormatted}
                       </td>
 
-                      {/* Actions */}
-                      {isAdmin && (
-                        <td className="py-3.5 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(perf)}
-                              className="w-7 h-7 rounded-lg bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#2563EB] flex items-center justify-center transition cursor-pointer"
-                              title="Edit performance"
-                            >
-                              <Edit3 size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeletePerformance(perf)}
-                              className="w-7 h-7 rounded-lg bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#DC2626] flex items-center justify-center transition cursor-pointer"
-                              title="Delete record"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      )}
+                      {/* Action */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-2.5">
+                          {isAdmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(perf)}
+                                className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer p-1"
+                                title="Edit performance"
+                              >
+                                <Edit3 size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePerformance(perf)}
+                                className="text-slate-600 hover:text-rose-600 transition-colors cursor-pointer p-1"
+                                title="Delete record"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
