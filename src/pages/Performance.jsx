@@ -1931,8 +1931,6 @@ const Performance = () => {
                 <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
                   <th className="py-3 px-4 w-12 text-left font-semibold">No.</th>
                   <th className="py-3 px-4 text-left font-semibold">Employee</th>
-                  <th className="py-3 px-4 text-left font-semibold">Department</th>
-                  <th className="py-3 px-4 text-left font-semibold">Type</th>
                   <th className="py-3 px-4 text-left font-semibold">Performance</th>
                   <th className="py-3 px-4 text-left font-semibold">Rating</th>
                   <th className="py-3 px-4 text-left font-semibold">Feedback</th>
@@ -1947,8 +1945,6 @@ const Performance = () => {
                   const empName = getEmployeeDisplayName(perf);
                   const empEmail = getEmployeeEmail(perf);
                   const pct = getNumericPercentage(perf);
-                  const dept = getDepartment(perf);
-                  const empType = perf.employeeType || (perf.role ? (String(perf.role).toLowerCase().includes("lead") ? "Team Leader" : "Employee") : "Employee");
                   const ratingVal = getRating(perf);
                   const feedbackText = getFeedback(perf);
                   const remarksText = getRemarks(perf);
@@ -1974,20 +1970,6 @@ const Performance = () => {
                             {empEmail || "No email available"}
                           </span>
                         </div>
-                      </td>
-
-                      {/* Department (Badge style) */}
-                      <td className="py-3.5 px-4">
-                        <span className="inline-block px-3 py-1 rounded-[6px] text-xs font-medium bg-[#e6ecf0] text-[#2c6580]">
-                          {dept}
-                        </span>
-                      </td>
-
-                      {/* Type (Badge style) */}
-                      <td className="py-3.5 px-4">
-                        <span className="inline-block px-3 py-1 rounded-[6px] text-xs font-medium bg-[#e6ecf0] text-[#2c6580]">
-                          {empType}
-                        </span>
                       </td>
 
                       {/* Performance (Visual Progress Bar) */}
