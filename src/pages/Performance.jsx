@@ -1931,8 +1931,8 @@ const Performance = () => {
         ) : (
           <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
             <table className="w-full text-left text-xs border-collapse">
-              <thead style={{ backgroundColor: "#0346651A" }}>
-                <tr className="text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
+              <thead>
+                <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
                   <th className="py-3 px-4 w-12 text-left font-semibold">No.</th>
                   <th className="py-3 px-4 text-left font-semibold">Employee</th>
                   <th className="py-3 px-4 text-left font-semibold">Department</th>
