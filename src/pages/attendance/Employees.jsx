@@ -22,8 +22,6 @@ import {
 import { useConfirm } from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
 import {
-  isFinanceOrExcludedUser,
-  filterOutFinanceUsers,
   filterOutUnknownUsers,
   isUnknownEmployeeOrUser
 } from "../../utils/roleFilters";
@@ -141,7 +139,7 @@ export default function Employees() {
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/employee/list",
+        "https://kt-backend-yzr4.onrender.com/api/users/all",
         {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -149,13 +147,71 @@ export default function Employees() {
         }
       );
 
+      if (!res.ok) throw new Error(`Failed to fetch users (HTTP ${res.status})`);
       const data = await res.json();
-
-      if (data.success) {
-        setEmployees(filterOutUnknownUsers(filterOutFinanceUsers(data.employees || [])));
-      } else {
-        console.error(data.message || "Failed to fetch employees");
+      const users = Array.isArray(data)
+        ? data
+        : data.users || data.data || data.employees || [];
+      if (!Array.isArray(users)) {
+        throw new Error(data.message || "Unexpected users response");
       }
+
+      let roleNamesById = new Map();
+      try {
+        const rolesRes = await fetch("https://kt-backend-yzr4.onrender.com/api/role", {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (rolesRes.ok) {
+          const rolesData = await rolesRes.json();
+          const roles = Array.isArray(rolesData)
+            ? rolesData
+            : rolesData.roles || rolesData.data || [];
+          roleNamesById = new Map(
+            roles.map((role) => [
+              String(role?._id || role?.id || "").toLowerCase(),
+              String(role?.roleName || role?.name || role?.title || "").trim(),
+            ]).filter(([id, name]) => id && name)
+          );
+        }
+      } catch (roleError) {
+        console.warn("Could not resolve employee roles:", roleError?.message);
+      }
+
+      const normalizedUsers = users.map((user) => {
+        const nestedUser = user?.userID || user?.userId || user?.user;
+        const record = nestedUser && typeof nestedUser === "object"
+          ? { ...nestedUser, ...user }
+          : user;
+        const rawRole = record?.role || record?.userRole || record?.roleName || record?.roleId;
+        const roleText = rawRole && typeof rawRole === "object"
+          ? rawRole.roleName || rawRole.name || rawRole.title || rawRole._id || rawRole.id || ""
+          : rawRole;
+        const role = roleNamesById.get(String(roleText || "").toLowerCase()) || roleText || "";
+        const rawDesignation = record?.designation || record?.position || "";
+        const designation = typeof rawDesignation === "object"
+          ? rawDesignation.name || rawDesignation.designationName || rawDesignation.title || ""
+          : rawDesignation;
+        const rawDepartment = record?.department || record?.departmentName || record?.dept || "";
+        const department = typeof rawDepartment === "object"
+          ? rawDepartment.name || rawDepartment.departmentName || rawDepartment.title || ""
+          : rawDepartment;
+        const name = record?.name || record?.fullName ||
+          `${record?.firstName || ""} ${record?.lastName || ""}`.trim();
+
+        return {
+          ...record,
+          _id: record?._id || record?.id || record?.employeeId?._id || record?.employeeID?._id,
+          name,
+          role: String(role),
+          designation,
+          department,
+          employeeStatus: record?.employeeStatus || record?.status ||
+            (record?.isActive === false ? "Inactive" : "Active"),
+        };
+      });
+      setEmployees(filterOutUnknownUsers(normalizedUsers));
     } catch (error) {
       console.error("Fetch employees error:", error);
     } finally {
@@ -551,7 +607,7 @@ export default function Employees() {
   // FILTER
   // =========================
   const filteredEmployees = employees.filter((emp) => {
-    if (isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
+    if (isUnknownEmployeeOrUser(emp)) return false;
 
     const fullName = String(
       emp.name ||
@@ -583,6 +639,7 @@ export default function Employees() {
 
     const empRole = String(emp.role || emp.userRole || emp.userId?.role || "").trim().toLowerCase();
     const desigLower = rawDesig.toLowerCase();
+    const deptLower = rawDept.toLowerCase();
     const isEmpTL = Boolean(
       emp.isTeamLead ||
       emp.isTeamLeader ||
@@ -594,12 +651,24 @@ export default function Employees() {
       desigLower.includes("tl")
     );
     const isEmpHR = empRole === "hr" || desigLower.includes("hr");
+    const isEmpAccountant =
+      empRole.includes("account") ||
+      desigLower.includes("account") ||
+      deptLower.includes("account");
+    const isEmpCA =
+      /\bca\b/i.test(empRole) ||
+      /\bca\b/i.test(desigLower) ||
+      /\bca\b/i.test(deptLower) ||
+      empRole.includes("chartered") ||
+      desigLower.includes("chartered");
 
     const matchesRole =
       filterRole === "all" ||
       (filterRole === "hr" && isEmpHR) ||
       (filterRole === "team lead" && isEmpTL) ||
-      (filterRole === "employee" && !isEmpHR && !isEmpTL);
+      (filterRole === "accountant" && isEmpAccountant) ||
+      (filterRole === "ca" && isEmpCA) ||
+      (filterRole === "employee" && !isEmpHR && !isEmpTL && !isEmpAccountant && !isEmpCA);
 
     const matchesDept = matchesEmployeeDepartment(emp, filterDepartment);
     const matchesEmpRole = matchesEmployeeRole(emp, filterEmployeeRole);
@@ -807,6 +876,8 @@ export default function Employees() {
                       <option value="employee">Employee</option>
                       <option value="team lead">Team Lead</option>
                       <option value="hr">HR</option>
+                      <option value="accountant">Accountant</option>
+                      <option value="ca">CA</option>
                     </select>
                   </div>
 

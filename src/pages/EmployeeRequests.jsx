@@ -111,13 +111,45 @@ const EmployeeRequests = () => {
         const data = await response.json();
         userList = Array.isArray(data) ? data : data?.users || data?.data || [];
       }
+
+      try {
+        const rolesRes = await api.get('/api/role');
+        const roles = rolesRes.data?.roles || rolesRes.data?.data || (Array.isArray(rolesRes.data) ? rolesRes.data : []);
+        const roleNamesById = new Map(
+          roles.map(role => [
+            String(role?._id || role?.id || '').toLowerCase(),
+            String(role?.roleName || role?.name || role?.title || '').trim()
+          ]).filter(([id, name]) => id && name)
+        );
+        userList = userList.map(user => {
+          const rawRole = user?.role || user?.userRole || user?.roleName || user?.roleId;
+          const roleText = rawRole && typeof rawRole === 'object'
+            ? rawRole.roleName || rawRole.name || rawRole.title || rawRole._id || rawRole.id || ''
+            : rawRole;
+          const role = roleNamesById.get(String(roleText || '').toLowerCase()) || roleText;
+          const rawDepartment = user?.department || user?.departmentName || user?.dept;
+          const department = rawDepartment && typeof rawDepartment === 'object'
+            ? rawDepartment.name || rawDepartment.departmentName || rawDepartment.title || ''
+            : rawDepartment;
+          return {
+            ...user,
+            ...(role ? { role: String(role) } : {}),
+            ...(department ? { department: String(department) } : {})
+          };
+        });
+      } catch (roleError) {
+        console.warn('Could not resolve employee request roles:', roleError?.message);
+      }
+
       if (fetchSequence === usersFetchSequenceRef.current) {
         setUsers(filterOutUnknownUsers(userList));
       }
+      return userList;
     } catch (err) {
       if (!isSilent) {
         setError(err.message || 'Something went wrong while loading users');
       }
+      return [];
     } finally {
       if (!isSilent) {
         setLoading(false);
@@ -322,48 +354,15 @@ const EmployeeRequests = () => {
     return [];
   };
 
-  // Fetch Available Team Leads from https://kt-backend-yzr4.onrender.com/api/employee/list and users roster
+  // Fetch available team leads from the users roster.
   const fetchTeamLeads = async () => {
     setLoadingTeamLeads(true);
     try {
-      const token = getAuthToken();
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      };
-
       const leads = [];
 
-      // Query https://kt-backend-yzr4.onrender.com/api/employee/list
-      try {
-        let empList = [];
-        try {
-          const empRes = await api.get('/api/employee/list', { headers });
-          empList = empRes.data?.employees || empRes.data?.data || (Array.isArray(empRes.data) ? empRes.data : []);
-        } catch (apiErr) {
-          const fetchRes = await fetch('https://kt-backend-yzr4.onrender.com/api/employee/list', { headers });
-          const empData = await fetchRes.json().catch(() => ({}));
-          empList = empData?.employees || empData?.data || (Array.isArray(empData) ? empData : []);
-        }
-
-        // Filter ONLY employees who are Team Leads
-        const employeeTLs = (empList || []).filter((emp) => {
-          if (!emp || isFinanceOrExcludedUser(emp)) return false;
-          return isTeamLeadUser(emp);
-        });
-
-        leads.push(...employeeTLs);
-      } catch (err) {
-        console.warn('Could not fetch employees for TLs:', err?.message);
-      }
-
-      // Also include any user from users state or allUsers who is marked as Team Lead
-      try {
-        if (Array.isArray(users) && users.length > 0) {
-          const userTLs = users.filter(u => u && !isFinanceOrExcludedUser(u) && isTeamLeadUser(u));
-          leads.push(...userTLs);
-        }
-      } catch {}
+      const roster = users.length > 0 ? users : await fetchUsers(true);
+      const userTLs = roster.filter(u => u && !isFinanceOrExcludedUser(u) && isTeamLeadUser(u));
+      leads.push(...userTLs);
 
       // Deduplicate leads by identifier or normalized name
       const seen = new Set();
@@ -992,27 +991,28 @@ const EmployeeRequests = () => {
           }
           if (!Array.isArray(currentTeams)) currentTeams = [];
 
-          // Step B: Find matching employee record in /api/employee/list (to get employee _id as well as user _id)
-          try {
-            const empRes = await api.get('/api/employee/list', { headers });
-            const empList = empRes.data?.employees || empRes.data?.data || (Array.isArray(empRes.data) ? empRes.data : []);
-            const matchedEmp = (empList || []).find(e => {
-              if (!e) return false;
-              const eEmail = (e.email || '').toLowerCase().trim();
-              const uEmail = (approvingUser?.email || '').toLowerCase().trim();
-              if (eEmail && uEmail && eEmail === uEmail) return true;
-              const eUserId = String(e.userId || e.userID || '').toLowerCase().trim();
-              if (eUserId && eUserId === String(userId).toLowerCase().trim()) return true;
-              const eCode = String(e.employeeID || e.employeeCode || '').trim();
-              const uCode = String(approvingUser?.employeeID || approvingUser?.employeeCode || '').trim();
-              if (eCode && uCode && eCode === uCode) return true;
-              return false;
-            });
-            if (matchedEmp?._id) {
-              resolvedEmpRecordId = String(matchedEmp._id);
-            }
-          } catch (e) {
-            console.warn('Employee list lookup notice:', e?.message);
+          // Resolve IDs from the roster loaded by /api/users/all.
+          const matchedEmp = users.find(e => {
+            if (!e) return false;
+            const eEmail = String(e.email || '').toLowerCase().trim();
+            const uEmail = String(approvingUser?.email || '').toLowerCase().trim();
+            if (eEmail && uEmail && eEmail === uEmail) return true;
+            const rawUserId = e.userId || e.userID;
+            const eUserId = String(
+              rawUserId && typeof rawUserId === 'object'
+                ? rawUserId._id || rawUserId.id || ''
+                : rawUserId || ''
+            ).toLowerCase().trim();
+            if (eUserId && eUserId === String(userId).toLowerCase().trim()) return true;
+            const eCode = String(e.employeeID || e.employeeCode || '').trim();
+            const uCode = String(approvingUser?.employeeID || approvingUser?.employeeCode || '').trim();
+            return Boolean(eCode && uCode && eCode === uCode);
+          });
+          const employeeRecordId = matchedEmp?.employeeId?._id ||
+            matchedEmp?.employeeID?._id ||
+            matchedEmp?._id;
+          if (employeeRecordId) {
+            resolvedEmpRecordId = String(employeeRecordId);
           }
 
           const employeeIdentifiersToAdd = [resolvedEmpRecordId, String(userId)].filter(Boolean);
@@ -1226,28 +1226,25 @@ const EmployeeRequests = () => {
       };
 
       // 1. Resolve all identifiers for this user
-      let empRecordId = null;
-      try {
-        const empRes = await api.get('/api/employee/list', { headers });
-        const empList = empRes.data?.employees || empRes.data?.data || (Array.isArray(empRes.data) ? empRes.data : []);
-        const matchedEmp = (empList || []).find(e => {
-          if (!e) return false;
-          const eEmail = (e.email || '').toLowerCase().trim();
-          const uEmail = (user?.email || '').toLowerCase().trim();
-          if (eEmail && uEmail && eEmail === uEmail) return true;
-          const eUserId = String(e.userId || e.userID || '').toLowerCase().trim();
-          if (eUserId && eUserId === String(userId).toLowerCase().trim()) return true;
-          const eCode = String(e.employeeID || e.employeeCode || '').trim();
-          const uCode = String(user?.employeeID || user?.employeeCode || '').trim();
-          if (eCode && uCode && eCode === uCode) return true;
-          return false;
-        });
-        if (matchedEmp?._id) {
-          empRecordId = String(matchedEmp._id);
-        }
-      } catch (e) {
-        console.warn('Employee lookup note during revoke:', e?.message);
-      }
+      const matchedEmp = users.find(e => {
+        if (!e) return false;
+        const eEmail = String(e.email || '').toLowerCase().trim();
+        const uEmail = String(user?.email || '').toLowerCase().trim();
+        if (eEmail && uEmail && eEmail === uEmail) return true;
+        const rawUserId = e.userId || e.userID;
+        const eUserId = String(
+          rawUserId && typeof rawUserId === 'object'
+            ? rawUserId._id || rawUserId.id || ''
+            : rawUserId || ''
+        ).toLowerCase().trim();
+        if (eUserId && eUserId === String(userId).toLowerCase().trim()) return true;
+        const eCode = String(e.employeeID || e.employeeCode || '').trim();
+        const uCode = String(user?.employeeID || user?.employeeCode || '').trim();
+        return Boolean(eCode && uCode && eCode === uCode);
+      });
+      const empRecordId = matchedEmp?.employeeId?._id ||
+        matchedEmp?.employeeID?._id ||
+        matchedEmp?._id;
 
       const allUserIdentifiers = [
         String(userId),
@@ -1537,7 +1534,7 @@ const EmployeeRequests = () => {
 
   // 1. Base users matching search & excluding non-eligible users
   const baseUsers = users.filter((user) => {
-    if (isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return false;
+    if (isUnknownEmployeeOrUser(user)) return false;
 
     const term = searchTerm.trim().toLowerCase();
     const searchMatch = !term ||

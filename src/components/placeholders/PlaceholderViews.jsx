@@ -608,7 +608,7 @@ export const TeamMembersView = () => {
   );
 };
 
-// 5. EMPLOYEES DIRECTORY (Company-wide directory for Employees & Team Leads - Showing Employee, TL, HR, Admin; Excluding Account & CA)
+// 5. EMPLOYEES DIRECTORY (Company-wide directory for Employees & Team Leads)
 export const EmployeesView = () => {
   const [filterRole, setFilterRole] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -619,10 +619,9 @@ export const EmployeesView = () => {
     const fetchCompanyEmployees = async () => {
       setIsLoading(true);
       try {
-        // Fetch users and employee records
-        const [usersRes, empsRes, rolesRes] = await Promise.allSettled([
+        // Use the complete users roster as the directory source.
+        const [usersRes, rolesRes] = await Promise.allSettled([
           api.get('/api/users/all'),
-          api.get('/api/employee/list'),
           api.get('/api/role')
         ]);
 
@@ -630,9 +629,6 @@ export const EmployeesView = () => {
           ? (usersRes.value.data?.users || usersRes.value.data?.data || (Array.isArray(usersRes.value.data) ? usersRes.value.data : []))
           : [];
 
-        const rawEmps = empsRes.status === 'fulfilled'
-          ? (empsRes.value.data?.employees || empsRes.value.data?.data || (Array.isArray(empsRes.value.data) ? empsRes.value.data : []))
-          : [];
         const rawRoles = rolesRes.status === 'fulfilled'
           ? (rolesRes.value.data?.roles || rolesRes.value.data?.data || (Array.isArray(rolesRes.value.data) ? rolesRes.value.data : []))
           : [];
@@ -724,6 +720,19 @@ export const EmployeesView = () => {
             return { category: 'ADMIN', roleFull: 'Administrator' };
           }
           if (roles.some(role =>
+            role.includes('chartered accountant') ||
+            role === 'ca' ||
+            /\bca\b/i.test(role)
+          ) || departments.some(department => department.includes('chartered accountant') || department === 'ca')) {
+            return { category: 'CA', roleFull: 'Chartered Accountant (CA)' };
+          }
+          if (
+            roles.some(role => role.includes('account')) ||
+            departments.some(department => department.includes('account'))
+          ) {
+            return { category: 'ACCOUNTANT', roleFull: 'Accountant' };
+          }
+          if (roles.some(role =>
             role.includes('employee') ||
             role === 'staff' ||
             role.includes('developer') ||
@@ -735,54 +744,15 @@ export const EmployeesView = () => {
           return null;
         };
 
-        // Helper to identify Account, CA, and Finance users who must NOT be shown
-        const isAccountOrCA = (u) => {
-          if (!u) return false;
-          const sources = getDirectorySources(u);
-          const role = sources.map(source => getDirectoryText(source.role || source.userRole || source.roleType || source.roleName || source.roleId)).join(' ');
-          const dept = sources.map(source => getDirectoryText(source.department || source.dept || source.departmentName)).join(' ');
-          const desig = sources.map(source => getDirectoryText(source.designation || source.designationName || source.jobTitle || source.position)).join(' ');
-          const name = sources.map(source => getDirectoryText(source.fullName || source.name)).join(' ');
-
-          // 1. Account / Accountant
-          if (role.includes('account') || dept.includes('account') || desig.includes('account')) return true;
-
-          // 2. CA / Chartered Accountant
-          if (
-            role === 'ca' ||
-            role.startsWith('ca ') ||
-            role.endsWith(' ca') ||
-            role.includes('chartered accountant') ||
-            desig === 'ca' ||
-            desig.startsWith('ca ') ||
-            desig.endsWith(' ca') ||
-            desig.includes('chartered accountant')
-          ) {
-            return true;
-          }
-
-          // 3. Finance & Audit
-          if (role.includes('finance') || dept.includes('finance') || desig.includes('finance')) return true;
-          if (role.includes('audit') || dept.includes('audit') || desig.includes('audit')) return true;
-          if (role.includes('cfo') || desig.includes('cfo')) return true;
-
-          // 4. Finance Admin specific check
-          if (name.includes('finance') && role.includes('admin')) return true;
-
-          return false;
-        };
-
-        // Helper to ensure ONLY employee, TL, HR, admin are shown
         const isAllowedDirectoryRole = (u) => {
           if (!u) return false;
-          if (isAccountOrCA(u)) return false;
           return Boolean(getDirectoryRole(u));
         };
 
         const seenKeys = new Map();
         const combined = [];
 
-        [...rawUsers, ...rawEmps].forEach((u) => {
+        rawUsers.forEach((u) => {
           if (!isAllowedDirectoryRole(u)) return;
 
           const sources = getDirectorySources(u);
@@ -794,7 +764,7 @@ export const EmployeesView = () => {
           if (uniqueKey && seenKeys.has(uniqueKey)) {
             const existingIndex = seenKeys.get(uniqueKey);
             const existing = combined[existingIndex];
-            const categoryPriority = { EMP: 0, TL: 1, ADMIN: 2, HR: 3 };
+            const categoryPriority = { EMP: 0, ACCOUNTANT: 1, CA: 2, TL: 3, ADMIN: 4, HR: 5 };
             if (categoryPriority[category] > categoryPriority[existing.role]) {
               combined[existingIndex] = {
                 ...existing,
@@ -863,7 +833,7 @@ export const EmployeesView = () => {
           <div>
             <h2 className="text-xl font-bold text-slate-900">Company Employee Directory</h2>
             <p className="text-xs sm:text-sm text-slate-500">
-              Company staff directory including Employees, Team Leaders, HR, and Administrators
+              Company staff directory including Employees, Team Leaders, HR, Accountants, and CAs
             </p>
           </div>
         </div>
@@ -875,6 +845,8 @@ export const EmployeesView = () => {
             { tag: 'EMP', label: 'Employees' },
             { tag: 'TL', label: 'Team Leaders' },
             { tag: 'HR', label: 'HR' },
+            { tag: 'ACCOUNTANT', label: 'Accountants' },
+            { tag: 'CA', label: 'CA' },
             { tag: 'ADMIN', label: 'Admin' },
           ].map(({ tag, label }) => (
             <button
