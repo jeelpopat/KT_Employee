@@ -665,7 +665,7 @@ export const Header = ({ onSignOut }) => {
   const activeUnreadCount = isAdmin ? adminUnreadCount : employeeUnreadCount;
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 h-16 border-b border-[#00334d] bg-[#003d5b] text-white transition-colors shadow-xs">
+    <header className="fixed top-0 left-0 right-0 w-full z-50 h-16 border-b border-[#083b4e] bg-[#0b4d68] text-white transition-colors shadow-xs font-poppins">
       <div className="flex h-full items-center justify-between px-3 sm:px-6">
 
         {/* Left: Mobile Sidebar Toggle & White Brand Logo */}
@@ -703,7 +703,7 @@ export const Header = ({ onSignOut }) => {
         </div>
 
         {/* Right: Actions, Notifications, Profile & Mobile Menu */}
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0 font-poppins">
           {/* Active monitoring badge for employees and team leads */}
           {userRole !== 'hr' && userRole !== 'admin' && attendanceStatus === 'checked_in' && (
             <button
@@ -717,7 +717,7 @@ export const Header = ({ onSignOut }) => {
             </button>
           )}
 
-          {/* Admin Announcement Trigger Button - Opens Modal Directly from Any Page */}
+          {/* Admin Announcement Trigger Button - Exact match to reference screenshot */}
           {userRole === 'admin' && (
             <button
               type="button"
@@ -727,9 +727,9 @@ export const Header = ({ onSignOut }) => {
                 setEditingAnnouncementId(null);
                 setShowAnnouncementModal(true);
               }}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white text-slate-800 hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-md bg-white text-[#0b4d68] hover:bg-slate-50 text-xs sm:text-[13px] font-medium font-poppins transition-colors cursor-pointer shadow-xs border-0"
             >
-              <Plus size={14} className="text-slate-800" />
+              <Plus size={14} strokeWidth={2.2} className="text-[#0b4d68]" />
               <span>Announcement</span>
             </button>
           )}
@@ -744,11 +744,11 @@ export const Header = ({ onSignOut }) => {
               }}
               aria-label={`Notifications${activeUnreadCount > 0 ? `, ${activeUnreadCount} unread` : ''}`}
               title="View notifications"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white hover:bg-white/10 transition-colors relative cursor-pointer"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-white hover:bg-white/10 transition-colors relative cursor-pointer"
             >
-              <Bell size={18} />
+              <Bell size={20} strokeWidth={1.8} className="text-white" />
               {activeUnreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 bg-rose-500 text-white font-bold rounded-full text-[9px] ring-2 ring-[#003d5b] animate-pulse flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 bg-rose-500 text-white font-bold rounded-full text-[9px] ring-2 ring-[#0b4d68] flex items-center justify-center">
                   {activeUnreadCount > 99 ? '99+' : activeUnreadCount}
                 </span>
               )}
@@ -1065,10 +1065,10 @@ export const Header = ({ onSignOut }) => {
                 setIsProfileMenuOpen((prev) => !prev);
                 setIsNotificationsOpen(false);
               }}
-              className="flex items-center gap-2 p-1 pl-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent"
+              className="flex items-center gap-2.5 p-1 pl-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent font-poppins"
             >
               <div className="relative shrink-0">
-                <div className="w-8 h-8 rounded-full bg-white text-[#003d5b] font-bold text-xs flex items-center justify-center ring-2 ring-white/20 shadow-xs overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-white text-[#0b4d68] font-bold text-xs flex items-center justify-center shadow-xs overflow-hidden font-poppins">
                   {isAdmin ? (
                     displayName
                       .split(' ')
@@ -1090,14 +1090,10 @@ export const Header = ({ onSignOut }) => {
                     />
                   )}
                 </div>
-                <span
-                  className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white"
-                  title="Online"
-                />
               </div>
 
-              <div className="hidden sm:flex items-center gap-1.5 pr-1">
-                <span className="text-xs font-bold truncate max-w-[150px] tracking-wide text-white uppercase">
+              <div className="hidden sm:flex items-center pr-1">
+                <span className="text-xs sm:text-[13px] font-medium tracking-wide text-white uppercase font-poppins">
                   {displayName || 'HARSH KOTHARI'}
                 </span>
               </div>

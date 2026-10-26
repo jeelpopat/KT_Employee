@@ -279,7 +279,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
-        { tab: 'admin-checkin-requests', label: 'Check-ins Requests', icon: CheckInsIcon },
+        { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon },
         { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon },
         { tab: 'admin-adjustments', label: 'Adjustments', icon: AdjustmentsIcon },
         { tab: 'admin-holidays', label: 'Holidays and Events', icon: HolidaysIcon },
@@ -302,15 +302,14 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
       ]
     },
-    // {
-    //   title: "RECRUITMENT AND LEADS",
-    //   items: [
-    //     { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
-    //     { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
-    //     { tab: 'admin-portfolio-leads', label: 'Portfolio Leads', icon: PerformanceIcon },
-    //     { tab: 'admin-contacts', label: 'Contacts', icon: ContactsIcon },
-    //   ]
-    // },
+    {
+      title: "RECRUITMENT AND LEADS",
+      items: [
+        { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
+        { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
+        { tab: 'admin-contacts', label: 'Contacts', icon: ContactsIcon },
+      ]
+    },
     {
       title: "ACCOUNT",
       items: [
@@ -331,7 +330,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
-        { tab: 'admin-checkin-requests', label: 'Check-ins Requests', icon: CheckInsIcon },
+        { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon },
         { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon },
         { tab: 'admin-adjustments', label: 'Adjustments', icon: AdjustmentsIcon },
         { tab: 'admin-holidays', label: 'Holidays and Events', icon: HolidaysIcon },
@@ -472,29 +471,35 @@ export const Sidebar = ({ onSignOut }) => {
 
       {/* Sidebar Container positioned seamlessly below the full-width navbar */}
       <aside
-        className={`fixed top-16 left-0 bottom-0 h-[calc(100vh-4rem)] w-60 bg-white border-r border-slate-200/80 flex flex-col overflow-hidden z-40 transition-transform duration-200 ease-in-out
+        className={`fixed top-16 left-0 bottom-0 h-[calc(100vh-4rem)] w-60 bg-white border-r border-[#e5ecf2] flex flex-col overflow-hidden z-40 transition-transform duration-200 ease-in-out font-poppins
           ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"} 
-          lg:translate-x-0`}
+          lg:translate-x-0 shadow-xs`}
       >
         {/* Navigation Area */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-3.5 text-xs">
+        <nav className="flex-1 overflow-y-auto font-poppins scrollbar-thin scrollbar-thumb-slate-200">
           {menuSections.map((section) => (
-            <div key={section.title} className="space-y-1">
-              <p className="px-2.5 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 bg-[#edf4f8] rounded-xs">
-                {section.title}
-              </p>
+            <div key={section.title} className="w-full">
+              {/* Full-width section header banner matching Image 1 */}
+              <div className="w-full bg-[#edf3f8] px-4 py-2 border-y border-[#e2edf5] first:border-t-0 select-none">
+                <span className="text-[11px] font-semibold text-[#6f8294] uppercase tracking-wider block font-poppins">
+                  {section.title}
+                </span>
+              </div>
+
+              {/* Items in this section */}
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = isTabActive(item.tab);
+                const isProfile = item.tab === 'profile';
 
                 return (
                   <button
                     key={item.tab}
                     type="button"
                     onClick={() => handleNavClick(item.tab)}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-all duration-150 text-xs cursor-pointer text-left ${isActive
-                      ? "text-white font-semibold shadow-xs"
-                      : "text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium"
+                    className={`w-full flex items-center justify-between px-4 py-2.5 transition-colors cursor-pointer text-left border-b border-[#edf2f7] font-poppins relative select-none rounded-none ${isActive
+                      ? "text-white font-medium shadow-none"
+                      : "bg-white text-[#1e293b] hover:bg-[#f6f9fc] font-medium"
                       }`}
                     style={
                       isActive
@@ -502,51 +507,64 @@ export const Sidebar = ({ onSignOut }) => {
                         : undefined
                     }
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Icon size={18} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-600'}`} />
-                      <span className="truncate">{item.label}</span>
+                    {/* Left Dark Accent Stripe on Active Item (exact match to Image 1) */}
+                    {isActive && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1 bg-[#022e43]" />
+                    )}
+
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <Icon
+                        size={18}
+                        className={`shrink-0 ${isActive ? 'text-white' : isProfile ? 'text-black fill-current' : 'text-[#1e293b]'}`}
+                      />
+                      <span className="truncate text-[13px] tracking-normal font-poppins">{item.label}</span>
                     </div>
 
                     {item.badge && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 shrink-0">
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/70 shrink-0">
                         {item.badge}
                       </span>
                     )}
                   </button>
                 );
               })}
+
+              {/* Role Card & Log Out placed right under ACCOUNT Profile matching Image 1 */}
+              {section.title === "ACCOUNT" && (
+                <div className="bg-white border-b border-[#edf2f7] pb-2">
+                  <div className="mx-3 mt-2.5 mb-2 p-3 rounded-md bg-[#f8fafc] border border-[#cfdbe5] font-poppins shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-semibold text-[#8e9aa8] tracking-wider leading-none">
+                        Role
+                      </span>
+                      <span
+                        className="text-[11px] font-medium px-2.5 py-0.5 rounded text-white capitalize leading-tight"
+                        style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                      >
+                        {userRole === 'admin' ? 'Admin' : (userRole === 'hr' ? 'HR' : (userRole === 'team_leader' ? 'TL' : 'Employee'))}
+                      </span>
+                    </div>
+                    <p className="text-[14px] font-semibold text-[#1e293b] mt-1.5 leading-tight">
+                      {roleLabels[userRole] || 'Administrator'}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCheckOut();
+                      if (onSignOut) onSignOut();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50/50 transition-colors cursor-pointer font-poppins"
+                  >
+                    <LogOutIcon size={18} className="shrink-0 text-red-500" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </nav>
-
-        {/* Footer with Role indicator & Logout matching reference image */}
-        <div className="p-3 border-t border-slate-100 bg-white shrink-0">
-          <div className="mb-2 p-2.5 rounded-lg border border-slate-200 bg-white">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 block tracking-wider leading-none mb-1">Role</span>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800">
-                {roleLabels[userRole] || 'Administrator'}
-              </span>
-              <span
-                className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full text-white bg-[#0082c3] capitalize"
-              >
-                {userRole === 'admin' ? 'Admin' : (userRole === 'hr' ? 'HR' : (userRole === 'team_leader' ? 'TL' : 'Employee'))}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              handleCheckOut();
-              if (onSignOut) onSignOut();
-            }}
-            className="w-full flex items-center gap-2 px-1 py-1 text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-          >
-            <LogOutIcon size={18} className="shrink-0 text-rose-500" />
-            <span>Log Out</span>
-          </button>
-        </div>
       </aside>
     </>
   );

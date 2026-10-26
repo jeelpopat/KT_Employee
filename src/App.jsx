@@ -198,16 +198,16 @@ const MainLayout = ({ handleSignOut }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+    <div className="min-h-screen bg-[#F4F4F4] text-slate-900 font-sans" style={{ backgroundColor: '#F4F4F4' }}>
       <div inert={requiresEmployeeScreenCapture}>
-        <Suspense fallback={<div className="h-16 border-b border-[#00334d] bg-[#003d5b]" />}>
+        <Suspense fallback={<div className="h-16 border-b border-[#083b4e] bg-[#0b4d68]" />}>
           <Header onSignOut={handleLayoutSignOut} />
         </Suspense>
         <Suspense fallback={null}>
           <Sidebar onSignOut={handleLayoutSignOut} />
         </Suspense>
-        <div className="lg:pl-60 flex flex-col min-h-screen pt-16">
-          <main className="flex-1 p-3 pt-4 sm:p-5 sm:pt-6 lg:p-6 lg:pt-6">
+        <div className="lg:pl-60 flex flex-col min-h-screen pt-16 bg-[#F4F4F4]">
+          <main className="flex-1 p-3 pt-4 sm:p-5 sm:pt-6 lg:p-6 lg:pt-6 bg-[#F4F4F4]">
             <div className="page-content w-full">
               <Suspense fallback={
                 <div className="flex items-center justify-center min-h-[350px]">
@@ -222,6 +222,7 @@ const MainLayout = ({ handleSignOut }) => {
         <Suspense fallback={null}>
           <InactivityAlertModal />
         </Suspense>
+      </div>
       </div>
       {requiresEmployeeScreenCapture && (
         <div
