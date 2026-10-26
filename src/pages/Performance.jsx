@@ -71,6 +71,42 @@ const isDummyPerformanceRecord = (p) => {
   return false;
 };
 
+const dedupePerformanceRecords = (records) => {
+  const uniqueRecords = new Map();
+
+  records.forEach((record) => {
+    if (!record) return;
+    const employee = record.employeeID || record.employee;
+    const employeeId = typeof record.employeeId === "object"
+      ? record.employeeId?._id || record.employeeId?.id
+      : record.employeeId;
+    const employeeIdentity =
+      record.employeeEmail ||
+      record.email ||
+      employeeId ||
+      employee?._id ||
+      employee?.id ||
+      employee?.email ||
+      record.employeeName ||
+      employee?.name ||
+      employee?.fullName ||
+      "employee";
+    const key = JSON.stringify([
+      employeeIdentity,
+      record.createdAt || record.date || "",
+      record.performancePercentage ?? record.percentage ?? record.performance?.performancePercentage ?? "",
+      record.rating ?? "",
+      record.feedback ?? "",
+      record.remarks ?? record.remark ?? "",
+      record.evaluatorName || record.submittedBy?.name || record.submittedBy?.fullName || "",
+      record.evaluatorRole || record.submittedBy?.role || ""
+    ]).toLowerCase();
+    if (!uniqueRecords.has(key)) uniqueRecords.set(key, record);
+  });
+
+  return Array.from(uniqueRecords.values());
+};
+
 // Purge stale or test performance records from local storage across all keys
 const purgeStalePerformances = () => {
   try {
@@ -426,13 +462,13 @@ const Performance = () => {
               });
             }
 
-            const filteredPerfs = rawPerfs.filter((perf) => {
+            const filteredPerfs = dedupePerformanceRecords(rawPerfs.filter((perf) => {
               if (!perf || isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf)) return false;
               if (isFinanceOrExcludedUser(perf)) return false;
               if (perf.employeeID && (isFinanceOrExcludedUser(perf.employeeID) || isUnknownEmployeeOrUser(perf.employeeID))) return false;
               if (perf.employee && (isFinanceOrExcludedUser(perf.employee) || isUnknownEmployeeOrUser(perf.employee))) return false;
               return true;
-            });
+            }));
 
             // Update persistent cache so reviews remain synchronized
             try {
@@ -512,7 +548,7 @@ const Performance = () => {
         });
         setPerformances(Array.from(mergedMap.values()));
       } else {
-        setPerformances(fetchedData);
+        setPerformances(dedupePerformanceRecords(fetchedData));
       }
     } catch (err) {
       console.error("Backend performance fetch error:", err);
