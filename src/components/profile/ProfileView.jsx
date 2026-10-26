@@ -122,6 +122,24 @@ export const ProfileView = () => {
   const currentUserId = contextUser?.id || contextUser?._id || contextUser?.employeeId || 'current_user';
   const localStorageDocKey = `employee_documents_${currentUserId}`;
   const localStoragePhotoKey = `user_profile_photo_${currentUserId}`;
+  const localStoragePhotoResetKey = `user_profile_photo_reset_${currentUserId}`;
+  const [isProfilePhotoReset, setIsProfilePhotoReset] = useState(
+    () => {
+      try {
+        return localStorage.getItem(localStoragePhotoResetKey) === 'true';
+      } catch (error) {
+        console.warn('Could not read profile photo reset state:', error);
+        return false;
+      }
+    }
+  );
+  const clearProfilePhotoReset = () => {
+    try {
+      localStorage.removeItem(localStoragePhotoResetKey);
+    } catch (error) {
+      console.warn('Could not clear profile photo reset state:', error);
+    }
+  };
 
   const [isSyncingDocs, setIsSyncingDocs] = useState(false);
 
@@ -226,7 +244,7 @@ export const ProfileView = () => {
     ''
   );
 
-  const activePhotoUrl = localPhotoUrl || serverPhotoUrl;
+  const activePhotoUrl = isProfilePhotoReset ? '' : localPhotoUrl || serverPhotoUrl;
 
   // Load and sync Documents
   useEffect(() => {
@@ -501,6 +519,8 @@ export const ProfileView = () => {
       const reader = new FileReader();
       reader.onload = async (readEvent) => {
         const dataUrl = readEvent.target.result;
+        setIsProfilePhotoReset(false);
+        clearProfilePhotoReset();
         setLocalPhotoUrl(dataUrl);
         setImgError(false);
 
@@ -551,15 +571,6 @@ export const ProfileView = () => {
         } catch (updateErr) {
           console.warn("Backend /api/users/profile/update warning:", updateErr);
         }
-
-        try {
-          await api.put('/api/employee-panel/profile', {
-            profilePhoto: finalUrl,
-            photoUrl: finalUrl,
-            avatar: finalUrl,
-            image: finalUrl
-          });
-        } catch (e) {}
 
         // 4. Update AppContext with final URL
         if (updateUserProfile) {
@@ -628,10 +639,35 @@ export const ProfileView = () => {
     if (!window.confirm("Revert profile photo back to the company dark blue logo?")) return;
 
     setLocalPhotoUrl('');
+    setIsProfilePhotoReset(true);
     setImgError(false);
+    const clearedPhotoFields = {
+      profilePhoto: '',
+      profileImage: '',
+      photoUrl: '',
+      avatar: '',
+      image: '',
+      photo: ''
+    };
+    const clearNestedPhotoFields = (source) => {
+      if (!source || typeof source !== 'object' || Array.isArray(source)) return source;
+      const cleared = { ...source, ...clearedPhotoFields };
+      ['profile', 'user', 'employee', 'employeeId', 'employeeID', 'emp', 'employeeDetails', 'data']
+        .forEach(key => {
+          if (source[key] && typeof source[key] === 'object') {
+            cleared[key] = clearNestedPhotoFields(source[key]);
+          }
+        });
+      return cleared;
+    };
+    setProfileData(prev => {
+      if (!prev) return prev;
+      return clearNestedPhotoFields(prev);
+    });
 
     try {
       localStorage.removeItem(localStoragePhotoKey);
+      localStorage.setItem(localStoragePhotoResetKey, 'true');
       const empPhotos = JSON.parse(localStorage.getItem('kt_employee_photos') || '{}');
       const validId = resolveEmployeeId();
       if (validId) delete empPhotos[validId.toLowerCase()];
@@ -647,20 +683,17 @@ export const ProfileView = () => {
     }
 
     if (updateUserProfile) {
-      updateUserProfile({ profilePhoto: '', photoUrl: '', avatar: '' });
+      updateUserProfile(clearedPhotoFields);
     }
 
     try {
-      await api.put('/api/users/profile/update', {
-        profilePhoto: '',
-        photoUrl: '',
-        avatar: ''
-      });
-    } catch (e) {
-      console.warn("Backend reset photo warning:", e);
+      await api.put('/api/users/profile/update', clearedPhotoFields);
+      setPhotoFeedback({ type: 'success', text: 'Profile photo reverted to company logo.' });
+    } catch (error) {
+      console.error("Backend reset photo warning:", error);
+      setPhotoFeedback({ type: 'error', text: 'Could not reset the profile photo on the server. Please try again.' });
     }
 
-    setPhotoFeedback({ type: 'success', text: 'Profile photo reverted to company logo.' });
     setTimeout(() => setPhotoFeedback({ type: '', text: '' }), 3000);
   };
 
@@ -784,25 +817,6 @@ export const ProfileView = () => {
 
         persistDocuments(updatedDocs);
 
-        // If updated document was passport photo, sync with profile photo!
-        if (targetActionDocId === 'passport_photo') {
-          setLocalPhotoUrl(finalFileUrl);
-          setImgError(false);
-          if (updateUserProfile) {
-            updateUserProfile({ profilePhoto: finalFileUrl, photoUrl: finalFileUrl, avatar: finalFileUrl });
-          }
-          try {
-            localStorage.setItem(localStoragePhotoKey, finalFileUrl);
-            await api.put('/api/users/profile/update', {
-              profilePhoto: finalFileUrl,
-              photoUrl: finalFileUrl,
-              avatar: finalFileUrl
-            });
-          } catch (e) {
-            console.warn(e);
-          }
-        }
-
         // If doc viewer is open with this doc, update viewer state too
         if (docViewerModal.isOpen && docViewerModal.doc?.id === targetActionDocId) {
           setDocViewerModal(prev => ({
@@ -843,6 +857,8 @@ export const ProfileView = () => {
     }
 
     setLocalPhotoUrl(doc.fileUrl);
+    setIsProfilePhotoReset(false);
+    clearProfilePhotoReset();
     setImgError(false);
 
     if (updateUserProfile) {

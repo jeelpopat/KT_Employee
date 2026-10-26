@@ -37,6 +37,7 @@ export const Header = ({ onSignOut }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [headerProfileData, setHeaderProfileData] = useState(null);
+  const profilePhotoResetRef = useRef(false);
 
   // Refs for click-outside functionality
   const notificationRef = useRef(null);
@@ -572,10 +573,14 @@ export const Header = ({ onSignOut }) => {
       try {
         const pData = await fetchLiveUserProfile();
         if (pData && isMounted) {
-          setHeaderProfileData(pData);
+          setHeaderProfileData(profilePhotoResetRef.current ? null : pData);
           const resolved = resolveEmployeeName(pData);
           if (resolved && updateUserProfile && user?.name !== resolved) {
-            updateUserProfile({ name: resolved, fullName: resolved, employee: resolveEmployeeData(pData) });
+            updateUserProfile({
+              name: resolved,
+              fullName: resolved,
+              ...(!profilePhotoResetRef.current && { employee: resolveEmployeeData(pData) })
+            });
           }
         }
       } catch (error) {
@@ -586,6 +591,19 @@ export const Header = ({ onSignOut }) => {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const handleProfilePhotoUpdated = (event) => {
+      if (!Object.prototype.hasOwnProperty.call(event.detail || {}, 'photoUrl')) return;
+      profilePhotoResetRef.current = !event.detail.photoUrl;
+      if (profilePhotoResetRef.current) {
+        setHeaderProfileData(null);
+      }
+    };
+
+    window.addEventListener('kt_profile_photo_updated', handleProfilePhotoUpdated);
+    return () => window.removeEventListener('kt_profile_photo_updated', handleProfilePhotoUpdated);
   }, []);
 
   const extractPhoto = (source) => {
@@ -1048,11 +1066,11 @@ export const Header = ({ onSignOut }) => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    displayName
-                      .split(' ')
-                      .map((word) => word.charAt(0).toUpperCase())
-                      .slice(0, 2)
-                      .join('') || 'HK'
+                    <img
+                      src={companyLogo}
+                      alt="Company logo"
+                      className="w-full h-full object-contain p-0.5"
+                    />
                   )}
                 </div>
                 <span
