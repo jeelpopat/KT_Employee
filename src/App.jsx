@@ -223,7 +223,6 @@ const MainLayout = ({ handleSignOut }) => {
           <InactivityAlertModal />
         </Suspense>
       </div>
-      </div>
       {requiresEmployeeScreenCapture && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
