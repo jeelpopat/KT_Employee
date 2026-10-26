@@ -68,6 +68,28 @@ const TEAM_LEAD_URL =
 const DAILY_UPDATE_URL =
   "https://kt-backend-yzr4.onrender.com/api/dailyUpdate/list";
 
+const getLocalDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const isValidProjectDate = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12) return false;
+
+  const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= daysInMonth[month - 1];
+};
+
 function MultiSelectDropdown({
   label,
   options = [],
@@ -337,6 +359,7 @@ export default function Team() {
   const currentRole = userRole || deriveUserRole(user);
   const isAdmin = isAdminRole(currentRole, user);
   const isTL = !isAdmin && isTeamLeadRole(currentRole, user);
+  const todayDate = getLocalDateString();
   const userIdentifiers = useMemo(() => getLoggedInUserIdentifiers(user), [user]);
   const [projects, setProjects] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -1298,6 +1321,43 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       ...(name === "assignedTL" ? { assignedEmployees: [] } : {}),
     }));
   };
+  const handleProjectDateChange = (e) => {
+    const { name, value } = e.currentTarget;
+    const previousValue = projectForm[name];
+
+    if (value && !isValidProjectDate(value)) {
+      e.currentTarget.value = previousValue;
+      showToast("Enter a valid date using a four-digit year.", "error");
+      return;
+    }
+
+    if (name === "endDate" && value && value < todayDate) {
+      e.currentTarget.value = previousValue;
+      showToast("End date must be today or later.", "error");
+      return;
+    }
+
+    if (name === "endDate" && value && projectForm.startDate && value < projectForm.startDate) {
+      e.currentTarget.value = previousValue;
+      showToast("End date cannot be earlier than the start date.", "error");
+      return;
+    }
+
+    setProjectForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "startDate" && value && prev.endDate && prev.endDate < value
+        ? { endDate: value }
+        : {}),
+    }));
+  };
+  const handleProjectDateBlur = (e) => {
+    const { name, value, validity } = e.currentTarget;
+    if (validity.badInput || (value && !isValidProjectDate(value))) {
+      e.currentTarget.value = projectForm[name];
+      showToast("Enter a valid date using a four-digit year.", "error");
+    }
+  };
 
   const getProjectParticipants = (task) => {
     if (!task) return { empNames: "", tlName: "" };
@@ -1670,6 +1730,24 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
       if (!projectForm.assignedTL) {
         showToast("Please select a team lead.", "error");
+        return;
+      }
+
+      if (
+        (projectForm.startDate && !isValidProjectDate(projectForm.startDate)) ||
+        (projectForm.endDate && !isValidProjectDate(projectForm.endDate))
+      ) {
+        showToast("Enter valid project dates using a four-digit year.", "error");
+        return;
+      }
+
+      if (projectForm.endDate && projectForm.endDate < todayDate) {
+        showToast("End date must be today or later.", "error");
+        return;
+      }
+
+      if (projectForm.startDate && projectForm.endDate && projectForm.endDate < projectForm.startDate) {
+        showToast("End date cannot be earlier than the start date.", "error");
         return;
       }
 
@@ -2946,7 +3024,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     type="date"
                     name="startDate"
                     value={projectForm.startDate}
-                    onChange={handleChange}
+                    max="9999-12-31"
+                    onChange={handleProjectDateChange}
+                    onBlur={handleProjectDateBlur}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -2958,8 +3038,13 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   <input
                     type="date"
                     name="endDate"
+                    min={projectForm.startDate && projectForm.startDate > todayDate
+                      ? projectForm.startDate
+                      : todayDate}
+                    max="9999-12-31"
                     value={projectForm.endDate}
-                    onChange={handleChange}
+                    onChange={handleProjectDateChange}
+                    onBlur={handleProjectDateBlur}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
