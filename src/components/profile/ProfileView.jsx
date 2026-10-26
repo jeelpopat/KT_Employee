@@ -1025,6 +1025,10 @@ export const ProfileView = () => {
   // --- Personal & Contact Form Save ---
   const handleSaveContact = async (e) => {
     e.preventDefault();
+    if (!/^\d{10}$/.test(phone)) {
+      showToast("Please enter a valid 10-digit mobile number.", "error");
+      return;
+    }
     setIsSaving(true);
     const cleanName = name.trim();
 
@@ -1604,9 +1608,12 @@ export const ProfileView = () => {
                       <Phone size={14} className="text-slate-400" /> Phone Number
                     </label>
                     <input 
-                      type="text" 
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[0-9]{10}"
                       value={phone} 
-                      onChange={e => setPhone(e.target.value)} 
+                      onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-indigo-500 transition-colors"
                       required
                     />
