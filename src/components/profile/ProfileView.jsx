@@ -93,6 +93,7 @@ export const ProfileView = () => {
   const [docFeedback, setDocFeedback] = useState({ type: '', text: '' });
   const [uploadingDocId, setUploadingDocId] = useState(null);
   const [isDeletingPassportPhoto, setIsDeletingPassportPhoto] = useState(false);
+  const [isSavingDocNumber, setIsSavingDocNumber] = useState(false);
   const [editingDocId, setEditingDocId] = useState(null);
   const [tempDocNumber, setTempDocNumber] = useState('');
 
@@ -246,6 +247,12 @@ export const ProfileView = () => {
   );
 
   const activePhotoUrl = isProfilePhotoReset ? '' : localPhotoUrl || serverPhotoUrl;
+  const serverAadharNumber = String(
+    emp?.aadharNumber ?? emp?.aadhar ?? prof?.aadharNumber ?? prof?.aadhar ?? profileData?.aadharNumber ?? ''
+  ).trim();
+  const serverPanNumber = String(
+    emp?.panNumber ?? emp?.pan ?? prof?.panNumber ?? prof?.pan ?? profileData?.panNumber ?? ''
+  ).trim();
 
   // Load and sync Documents
   useEffect(() => {
@@ -344,7 +351,9 @@ export const ProfileView = () => {
                 matchedCore.fileUrl = remoteDoc.fileUrl || matchedCore.fileUrl;
                 matchedCore.fileName = remoteDoc.fileName || matchedCore.fileName;
                 matchedCore.fileType = remoteDoc.fileType || matchedCore.fileType;
-                if (remoteDoc.description) matchedCore.docNumber = remoteDoc.description;
+                if (remoteDoc.description && (!matchedCore.docNumber || matchedCore.docNumber === 'Not Provided')) {
+                  matchedCore.docNumber = remoteDoc.description;
+                }
                 matchedCore.status = 'uploaded';
                 matchedCore.remoteId = remoteDoc._id;
                 if (remoteDoc.createdAt) {
@@ -379,6 +388,16 @@ export const ProfileView = () => {
         console.warn("Could not query backend documents endpoint:", err);
       }
 
+      [
+        { id: 'aadhar', value: serverAadharNumber },
+        { id: 'pan', value: serverPanNumber }
+      ].forEach(({ id, value }) => {
+        const doc = initialDocs.find(item => item.id === id);
+        if (doc && value) {
+          doc.docNumber = value;
+        }
+      });
+
       setDocuments(initialDocs);
       try {
         localStorage.setItem(localStorageDocKey, JSON.stringify(initialDocs));
@@ -390,7 +409,7 @@ export const ProfileView = () => {
     if (!isLoadingData) {
       initializeDocuments();
     }
-  }, [isLoadingData, currentUserId, localStorageDocKey, activePhotoUrl]);
+  }, [isLoadingData, currentUserId, localStorageDocKey, activePhotoUrl, serverAadharNumber, serverPanNumber]);
 
   // Sync documents on-demand from GET /api/document
   const syncDocumentsFromBackend = async () => {
@@ -888,20 +907,74 @@ export const ProfileView = () => {
   // Inline Document Number Edit
   const handleStartEditNumber = (doc) => {
     setEditingDocId(doc.id);
-    setTempDocNumber(doc.docNumber || '');
+    const docNumber = doc.docNumber || '';
+    setTempDocNumber(
+      doc.id === 'aadhar' && docNumber !== 'Not Provided'
+        ? String(docNumber).replace(/\D/g, '').slice(0, 12)
+        : doc.id === 'pan'
+          ? (docNumber === 'Not Provided' ? '' : String(docNumber).replace(/[^a-z\d]/gi, '').toUpperCase().slice(0, 10))
+          : docNumber === 'Not Provided' ? '' : docNumber
+    );
   };
 
-  const handleSaveDocNumber = (docId) => {
+  const handleSaveDocNumber = async (docId) => {
+    const docNumber = tempDocNumber.trim();
+    if (docId === 'aadhar' && docNumber && !/^\d{12}$/.test(docNumber)) {
+      showToast('Aadhaar number must contain exactly 12 digits.', 'error');
+      return;
+    }
+    const normalizedDocNumber = docId === 'pan' ? docNumber.toUpperCase() : docNumber;
+    if (docId === 'pan' && normalizedDocNumber && !/^[A-Z]{5}\d{4}[A-Z]$/.test(normalizedDocNumber)) {
+      showToast('PAN number must be 10 characters: 5 letters, 4 digits, and 1 letter (e.g. ABCDE1234F).', 'error');
+      return;
+    }
+
+    const profileField = docId === 'aadhar'
+      ? 'aadharNumber'
+      : docId === 'pan'
+        ? 'panNumber'
+        : null;
+
+    if (profileField) {
+      setIsSavingDocNumber(true);
+      try {
+        const valueToSave = docId === 'pan' ? normalizedDocNumber : docNumber;
+        const response = await api.put('/api/users/profile/update', { [profileField]: valueToSave });
+        if (response.data?.success === false) {
+          throw new Error(response.data?.message || `${docId.toUpperCase()} number update was rejected.`);
+        }
+      } catch (error) {
+        console.error(`Could not save ${docId.toUpperCase()} number:`, error);
+        showToast(`Could not save ${docId.toUpperCase()} number. Please try again.`, 'error');
+        setIsSavingDocNumber(false);
+        return;
+      }
+    }
+
     const updatedDocs = documents.map(d => {
       if (d.id === docId) {
         return {
           ...d,
-          docNumber: tempDocNumber.trim()
+          docNumber: normalizedDocNumber
         };
       }
       return d;
     });
     persistDocuments(updatedDocs);
+    if (profileField) {
+      const profileFields = {
+        [profileField]: normalizedDocNumber,
+        ...(docId === 'aadhar' ? { aadhar: normalizedDocNumber } : { pan: normalizedDocNumber })
+      };
+      setProfileData(prev => ({
+        ...(prev || {}),
+        ...profileFields,
+        profile: { ...(prev?.profile || {}), ...profileFields },
+        employee: { ...(prev?.employee || {}), ...profileFields }
+      }));
+      if (updateUserProfile) updateUserProfile(profileFields);
+      setIsSavingDocNumber(false);
+    }
     setEditingDocId(null);
     setTempDocNumber('');
     setDocFeedback({ type: 'success', text: 'Document number updated.' });
@@ -1827,9 +1900,11 @@ export const ProfileView = () => {
                           <button
                             type="button"
                             onClick={() => handleSaveDocNumber(aadharDoc.id)}
-                            className="text-[11px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1 cursor-pointer"
+                            disabled={isSavingDocNumber}
+                            className="text-[11px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1 cursor-pointer disabled:opacity-60"
                           >
-                            <Check size={12} /> Save
+                            {isSavingDocNumber ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            {isSavingDocNumber ? 'Saving...' : 'Save'}
                           </button>
                         ) : (
                           <button
@@ -1846,8 +1921,11 @@ export const ProfileView = () => {
                         <input
                           type="text"
                           value={tempDocNumber}
-                          onChange={e => setTempDocNumber(e.target.value)}
+                          onChange={e => setTempDocNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
                           placeholder="e.g. 1234 5678 9012"
+                          inputMode="numeric"
+                          maxLength={12}
+                          pattern="[0-9]{12}"
                           className="w-full px-2 py-1 text-xs font-mono bg-white border border-indigo-400 rounded-lg text-slate-900 focus:outline-none"
                           autoFocus
                         />
@@ -1938,9 +2016,11 @@ export const ProfileView = () => {
                           <button
                             type="button"
                             onClick={() => handleSaveDocNumber(panDoc.id)}
-                            className="text-[11px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1 cursor-pointer"
+                            disabled={isSavingDocNumber}
+                            className="text-[11px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1 cursor-pointer disabled:opacity-60"
                           >
-                            <Check size={12} /> Save
+                            {isSavingDocNumber ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            {isSavingDocNumber ? 'Saving...' : 'Save'}
                           </button>
                         ) : (
                           <button
@@ -1957,8 +2037,11 @@ export const ProfileView = () => {
                         <input
                           type="text"
                           value={tempDocNumber}
-                          onChange={e => setTempDocNumber(e.target.value)}
+                          onChange={e => setTempDocNumber(e.target.value.replace(/[^a-z\d]/gi, '').toUpperCase().slice(0, 10))}
                           placeholder="e.g. ABCDE1234F"
+                          maxLength={10}
+                          autoCapitalize="characters"
+                          spellCheck={false}
                           className="w-full px-2 py-1 text-xs font-mono uppercase bg-white border border-indigo-400 rounded-lg text-slate-900 focus:outline-none"
                           autoFocus
                         />

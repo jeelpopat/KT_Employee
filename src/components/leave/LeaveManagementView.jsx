@@ -57,6 +57,19 @@ export const LeaveManagementView = () => {
   // Leave policy: leaves must be applied at least 2 days in advance (e.g., if today is 3/10, selectable from 5/10 onwards)
   const minAllowedDate = getLocalDateString(2);
 
+  const isValidLeaveDate = (value) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+
+    const [, year, month, day] = match.map(Number);
+    const date = new Date(0);
+    date.setUTCFullYear(year, month - 1, day);
+    date.setUTCHours(0, 0, 0, 0);
+    return date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day;
+  };
+
   // Resolve applicant role strictly matching schema enum: ["employee", "team lead", "hr", "admin"]
   const resolveApplicantRole = () => {
     const rawRole = (
@@ -465,6 +478,10 @@ export const LeaveManagementView = () => {
 
     if (!startDate) {
       setFormError('Please select a start date.');
+      return;
+    }
+    if (!isValidLeaveDate(startDate) || (endDate && !isValidLeaveDate(endDate))) {
+      setFormError('Please enter valid leave dates with a 4-digit year.');
       return;
     }
 
@@ -907,8 +924,8 @@ export const LeaveManagementView = () => {
 
       {/* Apply Leave Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 transition-opacity flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-xl shadow-xs border border-slate-200 flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 transition-opacity flex items-center justify-center p-4">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white rounded-xl shadow-xs border border-slate-200 flex flex-col overflow-hidden">
             
             <div className="px-4 sm:px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div>
@@ -925,7 +942,7 @@ export const LeaveManagementView = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 text-sm">
+            <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto p-4 sm:p-6 space-y-5 text-sm">
               
               {formError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 font-medium text-sm flex items-start gap-2">
@@ -1080,9 +1097,17 @@ export const LeaveManagementView = () => {
                     <input 
                       type="date" 
                       min={minAllowedDate}
+                      max="9999-12-31"
                       value={startDate}
                       onChange={e => {
                         const val = e.target.value;
+                        if (val && !isValidLeaveDate(val)) {
+                          const message = 'Please enter a valid date using a 4-digit year.';
+                          e.target.setCustomValidity(message);
+                          setFormError(message);
+                          return;
+                        }
+                        e.target.setCustomValidity('');
                         if (val && val < minAllowedDate) {
                           setFormError(`Policy Notice: Leave must be applied at least 2 days in advance (from ${minAllowedDate} onwards).`);
                         } else {
@@ -1116,9 +1141,17 @@ export const LeaveManagementView = () => {
                     <input 
                       type="date" 
                       min={startDate || minAllowedDate}
+                      max="9999-12-31"
                       value={(isHalfDay || leaveType === 'half_day') ? startDate : endDate}
                       onChange={e => {
                         const val = e.target.value;
+                        if (val && !isValidLeaveDate(val)) {
+                          const message = 'Please enter a valid date using a 4-digit year.';
+                          e.target.setCustomValidity(message);
+                          setFormError(message);
+                          return;
+                        }
+                        e.target.setCustomValidity('');
                         if (val && val < minAllowedDate) {
                           setFormError(`Policy Notice: Leave must be applied at least 2 days in advance (from ${minAllowedDate} onwards).`);
                         } else if (startDate && val < startDate) {
