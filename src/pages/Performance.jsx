@@ -107,6 +107,61 @@ const dedupePerformanceRecords = (records) => {
   return Array.from(uniqueRecords.values());
 };
 
+const getPerformanceEmployeeIdentity = (record) => {
+  const ids = new Set();
+  const emails = new Set();
+  const names = new Set();
+  const visit = (value) => {
+    if (!value) return;
+    if (typeof value === "string" || typeof value === "number") {
+      ids.add(String(value).toLowerCase().trim());
+      return;
+    }
+    if (typeof value !== "object") return;
+
+    [
+      value._id,
+      value.id,
+      value.userId,
+      value.userID,
+      value.employeeId,
+      value.employeeID,
+      value.empId,
+      value.uniqueID,
+      value.uniqueId,
+      value.employeeCode
+    ].filter(Boolean).forEach((id) => ids.add(String(id).toLowerCase().trim()));
+
+    [value.email, value.employeeEmail].filter(Boolean).forEach((email) => {
+      emails.add(String(email).toLowerCase().trim());
+    });
+
+    [
+      value.name,
+      value.fullName,
+      value.displayName,
+      `${value.firstName || ""} ${value.lastName || ""}`.trim()
+    ].filter(Boolean).forEach((name) => {
+      names.add(String(name).toLowerCase().replace(/\s+/g, " ").trim());
+    });
+
+    [value.user, value.employee, value.profile].forEach((nested) => {
+      if (nested && nested !== value) visit(nested);
+    });
+  };
+
+  if (!record) return { ids, emails, names };
+  [record.employeeID, record.employeeId, record.employee, record.userId, record.user, record.profile]
+    .forEach(visit);
+  [record.employeeEmail, record.email].filter(Boolean).forEach((email) => {
+    emails.add(String(email).toLowerCase().trim());
+  });
+  [record.employeeName, record.name, record.fullName].filter(Boolean).forEach((name) => {
+    names.add(String(name).toLowerCase().replace(/\s+/g, " ").trim());
+  });
+  return { ids, emails, names };
+};
+
 // Purge stale or test performance records from local storage across all keys
 const purgeStalePerformances = () => {
   try {
@@ -290,15 +345,38 @@ const Performance = () => {
       ]);
 
       let uMap = {};
+      const indexUser = (record) => {
+        if (!record || typeof record !== "object") return;
+        const identifiers = [
+          record._id,
+          record.id,
+          record.userId,
+          record.userID,
+          record.employeeId,
+          record.employeeID,
+          record.empId,
+          record.uniqueID,
+          record.uniqueId,
+          record.employeeCode,
+          record.email,
+          record.user?._id,
+          record.user?.id,
+          record.user?.userId,
+          record.user?.email,
+          record.employee?._id,
+          record.employee?.id,
+          record.employee?.employeeId,
+          record.employee?.email
+        ];
+        identifiers.filter(Boolean).forEach((identifier) => {
+          uMap[String(identifier).toLowerCase().trim()] = record;
+        });
+      };
       const empData = empRes.status === "fulfilled" ? empRes.value : {};
       const rawEmps = empData?.employees || empData?.data || empData?.users || (Array.isArray(empData) ? empData : []);
       if (Array.isArray(rawEmps)) {
         rawEmps.forEach((e) => {
-          if (!e) return;
-          if (e._id) uMap[String(e._id)] = e;
-          if (e.id) uMap[String(e.id)] = e;
-          if (e.userId) uMap[String(e.userId)] = e;
-          if (e.email) uMap[String(e.email).toLowerCase().trim()] = e;
+          indexUser(e);
         });
       }
 
@@ -306,11 +384,7 @@ const Performance = () => {
       const rawUsers = userData?.users || userData?.data || (Array.isArray(userData) ? userData : []);
       if (Array.isArray(rawUsers)) {
         rawUsers.forEach((u) => {
-          if (!u) return;
-          if (u._id) uMap[String(u._id)] = u;
-          if (u.id) uMap[String(u.id)] = u;
-          if (u.userId) uMap[String(u.userId)] = u;
-          if (u.email) uMap[String(u.email).toLowerCase().trim()] = u;
+          indexUser(u);
         });
       }
 
@@ -359,6 +433,58 @@ const Performance = () => {
       );
 
       const teamScope = extractAssignedTeamEmployees(myTeams, uMap);
+      const addTeamMemberIdentifiers = (member) => {
+        if (!member) return;
+        if (typeof member === "string" || typeof member === "number") {
+          const identifier = String(member).toLowerCase().trim();
+          if (identifier) teamScope.memberIds.add(identifier);
+          const resolved = uMap[identifier];
+          if (resolved && resolved !== member) addTeamMemberIdentifiers(resolved);
+          return;
+        }
+        if (typeof member !== "object") return;
+
+        [
+          member._id,
+          member.id,
+          member.userId,
+          member.userID,
+          member.employeeId,
+          member.employeeID,
+          member.empId,
+          member.uniqueID,
+          member.uniqueId,
+          member.employeeCode
+        ].filter(Boolean).forEach((identifier) => {
+          teamScope.memberIds.add(String(identifier).toLowerCase().trim());
+        });
+
+        [
+          member.email,
+          member.user?.email,
+          member.employee?.email
+        ].filter(Boolean).forEach((email) => {
+          teamScope.memberEmails.add(String(email).toLowerCase().trim());
+        });
+
+        [
+          member.name,
+          member.fullName,
+          member.displayName,
+          `${member.firstName || ""} ${member.lastName || ""}`.trim(),
+          member.user?.name,
+          member.user?.fullName,
+          member.employee?.name,
+          member.employee?.fullName
+        ].filter(Boolean).forEach((name) => {
+          teamScope.memberNames.add(String(name).toLowerCase().replace(/\s+/g, " ").trim());
+        });
+
+        [member.user, member.employee, member.profile].forEach((nested) => {
+          if (nested && nested !== member) addTeamMemberIdentifiers(nested);
+        });
+      };
+      teamScope.memberRecords.forEach(addTeamMemberIdentifiers);
 
       // Check projects for team members assigned under this Team Leader
       const projData = projRes.status === "fulfilled" ? projRes.value : {};
@@ -372,15 +498,7 @@ const Performance = () => {
             isLeadMatch(p.teamLead) ||
             isLeadMatch(p.assignedTL);
           if (isProjectLead && Array.isArray(p.employees)) {
-            p.employees.forEach((emp) => {
-              if (!emp) return;
-              const eId = String(emp._id || emp.id || emp.userId || emp).toLowerCase().trim();
-              const eEmail = String(emp.email || "").toLowerCase().trim();
-              const eName = String(emp.name || emp.fullName || "").toLowerCase().trim();
-              if (eId) teamScope.memberIds.add(eId);
-              if (eEmail) teamScope.memberEmails.add(eEmail);
-              if (eName) teamScope.memberNames.add(eName);
-            });
+            p.employees.forEach(addTeamMemberIdentifiers);
           }
         });
       }
@@ -390,15 +508,7 @@ const Performance = () => {
         const storedAssignments = JSON.parse(localStorage.getItem("teamLeadAssignedEmployees") || "{}");
         Object.entries(storedAssignments).forEach(([tlKey, empIds]) => {
           if (isLeadMatch(tlKey) && Array.isArray(empIds)) {
-            empIds.forEach((eid) => {
-              const s = String(eid).toLowerCase().trim();
-              if (s) {
-                teamScope.memberIds.add(s);
-                const u = uMap[s];
-                if (u?.email) teamScope.memberEmails.add(String(u.email).toLowerCase().trim());
-                if (u?.name || u?.fullName) teamScope.memberNames.add(String(u.name || u.fullName).toLowerCase().trim());
-              }
-            });
+            empIds.forEach(addTeamMemberIdentifiers);
           }
         });
       } catch {}
@@ -407,13 +517,7 @@ const Performance = () => {
         const userTLMap = JSON.parse(localStorage.getItem("kt_user_assigned_tl") || "{}");
         Object.entries(userTLMap).forEach(([uid, tlVal]) => {
           if (isLeadMatch(tlVal)) {
-            const s = String(uid).toLowerCase().trim();
-            if (s) {
-              teamScope.memberIds.add(s);
-              const u = uMap[s];
-              if (u?.email) teamScope.memberEmails.add(String(u.email).toLowerCase().trim());
-              if (u?.name || u?.fullName) teamScope.memberNames.add(String(u.name || u.fullName).toLowerCase().trim());
-            }
+            addTeamMemberIdentifiers(uid);
           }
         });
       } catch {}
@@ -918,48 +1022,22 @@ const Performance = () => {
   // ============================================================
   const isMyRecord = useCallback((perf) => {
     if (!perf) return false;
-    const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").toLowerCase().trim();
-    const myUniqueId = String(user?.uniqueID || user?.employeeID || user?.uniqueId || user?.empId || "").toLowerCase().trim();
-    const myEmail = String(user?.email || "").toLowerCase().trim();
-    const myName = String(user?.name || user?.fullName || "").toLowerCase().trim();
+    const myIdentity = getPerformanceEmployeeIdentity(user);
+    [
+      getRealAuthUserId(user),
+      user?._id,
+      user?.id,
+      user?.employeeId,
+      user?.uniqueID,
+      user?.employeeID,
+      user?.uniqueId,
+      user?.empId
+    ].filter(Boolean).forEach((id) => myIdentity.ids.add(String(id).toLowerCase().trim()));
+    const perfIdentity = getPerformanceEmployeeIdentity(perf);
 
-    // 1. Check ID / UniqueID match
-    const perfEmpId = String(
-      (typeof perf.employeeID === "object" ? (perf.employeeID?._id || perf.employeeID?.id || perf.employeeID?.userId || perf.employeeID?.uniqueID) : perf.employeeID) ||
-      (typeof perf.employee === "object" ? (perf.employee?._id || perf.employee?.id || perf.employee?.userId || perf.employee?.uniqueID) : perf.employee) ||
-      perf.employeeId ||
-      perf.userId ||
-      perf.uniqueID ||
-      ""
-    ).toLowerCase().trim();
-
-    if (myId && perfEmpId && (myId === perfEmpId || perfEmpId.includes(myId) || myId.includes(perfEmpId))) return true;
-    if (myUniqueId && perfEmpId && (myUniqueId === perfEmpId || perfEmpId.includes(myUniqueId))) return true;
-
-    // 2. Check Email match
-    const perfEmail = String(
-      (typeof perf.employeeID === "object" ? perf.employeeID?.email : "") ||
-      (typeof perf.employee === "object" ? perf.employee?.email : "") ||
-      perf.employeeEmail ||
-      perf.email ||
-      ""
-    ).toLowerCase().trim();
-
-    if (myEmail && perfEmail && myEmail === perfEmail) return true;
-
-    // 3. Check Name match
-    const perfName = String(
-      (typeof perf.employeeID === "object" ? (perf.employeeID?.name || perf.employeeID?.fullName) : "") ||
-      (typeof perf.employee === "object" ? (perf.employee?.name || perf.employee?.fullName) : "") ||
-      perf.employeeName ||
-      perf.name ||
-      perf.fullName ||
-      ""
-    ).toLowerCase().trim();
-
-    if (myName && perfName && (myName === perfName || (myName.length >= 3 && perfName.length >= 3 && (myName.includes(perfName) || perfName.includes(myName))))) return true;
-
-    return false;
+    return [...perfIdentity.ids].some((id) => myIdentity.ids.has(id)) ||
+      [...perfIdentity.emails].some((email) => myIdentity.emails.has(email)) ||
+      [...perfIdentity.names].some((name) => myIdentity.names.has(name));
   }, [user]);
 
   // ============================================================
@@ -970,72 +1048,33 @@ const Performance = () => {
     // Exclude TL's personal review from team members tab
     if (isMyRecord(perf)) return false;
 
-    // Direct check if perf document mentions teamLeadId
-    const myId = String(getRealAuthUserId(user) || user?._id || user?.id || "").toLowerCase().trim();
-    const perfTL = String(
-      perf.teamLeadId ||
-      perf.teamLeaderId ||
-      perf.tlId ||
-      perf.teamLead ||
-      (typeof perf.employeeID === "object" ? (perf.employeeID?.teamLeadId || perf.employeeID?.teamLeader) : "") ||
-      ""
-    ).toLowerCase().trim();
+    const myIdentity = getPerformanceEmployeeIdentity(user);
+    [
+      getRealAuthUserId(user),
+      user?._id,
+      user?.id,
+      user?.employeeId
+    ].filter(Boolean).forEach((id) => myIdentity.ids.add(String(id).toLowerCase().trim()));
+    const teamLeadIdentity = getPerformanceEmployeeIdentity({
+      employeeId: perf.teamLeadId,
+      employeeID: perf.teamLeaderId,
+      userId: perf.tlId,
+      employee: perf.teamLead
+    });
+    const isAssignedToCurrentLead = [...teamLeadIdentity.ids].some((id) => myIdentity.ids.has(id)) ||
+      [...teamLeadIdentity.emails].some((email) => myIdentity.emails.has(email));
 
-    if (myId && perfTL && (myId === perfTL || perfTL.includes(myId))) {
+    if (isAssignedToCurrentLead) {
       return true;
     }
 
-    // Direct check if review was evaluated or submitted by this Team Leader
-    if (perf.submittedBy) {
-      const subId = String(perf.submittedBy._id || perf.submittedBy.id || perf.submittedBy.userId || "").toLowerCase().trim();
-      const subEmail = String(perf.submittedBy.email || "").toLowerCase().trim();
-      if ((myId && subId === myId) || (user?.email && subEmail === String(user.email).toLowerCase().trim())) {
-        return true;
-      }
-    }
-
-    if (!teamEmployeesScope) {
-      // If team scope is still resolving, show non-excluded employee records
-      return !isFinanceOrExcludedUser(perf) && !isUnknownEmployeeOrUser(perf);
-    }
+    if (!teamEmployeesScope) return false;
 
     const { memberIds, memberEmails, memberNames } = teamEmployeesScope;
-    if (memberIds.size === 0 && memberEmails.size === 0 && memberNames.size === 0) {
-      // If no explicit team assignment found in backend, allow other employee records through
-      return !isFinanceOrExcludedUser(perf) && !isUnknownEmployeeOrUser(perf);
-    }
-
-    // Check Employee ID
-    const perfEmpId = String(
-      (typeof perf.employeeID === "object" ? (perf.employeeID?._id || perf.employeeID?.id || perf.employeeID?.userId || perf.employeeID?.employeeId) : perf.employeeID) ||
-      (typeof perf.employee === "object" ? (perf.employee?._id || perf.employee?.id || perf.employee?.userId || perf.employee?.employeeId) : perf.employee) ||
-      perf.employeeId ||
-      perf.userId ||
-      ""
-    ).toLowerCase().trim();
-    if (perfEmpId && memberIds.has(perfEmpId)) return true;
-
-    // Check Employee Email
-    const perfEmail = String(
-      perf.employeeEmail ||
-      (typeof perf.employeeID === "object" ? perf.employeeID?.email : "") ||
-      (typeof perf.employee === "object" ? perf.employee?.email : "") ||
-      perf.email ||
-      ""
-    ).toLowerCase().trim();
-    if (perfEmail && memberEmails.has(perfEmail)) return true;
-
-    // Check Employee Name
-    const perfName = String(
-      perf.employeeName ||
-      (typeof perf.employeeID === "object" ? (perf.employeeID?.name || perf.employeeID?.fullName) : "") ||
-      (typeof perf.employee === "object" ? (perf.employee?.name || perf.employee?.fullName) : "") ||
-      perf.name ||
-      ""
-    ).toLowerCase().trim();
-    if (perfName && memberNames.has(perfName)) return true;
-
-    return false;
+    const perfIdentity = getPerformanceEmployeeIdentity(perf);
+    return [...perfIdentity.ids].some((id) => memberIds.has(id)) ||
+      [...perfIdentity.emails].some((email) => memberEmails.has(email)) ||
+      [...perfIdentity.names].some((name) => memberNames.has(name));
   }, [teamEmployeesScope, isMyRecord, user]);
 
   // Role-isolated performances: Admin sees all; TL can toggle personal vs assigned team; Employee sees personal
