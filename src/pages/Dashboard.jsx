@@ -1064,8 +1064,11 @@ export default function Dashboard() {
                                 key={record._id || record.id || index}
                                 className="bg-white rounded-xl border border-[#81A2B2] p-3 flex flex-col items-center justify-center text-center shadow-xs transition-shadow hover:shadow-sm"
                               >
-                                {/* Ocean Blue Circle */}
-                                <div className="w-12 h-12 rounded-full bg-[#0679AE] text-white flex items-center justify-center font-bold text-sm select-none shadow-xs">
+                                {/* Ocean Blue Circle with vertical gradient */}
+                                <div
+                                  className="w-12 h-12 rounded-full text-white flex items-center justify-center font-bold text-sm select-none shadow-xs shrink-0 font-poppins"
+                                  style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
+                                >
                                   {initials}
                                 </div>
 
