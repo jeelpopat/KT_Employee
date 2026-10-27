@@ -308,12 +308,12 @@ export const ProfileView = () => {
             title: 'Passport Size Photo',
             subtitle: 'Official formal color photograph with solid background',
             category: 'Photograph',
-            docNumber: activePhotoUrl ? 'Active Employee Photo' : 'Not Uploaded',
-            status: activePhotoUrl ? 'uploaded' : 'pending',
-            fileUrl: activePhotoUrl || '',
-            fileName: activePhotoUrl ? 'Passport_Size_Photo.jpg' : '',
+            docNumber: 'Not Uploaded',
+            status: 'pending',
+            fileUrl: '',
+            fileName: '',
             fileType: 'image/jpeg',
-            uploadedAt: activePhotoUrl ? 'Uploaded' : 'Pending',
+            uploadedAt: 'Pending',
             isCore: true
           }
         ];
@@ -409,7 +409,7 @@ export const ProfileView = () => {
     if (!isLoadingData) {
       initializeDocuments();
     }
-  }, [isLoadingData, currentUserId, localStorageDocKey, activePhotoUrl, serverAadharNumber, serverPanNumber]);
+  }, [isLoadingData, currentUserId, localStorageDocKey, serverAadharNumber, serverPanNumber]);
 
   // Sync documents on-demand from GET /api/document
   const syncDocumentsFromBackend = async () => {
@@ -512,25 +512,6 @@ export const ProfileView = () => {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("File size exceeds 5MB limit. Please choose a smaller image.", "error");
-      e.target.value = '';
-      return;
-    }
-
-    try {
-      if (!(await isPassportSizePhoto(file))) {
-        showToast("Please upload a passport-size portrait photo with a 7:9 aspect ratio (35 x 45).", "error");
-        e.target.value = '';
-        return;
-      }
-    } catch (error) {
-      console.error("Could not validate profile photo:", error);
-      showToast("Could not read this image. Please select a valid photo.", "error");
-      e.target.value = '';
-      return;
-    }
-
     setIsPhotoUploading(true);
     setPhotoFeedback({ type: '', text: '' });
 
@@ -616,28 +597,6 @@ export const ProfileView = () => {
         try {
           window.dispatchEvent(new CustomEvent('kt_profile_photo_updated', { detail: { photoUrl: finalUrl } }));
         } catch (e) {}
-
-        // 6. Also sync Passport Size Photo document if present
-        setDocuments(prevDocs => {
-          const updated = prevDocs.map(doc => {
-            if (doc.id === 'passport_photo') {
-              return {
-                ...doc,
-                fileUrl: finalUrl,
-                fileName: file.name || 'Passport_Size_Photo.jpg',
-                status: 'uploaded',
-                uploadedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-              };
-            }
-            return doc;
-          });
-          try {
-            localStorage.setItem(localStorageDocKey, JSON.stringify(updated));
-          } catch (e) {
-            console.warn(e);
-          }
-          return updated;
-        });
 
         setPhotoFeedback({ type: 'success', text: 'Profile photo updated successfully!' });
         setTimeout(() => setPhotoFeedback({ type: '', text: '' }), 4000);
