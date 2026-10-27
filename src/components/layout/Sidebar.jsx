@@ -302,14 +302,14 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
       ]
     },
-    {
-      title: "RECRUITMENT AND LEADS",
-      items: [
-        { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
-        { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
-        { tab: 'admin-contacts', label: 'Contacts', icon: ContactsIcon },
-      ]
-    },
+    // {
+    //   title: "RECRUITMENT AND LEADS",
+    //   items: [
+    //     { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
+    //     { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
+    //     { tab: 'admin-contacts', label: 'Contacts', icon: ContactsIcon },
+    //   ]
+    // },
     {
       title: "ACCOUNT",
       items: [
@@ -351,14 +351,14 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
       ]
     },
-    {
-      title: "RECRUITMENT AND HIRING",
-      items: [
-        { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
-        { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
-        { tab: 'admin-contacts', label: 'Contacts', icon: ContactsIcon },
-      ]
-    },
+    // {
+    //   title: "RECRUITMENT AND HIRING",
+    //   items: [
+    //     { tab: 'admin-applications', label: 'Applications', icon: ApplicationsIcon },
+    //     { tab: 'admin-positions', label: 'Positions', icon: PositionsIcon },
+    //     { tab: 'admin-contacts', label: 'Contacts', icon: ContactsIcon },
+    //   ]
+    // },
     {
       title: "ACCOUNT",
       items: [
