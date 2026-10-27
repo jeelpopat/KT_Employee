@@ -1,6 +1,8 @@
 import axios from "axios";
 import { stopScreenCapture } from "../services/monitoringService.js";
 
+export const SCREEN_CAPTURE_ENABLED_SESSION_KEY = "kt_screen_capture_enabled";
+
 /**
  * Safely decodes a JWT token without external libraries
  * @param {string} token 
@@ -44,6 +46,11 @@ export const isTokenExpired = (token) => {
  * Clears authentication data from localStorage
  */
 export const clearAuth = () => {
+  try {
+    sessionStorage.removeItem(SCREEN_CAPTURE_ENABLED_SESSION_KEY);
+  } catch (error) {
+    console.warn("Could not clear screen capture session state:", error);
+  }
   localStorage.removeItem("token");
   localStorage.removeItem("auth_token");
   localStorage.removeItem("user");

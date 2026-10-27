@@ -378,7 +378,6 @@ export const Sidebar = ({ onSignOut }) => {
     {
       title: "TEAM MANAGEMENT",
       items: [
-        { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
         { tab: 'team-tasks', label: 'Task Management', icon: TaskManagementIcon },
         { tab: 'team-leaves', label: 'Team Leave Requests', icon: LeaveRequestsIcon },
         { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: CheckInsIcon },
@@ -412,12 +411,6 @@ export const Sidebar = ({ onSignOut }) => {
       items: [
         { tab: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
         { tab: 'performance', label: 'My Performance', icon: PerformanceIcon },
-      ]
-    },
-    {
-      title: "MONITORING",
-      items: [
-        { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
       ]
     },
     {

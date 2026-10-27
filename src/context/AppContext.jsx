@@ -485,31 +485,43 @@ export const AppProvider = ({ children }) => {
     isEnabled: true
   });
 
-  // Sync screenshot monitoring settings from backend GET /api/employee-panel/monitoring/settings for HR/Admin
+  // Load the saved monitoring interval for every role so automatic captures share the configured cadence.
   useEffect(() => {
-    if (userRole !== 'admin' && userRole !== 'hr') {
-      return;
-    }
+    const applySettings = (settings) => {
+      if (!settings?.intervalSeconds) return;
+      const intervalSeconds = Number(settings.intervalSeconds) || 300;
+      setScreenshotConfig(prev => ({
+        ...prev,
+        intervalSeconds,
+        intervalMinutes: Number(settings.intervalMinutes) || Math.max(1, Math.round(intervalSeconds / 60)),
+        isPausedOnBreak: settings.pauseOnBreak !== undefined ? settings.pauseOnBreak : true,
+        pauseOnBreak: settings.pauseOnBreak !== undefined ? settings.pauseOnBreak : true,
+        isEnabled: settings.isEnabled !== undefined ? settings.isEnabled : prev.isEnabled
+      }));
+      setNextScreenshotCountdown(intervalSeconds);
+    };
+
     const loadSettings = async () => {
       try {
-        const s = await getMonitoringSettings();
-        if (s && s.intervalSeconds) {
-          setScreenshotConfig(prev => ({
-            ...prev,
-            intervalSeconds: Number(s.intervalSeconds) || 300,
-            intervalMinutes: Number(s.intervalMinutes) || Math.max(1, Math.round((Number(s.intervalSeconds) || 300) / 60)),
-            isPausedOnBreak: s.pauseOnBreak !== undefined ? s.pauseOnBreak : true,
-            pauseOnBreak: s.pauseOnBreak !== undefined ? s.pauseOnBreak : true,
-            isEnabled: s.isEnabled !== undefined ? s.isEnabled : prev.isEnabled
-          }));
-          setNextScreenshotCountdown(Number(s.intervalSeconds) || 300);
-        }
-      } catch (err) {
-        // Silently keep default
+        applySettings(await getMonitoringSettings());
+      } catch (error) {
+        console.warn('Could not load screenshot monitoring settings:', error);
       }
     };
+
+    const handleStorageChange = (event) => {
+      if (event.key !== 'kt_screenshot_monitoring_settings' || !event.newValue) return;
+      try {
+        applySettings(JSON.parse(event.newValue));
+      } catch (error) {
+        console.warn('Could not read updated screenshot monitoring settings:', error);
+      }
+    };
+
     loadSettings();
-  }, [userRole]);
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const [screenshots, setScreenshots] = useState([]);
   const [latestScreenshot, setLatestScreenshot] = useState(null);

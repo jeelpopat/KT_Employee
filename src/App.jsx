@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
-import { performAutoCheckout, clearAuth, isTokenExpired } from './utils/auth.js';
+import { performAutoCheckout, clearAuth, isTokenExpired, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
@@ -65,6 +65,14 @@ const MainLayout = ({ handleSignOut }) => {
     isScreenSharingActive,
     startScreenCapture
   } = useApp();
+  const [screenCaptureWasEnabled, setScreenCaptureWasEnabled] = useState(() => {
+    try {
+      return sessionStorage.getItem(SCREEN_CAPTURE_ENABLED_SESSION_KEY) === 'true';
+    } catch (error) {
+      console.warn('Could not read screen capture session state:', error);
+      return false;
+    }
+  });
   const [startingScreenCapture, setStartingScreenCapture] = useState(false);
   const [screenCaptureError, setScreenCaptureError] = useState('');
   const location = useLocation();
@@ -154,7 +162,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'tasks': return <TaskManagementView />;
       case 'leave': return <LeaveManagementView />;
       case 'profile': return <ProfileView />;
-      case 'admin-screenshots': return <AdminScreenshotPortal />;
+      case 'admin-screenshots': return (userRole === 'admin' || userRole === 'hr') ? <AdminScreenshotPortal /> : <DashboardView />;
 
       // Role-Specific & Standard Modules
       case 'admin-salary':
@@ -177,13 +185,21 @@ const MainLayout = ({ handleSignOut }) => {
   };
 
   const requiresEmployeeScreenCapture =
-    (userRole === 'employee' || userRole === 'team_leader') && !isScreenSharingActive;
+    (userRole === 'employee' || userRole === 'team_leader') &&
+    !isScreenSharingActive &&
+    !screenCaptureWasEnabled;
 
   const handleEnableScreenCapture = async () => {
     setStartingScreenCapture(true);
     setScreenCaptureError('');
     try {
       await startScreenCapture();
+      try {
+        sessionStorage.setItem(SCREEN_CAPTURE_ENABLED_SESSION_KEY, 'true');
+        setScreenCaptureWasEnabled(true);
+      } catch (error) {
+        console.warn('Could not save screen capture session state:', error);
+      }
     } catch (error) {
       if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
         setScreenCaptureError('Screen sharing was not allowed. Select a screen and choose Share in your browser to continue.');
