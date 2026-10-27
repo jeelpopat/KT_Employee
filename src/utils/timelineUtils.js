@@ -440,6 +440,48 @@ export const normalizeBreakRecord = (record) => {
   };
 };
 
+export const alignBreakRecordsToShift = (breaks, checkInTime) => {
+  const shiftStart = parseTimeToMinutes(checkInTime);
+  if (shiftStart === null || !Array.isArray(breaks)) {
+    return Array.isArray(breaks) ? breaks.map(normalizeBreakRecord) : [];
+  }
+
+  const shiftEnd = shiftStart + TOTAL_SHIFT_MINUTES;
+  const getCandidates = (time) => {
+    const minutes = parseTimeToMinutes(time);
+    if (minutes === null) return [null];
+    return [minutes, minutes + 720, minutes - 720];
+  };
+
+  return breaks.map((record) => {
+    const normalized = normalizeBreakRecord(record);
+    const startCandidates = getCandidates(normalized.startTime)
+      .filter((minutes) => minutes !== null && minutes >= shiftStart && minutes < shiftEnd);
+    const endCandidates = normalized.endTime
+      ? getCandidates(normalized.endTime).filter((minutes) => minutes !== null && minutes > shiftStart && minutes <= shiftEnd)
+      : [null];
+    const validPairs = startCandidates.flatMap((start) => endCandidates
+      .filter((end) => end === null || end > start)
+      .map((end) => ({ start, end })));
+
+    if (validPairs.length === 0) return normalized;
+
+    validPairs.sort((a, b) => {
+      const aShift = Math.abs(a.start - parseTimeToMinutes(normalized.startTime)) +
+        (a.end === null ? 0 : Math.abs(a.end - parseTimeToMinutes(normalized.endTime)));
+      const bShift = Math.abs(b.start - parseTimeToMinutes(normalized.startTime)) +
+        (b.end === null ? 0 : Math.abs(b.end - parseTimeToMinutes(normalized.endTime)));
+      return aShift - bShift;
+    });
+
+    const [best] = validPairs;
+    return {
+      startTime: formatMinutesToTimeStr(best.start),
+      endTime: best.end === null ? normalized.endTime : formatMinutesToTimeStr(best.end)
+    };
+  });
+};
+
 /**
  * Computes a strictly fixed 9-hour timeline starting from check-in time.
  * - Timeline span is strictly 9 hours (540 minutes).

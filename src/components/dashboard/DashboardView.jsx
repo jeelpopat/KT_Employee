@@ -21,7 +21,8 @@ import {
   formatMinutesToTimeStr,
   convertUTCMinutesToLocal,
   parseTimeToMinutes,
-  normalizeBreakRecord
+  normalizeBreakRecord,
+  alignBreakRecordsToShift
 } from '../../utils/timelineUtils.js';
 
 const isAttendanceApproved = (record) => {
@@ -638,11 +639,11 @@ export const DashboardView = () => {
       : [];
     const singleBreak = getTopLevelBreak(ta);
 
-    const breaksList = getUniqueBreaks([
+    const breaksList = getUniqueBreaks(alignBreakRecordsToShift([
       ...rawBreaks,
       ...sessionBreaks,
       ...(singleBreak.startTime || singleBreak.endTime ? [singleBreak] : [])
-    ]);
+    ], rawCheckIn));
 
     const yellowSegments = (segments || []).filter(s => s.type === 'yellow');
     const localBreakCount = parseInt(
