@@ -6,49 +6,80 @@ import { showToast } from "../components/common/Toast";
 
 const BASE_URL = "https://kt-backend-yzr4.onrender.com/api";
 
+const getEmployeeReferenceId = (item) => {
+  if (typeof item === 'string' || typeof item === 'number') return String(item);
+  if (!item || typeof item !== 'object') return null;
+
+  const directId = [item._id, item.id, item.employeeCode, item.uniqueID]
+    .find((value) => typeof value === 'string' || typeof value === 'number');
+  if (directId !== undefined) return String(directId);
+
+  for (const key of ['employeeId', 'employeeID', 'userId', 'userID', 'employee', 'user', 'userObj']) {
+    const linkedId = getEmployeeReferenceId(item[key]);
+    if (linkedId) return linkedId;
+  }
+  return typeof item.email === 'string' ? item.email : null;
+};
+
+const getEmployeeIdentifiers = (employee) => {
+  if (!employee || typeof employee !== 'object') return [];
+
+  const identifiers = [];
+  const visited = new Set();
+  const identifierKeys = [
+    '_id', 'id', 'userId', 'userID', 'employeeId', 'employeeID',
+    'employeeCode', 'uniqueID', 'email',
+  ];
+  const linkedRecordKeys = [
+    'user', 'employee', 'userObj', 'profile', 'employeeId',
+    'employeeID', 'userId', 'userID', 'assignedEmployee', 'member',
+  ];
+  const collect = (record, depth = 0) => {
+    if (!record || typeof record !== 'object' || visited.has(record) || depth > 3) return;
+    visited.add(record);
+    identifierKeys.forEach((key) => identifiers.push(record[key]));
+    linkedRecordKeys.forEach((key) => collect(record[key], depth + 1));
+  };
+  collect(employee);
+
+  return identifiers
+    .filter((value) => typeof value === 'string' || typeof value === 'number')
+    .map((value) => String(value).toLowerCase().trim())
+    .filter(Boolean);
+};
+
 // Helper to match an employee across any identifier: _id, userId, userID, employeeID, employeeCode, uniqueID, email
 const findEmployeeByIdOrUser = (empOrId, empList = []) => {
   if (!empOrId) return null;
-  if (typeof empOrId === 'object' && empOrId._id && empList.some(e => String(e._id) === String(empOrId._id))) {
-    return empList.find(e => String(e._id) === String(empOrId._id));
-  }
-  const target = (typeof empOrId === 'object' ? (empOrId._id || empOrId.id || empOrId.userId || empOrId.userID || empOrId.employeeId || empOrId.employeeID || empOrId.email) : empOrId);
-  if (!target) return null;
-  const targetStr = String(target).toLowerCase().trim();
+  const targetIds = typeof empOrId === 'object'
+    ? getEmployeeIdentifiers(empOrId)
+    : [String(empOrId).toLowerCase().trim()];
+  if (!targetIds.length) return null;
 
   return empList.find((e) => {
     if (!e) return false;
-    const ids = [
-      e._id,
-      e.id,
-      e.userId,
-      e.userID,
-      e.employeeId,
-      e.employeeID,
-      e.employeeCode,
-      e.uniqueID,
-      e.user?._id,
-      e.user?.id
-    ].filter(Boolean).map(x => String(x).toLowerCase().trim());
-
-    if (ids.includes(targetStr)) return true;
-
-    if (targetStr.includes('@')) {
-      const eEmail = (e.email || e.user?.email || '').toLowerCase().trim();
-      if (eEmail && eEmail === targetStr) return true;
-    }
-    return false;
+    const employeeIds = getEmployeeIdentifiers(e);
+    return targetIds.some((targetId) => employeeIds.includes(targetId));
   });
 };
 
 // Generate canonical uniqueness key for an employee (email, employeeCode, or id)
 const getCanonicalEmployeeKey = (empOrId, empList = []) => {
   if (!empOrId) return null;
+  const getEmployeeCode = (employee) => {
+    const code = [
+      employee.employeeID,
+      employee.employeeCode,
+      employee.uniqueID,
+    ].find((value) => typeof value === 'string' || typeof value === 'number');
+    return code === undefined ? '' : String(code).trim().toLowerCase();
+  };
+
   const matched = findEmployeeByIdOrUser(empOrId, empList);
   if (matched) {
     const email = (matched.email || matched.user?.email || '').toLowerCase().trim();
     if (email && email.includes('@')) return `email:${email}`;
-    const empCode = (matched.employeeID || matched.employeeCode || matched.uniqueID || '').trim().toLowerCase();
+    const empCode = getEmployeeCode(matched);
     if (empCode) return `code:${empCode}`;
     const id = matched._id || matched.id;
     if (id) return `id:${String(id).toLowerCase().trim()}`;
@@ -59,7 +90,7 @@ const getCanonicalEmployeeKey = (empOrId, empList = []) => {
   if (typeof empOrId === 'object') {
     const email = (empOrId.email || empOrId.user?.email || '').toLowerCase().trim();
     if (email && email.includes('@')) return `email:${email}`;
-    const empCode = (empOrId.employeeID || empOrId.employeeCode || empOrId.uniqueID || '').trim().toLowerCase();
+    const empCode = getEmployeeCode(empOrId);
     if (empCode) return `code:${empCode}`;
     const id = empOrId._id || empOrId.id;
     if (id) return `id:${String(id).toLowerCase().trim()}`;
@@ -96,6 +127,62 @@ const getDistinctAssignedEmployees = (rawList = [], empList = []) => {
   return distinctEmployees;
 };
 
+const getEmployeeName = (employee) => {
+  if (!employee || typeof employee !== 'object') return '';
+
+  const records = [
+    employee,
+    employee.employee,
+    employee.user,
+    employee.userObj,
+    employee.profile,
+    employee.employeeDetails,
+    employee.employeeData,
+    employee.userDetails,
+    employee.personalInfo,
+    employee.assignedEmployee,
+    employee.member,
+    employee.employeeId,
+    employee.employeeID,
+    employee.userId,
+    employee.userID,
+  ].filter((record) => record && typeof record === 'object');
+
+  for (const record of records) {
+    const firstName = record.firstName;
+    const lastName = record.lastName;
+    const name = (
+      ((firstName || record.first_name)
+        ? `${firstName || record.first_name} ${lastName || record.last_name || ''}`.trim()
+        : '') ||
+      record.employeeName ||
+      record.employee_name ||
+      record.empName ||
+      record.emp_name ||
+      record.name ||
+      record.fullName ||
+      record.full_name ||
+      record.displayName ||
+      record.userName ||
+      record.username
+    );
+    if (typeof name === 'string' && name.trim()) return name.trim();
+  }
+
+  return '';
+};
+
+const extractPeople = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+
+  for (const key of ['employees', 'users', 'data', 'results']) {
+    const records = extractPeople(payload[key]);
+    if (records.length) return records;
+  }
+  return [];
+};
+
 // Modal Component for Assignments
 const AssignmentModal = ({
   isOpen,
@@ -115,7 +202,7 @@ const AssignmentModal = ({
   useEffect(() => {
     if (lead && isOpen) {
       const distinct = getDistinctAssignedEmployees(lead.assignedEmployees || [], employees);
-      setSelectedEmployees(distinct.map((e) => String(e._id)));
+      setSelectedEmployees(distinct.map(getEmployeeReferenceId).filter(Boolean));
       setSearchQuery("");
       setFilterType("all");
     }
@@ -265,7 +352,7 @@ const AssignmentModal = ({
     // Checking: enforce "every employee max have 1 TL"
     const leadInfo = getAssignedLeadInfo(matched || employeeId);
     if (leadInfo && !leadInfo.isCurrentLead) {
-      const empName = getDisplayName(matched || employeeId, 'employee');
+      const empName = getDisplayName(matched || employeeId);
       const otherLeadName = leadInfo.leadName;
       const currentLeadName = lead?.name || lead?.fullName || "this Team Lead";
 
@@ -329,14 +416,14 @@ const AssignmentModal = ({
 
   if (!isOpen) return null;
 
-  const getDisplayName = (person, type) => {
+  const getDisplayName = (person) => {
     if (!person) return "Unnamed";
-    return person.name || person.fullName || person.firstName || person.email || "Unnamed";
+    return getEmployeeName(person) || person.email || "Unnamed";
   };
 
   // Filter & Search Logic
   const filteredEmployees = availableEmployees.filter((emp) => {
-    const name = getDisplayName(emp, 'employee').toLowerCase();
+    const name = getDisplayName(emp).toLowerCase();
     const email = (emp.email || '').toLowerCase();
     const code = (emp.employeeID || emp.employeeCode || '').toLowerCase();
     const q = searchQuery.toLowerCase().trim();
@@ -529,13 +616,13 @@ const AssignmentModal = ({
                       />
 
                       <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-100 to-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0 border border-slate-200/60">
-                        {(getDisplayName(employee, 'employee') || 'E').charAt(0).toUpperCase()}
+                        {(getDisplayName(employee) || 'E').charAt(0).toUpperCase()}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
-                            {getDisplayName(employee, 'employee')}
+                            {getDisplayName(employee)}
                           </p>
                           {employee.employeeID && (
                             <span className="text-2xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60 shrink-0">
@@ -640,29 +727,12 @@ export const TeamLead = () => {
     );
   };
 
-  const normalizeEmployeeId = (item) => { 
-    if (!item) return null;
-    if (typeof item === "string") return item;
-    if (typeof item === "number") return String(item);
-    if (typeof item === "object") {
-      if (item._id) return String(item._id);
-      if (item.id) return String(item.id);
-      if (item.employeeId) return String(item.employeeId);
-      if (item.userId) return String(item.userId);
-      if (item.user) return normalizeEmployeeId(item.user);
-    }
-    return null;
-  };
+  const normalizeEmployeeId = getEmployeeReferenceId;
 
   const getEmployeeDisplayName = (employee) => {
     if (!employee) return "Unnamed";
-    if (employee.firstName) {
-      const lastName = employee.lastName || "";
-      return `${employee.firstName} ${lastName}`.trim();
-    }
-    if (employee.name) return employee.name;
-    if (employee.fullName) return employee.fullName;
-    if (employee.displayName) return employee.displayName;
+    const name = getEmployeeName(employee);
+    if (name) return name;
     if (employee.email) return employee.email;
     return "Unnamed";
   };
@@ -827,20 +897,33 @@ const getDesignation = (lead) => {
     const candidateLists = [
       lead.employees,
       lead.assignedEmployees,
+      lead.assignedMembers,
+      lead.members,
       lead.teamEmployees,
       lead.employeeIds,
       lead.team?.employees,
+      lead.team?.members,
       lead.user?.employees,
       lead.teamLead?.employees,
+      lead.teamLead?.members,
     ];
 
     const mergedIds = candidateLists.flatMap((value) => {
       if (!value) return [];
       if (!Array.isArray(value)) return [];
-      return value.map((item) => normalizeEmployeeId(item)).filter(Boolean);
+      return value.map((item) => {
+        if (item && typeof item === 'object' && getEmployeeName(item)) return item;
+        return normalizeEmployeeId(item);
+      }).filter(Boolean);
     });
 
-    return [...new Set(mergedIds)];
+    const seen = new Set();
+    return mergedIds.filter((item) => {
+      const key = normalizeEmployeeId(item) || getEmployeeName(item);
+      if (!key || seen.has(String(key).toLowerCase())) return false;
+      seen.add(String(key).toLowerCase());
+      return true;
+    });
   };
 
   const loadSavedEmployeeAssignments = () => {
@@ -1123,7 +1206,7 @@ const getDesignation = (lead) => {
           const empsA = getAssignedEmployeeIds(existing);
           const empsB = getAssignedEmployeeIds(normalizedLead);
           const distinctCombined = getDistinctAssignedEmployees([...empsA, ...empsB], fetchedEmployees);
-          existing.assignedEmployees = distinctCombined.map(e => String(e._id));
+          existing.assignedEmployees = distinctCombined.map((employee) => normalizeEmployeeId(employee) || employee);
           if (!existing.rawTeamDocId) existing.rawTeamDocId = apiLead._id;
         } else {
           mergedLeads.push(normalizedLead);
@@ -1193,7 +1276,9 @@ const getDesignation = (lead) => {
           return true;
         });
 
-        const distinctIds = singleTlEmployees.map(e => String(e._id));
+        const distinctIds = singleTlEmployees
+          .map((employee) => normalizeEmployeeId(employee) || employee)
+          .filter(Boolean);
         lead.assignedEmployees = distinctIds;
 
         // Store under lead._id and all associated IDs so lookups always find clean deduplicated IDs
@@ -1217,18 +1302,31 @@ const getDesignation = (lead) => {
 
   const fetchEmployees = async (headers) => {
     try {
-      let allEmployees = [];
+      const allEmployees = [];
       try {
         const res = await axios.get(`${BASE_URL}/employee/list`, { headers });
-        allEmployees = res?.data?.employees || res?.data?.data || (Array.isArray(res?.data) ? res.data : []);
+        allEmployees.push(...extractPeople(res?.data));
       } catch (e) {
-        const fallbackRes = await axios.get(`${BASE_URL}/users/all`, { headers });
-        allEmployees = fallbackRes?.data?.users || fallbackRes?.data?.data || (Array.isArray(fallbackRes?.data) ? fallbackRes.data : []);
+        console.warn("Could not fetch /employee/list; trying user directory:", e?.message);
       }
 
-      const validEmployees = (Array.isArray(allEmployees) ? allEmployees : []).filter((emp) => {
+      for (const endpoint of ['/users/all', '/user/all']) {
+        try {
+          const usersRes = await axios.get(`${BASE_URL}${endpoint}`, { headers });
+          allEmployees.push(...extractPeople(usersRes?.data));
+          break;
+        } catch (e) {
+          console.warn(`Could not fetch ${endpoint}:`, e?.message);
+        }
+      }
+
+      if (!allEmployees.length) {
+        throw new Error('Employee and user directory endpoints returned no employee records.');
+      }
+
+      const validEmployees = allEmployees.filter((emp) => {
         if (!emp || isFinanceOrExcludedUser(emp)) return false;
-        const name = emp.name || emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+        const name = getEmployeeName(emp);
         if (!name || name === "Unnamed" || name === "No Name" || name === "Unknown Employee" || name === "Unknown User") return false;
         return true;
       });
@@ -1260,7 +1358,7 @@ const getDesignation = (lead) => {
     const distinctAssigned = getDistinctAssignedEmployees(rawAssigned, employees);
     const leadWithAssignments = {
       ...lead,
-      assignedEmployees: distinctAssigned.map(e => String(e._id))
+    assignedEmployees: distinctAssigned.map(getEmployeeReferenceId).filter(Boolean)
     };
     setSelectedLead(leadWithAssignments);
     setModalOpen(true);
