@@ -354,9 +354,9 @@ const Performance = () => {
     try {
       const [teamsData, empRes, usersRes, projRes] = await Promise.allSettled([
         fetchTeamsList(),
-        fetch("https://kt-backend-yzr4.onrender.com/api/employee/list", { headers }).then((r) => r.json().catch(() => ({}))),
-        fetch("https://kt-backend-yzr4.onrender.com/api/users/all", { headers }).then((r) => r.json().catch(() => ({}))),
-        fetch("https://kt-backend-yzr4.onrender.com/api/projectManage/project/all", { headers }).then((r) => r.json().catch(() => ({})))
+        fetch("https://kt-backend-ttzj.onrender.com/api/employee/list", { headers }).then((r) => r.json().catch(() => ({}))),
+        fetch("https://kt-backend-ttzj.onrender.com/api/users/all", { headers }).then((r) => r.json().catch(() => ({}))),
+        fetch("https://kt-backend-ttzj.onrender.com/api/projectManage/project/all", { headers }).then((r) => r.json().catch(() => ({})))
       ]);
 
       let uMap = {};
@@ -554,7 +554,7 @@ const Performance = () => {
         let liveSucceeded = false;
         try {
           const response = await fetch(
-            "https://kt-backend-yzr4.onrender.com/api/performance/all",
+            "https://kt-backend-ttzj.onrender.com/api/performance/all",
             { headers }
           );
 
@@ -573,7 +573,7 @@ const Performance = () => {
               rawPerfs.forEach((perf) => {
                 if (isDummyPerformanceRecord(perf) && perf._id && !String(perf._id).startsWith("perf-")) {
                   try {
-                    fetch(`https://kt-backend-yzr4.onrender.com/api/performance/delete/${perf._id}`, {
+                    fetch(`https://kt-backend-ttzj.onrender.com/api/performance/delete/${perf._id}`, {
                       method: "DELETE",
                       headers
                     }).catch(() => { });
@@ -622,17 +622,17 @@ const Performance = () => {
 
       const candidateEndpoints = [
         ...(isTL ? [
-          "https://kt-backend-yzr4.onrender.com/api/performance/team",
-          "https://kt-backend-yzr4.onrender.com/api/performance/teamlead",
-          "https://kt-backend-yzr4.onrender.com/api/performance/team-lead",
-          `https://kt-backend-yzr4.onrender.com/api/performance/team/${myId}`,
-          `https://kt-backend-yzr4.onrender.com/api/performance/teamlead/${myId}`
+          "https://kt-backend-ttzj.onrender.com/api/performance/team",
+          "https://kt-backend-ttzj.onrender.com/api/performance/teamlead",
+          "https://kt-backend-ttzj.onrender.com/api/performance/team-lead",
+          `https://kt-backend-ttzj.onrender.com/api/performance/team/${myId}`,
+          `https://kt-backend-ttzj.onrender.com/api/performance/teamlead/${myId}`
         ] : []),
         ...(myId ? [
-          `https://kt-backend-yzr4.onrender.com/api/performance/user/${myId}`,
-          `https://kt-backend-yzr4.onrender.com/api/performance/employee/${myId}`,
-          `https://kt-backend-yzr4.onrender.com/api/performance/${myId}`,
-          "https://kt-backend-yzr4.onrender.com/api/performance/my"
+          `https://kt-backend-ttzj.onrender.com/api/performance/user/${myId}`,
+          `https://kt-backend-ttzj.onrender.com/api/performance/employee/${myId}`,
+          `https://kt-backend-ttzj.onrender.com/api/performance/${myId}`,
+          "https://kt-backend-ttzj.onrender.com/api/performance/my"
         ] : [])
       ];
 
@@ -687,7 +687,7 @@ const Performance = () => {
   const fetchEmployees = useCallback(async () => {
     try {
       const response = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/employee/list",
+        "https://kt-backend-ttzj.onrender.com/api/employee/list",
         { headers }
       );
 
@@ -1422,7 +1422,7 @@ const Performance = () => {
 
       if (isEditModalOpen && editingRecord) {
         const response = await fetch(
-          `https://kt-backend-yzr4.onrender.com/api/performance/update/${editingRecord._id}`,
+          `https://kt-backend-ttzj.onrender.com/api/performance/update/${editingRecord._id}`,
           {
             method: "PUT",
             headers: {
@@ -1458,7 +1458,7 @@ const Performance = () => {
         setEditingRecord(null);
       } else {
         let response = await fetch(
-          "https://kt-backend-yzr4.onrender.com/api/performance/create",
+          "https://kt-backend-ttzj.onrender.com/api/performance/create",
           {
             method: "POST",
             headers: {
@@ -1474,7 +1474,7 @@ const Performance = () => {
         // Fallback: If backend specifically expects month name string (e.g. "October")
         if (!response.ok && (data.message || "").toLowerCase().includes("month")) {
           const fallbackRes = await fetch(
-            "https://kt-backend-yzr4.onrender.com/api/performance/create",
+            "https://kt-backend-ttzj.onrender.com/api/performance/create",
             {
               method: "POST",
               headers: {
@@ -1513,7 +1513,7 @@ const Performance = () => {
         // immediately call the update endpoint which is confirmed to persist remarks correctly.
         if (!newId) {
           try {
-            const checkRes = await fetch("https://kt-backend-yzr4.onrender.com/api/performance/all", { headers });
+            const checkRes = await fetch("https://kt-backend-ttzj.onrender.com/api/performance/all", { headers });
             if (checkRes.ok) {
               const allJson = await checkRes.json();
               const list = Array.isArray(allJson.data)
@@ -1536,7 +1536,7 @@ const Performance = () => {
         if (newId && !String(newId).startsWith("perf-")) {
           try {
             await fetch(
-              `https://kt-backend-yzr4.onrender.com/api/performance/update/${newId}`,
+              `https://kt-backend-ttzj.onrender.com/api/performance/update/${newId}`,
               {
                 method: "PUT",
                 headers: {
@@ -1613,7 +1613,7 @@ const Performance = () => {
 
     try {
       const response = await fetch(
-        `https://kt-backend-yzr4.onrender.com/api/performance/delete/${perf._id}`,
+        `https://kt-backend-ttzj.onrender.com/api/performance/delete/${perf._id}`,
         {
           method: "DELETE",
           headers,

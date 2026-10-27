@@ -36,7 +36,7 @@ import {
   matchesEmployeeRole
 } from "../../utils/employeeRoles";
 
-const API_BASE = "https://kt-backend-yzr4.onrender.com/api";
+const API_BASE = "https://kt-backend-ttzj.onrender.comapi";
 
 const initialFormData = {
   fullName: "",
@@ -156,7 +156,7 @@ export default function Employees() {
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/users/all",
+        "https://kt-backend-ttzj.onrender.com/api/users/all",
         {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -175,7 +175,7 @@ export default function Employees() {
 
       let employeeRecords = [];
       try {
-        const employeeRes = await fetch("https://kt-backend-yzr4.onrender.com/api/employee/list", {
+        const employeeRes = await fetch("https://kt-backend-ttzj.onrender.com/api/employee/list", {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
@@ -195,7 +195,7 @@ export default function Employees() {
 
       let roleNamesById = new Map();
       try {
-        const rolesRes = await fetch("https://kt-backend-yzr4.onrender.com/api/role", {
+        const rolesRes = await fetch("https://kt-backend-ttzj.onrender.com/api/role", {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
@@ -285,8 +285,8 @@ export default function Employees() {
   const toggleTL = async (employeeId, isTeamLead) => {
     try {
       const url = isTeamLead
-        ? `https://kt-backend-yzr4.onrender.com/api/employee/remove-tl/${employeeId}`
-        : `https://kt-backend-yzr4.onrender.com/api/employee/assign-tl/${employeeId}`;
+        ? `https://kt-backend-ttzj.onrender.com/api/employee/remove-tl/${employeeId}`
+        : `https://kt-backend-ttzj.onrender.com/api/employee/assign-tl/${employeeId}`;
 
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
@@ -555,7 +555,7 @@ export default function Employees() {
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
-        `https://kt-backend-yzr4.onrender.com/api/employee/edit/${selectedEmployeeId}`,
+        `https://kt-backend-ttzj.onrender.com/api/employee/edit/${selectedEmployeeId}`,
         {
           method: "PUT",
           headers: {
@@ -605,7 +605,7 @@ export default function Employees() {
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
-        `https://kt-backend-yzr4.onrender.com/api/employee/delete/${employeeId}`,
+        `https://kt-backend-ttzj.onrender.com/api/employee/delete/${employeeId}`,
         {
           method: "DELETE",
           headers: {

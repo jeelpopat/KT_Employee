@@ -27,7 +27,7 @@ import {
 import { showToast } from '../../components/common/Toast';
 
 const ATTENDANCE_URL =
-  'https://kt-backend-yzr4.onrender.com/api/attendance/admin/all';
+  'https://kt-backend-ttzj.onrender.com/api/attendance/admin/all';
 
 const AVATAR_COLORS = [
   'bg-blue-600',
@@ -938,7 +938,7 @@ export default function AttendanceLogs() {
 
       // 2. Fetch all users from /users/all to guarantee HR, TL, Employee are all in table (Excluding Admin & Finance)
       try {
-        const usersUrl = 'https://kt-backend-yzr4.onrender.com/api/users/all';
+        const usersUrl = 'https://kt-backend-ttzj.onrender.com/api/users/all';
         const usersRes = await fetch(usersUrl, { method: 'GET', headers });
         if (usersRes.ok) {
           const usersData = await usersRes.json();

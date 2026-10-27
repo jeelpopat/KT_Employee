@@ -416,7 +416,7 @@ export default function App() {
     try {
       await performAutoCheckout(token);
       if (token) {
-        await fetch('https://kt-backend-yzr4.onrender.com/api/users/logout', {
+        await fetch('https://kt-backend-ttzj.onrender.com/api/users/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

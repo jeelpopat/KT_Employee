@@ -360,7 +360,7 @@ export default function Contacts() {
     try {
       setLoading(true);
       const response = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/contact"
+        "https://kt-backend-ttzj.onrender.com/api/contact"
       );
       const result = await response.json();
 

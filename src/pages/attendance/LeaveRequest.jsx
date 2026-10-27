@@ -27,7 +27,7 @@ import {
   isLeaveOfAssignedTeam,
 } from "../../utils/teamLeadUtils";
 
-const BASE_URL = "https://kt-backend-yzr4.onrender.com/api/leave";
+const BASE_URL = "https://kt-backend-ttzj.onrender.com/api/leave";
 
 const LEAVE_URL = `${BASE_URL}/all`;
 
@@ -402,7 +402,7 @@ export default function LeaveRequest() {
           },
         }).then(r => r.json().catch(() => ({}))),
         fetchTeamsList(),
-        fetch("https://kt-backend-yzr4.onrender.com/api/users/all", {
+        fetch("https://kt-backend-ttzj.onrender.com/api/users/all", {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",

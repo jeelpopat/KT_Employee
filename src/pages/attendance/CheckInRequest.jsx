@@ -109,13 +109,13 @@ const getLoggedInAdminId = (fallbackUser = null) => {
 };
 
 const PENDING_URL =
-  "https://kt-backend-yzr4.onrender.com/api/attendance/pending";
+  "https://kt-backend-ttzj.onrender.com/api/attendance/pending";
 
 const APPROVE_URL =
-  "https://kt-backend-yzr4.onrender.com/api/attendance/approve";
+  "https://kt-backend-ttzj.onrender.com/api/attendance/approve";
 
 const REJECT_URL =
-  "https://kt-backend-yzr4.onrender.com/api/attendance/reject";
+  "https://kt-backend-ttzj.onrender.com/api/attendance/reject";
 
 const AVATAR_COLORS = [
   "bg-blue-600",
@@ -641,7 +641,7 @@ export default function CheckInRequest() {
 
       // 2. Query live /api/users/profile
       try {
-        const pRes = await fetch("https://kt-backend-yzr4.onrender.com/api/users/profile", { headers });
+        const pRes = await fetch("https://kt-backend-ttzj.onrender.com/api/users/profile", { headers });
         if (pRes.ok) {
           const pData = await pRes.json();
           const pId = extractIdFromObject(pData);
@@ -655,7 +655,7 @@ export default function CheckInRequest() {
 
       // 3. Query /api/users/all for user list and approver fallback
       try {
-        const uRes = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all", { headers });
+        const uRes = await fetch("https://kt-backend-ttzj.onrender.com/api/users/all", { headers });
         if (uRes.ok) {
           const uData = await uRes.json();
           const list = uData?.users || uData?.data || (Array.isArray(uData) ? uData : []);
@@ -767,7 +767,7 @@ export default function CheckInRequest() {
       let additionalRecords = [];
       try {
         let allRes = await fetch(
-          `https://kt-backend-yzr4.onrender.com/api/attendance/admin/all?_t=${Date.now()}`,
+          `https://kt-backend-ttzj.onrender.com/api/attendance/admin/all?_t=${Date.now()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -777,7 +777,7 @@ export default function CheckInRequest() {
         );
         if (!allRes.ok) {
           allRes = await fetch(
-            `https://kt-backend-yzr4.onrender.com/api/attendance/admin/all?_t=${Date.now()}`,
+            `https://kt-backend-ttzj.onrender.com/api/attendance/admin/all?_t=${Date.now()}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -915,7 +915,7 @@ export default function CheckInRequest() {
       let effectiveAdminId = adminApproverId || getLoggedInAdminId(contextUser);
       if (!effectiveAdminId) {
         try {
-          const pRes = await fetch("https://kt-backend-yzr4.onrender.com/api/users/profile", {
+          const pRes = await fetch("https://kt-backend-ttzj.onrender.com/api/users/profile", {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`
@@ -930,7 +930,7 @@ export default function CheckInRequest() {
 
         if (!effectiveAdminId) {
           try {
-            const uRes = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all", {
+            const uRes = await fetch("https://kt-backend-ttzj.onrender.com/api/users/all", {
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`

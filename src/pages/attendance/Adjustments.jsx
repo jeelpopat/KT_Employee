@@ -161,7 +161,7 @@ export default function Adjustments() {
     useState(false);
 
   const API_BASE_URL =
-    "https://kt-backend-yzr4.onrender.com/api";
+    "https://kt-backend-ttzj.onrender.comapi";
 
   // ============================================================
   // LOAD ATTENDANCE SETTINGS

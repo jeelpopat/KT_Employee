@@ -1685,7 +1685,7 @@ export const SalaryView = () => {
     try {
       let res;
       try {
-        // PUT: https://kt-backend-yzr4.onrender.com/api/salaries/:id/pay
+        // PUT: https://kt-backend-ttzj.onrender.com/api/salaries/:id/pay
         res = await api.put(`/api/salaries/${empId}/pay`, payload);
       } catch (errPrimary) {
         if (selectedPayrollToUpdate._id && String(selectedPayrollToUpdate._id) !== String(empId)) {

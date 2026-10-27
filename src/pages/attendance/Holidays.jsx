@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Calendar } from 'lucide-react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 
-const API_BASE = 'https://kt-backend-yzr4.onrender.com/api/holiday';
+const API_BASE = 'https://kt-backend-ttzj.onrender.com/api/holiday';
 
 const toStandardDateString = (input) => {
   if (!input) return '';

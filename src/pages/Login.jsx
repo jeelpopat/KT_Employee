@@ -20,7 +20,7 @@ function Login({ setIsAuthenticated }) {
       setLoading(true);
 
       const response = await fetch(
-        "https://kt-backend-yzr4.onrender.com/api/users/login",
+        "https://kt-backend-ttzj.onrender.com/api/users/login",
         {
           method: "POST",
           headers: {
