@@ -430,6 +430,16 @@ export const parseTimeToMinutes = (timeVal) => {
   return null;
 };
 
+export const normalizeBreakRecord = (record) => {
+  const breakRecord = record && typeof record === 'object' ? record : {};
+  return {
+    startTime: breakRecord.startTime || breakRecord.breakStart || breakRecord.breakStartTime ||
+      breakRecord.breakInTime || breakRecord.breakIn || breakRecord.start || breakRecord.from || breakRecord.inTime || null,
+    endTime: breakRecord.endTime || breakRecord.breakEnd || breakRecord.breakEndTime ||
+      breakRecord.breakOutTime || breakRecord.breakOut || breakRecord.end || breakRecord.to || breakRecord.outTime || null
+  };
+};
+
 /**
  * Computes a strictly fixed 9-hour timeline starting from check-in time.
  * - Timeline span is strictly 9 hours (540 minutes).
@@ -673,9 +683,35 @@ export const computeNineHourTimeline = ({
   let accumulatedBreakMinutes = 0;
   let displaySegments = [];
   let breakStartTime = '';
+  const recordedBreaks = Array.isArray(breaks) ? breaks.map(normalizeBreakRecord) : [];
+  const backendBreakSegments = (Array.isArray(timelineSegments) ? timelineSegments : [])
+    .filter((segment) => (
+      segment.type === 'yellow' ||
+      (segment.label || '').toLowerCase().includes('break')
+    ));
+  const backendBreaksMatchRecords = recordedBreaks.every((recordedBreak) => {
+    const { startTime, endTime } = normalizeBreakRecord(recordedBreak);
+    const recordedStart = parseTimeToMinutes(startTime);
+    const recordedEnd = parseTimeToMinutes(endTime);
+    if (recordedStart === null) return true;
+
+    return backendBreakSegments.some((segment) => {
+      const segmentStart = convertUTCMinutesToLocal(segment.fromMinutes, startMinutes);
+      const segmentEnd = convertUTCMinutesToLocal(segment.toMinutes, startMinutes);
+      return (
+        Math.abs(segmentStart - recordedStart) <= 1 &&
+        (recordedEnd === null || Math.abs(segmentEnd - recordedEnd) <= 1)
+      );
+    });
+  });
+  const useBackendTimelineSegments = (
+    Array.isArray(timelineSegments) &&
+    timelineSegments.length > 0 &&
+    (recordedBreaks.length === 0 || backendBreaksMatchRecords)
+  );
 
   // 1. Process backend timelineSegments if present
-  if (!isRejected && Array.isArray(timelineSegments) && timelineSegments.length > 0) {
+  if (!isRejected && useBackendTimelineSegments) {
     const parsedCheckOut = parseTimeToMinutes(checkOutTime);
     const maxAllowedEnd = (isCheckedOut && parsedCheckOut !== null)
       ? Math.min(endMinutes, parsedCheckOut)
@@ -811,8 +847,9 @@ export const computeNineHourTimeline = ({
       if (Array.isArray(breaks) && breaks.length > 0) {
         let cursor = startMinutes;
         breaks.forEach((b, bIdx) => {
-          const bStart = parseTimeToMinutes(b.startTime || b.from);
-          const bEnd = parseTimeToMinutes(b.endTime || b.to) || (isOnBreak ? currentMinutes : effectiveEndMinutes);
+          const { startTime, endTime } = normalizeBreakRecord(b);
+          const bStart = parseTimeToMinutes(startTime);
+          const bEnd = parseTimeToMinutes(endTime) || (isOnBreak ? currentMinutes : effectiveEndMinutes);
 
           if (bStart !== null && bStart > cursor) {
             const wClampedFrom = Math.max(startMinutes, cursor);

@@ -20,7 +20,8 @@ import {
   getAutoCheckOutTimeForDate,
   formatMinutesToTimeStr,
   convertUTCMinutesToLocal,
-  parseTimeToMinutes
+  parseTimeToMinutes,
+  normalizeBreakRecord
 } from '../../utils/timelineUtils.js';
 
 const isAttendanceApproved = (record) => {
@@ -58,8 +59,7 @@ const getUniqueBreaks = (breaks) => {
   const uniqueBreaks = [];
 
   breaks.forEach((breakItem) => {
-    const startTime = breakItem.startTime || breakItem.breakStart || breakItem.start;
-    const endTime = breakItem.endTime || breakItem.breakEnd || breakItem.end;
+    const { startTime, endTime } = normalizeBreakRecord(breakItem);
     if (!startTime && !endTime) return;
 
     const normalizeTime = (time) => {
@@ -87,6 +87,12 @@ const getUniqueBreaks = (breaks) => {
 
   return uniqueBreaks.map(({ startTime, endTime }) => ({ startTime, endTime }));
 };
+
+const asBreakArray = (breaks) => (Array.isArray(breaks) ? breaks : (breaks ? [breaks] : []));
+const getTopLevelBreak = (record) => ({
+  startTime: record?.breakStart || record?.breakStartTime || record?.breakInTime || record?.breakIn || null,
+  endTime: record?.breakEnd || record?.breakEndTime || record?.breakOutTime || record?.breakOut || null
+});
 
 const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   const R = 6371000; // Earth radius in meters
@@ -626,16 +632,17 @@ export const DashboardView = () => {
     );
 
     // Break Determination (Robust Multi-Source Check)
-    const rawBreaks = Array.isArray(ta?.breaks) ? ta.breaks : (ta?.breaks ? [ta.breaks] : []);
+    const rawBreaks = asBreakArray(ta?.breaks);
     const sessionBreaks = Array.isArray(ta?.sessions)
-      ? ta.sessions.filter(s => s.breakStart || s.breakEnd).map(s => ({ startTime: s.breakStart, endTime: s.breakEnd }))
+      ? ta.sessions.map(normalizeBreakRecord).filter(b => b.startTime || b.endTime)
       : [];
-    const singleBreak = (ta?.breakStart || ta?.breakEnd) ? [{ startTime: ta.breakStart, endTime: ta.breakEnd }] : [];
+    const singleBreak = getTopLevelBreak(ta);
 
-    const breaksList = getUniqueBreaks([...rawBreaks, ...sessionBreaks, ...singleBreak].map(b => ({
-      startTime: b.startTime || b.breakStart || b.start,
-      endTime: b.endTime || b.breakEnd || b.end
-    })));
+    const breaksList = getUniqueBreaks([
+      ...rawBreaks,
+      ...sessionBreaks,
+      ...(singleBreak.startTime || singleBreak.endTime ? [singleBreak] : [])
+    ]);
 
     const yellowSegments = (segments || []).filter(s => s.type === 'yellow');
     const localBreakCount = parseInt(
@@ -1139,13 +1146,16 @@ export const DashboardView = () => {
 
       // 5. Merge all sources: todayDoc, timelineItem, adminRecord (preserving all break data, times, and segments)
       const rawBreaks = [
-        ...(Array.isArray(todayDoc?.breaks) && todayDoc.breaks.length > 0 ? todayDoc.breaks : []),
-        ...(Array.isArray(timelineItem?.breaks) && timelineItem.breaks.length > 0 ? timelineItem.breaks : []),
-        ...(Array.isArray(adminRecord?.breaks) && adminRecord.breaks.length > 0 ? adminRecord.breaks : []),
-        ...(todayDoc?.breakStart || todayDoc?.breakEnd ? [{ startTime: todayDoc.breakStart, endTime: todayDoc.breakEnd }] : []),
-        ...(timelineItem?.breakStart || timelineItem?.breakEnd ? [{ startTime: timelineItem.breakStart, endTime: timelineItem.breakEnd }] : []),
-        ...(adminRecord?.breakStart || adminRecord?.breakEnd ? [{ startTime: adminRecord.breakStart, endTime: adminRecord.breakEnd }] : []),
-        ...(Array.isArray(adminRecord?.sessions) ? adminRecord.sessions.filter(s => s.breakStart || s.breakEnd).map(s => ({ startTime: s.breakStart, endTime: s.breakEnd })) : [])
+        ...asBreakArray(todayDoc?.breaks),
+        ...asBreakArray(timelineItem?.breaks),
+        ...asBreakArray(adminRecord?.breaks),
+        ...[todayDoc, timelineItem, adminRecord]
+          .filter(Boolean)
+          .map(getTopLevelBreak)
+          .filter(b => b.startTime || b.endTime),
+        ...[todayDoc, timelineItem, adminRecord]
+          .filter(record => Array.isArray(record?.sessions))
+          .flatMap(record => record.sessions.map(normalizeBreakRecord).filter(b => b.startTime || b.endTime))
       ];
 
       const mergedCheckIn = todayDoc?.approvedCheckInTime || todayDoc?.checkInTime || todayDoc?.checkInTimeDisplay || todayDoc?.approvedCheckInTimeDisplay || timelineItem?.approvedCheckInTime || timelineItem?.checkInTime || timelineItem?.checkInTimeDisplay || adminRecord?.approvedCheckInTime || adminRecord?.checkInTime || adminRecord?.punchIn || adminRecord?.checkIn || todayDoc?.inTime || timelineItem?.inTime;
@@ -2579,7 +2589,11 @@ export const DashboardView = () => {
                 <div
                   key={seg.id}
                   title={seg.label}
-                  style={{ left: `${seg.leftPercent}%`, width: `${seg.widthPercent}%` }}
+                  style={{
+                    left: `${seg.leftPercent}%`,
+                    width: seg.type === 'break' ? `max(${seg.widthPercent}%, 3px)` : `${seg.widthPercent}%`,
+                    zIndex: seg.type === 'break' ? 2 : 1
+                  }}
                   className={`absolute top-0 bottom-0 h-full ${seg.colorClass} hover:brightness-110 transition-all border-r border-white/20`}
                 />
               ))}
