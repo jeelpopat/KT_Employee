@@ -903,7 +903,7 @@ export const AdminScreenshotPortal = () => {
               onChange={e => setSelectedEmployeeFilter(e.target.value)}
               className="px-3 py-1.5 text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:outline-none transition cursor-pointer"
             >
-              <option value="all">All Employees ({allScreenshots.length})</option>
+              <option value="all">All Employees ({uniqueEmployees.length})</option>
               {uniqueEmployees.map(emp => (
                 <option key={emp.id} value={emp.id}>
                   [{emp.positionShort || 'EMP'}] {emp.name} ({emp.userId || emp.id})
@@ -1037,13 +1037,13 @@ export const AdminScreenshotPortal = () => {
                     }}
                   />
                   <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-slate-900/80 text-white text-[10px] font-mono font-semibold backdrop-blur-xs">
-                    #{scr.sequenceNo || idx + 1}
+                    {scr.sequenceNo !== null && scr.sequenceNo !== undefined ? `#${scr.sequenceNo}` : 'Sequence not recorded'}
                   </span>
                   <span className="absolute top-2 right-2 backdrop-blur-xs">
                     {renderStatusPill(scr.status)}
                   </span>
                   <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-indigo-600/90 text-white text-[10px] font-semibold backdrop-blur-xs">
-                    {scr.activityLevel || 88}% Activity
+                    {scr.activityLevel !== null && scr.activityLevel !== undefined ? `${scr.activityLevel}% Activity` : 'Activity not recorded'}
                   </span>
                 </div>
 
@@ -1173,7 +1173,9 @@ export const AdminScreenshotPortal = () => {
                 className="max-h-[75vh] w-auto object-contain rounded-lg"
               />
               <span className="absolute top-4 left-4 bg-slate-900/80 text-white font-mono text-xs px-3 py-1 rounded-full border border-slate-700">
-                Sequence #{lightboxRecord.sequenceNo}
+                {lightboxRecord.sequenceNo !== null && lightboxRecord.sequenceNo !== undefined
+                  ? `Sequence #${lightboxRecord.sequenceNo}`
+                  : 'Sequence not recorded'}
               </span>
               <span className="absolute bottom-4 left-4 bg-emerald-600/90 text-white text-xs px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
                 <Database size={12} />
@@ -1348,8 +1350,14 @@ export const AdminScreenshotPortal = () => {
                   <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60">
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">Activity Level</span>
                     <div className="flex items-center justify-between mt-1">
-                      <span className="font-mono font-bold text-emerald-400 text-sm">{lightboxRecord.activityLevel}%</span>
-                      <span className="text-[10px] text-slate-400">Mouse & Keyboard Active</span>
+                      <span className="font-mono font-bold text-emerald-400 text-sm">
+                        {lightboxRecord.activityLevel !== null && lightboxRecord.activityLevel !== undefined
+                          ? `${lightboxRecord.activityLevel}%`
+                          : 'Not recorded'}
+                      </span>
+                      {lightboxRecord.activityLevel !== null && lightboxRecord.activityLevel !== undefined && (
+                        <span className="text-[10px] text-slate-400">Mouse & Keyboard Active</span>
+                      )}
                     </div>
                   </div>
 

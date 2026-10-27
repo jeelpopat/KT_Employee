@@ -141,6 +141,139 @@ export const filterOutFinanceUsers = (list) => {
   return list.filter((item) => !isFinanceOrExcludedUser(item));
 };
 
+export const getEmploymentStatus = (...records) => {
+  const sources = records.filter((record) => record && typeof record === 'object');
+
+  for (const source of sources) {
+    for (const field of ['employeeStatus', 'employmentStatus', 'status']) {
+      const value = source[field];
+      if (value != null && String(value).trim()) return String(value).trim();
+    }
+    if (typeof source.isActive === 'boolean') {
+      return source.isActive ? 'Active' : 'Inactive';
+    }
+  }
+
+  return 'Active';
+};
+
+export const resolveRoleName = (record, roleNamesById = new Map()) => {
+  const roleFields = [
+    'roleName',
+    'role_name',
+    'role',
+    'userRole',
+    'user_role',
+    'employeeRole',
+    'employee_role',
+    'roleType',
+    'role_type',
+    'roleId',
+    'role_id',
+    'roleID',
+  ];
+  const nestedFields = [
+    'user',
+    'userId',
+    'userID',
+    'employee',
+    'employeeId',
+    'employeeID',
+    'profile',
+  ];
+  const records = [];
+  const pending = [record];
+
+  while (pending.length > 0) {
+    const current = pending.shift();
+    if (!current || typeof current !== 'object' || records.includes(current)) continue;
+    records.push(current);
+    nestedFields.forEach((field) => {
+      if (current[field] && typeof current[field] === 'object') {
+        pending.push(current[field]);
+      }
+    });
+  }
+
+  const candidates = records.flatMap((source) => roleFields
+    .map((field) => source[field])
+    .filter((value) => value != null && value !== ''));
+
+  const names = candidates.map((candidate) => {
+    const value = candidate && typeof candidate === 'object'
+      ? candidate.roleName ||
+        candidate.name ||
+        candidate.title ||
+        candidate.key ||
+        candidate.label ||
+        candidate.displayName ||
+        candidate.role_name ||
+        candidate.roleId ||
+        candidate.userRole ||
+        candidate.user_role ||
+        candidate.employeeRole ||
+        candidate.employee_role ||
+        candidate.roleType ||
+        candidate.role_type ||
+        candidate.roleID ||
+        candidate.role_id ||
+        candidate._id ||
+        candidate.id ||
+        ''
+      : candidate;
+    const text = String(value || '').trim();
+    return roleNamesById.get(text.toLowerCase()) ||
+      (/^[0-9a-f]{24}$/i.test(text) ? '' : text);
+  }).filter(Boolean);
+
+  return names.find((name) => name.trim().toLowerCase() !== 'employee') || names[0] || '';
+};
+
+export const isTeamLeadRole = (...records) => {
+  const leadRoleNames = new Set(['teamlead', 'teamleader', 'tl']);
+
+  const getText = (value) => {
+    if (value && typeof value === 'object') {
+      return value.roleName || value.name || value.title || value.key || value.label || value.designationName || '';
+    }
+    return value == null ? '' : String(value);
+  };
+
+  const matchesLeadRole = (value) => {
+    const normalized = getText(value).toLowerCase().replace(/[^a-z]/g, '');
+    return leadRoleNames.has(normalized);
+  };
+
+  const isLeadRecord = (record) => {
+    if (!record || typeof record !== 'object') return false;
+    if (record.isTeamLead === true || record.isTeamLeader === true) return true;
+
+    return [
+      record.role,
+      record.userRole,
+      record.roleName,
+      record.designation,
+      record.designationName,
+      record.employeeRole,
+      record.position,
+    ].some(matchesLeadRole);
+  };
+
+  return records.some((record) => {
+    if (typeof record === 'string') return matchesLeadRole(record);
+    if (!record || typeof record !== 'object') return false;
+    return [
+      record,
+      record.user,
+      record.userId,
+      record.userID,
+      record.employee,
+      record.employeeId,
+      record.employeeID,
+    ].some(isLeadRecord);
+  });
+};
+
 /**
  * Checks if a user, employee, or record has an unknown / dummy employee name.
  */

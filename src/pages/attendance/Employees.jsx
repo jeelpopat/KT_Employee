@@ -22,8 +22,10 @@ import {
 import { useConfirm } from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
 import {
+  getEmploymentStatus,
   filterOutUnknownUsers,
-  isUnknownEmployeeOrUser
+  isUnknownEmployeeOrUser,
+  resolveRoleName
 } from "../../utils/roleFilters";
 import {
   EMPLOYEE_DEPARTMENTS_ROLES,
@@ -47,6 +49,21 @@ const initialFormData = {
   dob: "",
   address: "",
   bloodGroup: "",
+};
+
+const getEmployeeRoleLabel = (employee) => {
+  const roleText = resolveRoleName(employee);
+  const normalizedRole = roleText.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+
+  if (employee?.isTeamLead || employee?.isTeamLeader || ["team lead", "team leader", "teamlead", "tl"].includes(normalizedRole)) {
+    return "Team Lead";
+  }
+  if (normalizedRole === "hr") return "HR";
+  if (normalizedRole === "admin" || normalizedRole === "administrator") return "Admin";
+  if (normalizedRole.includes("account")) return "Accountant";
+  if (normalizedRole === "ca" || normalizedRole.includes("chartered accountant")) return "CA";
+  if (!normalizedRole || /^[0-9a-f]{24}$/i.test(normalizedRole)) return "Employee";
+  return roleText.trim().replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
 export default function Employees() {
@@ -156,6 +173,26 @@ export default function Employees() {
         throw new Error(data.message || "Unexpected users response");
       }
 
+      let employeeRecords = [];
+      try {
+        const employeeRes = await fetch("https://kt-backend-yzr4.onrender.com/api/employee/list", {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (employeeRes.ok) {
+          const employeeData = await employeeRes.json();
+          const records = Array.isArray(employeeData)
+            ? employeeData
+            : employeeData.employees || employeeData.data || employeeData.employeesList || [];
+          if (Array.isArray(records)) employeeRecords = records;
+        } else {
+          console.warn(`Could not load employee status records (HTTP ${employeeRes.status})`);
+        }
+      } catch (employeeError) {
+        console.warn("Could not load employee status records:", employeeError?.message);
+      }
+
       let roleNamesById = new Map();
       try {
         const rolesRes = await fetch("https://kt-backend-yzr4.onrender.com/api/role", {
@@ -170,8 +207,8 @@ export default function Employees() {
             : rolesData.roles || rolesData.data || [];
           roleNamesById = new Map(
             roles.map((role) => [
-              String(role?._id || role?.id || "").toLowerCase(),
-              String(role?.roleName || role?.name || role?.title || "").trim(),
+              String(role?._id || role?.id || role?.role_id || role?.roleID || "").toLowerCase(),
+              String(role?.roleName || role?.name || role?.title || role?.displayName || "").trim(),
             ]).filter(([id, name]) => id && name)
           );
         }
@@ -184,11 +221,26 @@ export default function Employees() {
         const record = nestedUser && typeof nestedUser === "object"
           ? { ...nestedUser, ...user }
           : user;
-        const rawRole = record?.role || record?.userRole || record?.roleName || record?.roleId;
-        const roleText = rawRole && typeof rawRole === "object"
-          ? rawRole.roleName || rawRole.name || rawRole.title || rawRole._id || rawRole.id || ""
-          : rawRole;
-        const role = roleNamesById.get(String(roleText || "").toLowerCase()) || roleText || "";
+        const normalizeIdentity = (value) => {
+          const identity = value && typeof value === "object" ? value._id || value.id : value;
+          return String(identity || "").trim().toLowerCase();
+        };
+        const userId = normalizeIdentity(record?._id || record?.id || record?.userID || record?.userId);
+        const employeeId = normalizeIdentity(record?.employeeID || record?.employeeId);
+        const email = normalizeIdentity(record?.email || record?.employeeEmail);
+        const employeeRecord = employeeRecords.find((employee) => {
+          const employeeUserId = normalizeIdentity(employee?.userID || employee?.userId);
+          const employeeIdValue = normalizeIdentity(employee?.employeeID || employee?.employeeId);
+          const employeeEmail = normalizeIdentity(
+            employee?.email || employee?.userID?.email || employee?.userId?.email
+          );
+          return (
+            (userId && employeeUserId && userId === employeeUserId) ||
+            (employeeId && employeeIdValue && employeeId === employeeIdValue) ||
+            (email && employeeEmail && email === employeeEmail)
+          );
+        });
+        const role = resolveRoleName(record, roleNamesById);
         const rawDesignation = record?.designation || record?.position || "";
         const designation = typeof rawDesignation === "object"
           ? rawDesignation.name || rawDesignation.designationName || rawDesignation.title || ""
@@ -207,8 +259,7 @@ export default function Employees() {
           role: String(role),
           designation,
           department,
-          employeeStatus: record?.employeeStatus || record?.status ||
-            (record?.isActive === false ? "Inactive" : "Active"),
+          employeeStatus: getEmploymentStatus(employeeRecord, record),
         };
       });
       setEmployees(filterOutUnknownUsers(normalizedUsers));
@@ -637,7 +688,7 @@ export default function Employees() {
       filterStatus === "all" ||
       (filterStatus.toLowerCase() === "active" ? (rawStatus === "active" || !rawStatus) : rawStatus === filterStatus.toLowerCase());
 
-    const empRole = String(emp.role || emp.userRole || emp.userId?.role || "").trim().toLowerCase();
+    const empRole = getEmployeeRoleLabel(emp).trim().toLowerCase();
     const desigLower = rawDesig.toLowerCase();
     const deptLower = rawDept.toLowerCase();
     const isEmpTL = Boolean(
@@ -651,6 +702,7 @@ export default function Employees() {
       desigLower.includes("tl")
     );
     const isEmpHR = empRole === "hr" || desigLower.includes("hr");
+    const isEmpAdmin = empRole === "admin";
     const isEmpAccountant =
       empRole.includes("account") ||
       desigLower.includes("account") ||
@@ -664,11 +716,12 @@ export default function Employees() {
 
     const matchesRole =
       filterRole === "all" ||
+      (filterRole === "admin" && isEmpAdmin) ||
       (filterRole === "hr" && isEmpHR) ||
       (filterRole === "team lead" && isEmpTL) ||
       (filterRole === "accountant" && isEmpAccountant) ||
       (filterRole === "ca" && isEmpCA) ||
-      (filterRole === "employee" && !isEmpHR && !isEmpTL && !isEmpAccountant && !isEmpCA);
+      (filterRole === "employee" && !isEmpAdmin && !isEmpHR && !isEmpTL && !isEmpAccountant && !isEmpCA);
 
     const matchesDept = matchesEmployeeDepartment(emp, filterDepartment);
     const matchesEmpRole = matchesEmployeeRole(emp, filterEmployeeRole);
@@ -874,6 +927,7 @@ export default function Employees() {
                     >
                       <option value="all">All Roles</option>
                       <option value="employee">Employee</option>
+                      <option value="admin">Admin</option>
                       <option value="team lead">Team Lead</option>
                       <option value="hr">HR</option>
                       <option value="accountant">Accountant</option>
@@ -1043,12 +1097,12 @@ export default function Employees() {
                         {/* ROLE (CLEAN UNBOXED WITH ICON) */}
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                            {String(emp.role || "").trim().toLowerCase() === "hr" ? (
+                            {getEmployeeRoleLabel(emp) === "HR" ? (
                               <>
                                 <UserCheck className="h-3.5 w-3.5 text-purple-600" />
                                 <span className="text-purple-700 font-semibold">HR</span>
                               </>
-                            ) : emp.isTeamLead || emp.role === "team lead" ? (
+                            ) : getEmployeeRoleLabel(emp) === "Team Lead" ? (
                               <>
                                 <Crown className="h-3.5 w-3.5 text-amber-500" />
                                 <span className="text-amber-700 font-semibold">Team Lead</span>
@@ -1056,7 +1110,7 @@ export default function Employees() {
                             ) : (
                               <>
                                 <User className="h-3.5 w-3.5 text-slate-400" />
-                                <span>Employee</span>
+                                <span>{getEmployeeRoleLabel(emp)}</span>
                               </>
                             )}
                           </span>
@@ -1178,18 +1232,18 @@ export default function Employees() {
                         </span>
 
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
-                          {String(emp.role || "").trim().toLowerCase() === "hr" ? (
+                          {getEmployeeRoleLabel(emp) === "HR" ? (
                             <>
                               <UserCheck className="h-3 w-3 text-purple-600" />
                               <span className="text-purple-700 font-semibold">HR</span>
                             </>
-                          ) : emp.isTeamLead || emp.role === "team lead" ? (
+                          ) : getEmployeeRoleLabel(emp) === "Team Lead" ? (
                             <>
                               <Crown className="h-3 w-3 text-amber-500" />
-                              <span className="text-amber-700 font-semibold">TL</span>
+                              <span className="text-amber-700 font-semibold">Team Lead</span>
                             </>
                           ) : (
-                            "Member"
+                            getEmployeeRoleLabel(emp)
                           )}
                         </span>
                       </div>
@@ -1324,18 +1378,18 @@ export default function Employees() {
                       </span>
 
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500">
-                        {String(emp.role || "").trim().toLowerCase() === "hr" ? (
+                        {getEmployeeRoleLabel(emp) === "HR" ? (
                           <>
                             <UserCheck className="h-2.5 w-2.5 text-purple-600" />
                             <span className="text-purple-700 font-semibold">HR</span>
                           </>
-                        ) : emp.isTeamLead || emp.role === "team lead" ? (
+                        ) : getEmployeeRoleLabel(emp) === "Team Lead" ? (
                           <>
                             <Crown className="h-2.5 w-2.5 text-amber-500" />
                             <span className="text-amber-700 font-semibold">TL</span>
                           </>
                         ) : (
-                          "Member"
+                          getEmployeeRoleLabel(emp)
                         )}
                       </span>
                     </div>
@@ -1488,11 +1542,12 @@ export default function Employees() {
 
               {/* FULL NAME (1 per row) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="employee-full-name" className="block text-sm font-medium text-gray-700 mb-1.5">
                   Full Name *
                 </label>
 
                 <input
+                  id="employee-full-name"
                   name="fullName"
                   placeholder="e.g. Keyur Nai"
                   value={formData.fullName}
@@ -1505,11 +1560,12 @@ export default function Employees() {
               {/* ROW 1: EMAIL & MOBILE NUMBER (2 per row) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="employee-email" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Email *
                   </label>
 
                   <input
+                    id="employee-email"
                     name="email"
                     type="email"
                     placeholder="e.g. itsmetilaksoni@gmail.com"
@@ -1521,11 +1577,12 @@ export default function Employees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="employee-mobile" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Mobile Number *
                   </label>
 
                   <input
+                    id="employee-mobile"
                     name="mobile"
                     placeholder="e.g. 7896321550"
                     value={formData.mobile}
@@ -1539,11 +1596,12 @@ export default function Employees() {
               {/* ROW 2: DEPARTMENT & ROLE / DESIGNATION (2 per row) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="employee-department" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Department *
                   </label>
 
                   <select
+                    id="employee-department"
                     name="department"
                     value={formData.department}
                     onChange={(e) => {
@@ -1576,11 +1634,12 @@ export default function Employees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="employee-designation" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Role / Designation *
                   </label>
 
                   <select
+                    id="employee-designation"
                     name="designation"
                     value={formData.designation}
                     onChange={(e) => {
@@ -1623,11 +1682,12 @@ export default function Employees() {
               {/* ROW 3: ROLE & GENDER (2 per row) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="employee-system-role" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Role *
                   </label>
 
                   <select
+                    id="employee-system-role"
                     name="role"
                     value={formData.role || "employee"}
                     onChange={handleChange}
@@ -1641,11 +1701,12 @@ export default function Employees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="employee-gender" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Gender *
                   </label>
 
                   <select
+                    id="employee-gender"
                     name="gender"
                     value={formData.gender}
                     onChange={handleChange}
@@ -1665,11 +1726,12 @@ export default function Employees() {
               {/* ROW 4: DATE OF BIRTH & BLOOD GROUP (2 per row) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="employee-dob" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Date of Birth *
                   </label>
 
                   <input
+                    id="employee-dob"
                     type="date"
                     name="dob"
                     value={formData.dob}
@@ -1680,11 +1742,12 @@ export default function Employees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="employee-blood-group" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Blood Group *
                   </label>
 
                   <select
+                    id="employee-blood-group"
                     name="bloodGroup"
                     value={formData.bloodGroup}
                     onChange={handleChange}
@@ -1712,11 +1775,12 @@ export default function Employees() {
 
               {/* ADDRESS (1 per row) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="employee-address" className="block text-sm font-medium text-gray-700 mb-1.5">
                   Address *
                 </label>
 
                 <input
+                  id="employee-address"
                   type="text"
                   name="address"
                   placeholder="e.g. 123 Main St, City, State"

@@ -68,7 +68,9 @@ export const ScreenshotHistoryModal = () => {
               <div className="bg-zinc-900 rounded-2xl p-4 text-white space-y-3 shadow-xs border border-zinc-800">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-zinc-300 font-mono">
-                    Session: {activePreview.sessionId} • Sequence #{activePreview.sequenceNo}
+                    Session: {activePreview.sessionId} • {activePreview.sequenceNo !== null && activePreview.sequenceNo !== undefined
+                      ? `Sequence #${activePreview.sequenceNo}`
+                      : 'Sequence not recorded'}
                   </span>
                   <button 
                     onClick={() => setActivePreview(null)}
@@ -97,7 +99,11 @@ export const ScreenshotHistoryModal = () => {
                   </div>
                   <div>
                     <span className="text-[10px] text-zinc-400 block uppercase font-semibold">Activity</span>
-                    <span className="font-medium text-emerald-400">{activePreview.activityLevel}%</span>
+                    <span className="font-medium text-emerald-400">
+                      {activePreview.activityLevel !== null && activePreview.activityLevel !== undefined
+                        ? `${activePreview.activityLevel}%`
+                        : 'Not recorded'}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-zinc-400 block uppercase font-semibold">Check-In</span>
@@ -122,10 +128,12 @@ export const ScreenshotHistoryModal = () => {
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
                     <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-zinc-900/80 text-white text-[10px] font-mono font-semibold">
-                      #{scr.sequenceNo}
+                      {scr.sequenceNo !== null && scr.sequenceNo !== undefined ? `#${scr.sequenceNo}` : 'Sequence not recorded'}
                     </span>
                     <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-zinc-900 text-white text-[10px] font-semibold">
-                      {scr.activityLevel}% Activity
+                      {scr.activityLevel !== null && scr.activityLevel !== undefined
+                        ? `${scr.activityLevel}% Activity`
+                        : 'Activity not recorded'}
                     </span>
                   </div>
 
@@ -160,4 +168,3 @@ export const ScreenshotHistoryModal = () => {
     </div>
   );
 };
-

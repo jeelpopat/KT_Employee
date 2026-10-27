@@ -924,8 +924,7 @@ export const AppProvider = ({ children }) => {
       positionLabel: positionInfo.label,
       sessionId: sessionId || `SES-${dateStr.replace(/-/g, '')}-001`,
       activeWindow: 'Active Workstation Screen',
-      capturedAt: nowObj.toISOString(),
-      activityLevel: Math.floor(Math.random() * 15 + 85)
+      capturedAt: nowObj.toISOString()
     };
 
     try {

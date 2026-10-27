@@ -75,6 +75,12 @@ export default function Positions() {
   };
 
   const handleSubmit = async () => {
+    const openingCount = Number(formData.openings);
+    if (!Number.isInteger(openingCount) || openingCount < 1) {
+      showToast("Openings must be a positive whole number.", "error");
+      return;
+    }
+
     try {
       const url = editId
         ? `https://kt-backend-yzr4.onrender.com/api/position/${editId}`
@@ -289,21 +295,29 @@ export default function Positions() {
           <div className="flex bg-white border border-slate-200 rounded-lg p-1 h-10 items-center">
             <button
               onClick={() => setViewMode("grid")}
+              type="button"
+              aria-label="Switch to grid view"
+              aria-pressed={viewMode === "grid"}
+              title="Grid view"
               className={`p-1.5 rounded transition-all cursor-pointer ${
                 viewMode === "grid" 
                   ? "bg-indigo-600 text-white shadow-xs" 
                   : "text-gray-400 hover:text-gray-600"
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1`}
             >
               <LayoutGrid className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode("list")}
+              type="button"
+              aria-label="Switch to list view"
+              aria-pressed={viewMode === "list"}
+              title="List view"
               className={`p-1.5 rounded transition-all cursor-pointer ${
                 viewMode === "list" 
                   ? "bg-indigo-600 text-white shadow-xs" 
                   : "text-gray-400 hover:text-gray-600"
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1`}
             >
               <ListIcon className="h-4 w-4" />
             </button>
@@ -373,13 +387,17 @@ export default function Positions() {
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleEdit(pos)}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            aria-label={`Edit ${pos.title || 'position'}`}
+                            title={`Edit ${pos.title || 'position'}`}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(pos._id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            aria-label={`Delete ${pos.title || 'position'}`}
+                            title={`Delete ${pos.title || 'position'}`}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -499,13 +517,17 @@ export default function Positions() {
                       <div className="flex items-center gap-2 lg:ml-4">
                         <button
                           onClick={() => handleEdit(pos)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          aria-label={`Edit ${pos.title || 'position'}`}
+                          title={`Edit ${pos.title || 'position'}`}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(pos._id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          aria-label={`Delete ${pos.title || 'position'}`}
+                          title={`Delete ${pos.title || 'position'}`}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -543,7 +565,9 @@ export default function Positions() {
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                aria-label="Close position dialog"
+                title="Close position dialog"
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -554,10 +578,11 @@ export default function Positions() {
               <div className="px-6 py-6 space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="position-title" className="block text-sm font-medium text-gray-700 mb-1.5">
                       Position Title *
                     </label>
                     <input
+                      id="position-title"
                       name="title"
                       placeholder="e.g. Senior Software Engineer"
                       value={formData.title}
@@ -566,10 +591,11 @@ export default function Positions() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="position-category" className="block text-sm font-medium text-gray-700 mb-1.5">
                       Category
                     </label>
                     <input
+                      id="position-category"
                       name="category"
                       placeholder="e.g. Engineering"
                       value={formData.category}
@@ -578,10 +604,11 @@ export default function Positions() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="position-department" className="block text-sm font-medium text-gray-700 mb-1.5">
                       Department
                     </label>
                     <input
+                      id="position-department"
                       name="department"
                       placeholder="e.g. Product Development"
                       value={formData.department}
@@ -593,10 +620,11 @@ export default function Positions() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="position-location" className="block text-sm font-medium text-gray-700 mb-1.5">
                       Location
                     </label>
                     <input
+                      id="position-location"
                       name="location"
                       placeholder="e.g. Remote, NYC"
                       value={formData.location}
@@ -605,10 +633,11 @@ export default function Positions() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="position-experience" className="block text-sm font-medium text-gray-700 mb-1.5">
                       Experience
                     </label>
                     <input
+                      id="position-experience"
                       name="exp"
                       placeholder="e.g. 3-5 years"
                       value={formData.exp}
@@ -617,12 +646,16 @@ export default function Positions() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="position-openings" className="block text-sm font-medium text-gray-700 mb-1.5">
                       Openings
                     </label>
                     <input
+                      id="position-openings"
                       name="openings"
                       type="number"
+                      min="1"
+                      step="1"
+                      required
                       placeholder="Number of openings"
                       value={formData.openings}
                       onChange={handleChange}
@@ -633,10 +666,11 @@ export default function Positions() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="position-type" className="block text-sm font-medium text-gray-700 mb-1.5">
                       Position Type
                     </label>
                     <select
+                      id="position-type"
                       name="type"
                       value={formData.type}
                       onChange={handleChange}
@@ -648,10 +682,11 @@ export default function Positions() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="position-priority" className="block text-sm font-medium text-gray-700 mb-1.5">
                       Priority
                     </label>
                     <select
+                      id="position-priority"
                       name="priority"
                       value={formData.priority}
                       onChange={handleChange}
@@ -665,10 +700,11 @@ export default function Positions() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="position-salary-range" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Salary Range
                   </label>
                   <input
+                    id="position-salary-range"
                     name="salaryRange"
                     placeholder="e.g. $80,000 - $120,000"
                     value={formData.salaryRange}
@@ -678,10 +714,11 @@ export default function Positions() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="position-skills" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Skills (Comma separated)
                   </label>
                   <input
+                    id="position-skills"
                     name="skills"
                     placeholder="HTML, CSS, JavaScript, React"
                     value={formData.skills}
@@ -692,10 +729,11 @@ export default function Positions() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="position-responsibilities" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Responsibilities (Comma separated)
                   </label>
                   <textarea
+                    id="position-responsibilities"
                     name="responsibilities"
                     placeholder="Develop responsive UI, Integrate APIs, Fix bugs"
                     value={formData.responsibilities}
@@ -707,10 +745,11 @@ export default function Positions() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="position-benefits" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Benefits (Comma separated)
                   </label>
                   <input
+                    id="position-benefits"
                     name="benefits"
                     placeholder="Health insurance, 401k, Flexible hours"
                     value={formData.benefits}
@@ -721,10 +760,11 @@ export default function Positions() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="position-description" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Description
                   </label>
                   <textarea
+                    id="position-description"
                     name="desc"
                     placeholder="Describe the position responsibilities and requirements..."
                     value={formData.desc}

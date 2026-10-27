@@ -1866,10 +1866,10 @@ export default function Adjustments() {
 
               <button
                 type="button"
-                onClick={
-                  closeSettings
-                }
-                className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                onClick={closeSettings}
+                aria-label="Close settings"
+                title="Close settings"
+                className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
               >
                 <X size={20} />
               </button>

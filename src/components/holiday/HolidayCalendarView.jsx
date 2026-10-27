@@ -241,15 +241,17 @@ export const HolidayCalendarView = () => {
           <div className="flex items-center gap-1.5">
             <button
               onClick={prevMonth}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition cursor-pointer shadow-xs"
-              title="Previous Month"
+              aria-label="Previous month"
+              title="Previous month"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
             >
               <ChevronLeft size={15} strokeWidth={2} />
             </button>
             <button
               onClick={nextMonth}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition cursor-pointer shadow-xs"
-              title="Next Month"
+              aria-label="Next month"
+              title="Next month"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
             >
               <ChevronRight size={15} strokeWidth={2} />
             </button>
@@ -459,7 +461,9 @@ export const HolidayCalendarView = () => {
               </div>
               <button
                 onClick={() => setSelectedDayInfo(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                aria-label="Close holiday details"
+                title="Close holiday details"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 <X size={16} />
               </button>

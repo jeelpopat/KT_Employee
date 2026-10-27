@@ -20,6 +20,56 @@ const formatINR = (val) => {
   }).format(num);
 };
 
+const getPayrollDeductionBreakdown = (payroll, fallbackPayslip) => {
+  const sources = [
+    payroll,
+    payroll?.salaryStructureSnapshot,
+    fallbackPayslip,
+    fallbackPayslip?.salaryStructureSnapshot
+  ].filter(Boolean);
+
+  const readAmount = (keys) => {
+    let firstDefinedAmount;
+    for (const source of sources) {
+      for (const key of keys) {
+        if (source[key] != null && Number.isFinite(Number(source[key]))) {
+          const amount = Number(source[key]);
+          if (amount !== 0) return amount;
+          if (firstDefinedAmount === undefined) firstDefinedAmount = amount;
+        }
+      }
+    }
+    return firstDefinedAmount;
+  };
+
+  const components = [
+    { key: 'fixedDeduction', label: 'Fixed Monthly Deduction', amount: readAmount(['fixedDeduction']) || 0 },
+    { key: 'extraDeduction', label: 'Extra Deduction', amount: readAmount(['extraDeduction']) || 0 },
+    { key: 'pfDeduction', label: 'Provident Fund (PF)', amount: readAmount(['pfDeduction']) || 0 },
+    { key: 'esicDeduction', label: 'ESIC', amount: readAmount(['esicDeduction']) || 0 },
+    { key: 'professionalTax', label: 'Professional Tax', amount: readAmount(['professionalTax']) || 0 },
+    { key: 'otherDeductions', label: 'Other Deductions', amount: readAmount(['otherDeductions']) || 0 },
+    { key: 'lopDeduction', label: 'Loss of Pay (LOP)', amount: readAmount(['lopDeduction']) || 0 },
+    { key: 'tdsAmount', label: 'TDS / Income Tax', amount: readAmount(['tdsAmount', 'tds']) || 0 }
+  ];
+  const componentTotal = Math.round(components.reduce((sum, item) => sum + item.amount, 0) * 100) / 100;
+  const persistedTotal = readAmount(['totalDeduction', 'totalDeductions']);
+  const grossSalary = readAmount(['grossSalary']);
+  const netSalary = readAmount(['netSalary']);
+  const grossNetDifference = grossSalary != null && netSalary != null
+    ? Math.round((grossSalary - netSalary) * 100) / 100
+    : undefined;
+  const totalDeduction = Math.round((persistedTotal || grossNetDifference || componentTotal || 0) * 100) / 100;
+  const tdsPercentage = readAmount(['tdsPercentage']) || 0;
+
+  return {
+    components,
+    totalDeduction,
+    tdsPercentage,
+    reconciliation: Math.round((totalDeduction - componentTotal) * 100) / 100
+  };
+};
+
 // Month Names mapping
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -729,9 +779,44 @@ export const SalaryView = () => {
           ? String(item.userId?._id || item.userId?.id || '')
           : typeof item.employeeId === 'object'
             ? String(item.employeeId?._id || item.employeeId?.id || '')
-            : String(item.userId || item.employeeId || '');
+            : typeof item.employee === 'object'
+              ? String(item.employee?._id || item.employee?.id || '')
+              : typeof item.user === 'object'
+                ? String(item.user?._id || item.user?.id || '')
+                : String(item.userId || item.employeeId || item.employee || item.user || '');
 
-        const matchedUser = staffMap.get(uId) || (typeof item.userId === 'object' ? item.userId : (typeof item.employeeId === 'object' ? item.employeeId : null));
+        const matchedUser = staffMap.get(uId) ||
+          (typeof item.userId === 'object' ? item.userId : null) ||
+          (typeof item.employeeId === 'object' ? item.employeeId : null) ||
+          (typeof item.employee === 'object' ? item.employee : null) ||
+          (typeof item.user === 'object' ? item.user : null);
+        const employeeSnapshots = [
+          item.employeeSnapshot,
+          item.userSnapshot,
+          item.employeeDetails,
+          item.userDetails,
+          typeof item.employeeId === 'object' ? item.employeeId : null,
+          typeof item.userId === 'object' ? item.userId : null,
+          typeof item.employee === 'object' ? item.employee : null,
+          typeof item.user === 'object' ? item.user : null
+        ].filter((snapshot) => snapshot && typeof snapshot === 'object');
+        const snapshotName =
+          item.employeeNameSnapshot ||
+          item.userNameSnapshot ||
+          employeeSnapshots.map((snapshot) => snapshot.nameSnapshot || snapshot.employeeNameSnapshot || snapshot.name || snapshot.fullName || snapshot.displayName).find(Boolean) ||
+          item.employeeName ||
+          item.userName ||
+          item.name;
+        const employeeIdentifier =
+          item.employeeCode ||
+          item.employeeIdentifierSnapshot ||
+          item.employeeID ||
+          item.uniqueID ||
+          employeeSnapshots.map((snapshot) => snapshot.employeeCode || snapshot.employeeID || snapshot.uniqueID).find(Boolean) ||
+          matchedUser?.employeeCode ||
+          matchedUser?.employeeID ||
+          matchedUser?.uniqueID ||
+          uId;
         const pId = String(item._id || item.id || '');
         const rawStatus = String(savedOverrides[pId] || item.status || item.paymentStatus || item.salaryStatus || 'processed').toLowerCase().trim();
         const currentStatus = rawStatus === 'paid' ? 'paid' : 'processed';
@@ -786,14 +871,16 @@ export const SalaryView = () => {
           lopDeduction: effectiveLopDeduction,
           netSalary: effectiveNetSalary,
           totalDeduction: effectiveTotalDeduction,
-          userObj: matchedUser || {
-            _id: uId,
-            name: item.userName || item.name || item.employeeId?.name || item.userId?.name || 'Staff Member',
-            email: item.userEmail || item.email || item.employeeId?.email || item.userId?.email || '',
-            role: item.role || item.employeeId?.role || item.userId?.role || 'employee'
+          employeeIdentifier: employeeIdentifier ? String(employeeIdentifier) : '',
+          userObj: {
+            ...(matchedUser || {}),
+            _id: matchedUser?._id || matchedUser?.id || uId,
+            name: snapshotName || matchedUser?.name || matchedUser?.fullName || (employeeIdentifier ? `User ${employeeIdentifier}` : 'Staff Member'),
+            email: item.userEmailSnapshot || item.employeeEmailSnapshot || item.userEmail || item.employeeEmail || item.email || matchedUser?.email || '',
+            role: matchedUser?.role || item.role || item.employeeId?.role || item.userId?.role || 'employee'
           }
         };
-      }).filter((item) => !isUnknownEmployeeOrUser(item.userObj) && !isUnknownEmployeeOrUser(item));
+      }).filter((item) => !isUnknownEmployeeOrUser(item.userObj));
 
       enriched.sort((a, b) => {
         const yearDiff = (Number(b.year) || 0) - (Number(a.year) || 0);
@@ -1093,10 +1180,16 @@ export const SalaryView = () => {
       fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
       grossSalary: Number(selectedUserActiveStructure.grossSalary) || processCalculations.grossSalary,
       basicForPf: Number(selectedUserActiveStructure.basicForPf) || 0,
+      fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
+      extraDeduction: extraDeductionValue,
       pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
       esicDeduction: Number(selectedUserActiveStructure.esicDeduction) || 0,
       professionalTax: Number(selectedUserActiveStructure.professionalTax) || 0,
+      otherDeductions: Number(selectedUserActiveStructure.otherDeductions) || 0,
+      lopDeduction: processCalculations.lopDeduction,
+      tdsPercentage: Number(selectedUserActiveStructure.tdsPercentage) || 0,
       tds: processCalculations.tdsAmount || 0,
+      tdsAmount: processCalculations.tdsAmount || 0,
       totalDeduction: processCalculations.totalDeduction,
       netSalary: processCalculations.netSalary,
       employerContributions: selectedUserActiveStructure.employerContributions || {
@@ -1125,6 +1218,9 @@ export const SalaryView = () => {
     const payload = {
       employeeId: processForm.userId,
       userId: processForm.userId,
+      employeeNameSnapshot: targetUserObj?.name || targetUserObj?.fullName || '',
+      employeeEmailSnapshot: targetUserObj?.email || '',
+      employeeIdentifierSnapshot: targetUserObj?.employeeID || targetUserObj?.uniqueID || '',
       companyId: targetUserObj?.companyId?._id || targetUserObj?.companyId || null,
       branchId: targetUserObj?.branchId?._id || targetUserObj?.branchId || null,
       financialYearId: targetUserObj?.financialYearId || selectedUserActiveStructure.financialYearId || null,
@@ -1189,6 +1285,9 @@ export const SalaryView = () => {
       const backendSyncPayload = {
         employeeId: processForm.userId,
         userId: processForm.userId,
+        employeeNameSnapshot: targetUserObj?.name || targetUserObj?.fullName || '',
+        employeeEmailSnapshot: targetUserObj?.email || '',
+        employeeIdentifierSnapshot: targetUserObj?.employeeID || targetUserObj?.uniqueID || '',
         month: parsedMonth,
         year: parsedYear,
         leaveDays: targetLeaveDays,
@@ -1284,6 +1383,11 @@ export const SalaryView = () => {
             grossSalary: targetGrossSalary,
             fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
             extraDeduction: extraDeductionValue,
+            pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
+            esicDeduction: Number(selectedUserActiveStructure.esicDeduction) || 0,
+            professionalTax: Number(selectedUserActiveStructure.professionalTax) || 0,
+            otherDeductions: Number(selectedUserActiveStructure.otherDeductions) || 0,
+            salaryStructureSnapshot: structureSnapshot,
             totalDeduction: targetTotalDeduction,
             tdsPercentage: Number(selectedUserActiveStructure.tdsPercentage) || 0,
             tdsAmount: processCalculations.tdsAmount,
@@ -1330,11 +1434,18 @@ export const SalaryView = () => {
     const allowVal = Number(slip.allowance) || 0;
     const fixBonusVal = Number(slip.fixedBonus) || 0;
     const extBonusVal = Number(slip.extraBonus) || 0;
-    const fixDedVal = Number(slip.fixedDeduction) || 0;
-    const extDedVal = Number(slip.extraDeduction) || 0;
-    const totDedVal = Number(slip.totalDeduction) || 0;
-    const tdsAmtVal = Number(slip.tdsAmount) || 0;
-    const tdsRate = slip.tdsPercentage || 0;
+    const deductionBreakdown = getPayrollDeductionBreakdown(slip);
+    const deductionRows = deductionBreakdown.components
+      .filter((item) => item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount')
+      .map((item) => {
+        const label = item.key === 'tdsAmount' ? `${item.label} (${deductionBreakdown.tdsPercentage}%)` : item.label;
+        return `<tr><td>${label}</td><td class="amount" style="color: #dc2626;">-${formatINR(item.amount)}</td></tr>`;
+      })
+      .join('');
+    const reconciliationRow = Math.abs(deductionBreakdown.reconciliation) >= 0.01
+      ? `<tr><td>Unitemized Deduction Reconciliation</td><td class="amount" style="color: #dc2626;">${deductionBreakdown.reconciliation > 0 ? '-' : '+'}${formatINR(Math.abs(deductionBreakdown.reconciliation))}</td></tr>`
+      : '';
+    const totDedVal = deductionBreakdown.totalDeduction;
 
     const slipStatus = String(slip?.status || 'processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed';
 
@@ -1419,9 +1530,8 @@ export const SalaryView = () => {
       <div class="col-title deductions-title">Deductions (Debits)</div>
       <table>
         <tbody>
-          <tr><td>Fixed Deduction</td><td class="amount" style="color: #dc2626;">-${formatINR(fixDedVal)}</td></tr>
-          ${extDedVal > 0 ? `<tr><td>Extra Deduction</td><td class="amount" style="color: #dc2626;">-${formatINR(extDedVal)}</td></tr>` : ''}
-          <tr><td>TDS / Income Tax (${tdsRate}%)</td><td class="amount" style="color: #dc2626;">-${formatINR(tdsAmtVal)}</td></tr>
+          ${deductionRows}
+          ${reconciliationRow}
           <tr class="total-row"><td>Total Deductions</td><td class="amount" style="color: #dc2626;">-${formatINR(totDedVal)}</td></tr>
         </tbody>
       </table>
@@ -1839,6 +1949,12 @@ export const SalaryView = () => {
             grossSalary: Number(payroll.grossSalary) || 0,
             fixedDeduction: Number(payroll.fixedDeduction) || 0,
             extraDeduction: Number(payroll.extraDeduction) || 0,
+            pfDeduction: Number(payroll.pfDeduction) || 0,
+            esicDeduction: Number(payroll.esicDeduction) || 0,
+            professionalTax: Number(payroll.professionalTax) || 0,
+            otherDeductions: Number(payroll.otherDeductions) || 0,
+            lopDeduction: Number(payroll.lopDeduction) || 0,
+            salaryStructureSnapshot: payroll.salaryStructureSnapshot,
             totalDeduction: Number(payroll.totalDeduction) || 0,
             tdsPercentage: Number(payroll.tdsPercentage) || 0,
             tdsAmount: Number(payroll.tdsAmount) || 0,
@@ -1946,10 +2062,13 @@ export const SalaryView = () => {
         (psUserId === payUserId && String(ps.month) === String(payroll.month) && String(ps.year) === String(payroll.year));
     });
 
+    const deductionBreakdown = getPayrollDeductionBreakdown(payroll, existingPayslip);
     setViewingPayslipModal({
-      ...(existingPayslip || payroll),
+      ...(existingPayslip || {}),
+      ...payroll,
       userObj: payroll.userObj || existingPayslip?.userObj || user,
-      status: String(payroll.status || existingPayslip?.status || 'processed').toLowerCase() === 'paid' ? 'paid' : 'processed'
+      status: String(payroll.status || existingPayslip?.status || 'processed').toLowerCase() === 'paid' ? 'paid' : 'processed',
+      deductionBreakdown
     });
   };
 
@@ -2440,6 +2559,11 @@ export const SalaryView = () => {
                                 <span className="text-[11px] text-slate-400 truncate block">
                                   {u.email || 'No email'}
                                 </span>
+                                {payroll.employeeIdentifier && (
+                                  <span className="text-[10px] text-slate-400 truncate block">
+                                    Employee ID: {payroll.employeeIdentifier}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -4030,30 +4154,31 @@ export const SalaryView = () => {
                     Deductions Breakdown (Debits)
                   </span>
                   <div className="space-y-1.5 text-slate-700">
-                    <div className="flex justify-between">
-                      <span>Fixed Monthly Deduction:</span>
-                      <span className="font-mono font-semibold text-rose-600">
-                        -{formatINR(viewingPayslipModal.fixedDeduction)}
-                      </span>
-                    </div>
-                    {Number(viewingPayslipModal.extraDeduction) > 0 && (
+                    {viewingPayslipModal.deductionBreakdown.components
+                      .filter((item) => item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount')
+                      .map((item) => (
+                        <div key={item.key} className="flex justify-between">
+                          <span>
+                            {item.label}{item.key === 'tdsAmount' ? ` (${viewingPayslipModal.deductionBreakdown.tdsPercentage}%)` : ''}:
+                          </span>
+                          <span className="font-mono font-semibold text-rose-600">
+                            -{formatINR(item.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    {Math.abs(viewingPayslipModal.deductionBreakdown.reconciliation) >= 0.01 && (
                       <div className="flex justify-between text-rose-700">
-                        <span>Extra Deduction:</span>
+                        <span>Unitemized Deduction Reconciliation:</span>
                         <span className="font-mono font-semibold">
-                          -{formatINR(viewingPayslipModal.extraDeduction)}
+                          {viewingPayslipModal.deductionBreakdown.reconciliation > 0 ? '-' : '+'}
+                          {formatINR(Math.abs(viewingPayslipModal.deductionBreakdown.reconciliation))}
                         </span>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <span>TDS / Income Tax ({viewingPayslipModal.tdsPercentage || 0}%):</span>
-                      <span className="font-mono font-semibold text-rose-600">
-                        -{formatINR(viewingPayslipModal.tdsAmount)}
-                      </span>
-                    </div>
                   </div>
                   <div className="pt-8 border-t border-slate-200 flex justify-between font-bold text-rose-600">
                     <span>Total Monthly Deductions:</span>
-                    <span className="font-mono text-sm">-{formatINR(viewingPayslipModal.totalDeduction)}</span>
+                    <span className="font-mono text-sm">-{formatINR(viewingPayslipModal.deductionBreakdown.totalDeduction)}</span>
                   </div>
                 </div>
               </div>

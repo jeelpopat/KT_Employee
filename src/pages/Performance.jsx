@@ -1177,19 +1177,15 @@ const Performance = () => {
       else needsImprovementCount++;
     });
 
-    const displayTotalEmployees = isTL
-      ? (teamEmployeesScope?.memberIds?.size || totalRecords)
-      : (employees.length > 0 ? employees.length : totalRecords);
-
     return {
       isPersonal: false,
-      totalEmployees: isTL ? totalRecords : displayTotalEmployees,
+      totalEmployees: totalRecords,
       totalEmployeesLabel: isTL ? "Team Evaluated" : "Total Evaluated",
       excellentCount,
       goodCount,
       needsImprovementCount
     };
-  }, [isAdmin, isTL, tlViewScope, myPerformances, employees, teamEmployeesScope, user]);
+  }, [isAdmin, isTL, tlViewScope, myPerformances, user]);
 
   // Available Month-Year Options from actual data
   const monthYearOptions = useMemo(() => {

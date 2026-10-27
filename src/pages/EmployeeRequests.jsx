@@ -27,8 +27,78 @@ import {
   UserCheck
 } from 'lucide-react';
 import api from '../api/axios';
-import { isFinanceOrExcludedUser, filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../utils/roleFilters';
+import {
+  isFinanceOrExcludedUser,
+  filterOutUnknownUsers,
+  isUnknownEmployeeOrUser,
+  resolveRoleName,
+} from '../utils/roleFilters';
 import { fetchTeamsList } from '../utils/teamLeadUtils';
+
+const roleLookupCache = new Map();
+const roleFields = ['role', 'userRole', 'roleName', 'employeeRole', 'roleType', 'roleId', 'roleID', 'role_id'];
+const nestedRoleRecordFields = ['user', 'userId', 'userID', 'employee', 'employeeId', 'employeeID', 'profile'];
+
+const getRoleIds = (record) => {
+  const pending = [record];
+  const visited = new Set();
+  const ids = new Set();
+
+  while (pending.length > 0) {
+    const current = pending.shift();
+    if (!current || typeof current !== 'object' || visited.has(current)) continue;
+    visited.add(current);
+
+    roleFields.forEach((field) => {
+      const value = current[field];
+      if (typeof value === 'string' && /^[0-9a-f]{24}$/i.test(value.trim())) {
+        ids.add(value.trim().toLowerCase());
+      } else if (value && typeof value === 'object') {
+        const roleName = value.roleName || value.name || value.title || value.displayName;
+        if (!roleName) {
+          const id = value._id || value.id || value.roleId || value.roleID || value.role_id;
+          if (id && /^[0-9a-f]{24}$/i.test(String(id).trim())) {
+            ids.add(String(id).trim().toLowerCase());
+          }
+        }
+      }
+    });
+
+    nestedRoleRecordFields.forEach((field) => {
+      const value = current[field];
+      if (value && typeof value === 'object') pending.push(value);
+    });
+  }
+
+  return [...ids];
+};
+
+const fetchRoleName = (roleId) => {
+  if (!roleLookupCache.has(roleId)) {
+    const lookup = (async () => {
+      for (const endpoint of [`/api/role/get/${roleId}`, `/api/role/${roleId}`]) {
+        try {
+          const response = await api.get(endpoint);
+          const role = response.data?.data || response.data?.role || response.data;
+          const name = typeof role === 'string'
+            ? role
+            : role?.roleName || role?.name || role?.title || role?.displayName;
+          if (name && !/^[0-9a-f]{24}$/i.test(String(name).trim())) {
+            return String(name).trim();
+          }
+        } catch {
+          // Try the alternate role-by-id route before reporting an unresolved ID.
+        }
+      }
+
+      console.warn('Could not resolve one or more employee request roles by ID; retaining available user role data.');
+      return '';
+    })();
+    roleLookupCache.set(roleId, lookup);
+  }
+
+  return roleLookupCache.get(roleId);
+};
 
 // Helper to determine if a user has the role of Team Leader (TL)
 export const isTeamLeadUser = (u) => {
@@ -112,34 +182,22 @@ const EmployeeRequests = () => {
         userList = Array.isArray(data) ? data : data?.users || data?.data || [];
       }
 
-      try {
-        const rolesRes = await api.get('/api/role');
-        const roles = rolesRes.data?.roles || rolesRes.data?.data || (Array.isArray(rolesRes.data) ? rolesRes.data : []);
-        const roleNamesById = new Map(
-          roles.map(role => [
-            String(role?._id || role?.id || '').toLowerCase(),
-            String(role?.roleName || role?.name || role?.title || '').trim()
-          ]).filter(([id, name]) => id && name)
-        );
-        userList = userList.map(user => {
-          const rawRole = user?.role || user?.userRole || user?.roleName || user?.roleId;
-          const roleText = rawRole && typeof rawRole === 'object'
-            ? rawRole.roleName || rawRole.name || rawRole.title || rawRole._id || rawRole.id || ''
-            : rawRole;
-          const role = roleNamesById.get(String(roleText || '').toLowerCase()) || roleText;
-          const rawDepartment = user?.department || user?.departmentName || user?.dept;
-          const department = rawDepartment && typeof rawDepartment === 'object'
-            ? rawDepartment.name || rawDepartment.departmentName || rawDepartment.title || ''
-            : rawDepartment;
-          return {
-            ...user,
-            ...(role ? { role: String(role) } : {}),
-            ...(department ? { department: String(department) } : {})
-          };
-        });
-      } catch (roleError) {
-        console.warn('Could not resolve employee request roles:', roleError?.message);
-      }
+      const unresolvedRoleIds = [...new Set(userList.flatMap(getRoleIds))];
+      const roleNamesById = new Map(
+        await Promise.all(unresolvedRoleIds.map(async (roleId) => [roleId, await fetchRoleName(roleId)]))
+      );
+      userList = userList.map(user => {
+        const role = resolveRoleName(user, roleNamesById);
+        const rawDepartment = user?.department || user?.departmentName || user?.dept;
+        const department = rawDepartment && typeof rawDepartment === 'object'
+          ? rawDepartment.name || rawDepartment.departmentName || rawDepartment.title || ''
+          : rawDepartment;
+        return {
+          ...user,
+          ...(role ? { role: String(role) } : {}),
+          ...(department ? { department: String(department) } : {})
+        };
+      });
 
       if (fetchSequence === usersFetchSequenceRef.current) {
         setUsers(filterOutUnknownUsers(userList));

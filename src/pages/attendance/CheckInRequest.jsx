@@ -132,58 +132,92 @@ const AVATAR_COLORS = [
 // NORMALIZE API RESPONSE
 // ============================================================
 const normalizeRequests = (payload) => {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
+  const arrayKeys = [
+    "pendingRequests",
+    "approvedRequests",
+    "rejectedRequests",
+    "pending",
+    "approved",
+    "rejected",
+    "pendingAttendances",
+    "approvedAttendances",
+    "rejectedAttendances",
+    "approvedCheckIns",
+    "rejectedCheckIns",
+    "checkIns",
+    "checkInRequests",
+    "attendanceRequests",
+    "attendanceRecords",
+    "allRequests",
+    "allRecords",
+    "allAttendances",
+    "requests",
+    "data",
+    "attendance",
+    "logs",
+    "records",
+    "result",
+    "items",
+  ];
+  const envelopeKeys = ["data", "result", "payload", "response", "summary", "attendance", "requests", "records", "items"];
+  const visited = new WeakSet();
+  const records = [];
 
-  if (payload && typeof payload === "object") {
-    if (Array.isArray(payload.pendingRequests)) {
-      return payload.pendingRequests;
+  const visit = (value, depth = 0) => {
+    if (!value || typeof value !== "object" || depth > 5 || visited.has(value)) return;
+    visited.add(value);
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item && typeof item === "object" && !Array.isArray(item)) records.push(item);
+      });
+      return;
     }
 
-    if (Array.isArray(payload.requests)) {
-      return payload.requests;
-    }
+    arrayKeys.forEach((key) => {
+      if (!Array.isArray(value[key])) return;
+      const statusHint = key.toLowerCase().startsWith("approved")
+        ? "approved"
+        : key.toLowerCase().startsWith("rejected")
+          ? "rejected"
+          : key.toLowerCase().startsWith("pending")
+            ? "pending"
+            : "";
 
-    if (Array.isArray(payload.data)) {
-      return payload.data;
-    }
+      value[key].forEach((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return;
+        const currentStatus = String(item.approvalStatus || "").toLowerCase().trim();
+        const generalStatus = String(item.status || "").toLowerCase().trim();
+        const hasExplicitDecision = ["approved", "rejected", "pending"].includes(currentStatus) ||
+          ["approved", "rejected", "pending"].includes(generalStatus) ||
+          isRecordApproved(item) ||
+          isRecordRejected(item);
+        records.push(statusHint && !hasExplicitDecision
+          ? { ...item, __approvalStatusHint: statusHint }
+          : item);
+      });
+    });
 
-    if (Array.isArray(payload.attendance)) {
-      return payload.attendance;
-    }
+    envelopeKeys.forEach((key) => {
+      if (value[key] && typeof value[key] === "object") visit(value[key], depth + 1);
+    });
 
-    if (Array.isArray(payload.logs)) {
-      return payload.logs;
+    if (value._id || value.id || value.userId || value.attendanceId) {
+      records.push(value);
     }
+  };
 
-    if (Array.isArray(payload.records)) {
-      return payload.records;
+  visit(payload);
+
+  const uniqueRecords = new Map();
+  records.forEach((record, index) => {
+    const key = record.attendanceId || record._id || record.id || `unkeyed-${index}`;
+    const existing = uniqueRecords.get(String(key));
+    if (!existing || record.__approvalStatusHint) {
+      uniqueRecords.set(String(key), { ...existing, ...record });
     }
-
-    if (Array.isArray(payload.result)) {
-      return payload.result;
-    }
-
-    if (Array.isArray(payload.items)) {
-      return payload.items;
-    }
-
-    if (payload.data && typeof payload.data === "object") {
-      if (Array.isArray(payload.data.data)) return payload.data.data;
-      if (Array.isArray(payload.data.attendance)) return payload.data.attendance;
-      if (Array.isArray(payload.data.logs)) return payload.data.logs;
-      if (Array.isArray(payload.data.records)) return payload.data.records;
-      if (Array.isArray(payload.data.result)) return payload.data.result;
-      if (Array.isArray(payload.data.items)) return payload.data.items;
-    }
-
-    if (payload._id || payload.userId) {
-      return [payload];
-    }
-  }
-
-  return [];
+  });
+  return [...uniqueRecords.values()];
 };
 
 // ============================================================
@@ -287,6 +321,7 @@ const extractEmployeeUserId = (item, allUsersList = []) => {
     typeof item.userId === "object" ? (item.userId?._id || item.userId?.id) : item.userId,
     typeof item.user === "object" ? (item.user?._id || item.user?.id) : item.user,
     typeof item.employeeId === "object" ? (item.employeeId?._id || item.employeeId?.id || item.employeeId?.userId) : item.employeeId,
+    typeof item.employeeID === "object" ? (item.employeeID?._id || item.employeeID?.id || item.employeeID?.userId) : item.employeeID,
     typeof item.employee === "object" ? (item.employee?._id || item.employee?.userId || item.employee?.id) : item.employee,
     typeof item.attendance === "object" ? (
       (typeof item.attendance.userId === "object" ? (item.attendance.userId?._id || item.attendance.userId?.id) : item.attendance.userId) ||
@@ -396,13 +431,31 @@ const isRecordRejected = (item) => {
   return false;
 };
 
-const getTodayLocal = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+const isExplicitlyExcludedAttendanceRequest = (item) => {
+  const people = [
+    item,
+    item?.userId,
+    item?.user,
+    item?.employeeId,
+    item?.employee,
+    item?.attendance?.userId,
+    item?.attendance?.user,
+    item?.attendance?.employee,
+  ].filter((person) => person && typeof person === "object");
+
+  return people.some((person) => isFinanceOrExcludedUser({
+    role: person.role || person.userRole || person.roleType || item.role || item.userRole,
+    department: person.department || person.dept || item.department || item.dept,
+    designation: person.designation || person.jobTitle || person.position || item.designation,
+  }));
 };
+
+const hasStableAttendanceRequestId = (item) => Boolean(
+  extractAttendanceId(item) ||
+  item?._id ||
+  item?.id ||
+  extractEmployeeUserId(item)
+);
 
 // ============================================================
 // MAP BACKEND REQUEST
@@ -425,6 +478,24 @@ const mapRequest = (item, index) => {
 
   const attendanceId = extractAttendanceId(item);
   const employeeUserId = extractEmployeeUserId(item);
+  const rawEmployeeName =
+    item.employeeName ||
+    item.name ||
+    item.userId?.name ||
+    item.user?.name ||
+    item.employee?.name ||
+    item.employeeId?.name ||
+    item.employeeID?.name ||
+    item.userID?.name ||
+    item.attendance?.employee?.name ||
+    item.attendance?.user?.name ||
+    "";
+  const employeeIdentifier = employeeUserId || attendanceId || item._id || item.id;
+  const employeeName = rawEmployeeName && !isUnknownEmployeeOrUser(rawEmployeeName)
+    ? rawEmployeeName
+    : employeeIdentifier
+      ? `Unidentified employee (${String(employeeIdentifier).slice(-6)})`
+      : "Unknown Employee";
 
   const resolvedApprovalStatus = (() => {
     const rawStatus = String(item.approvalStatus || "").toLowerCase().trim();
@@ -433,6 +504,9 @@ const mapRequest = (item, index) => {
     }
     if (isRecordRejected(item)) return "rejected";
     if (isRecordApproved(item)) return "approved";
+    if (["approved", "rejected", "pending"].includes(item.__approvalStatusHint)) {
+      return item.__approvalStatusHint;
+    }
     const generalStatus = String(item.status || "").toLowerCase().trim();
     if (generalStatus === "rejected") return "rejected";
     if (generalStatus === "approved") return "approved";
@@ -452,14 +526,7 @@ const mapRequest = (item, index) => {
     userId: employeeUserId,
     employeeUserId: employeeUserId,
 
-    name:
-      item.employeeName ||
-      item.name ||
-      item.userId?.name ||
-      item.user?.name ||
-      item.employee?.name ||
-      item.employeeId?.name ||
-      "Unknown Employee",
+    name: employeeName,
 
     role:
       item.role ||
@@ -690,20 +757,8 @@ export default function CheckInRequest() {
 
       const mappedRequests = normalized
         .filter((item) => {
-          if (!item || isFinanceOrExcludedUser(item) || isUnknownEmployeeOrUser(item)) return false;
-          if (item.userId && (isFinanceOrExcludedUser(item.userId) || isUnknownEmployeeOrUser(item.userId))) return false;
-          if (item.employee && (isFinanceOrExcludedUser(item.employee) || isUnknownEmployeeOrUser(item.employee))) return false;
-
-          const name =
-            item.employeeName ||
-            item.name ||
-            item.userId?.name ||
-            item.user?.name ||
-            item.employee?.name;
-          if (!name || isUnknownEmployeeOrUser(name)) {
-            return false;
-          }
-          return true;
+          if (!item || isExplicitlyExcludedAttendanceRequest(item)) return false;
+          return !isUnknownEmployeeOrUser(item) || hasStableAttendanceRequestId(item);
         })
         .map(mapRequest);
 
@@ -711,9 +766,8 @@ export default function CheckInRequest() {
       // approved and rejected check-in records are also available when filtering
       let additionalRecords = [];
       try {
-        const todayDate = getTodayLocal();
         let allRes = await fetch(
-          `https://kt-backend-yzr4.onrender.com/api/attendance/admin/all?date=${todayDate}&_t=${Date.now()}`,
+          `https://kt-backend-yzr4.onrender.com/api/attendance/admin/all?_t=${Date.now()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -737,7 +791,8 @@ export default function CheckInRequest() {
           const allLogs = normalizeRequests(allData);
           additionalRecords = allLogs
             .filter((item) => {
-              if (!item || isFinanceOrExcludedUser(item) || isUnknownEmployeeOrUser(item)) return false;
+              if (!item || isExplicitlyExcludedAttendanceRequest(item)) return false;
+              if (isUnknownEmployeeOrUser(item) && !hasStableAttendanceRequestId(item)) return false;
               return isRecordApproved(item) || isRecordRejected(item);
             })
             .map((item, idx) => {
@@ -750,7 +805,7 @@ export default function CheckInRequest() {
             });
         }
       } catch (e) {
-        // Silently continue if /admin/all is unavailable
+        console.warn("Could not fetch /api/attendance/admin/all:", e?.message);
       }
 
       // Merge pending requests and approved/rejected records
@@ -1238,6 +1293,16 @@ export default function CheckInRequest() {
       );
     });
 
+  const listedStatusCounts = requests.reduce((counts, request) => {
+    counts[request.approvalStatus] = (counts[request.approvalStatus] || 0) + 1;
+    return counts;
+  }, { pending: 0, approved: 0, rejected: 0 });
+  const hasSummaryScopeMismatch =
+    totalCount !== requests.length ||
+    pendingCount !== listedStatusCounts.pending ||
+    approvedCount !== listedStatusCounts.approved ||
+    rejectedCount !== listedStatusCounts.rejected;
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
 
@@ -1288,6 +1353,20 @@ export default function CheckInRequest() {
           </button>
         </div>
       </div>
+
+      {hasSummaryScopeMismatch && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <p>
+            The server summary reports {totalCount} check-in requests, but the list endpoints returned {requests.length} rows
+            {" "}(Pending {pendingCount}/{listedStatusCounts.pending}, Approved {approvedCount}/{listedStatusCounts.approved}, Rejected {rejectedCount}/{listedStatusCounts.rejected}).
+            Only returned rows can be audited here; missing rows are not fabricated.
+          </p>
+        </div>
+      )}
 
       {/* ===================================================
           3 METRIC CARDS (UI Standard Design)

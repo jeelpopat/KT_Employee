@@ -28,7 +28,7 @@ import {
   FileText,
   RefreshCw
 } from 'lucide-react';
-import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from '../../utils/roleFilters';
+import { getEmploymentStatus, isFinanceOrExcludedUser, isTeamLeadRole, isUnknownEmployeeOrUser } from '../../utils/roleFilters';
 import { getTaskProgress } from '../../utils/taskUtils';
 import {
   EMPLOYEE_DEPARTMENTS_ROLES,
@@ -457,12 +457,7 @@ const fetchAllMembers = async () => {
         const roleType =
           roleValues.some(value => /\bhr\b|human resources?/i.test(value))
             ? 'hr'
-            : roleValues.some(value =>
-                value === 'teamlead' ||
-                value === 'team lead' ||
-                value === 'team_lead' ||
-                value === 'tl'
-              )
+            : isTeamLeadRole(user, employee)
             ? 'tl'
             : 'employee';
 
@@ -598,12 +593,7 @@ const fetchAllMembers = async () => {
         // --------------------------------------
         // STATUS
         // --------------------------------------
-        const status =
-          employee?.employeeStatus ||
-          employee?.status ||
-          user?.employeeStatus ||
-          user?.status ||
-          'Active';
+        const status = getEmploymentStatus(employee, user);
 
         // --------------------------------------
         // JOINING DATE

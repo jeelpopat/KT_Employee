@@ -124,6 +124,7 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
               leftIcon={Lock}
               rightIcon={showPassword ? EyeOff : Eye}
               onRightIconClick={() => setShowPassword(!showPassword)}
+              rightIconAriaLabel={showPassword ? 'Hide password' : 'Show password'}
               required
             />
             <div className="flex justify-end mt-1.5">

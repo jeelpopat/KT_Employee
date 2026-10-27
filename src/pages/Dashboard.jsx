@@ -21,7 +21,8 @@ import {
   isFinanceOrExcludedUser,
   filterOutFinanceUsers,
   filterOutUnknownUsers,
-  isUnknownEmployeeOrUser
+  isUnknownEmployeeOrUser,
+  isTeamLeadRole
 } from "../utils/roleFilters";
 
 export default function Dashboard() {
@@ -217,46 +218,81 @@ export default function Dashboard() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       let userList = [];
+      let employeeList = [];
       try {
-        const res = await fetch("https://kt-backend-yzr4.onrender.com/api/user/all", { headers });
+        const res = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all", { headers });
         const d = await res.json();
-        userList = d.users || d.data || (Array.isArray(d) ? d : []);
+        const list = d.users || d.data?.users || d.data?.employees || d.data || d.employees || d;
+        userList = Array.isArray(list) ? list : [];
       } catch (e1) {
         try {
-          const res = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all", { headers });
+          const res = await fetch("https://kt-backend-yzr4.onrender.com/api/user/all", { headers });
           const d = await res.json();
-          userList = d.users || d.data || (Array.isArray(d) ? d : []);
+          const list = d.users || d.data?.users || d.data?.employees || d.data || d.employees || d;
+          userList = Array.isArray(list) ? list : [];
         } catch (e2) {
           try {
             const res = await fetch("https://kt-backend-yzr4.onrender.com/api/users/all");
             const d = await res.json();
-            userList = d.users || d.data || (Array.isArray(d) ? d : []);
+            const list = d.users || d.data?.users || d.data?.employees || d.data || d.employees || d;
+            userList = Array.isArray(list) ? list : [];
           } catch (e3) {
             console.warn("Could not fetch user/all or users/all for team leads:", e3);
           }
         }
       }
 
-      const isTeamLeadUser = (u) => {
-        if (!u || isFinanceOrExcludedUser(u)) return false;
-        const role = String(u.role || '').toLowerCase().trim();
-        const desig = String(u.designation?.designationName || u.designation?.name || u.designation || '').toLowerCase().trim();
-        return (
-          u.isTeamLead === true ||
-          u.isTeamLeader === true ||
-          role === 'team lead' ||
-          role === 'team_leader' ||
-          role === 'team leader' ||
-          role === 'tl' ||
-          role.includes('team lead') ||
-          role.includes('lead') ||
-          desig.includes('team lead') ||
-          desig.includes('team leader')
-        );
+      try {
+        const res = await fetch("https://kt-backend-yzr4.onrender.com/api/employee/list", { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.employees || data.data?.employees || data.employeesList ||
+            data.data?.employeesList || data.data || data;
+          employeeList = Array.isArray(list) ? list : [];
+        }
+      } catch (error) {
+        console.warn("Could not fetch employee records for team lead roles:", error);
+      }
+
+      const normalizeId = (value) => String(value?._id || value?.id || value?.userId || value?.userID || value || '').trim().toLowerCase();
+      const findEmployee = (user) => {
+        const userIds = [user?._id, user?.id, user?.userId, user?.userID, user?.employeeID, user?.employeeId]
+          .map(normalizeId)
+          .filter(Boolean);
+        const userEmail = String(user?.email || '').trim().toLowerCase();
+
+        return employeeList.find((employee) => {
+          const employeeIds = [
+            employee?._id,
+            employee?.id,
+            employee?.userID,
+            employee?.userId,
+            employee?.employeeID,
+            employee?.employeeId,
+          ].map(normalizeId).filter(Boolean);
+          const employeeEmail = String(employee?.email || employee?.userID?.email || employee?.userId?.email || '')
+            .trim()
+            .toLowerCase();
+          return userIds.some((id) => employeeIds.includes(id)) ||
+            Boolean(userEmail && employeeEmail && userEmail === employeeEmail);
+        });
       };
 
-      const teamLeadsFromUsers = (Array.isArray(userList) ? userList : []).filter(isTeamLeadUser);
-      let finalCount = teamLeadsFromUsers.length;
+      const teamLeadsFromUsers = (Array.isArray(userList) ? userList : [])
+        .filter((user) => {
+          const employee = findEmployee(user);
+          const member = { ...employee, ...user };
+          const name = member.name || member.fullName ||
+            [member.firstName, member.lastName].filter(Boolean).join(" ").trim();
+          const email = member.email || "";
+          return isTeamLeadRole(user, employee) &&
+            !isFinanceOrExcludedUser(member) &&
+            !isUnknownEmployeeOrUser({ ...member, name }) &&
+            Boolean(email && email !== "N/A" && email.includes("@"));
+        });
+      let finalCount = new Set(teamLeadsFromUsers.map((user) =>
+        normalizeId(user._id || user.id || user.email || user.employeeID || user.employeeId)
+      ).filter(Boolean)).size;
 
       // If users API had 0 team leads, fallback to teamLead/team
       if (finalCount === 0) {

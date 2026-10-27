@@ -186,6 +186,11 @@ export const normalizeCloudinaryResource = (raw = {}) => {
   const startTime = raw.startTime || raw.created_at || dateObj.toISOString();
   const endTime = raw.endTime || null;
   const lastActiveTime = raw.lastActiveTime || raw.created_at || dateObj.toISOString();
+  const rawSequenceNo = raw.sequenceNo ?? raw.sequence;
+  const rawActivityLevel = raw.activityLevel;
+  const parsedActivityLevel = rawActivityLevel === '' || rawActivityLevel === null || rawActivityLevel === undefined
+    ? null
+    : Number(rawActivityLevel);
 
   return {
     id: publicId,
@@ -204,11 +209,12 @@ export const normalizeCloudinaryResource = (raw = {}) => {
     date: dateStr,
     captureTime: timeStr,
     capturedAt: raw.created_at || dateObj.toISOString(),
+    sequenceNo: rawSequenceNo === '' || rawSequenceNo === null || rawSequenceNo === undefined ? null : rawSequenceNo,
     thumbnailUrl: raw.secure_url || raw.url,
     fullUrl: raw.secure_url || raw.url,
     imageUrl: raw.secure_url || raw.url,
     secure_url: raw.secure_url || raw.url,
-    activityLevel: 95,
+    activityLevel: parsedActivityLevel !== null && Number.isFinite(parsedActivityLevel) ? parsedActivityLevel : null,
     activeWindow: raw.activeWindow && !['active desktop application', 'active workstation screen', 'work workspace'].includes(String(raw.activeWindow).toLowerCase().trim())
       ? raw.activeWindow
       : `Kevalon Workspace • Core Operations (${empId})`,
@@ -568,10 +574,10 @@ export const normalizeScreenshotRecord = (raw) => {
   const empPhoto = typeof emp === 'object' ? (emp.profilePhoto || emp.photoUrl || emp.avatar || '') : (raw.profilePhoto || '');
   const positionInfo = deriveEmployeePosition(raw, typeof emp === 'object' ? emp : {});
 
-  const imgUrl = raw.imageUrl || raw.fullUrl || raw.thumbnailUrl || raw.url || raw.secure_url ||
-                 `https://res.cloudinary.com/${CLOUDINARY_CONFIG.cloudName}/image/upload/v${Date.now()}/monitoring/${empId}.jpg`;
+  const imgUrl = raw.imageUrl || raw.fullUrl || raw.thumbnailUrl || raw.url || raw.secure_url || '';
 
-  const dateObj = raw.capturedAt ? new Date(raw.capturedAt) : (raw.createdAt ? new Date(raw.createdAt) : new Date());
+  const capturedAt = raw.capturedAt || raw.createdAt || raw.created_at;
+  const dateObj = capturedAt ? new Date(capturedAt) : new Date();
   const dateStr = dateObj.toISOString().split('T')[0];
   const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -595,10 +601,20 @@ export const normalizeScreenshotRecord = (raw) => {
 
   const createdAt = raw.createdAt || dateObj.toISOString();
   const updatedAt = raw.updatedAt || raw.createdAt || dateObj.toISOString();
+  const stableId = raw._id || raw.id || raw.public_id || raw.publicId || imgUrl ||
+    `scr-${userId}-${capturedAt || raw.date || JSON.stringify(raw)}`;
+  const rawSequenceNo = raw.sequenceNo ?? raw.sequence;
+  const sequenceNo = rawSequenceNo === '' || rawSequenceNo === null || rawSequenceNo === undefined
+    ? null
+    : rawSequenceNo;
+  const rawActivityLevel = raw.activityLevel;
+  const parsedActivityLevel = rawActivityLevel === '' || rawActivityLevel === null || rawActivityLevel === undefined
+    ? null
+    : Number(rawActivityLevel);
 
   return {
-    id: raw._id || raw.id || `scr-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-    _id: raw._id || raw.id,
+    id: stableId,
+    _id: raw._id || raw.id || raw.public_id || raw.publicId || stableId,
     userId,
     attendanceId,
     startTime,
@@ -618,15 +634,15 @@ export const normalizeScreenshotRecord = (raw) => {
     date: raw.date || dateStr,
     captureTime: raw.captureTime || raw.time || timeStr,
     sessionId: raw.sessionId || `SES-${dateStr.replace(/-/g, '')}-001`,
-    sequenceNo: raw.sequenceNo || raw.sequence || Math.floor(Math.random() * 800 + 100),
+    sequenceNo,
     thumbnailUrl: raw.thumbnailUrl || imgUrl,
     fullUrl: raw.fullUrl || raw.imageUrl || imgUrl,
-    activityLevel: raw.activityLevel || Math.floor(Math.random() * 20 + 80),
+    activityLevel: parsedActivityLevel !== null && Number.isFinite(parsedActivityLevel) ? parsedActivityLevel : null,
     activeWindow: raw.activeWindow && !['active desktop application', 'active workstation screen', 'work workspace'].includes(String(raw.activeWindow).toLowerCase().trim())
       ? raw.activeWindow
       : `Kevalon Workspace • Core Operations (${empId})`,
     cloudStorage: 'Cloudinary (' + CLOUDINARY_CONFIG.cloudName + ')',
-    capturedAt: raw.capturedAt || raw.createdAt || dateObj.toISOString()
+    capturedAt: capturedAt || dateObj.toISOString()
   };
 };
 
@@ -880,7 +896,9 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
   formData.append('activeWindow', metadata.activeWindow || 'Kevalon Workspace');
   formData.append('sessionId', metadata.sessionId || '');
   formData.append('capturedAt', metadata.capturedAt || createdAt);
-  formData.append('activityLevel', metadata.activityLevel ? String(metadata.activityLevel) : '90');
+  if (metadata.activityLevel !== null && metadata.activityLevel !== undefined && Number.isFinite(Number(metadata.activityLevel))) {
+    formData.append('activityLevel', String(metadata.activityLevel));
+  }
   formData.append('cloudName', CLOUDINARY_CONFIG.cloudName);
   formData.append('apiKey', CLOUDINARY_CONFIG.apiKey);
   formData.append('cloudId', CLOUDINARY_CONFIG.cloudId);
@@ -920,7 +938,9 @@ export const uploadScreenshot = async (blobOrFile, metadata = {}) => {
     capturedAt: metadata.capturedAt || createdAt,
     captureTime: metadata.captureTime || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     date: metadata.date || new Date().toISOString().split('T')[0],
-    activityLevel: metadata.activityLevel ? Number(metadata.activityLevel) : 95,
+    activityLevel: metadata.activityLevel !== null && metadata.activityLevel !== undefined && Number.isFinite(Number(metadata.activityLevel))
+      ? Number(metadata.activityLevel)
+      : null,
     createdAt,
     updatedAt
   };

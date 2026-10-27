@@ -143,11 +143,33 @@ const formatLeaveType = (type) =>
   normalizeLeaveType(type)
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+const getCanonicalLeaveType = (type, leave) => {
+  const rawLeave = leave?.rawLeave || leave || {};
+  const totalDays = Number(rawLeave.totalDays ?? leave?.totalDays);
+  const halfDayType = String(rawLeave.halfDayType || leave?.halfDayType || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+  const isHalfDay = isHalfDayLeave(rawLeave, leave, totalDays, halfDayType);
+
+  if (!isHalfDay) return type || "Leave";
+
+  if (halfDayType === "first-half" || halfDayType === "second-half") {
+    return `Half Day (${halfDayType.replace("-", " ")})`;
+  }
+  return "Half Day";
+};
+
 const formatDuration = (leave) => {
+  if (leave?.dateIssue) return "Invalid date range";
+
   const rawLeave = leave?.rawLeave || leave || {};
   const totalDays = Number(rawLeave?.totalDays ?? leave?.totalDays ?? 0);
-  const isHalf = rawLeave?.isHalfDay || leave?.isHalfDay || totalDays === 0.5;
-  const halfType = rawLeave?.halfDayType || leave?.halfDayType;
+  const halfType = String(rawLeave?.halfDayType || leave?.halfDayType || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+  const isHalf = isHalfDayLeave(rawLeave, leave, totalDays, halfType);
 
   if (isHalf) {
     if (halfType === "first-half") return "0.5 Day (First Half)";
@@ -157,6 +179,57 @@ const formatDuration = (leave) => {
 
   return `${totalDays} ${totalDays === 1 ? "Day" : "Days"}`;
 };
+
+const isHalfDayLeave = (rawLeave, leave, totalDays, halfDayType) =>
+  rawLeave?.isHalfDay === true ||
+  leave?.isHalfDay === true ||
+  totalDays === 0.5 ||
+  halfDayType === "first-half" ||
+  halfDayType === "second-half";
+
+const getLeaveDateIssue = (startDate, endDate) => {
+  const parseLeaveDate = (value) => {
+    if (!value) return null;
+    const raw = String(value).trim();
+    const yearMatch = raw.match(/^[+-]?(\d{4,6})-\d{2}-\d{2}/);
+    const date = new Date(raw);
+
+    if (Number.isNaN(date.getTime())) return null;
+
+    const year = yearMatch ? Number(yearMatch[1]) : date.getFullYear();
+    if (year < 1900 || year > 9999) return null;
+
+    if (yearMatch) {
+      const [, month, day] = raw.match(/^[+-]?\d{4,6}-(\d{2})-(\d{2})/) || [];
+      if (!month || !day) return null;
+      const utcDate = new Date(0);
+      utcDate.setUTCFullYear(year, Number(month) - 1, Number(day));
+      utcDate.setUTCHours(0, 0, 0, 0);
+      if (
+        utcDate.getUTCFullYear() !== year ||
+        utcDate.getUTCMonth() !== Number(month) - 1 ||
+        utcDate.getUTCDate() !== Number(day)
+      ) {
+        return null;
+      }
+    }
+
+    return date;
+  };
+
+  const start = parseLeaveDate(startDate);
+  const end = parseLeaveDate(endDate);
+  if (!start || !end) return "The leave date is invalid or outside the supported range.";
+  if (end < start) return "The leave end date is before its start date.";
+  return "";
+};
+
+const DateCorrectionNotice = ({ issue }) => (
+  <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700">
+    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+    {issue}
+  </span>
+);
 
 const getEmployeeId = (employee) => {
   if (!employee) return "";
@@ -237,6 +310,10 @@ export default function LeaveRequest() {
 
   const openActionModal = (leave, status) => {
     if (!leave) return;
+    if (getLeaveDateIssue(leave.startDate, leave.endDate)) {
+      setError("This leave request has invalid dates and cannot be approved or rejected.");
+      return;
+    }
     setActionModal({
       isOpen: true,
       leave,
@@ -492,10 +569,16 @@ export default function LeaveRequest() {
 
             role: employeeRole,
 
-            leaveType:
-              leave?.leaveType ||
-              leave?.type ||
-              "Leave",
+            leaveType: getCanonicalLeaveType(
+              leave?.leaveType || leave?.type || "Leave",
+              leave
+            ),
+
+            isHalfDay: leave?.isHalfDay === true ||
+              Number(leave?.totalDays) === 0.5 ||
+              ["first-half", "second-half"].includes(String(leave?.halfDayType || "").trim().toLowerCase().replace(/[_\s]+/g, "-")),
+
+            halfDayType: leave?.halfDayType || "",
 
             startDate:
               leave?.startDate ||
@@ -506,6 +589,11 @@ export default function LeaveRequest() {
               leave?.endDate ||
               leave?.toDate ||
               "",
+
+            dateIssue: getLeaveDateIssue(
+              leave?.startDate || leave?.fromDate || "",
+              leave?.endDate || leave?.toDate || ""
+            ),
 
             totalDays:
               leave?.totalDays ??
@@ -808,6 +896,7 @@ export default function LeaveRequest() {
 
   const canTakeAction = (leave) => {
     if (!leave) return false;
+    if (leave.dateIssue) return false;
 
     const loggedRole = normalizeRole(
       currentRole
@@ -975,6 +1064,12 @@ export default function LeaveRequest() {
 
     setError("");
     setSuccess("");
+
+    const dateIssue = getLeaveDateIssue(leave.startDate, leave.endDate);
+    if (dateIssue) {
+      setError(`${dateIssue} Correct the dates before taking approval action.`);
+      return;
+    }
 
     if (!remark || !remark.trim()) {
       setError("Please enter a description/remark before submitting.");
@@ -1203,10 +1298,13 @@ export default function LeaveRequest() {
   const formatDate = (date) => {
     if (!date) return "-";
 
+    if (getLeaveDateIssue(date, date)) return "Invalid date";
+
     const parsed = new Date(date);
 
     if (
-      Number.isNaN(parsed.getTime())
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getFullYear() > 9999
     ) {
       return "-";
     }
@@ -1862,6 +1960,9 @@ export default function LeaveRequest() {
                         <td className="px-2 py-3 text-xs text-gray-600">
                           <span className="block">{formatDate(request.startDate)}</span>
                           <span className="block">to {formatDate(request.endDate)}</span>
+                          {request.dateIssue && (
+                            <DateCorrectionNotice issue={request.dateIssue} />
+                          )}
                         </td>
 
                         <td className="px-2 py-3">
@@ -2028,6 +2129,9 @@ export default function LeaveRequest() {
                             request.endDate
                           )}
                         </p>
+                        {request.dateIssue && (
+                          <DateCorrectionNotice issue={request.dateIssue} />
+                        )}
                       </div>
 
                       <div>
@@ -2315,7 +2419,20 @@ export default function LeaveRequest() {
                       selectedLeave.endDate
                     )}
                   </p>
+
                 </div>
+
+                {selectedLeave.dateIssue && (
+                  <div className="border border-rose-200 bg-rose-50 rounded-xl p-3 text-sm text-rose-800">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-semibold">Date correction required</p>
+                        <p className="mt-0.5">{selectedLeave.dateIssue} This request cannot be approved or rejected until its dates are corrected.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
 

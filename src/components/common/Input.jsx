@@ -11,6 +11,7 @@ export const Input = forwardRef(({
   leftIcon: LeftIcon,
   rightIcon: RightIcon,
   onRightIconClick,
+  rightIconAriaLabel,
   className = '',
   containerClassName = '',
   ...props
@@ -51,7 +52,8 @@ export const Input = forwardRef(({
             onClick={onRightIconClick}
             disabled={!onRightIconClick}
             tabIndex={onRightIconClick ? 0 : -1}
-            className={`absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 focus:outline-none ${
+            aria-label={onRightIconClick ? rightIconAriaLabel : undefined}
+            className={`absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 rounded ${
               onRightIconClick ? 'cursor-pointer hover:text-slate-600' : 'pointer-events-none'
             }`}
           >
