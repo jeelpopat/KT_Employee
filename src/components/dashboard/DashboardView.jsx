@@ -211,7 +211,7 @@ export const DashboardView = () => {
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
       return trimmed;
     }
-    const base = 'https://kt-backend-yzr4.onrender.com';
+    const base = 'https://kt-backend-ttzj.onrender.com';
     return trimmed.startsWith('/') ? `${base}${trimmed}` : `${base}/${trimmed}`;
   };
 
