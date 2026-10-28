@@ -731,6 +731,19 @@ export const computeNineHourTimeline = ({
       segment.type === 'yellow' ||
       (segment.label || '').toLowerCase().includes('break')
     ));
+  const activeBreakRecord = [...recordedBreaks].reverse().find(
+    (record) => record.startTime && !record.endTime
+  );
+  const parsedActiveBreakStart = isOnBreak
+    ? parseTimeToMinutes(activeBreakRecord?.startTime || breakInTime) ??
+      (backendBreakSegments.length > 0
+        ? convertUTCMinutesToLocal(backendBreakSegments[backendBreakSegments.length - 1].fromMinutes, startMinutes)
+        : null)
+    : null;
+  const activeBreakStartMinutes = parsedActiveBreakStart === null
+    ? null
+    : [parsedActiveBreakStart - 1440, parsedActiveBreakStart, parsedActiveBreakStart + 1440]
+      .find((minutes) => minutes >= startMinutes && minutes <= endMinutes) ?? null;
   const backendBreaksMatchRecords = recordedBreaks.every((recordedBreak) => {
     const { startTime, endTime } = normalizeBreakRecord(recordedBreak);
     const recordedStart = parseTimeToMinutes(startTime);
@@ -787,9 +800,9 @@ export const computeNineHourTimeline = ({
         }
       }
 
-      // If employee is actively on break right now, do not render working segments that appear after break start
-      if (!isBreak && !isInactiveOrLate && isOnBreak && localFrom >= startMinutes) {
-        return;
+      // Preserve completed work in the timeline, but do not extend it into the active break.
+      if (!isBreak && !isInactiveOrLate && isOnBreak && activeBreakStartMinutes !== null) {
+        localTo = Math.min(localTo, activeBreakStartMinutes);
       }
 
       // Clamp strictly within the 9-hour timeline [startMinutes, maxAllowedEnd]
