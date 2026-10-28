@@ -36,7 +36,7 @@ import {
   matchesEmployeeRole
 } from "../../utils/employeeRoles";
 
-const API_BASE = "https://kt-backend-ttzj.onrender.comapi";
+const API_BASE = "https://kt-backend-ttzj.onrender.com/api";
 
 const initialFormData = {
   fullName: "",
