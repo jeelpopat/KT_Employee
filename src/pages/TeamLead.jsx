@@ -4,7 +4,7 @@ import { Crown } from "lucide-react";
 import { isFinanceOrExcludedUser } from "../utils/roleFilters";
 import { showToast } from "../components/common/Toast";
 
-const BASE_URL = "https://kt-backend-ttzj.onrender.comapi";
+const BASE_URL = "https://kt-backend-ttzj.onrender.com/api";
 
 const getEmployeeReferenceId = (item) => {
   if (typeof item === 'string' || typeof item === 'number') return String(item);
