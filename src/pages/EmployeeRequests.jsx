@@ -224,7 +224,7 @@ const EmployeeRequests = () => {
     }
   };
 
-  // 1. Fetch Companies dynamically: GET /api/company/
+  // 1. Fetch Companies dynamically: GET /api/company
   const fetchCompanies = async () => {
     setLoadingCompanies(true);
     try {
@@ -236,21 +236,18 @@ const EmployeeRequests = () => {
       };
 
       try {
-        const compRes = await api.get('/api/company/', { headers });
-        const cData = compRes.data?.data || compRes.data?.companies || compRes.data || [];
+        const compRes = await api.get('/api/company', { headers });
+        const cData = compRes.data?.data || compRes.data?.companies || (Array.isArray(compRes.data) ? compRes.data : []);
         if (Array.isArray(cData) && cData.length > 0) companyList = cData;
       } catch (cErr) {
-        console.warn('GET /api/company/ via api instance encountered error:', cErr?.message);
+        console.warn('GET /api/company via api instance encountered error:', cErr?.message);
       }
 
       if (companyList.length === 0) {
         try {
-          const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/company/', { headers });
-          if (fetchRes.ok) {
-            const compData = await fetchRes.json();
-            const cData = compData?.data || compData?.companies || compData || [];
-            if (Array.isArray(cData) && cData.length > 0) companyList = cData;
-          }
+          const compRes = await api.get('/api/company/', { headers });
+          const cData = compRes.data?.data || compRes.data?.companies || (Array.isArray(compRes.data) ? compRes.data : []);
+          if (Array.isArray(cData) && cData.length > 0) companyList = cData;
         } catch { }
       }
 
@@ -259,14 +256,32 @@ const EmployeeRequests = () => {
           const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/company', { headers });
           if (fetchRes.ok) {
             const compData = await fetchRes.json();
-            const cData = compData?.data || compData?.companies || compData || [];
+            const cData = compData?.data || compData?.companies || (Array.isArray(compData) ? compData : []);
             if (Array.isArray(cData) && cData.length > 0) companyList = cData;
           }
         } catch { }
       }
 
-      setCompanies(companyList);
-      return companyList;
+      if (companyList.length === 0) {
+        try {
+          const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/company/', { headers });
+          if (fetchRes.ok) {
+            const compData = await fetchRes.json();
+            const cData = compData?.data || compData?.companies || (Array.isArray(compData) ? compData : []);
+            if (Array.isArray(cData) && cData.length > 0) companyList = cData;
+          }
+        } catch { }
+      }
+
+      const cleanCompanies = companyList.map(c => ({
+        _id: String(c._id || c.id || ''),
+        id: String(c._id || c.id || ''),
+        companyName: c.companyName || c.name || c.title || 'Kevalon Technology',
+        ...c
+      }));
+
+      setCompanies(cleanCompanies);
+      return cleanCompanies;
     } catch (err) {
       console.error('Failed to load companies:', err);
       setCompanies([]);
@@ -277,9 +292,14 @@ const EmployeeRequests = () => {
   };
 
   // 2. Fetch Branches dynamically from API
+  // Backend endpoint: GET https://kt-backend-ttzj.onrender.com/api/branch?companyId=<companyId>
   const fetchBranches = async (companyId) => {
     setBranchLoadError('');
-    if (!companyId) {
+    const rawCompId = typeof companyId === 'object' && companyId !== null
+      ? (companyId._id || companyId.id || companyId.companyId || '')
+      : String(companyId || '').trim();
+
+    if (!rawCompId) {
       setBranches([]);
       return [];
     }
@@ -292,16 +312,97 @@ const EmployeeRequests = () => {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      const branchRes = await api.get(`/api/branch?companyId=${encodeURIComponent(companyId)}`, { headers });
-      const bData = branchRes.data?.data || branchRes.data?.branches || branchRes.data || [];
-      if (Array.isArray(bData) && bData.length > 0) branchList = bData;
+      // 1. Primary: GET /api/branch?companyId=<companyId> via api client
+      try {
+        const branchRes = await api.get(`/api/branch?companyId=${encodeURIComponent(rawCompId)}`, { headers });
+        const bData = branchRes.data?.data || branchRes.data?.branches || (Array.isArray(branchRes.data) ? branchRes.data : []);
+        if (Array.isArray(bData) && bData.length > 0) branchList = bData;
+      } catch (bErr) {
+        console.warn('GET /api/branch?companyId via api encountered error:', bErr?.message);
+      }
 
-      setBranches(branchList);
-      return branchList;
+      // 2. Direct fetch fallback with companyId parameter
+      if (branchList.length === 0) {
+        try {
+          const fetchRes = await fetch(`https://kt-backend-ttzj.onrender.com/api/branch?companyId=${encodeURIComponent(rawCompId)}`, { headers });
+          if (fetchRes.ok) {
+            const bJson = await fetchRes.json();
+            const bData = bJson?.data || bJson?.branches || (Array.isArray(bJson) ? bJson : []);
+            if (Array.isArray(bData) && bData.length > 0) branchList = bData;
+          }
+        } catch (fErr) {
+          console.warn('GET /api/branch?companyId via direct fetch error:', fErr?.message);
+        }
+      }
+
+      // 3. Fallback: GET /api/branch without filter query and match companyId locally
+      if (branchList.length === 0) {
+        try {
+          let allBranches = [];
+          try {
+            const allRes = await api.get('/api/branch', { headers });
+            const allData = allRes.data?.data || allRes.data?.branches || (Array.isArray(allRes.data) ? allRes.data : []);
+            if (Array.isArray(allData) && allData.length > 0) allBranches = allData;
+          } catch {
+            const fetchAll = await fetch('https://kt-backend-ttzj.onrender.com/api/branch', { headers });
+            if (fetchAll.ok) {
+              const allJson = await fetchAll.json();
+              const allData = allJson?.data || allJson?.branches || (Array.isArray(allJson) ? allJson : []);
+              if (Array.isArray(allData) && allData.length > 0) allBranches = allData;
+            }
+          }
+
+          if (allBranches.length > 0) {
+            const matched = allBranches.filter(b => {
+              const cId = typeof b.companyId === 'object' && b.companyId !== null
+                ? (b.companyId._id || b.companyId.id)
+                : (b.companyId || b.company);
+              return !cId || String(cId) === String(rawCompId);
+            });
+            if (matched.length > 0) {
+              branchList = matched;
+            } else {
+              branchList = allBranches;
+            }
+          }
+        } catch (allErr) {
+          console.warn('GET /api/branch fallback error:', allErr?.message);
+        }
+      }
+
+      // Format clean JSON branch records strictly conforming to the backend response structure (no static dummy records)
+      const cleanBranchList = branchList.map((b) => ({
+        _id: String(b._id || b.id || ''),
+        id: String(b._id || b.id || ''),
+        companyId: typeof b.companyId === 'object' && b.companyId !== null
+          ? String(b.companyId._id || b.companyId.id || rawCompId)
+          : String(b.companyId || rawCompId),
+        branchName: b.branchName || b.name || b.title || 'Main Branch',
+        branchCode: b.branchCode || '',
+        address: b.address || '',
+        city: b.city || '',
+        state: b.state || '',
+        pincode: b.pincode || '',
+        country: b.country || '',
+        phone: b.phone || '',
+        email: b.email || '',
+        manager: b.manager || '',
+        isHeadOffice: Boolean(b.isHeadOffice),
+        status: b.status || 'active',
+        createdAt: b.createdAt || '',
+        updatedAt: b.updatedAt || '',
+        __v: b.__v
+      }));
+
+      setBranches(cleanBranchList);
+      if (cleanBranchList.length === 0) {
+        setBranchLoadError('No branches found for the selected company.');
+      }
+      return cleanBranchList;
     } catch (err) {
       console.error('Failed to load branches:', err);
       setBranches([]);
-      setBranchLoadError(err.response?.data?.message || 'Failed to load branches for the selected company.');
+      setBranchLoadError(err.response?.data?.message || err.message || 'Failed to load branches for the selected company.');
       return [];
     } finally {
       setLoadingBranches(false);
@@ -310,7 +411,11 @@ const EmployeeRequests = () => {
 
   // 3. Fetch Financial Year dynamically from API
   const fetchFinancialYears = async (branchId, companyId) => {
-    if (!branchId) {
+    const rawBranchId = typeof branchId === 'object' && branchId !== null
+      ? (branchId._id || branchId.id || '')
+      : String(branchId || '').trim();
+
+    if (!rawBranchId) {
       setFinancialYears([]);
       return [];
     }
@@ -324,8 +429,8 @@ const EmployeeRequests = () => {
       };
 
       try {
-        const fyRes = await api.get(`/api/financial-year?branchId=${encodeURIComponent(branchId)}`, { headers });
-        const fData = fyRes.data?.data || fyRes.data?.financialYears || fyRes.data?.years || fyRes.data || [];
+        const fyRes = await api.get(`/api/financial-year?branchId=${encodeURIComponent(rawBranchId)}`, { headers });
+        const fData = fyRes.data?.data || fyRes.data?.financialYears || fyRes.data?.years || (Array.isArray(fyRes.data) ? fyRes.data : []);
         if (Array.isArray(fData) && fData.length > 0) fyList = fData;
       } catch (fErr) {
         console.warn('GET /api/financial-year?branchId via api encountered error:', fErr?.message);
@@ -333,10 +438,10 @@ const EmployeeRequests = () => {
 
       if (fyList.length === 0) {
         try {
-          const fetchRes = await fetch(`https://kt-backend-ttzj.onrender.com/api/financial-year?branchId=${encodeURIComponent(branchId)}`, { headers });
+          const fetchRes = await fetch(`https://kt-backend-ttzj.onrender.com/api/financial-year?branchId=${encodeURIComponent(rawBranchId)}`, { headers });
           if (fetchRes.ok) {
             const fData = await fetchRes.json();
-            const list = fData?.data || fData?.financialYears || fData?.years || fData || [];
+            const list = fData?.data || fData?.financialYears || fData?.years || (Array.isArray(fData) ? fData : []);
             if (Array.isArray(list) && list.length > 0) fyList = list;
           }
         } catch { }
@@ -347,19 +452,27 @@ const EmployeeRequests = () => {
           const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/financial-year', { headers });
           if (fetchRes.ok) {
             const fData = await fetchRes.json();
-            const list = fData?.data || fData?.financialYears || fData?.years || fData || [];
+            const list = fData?.data || fData?.financialYears || fData?.years || (Array.isArray(fData) ? fData : []);
             if (Array.isArray(list) && list.length > 0) {
               fyList = list.filter(f => {
                 const bId = f.branchId?._id || f.branchId || f.branch;
-                return !bId || String(bId) === String(branchId);
+                return !bId || String(bId) === String(rawBranchId);
               });
             }
           }
         } catch { }
       }
 
-      setFinancialYears(fyList);
-      return fyList;
+      const cleanFyList = fyList.map(f => ({
+        _id: String(f._id || f.id || ''),
+        id: String(f._id || f.id || ''),
+        yearLabel: f.yearLabel || f.year || f.financialYear || f.name || '',
+        status: f.status || 'active',
+        ...f
+      }));
+
+      setFinancialYears(cleanFyList);
+      return cleanFyList;
     } catch (err) {
       console.error('Failed to load financial years:', err);
       setFinancialYears([]);
@@ -438,15 +551,26 @@ const EmployeeRequests = () => {
     }
   };
 
-  // Initial load of metadata: fetch companies, team leads & live teams.
-  // Branches and financial years are loaded after the approval modal selects a company.
+  // Initial load of metadata: fetch companies, initial branches, FY, team leads & live teams
   const fetchApprovalMetadata = async () => {
     try {
       await Promise.all([
         fetchTeamLeads(),
         fetchBackendTeams()
       ]);
-      await fetchCompanies();
+      const compList = await fetchCompanies();
+      if (Array.isArray(compList) && compList.length > 0) {
+        const firstCompId = compList[0]._id || compList[0].id;
+        if (firstCompId) {
+          const bList = await fetchBranches(firstCompId);
+          if (Array.isArray(bList) && bList.length > 0) {
+            const firstBranchId = bList[0]._id || bList[0].id;
+            if (firstBranchId) {
+              await fetchFinancialYears(firstBranchId, firstCompId);
+            }
+          }
+        }
+      }
     } catch (err) {
       console.error('Failed to load approval metadata:', err);
     }
@@ -2330,10 +2454,13 @@ const EmployeeRequests = () => {
                         </option>
                         {branches.map((b) => {
                           const id = b._id || b.id;
+                          const codeText = b.branchCode ? ` (${b.branchCode})` : '';
+                          const hoBadge = b.isHeadOffice ? ' [Head Office]' : '';
+                          const cityText = b.city ? ` - ${b.city}` : '';
                           const label = b.branchName || b.name || b.title || id;
                           return (
                             <option key={id} value={id}>
-                              {label}
+                              {label}{codeText}{hoBadge}{cityText}
                             </option>
                           );
                         })}
