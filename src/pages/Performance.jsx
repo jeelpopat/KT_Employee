@@ -43,18 +43,18 @@ const DEPARTMENTS = [
   "HR"
 ];
 
-const isValidPerformanceDate = (value) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+const getCurrentPerformanceMonth = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const isValidPerformanceMonth = (value) => {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
   if (!match) return false;
 
   const year = Number(match[1]);
   const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (year < 1 || month < 1 || month > 12) return false;
-
-  const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  return day >= 1 && day <= daysInMonth[month - 1];
+  return year >= 1 && month >= 1 && month <= 12;
 };
 
 // Storage keys for cross-role persistence and sync
@@ -280,6 +280,9 @@ const Performance = () => {
   const { user, userRole } = useApp();
   const normalizedRole = String(userRole || deriveUserRole(user) || "").toLowerCase().trim();
   const isAdmin = isAdminRole(normalizedRole, user) || normalizedRole === "admin";
+  const isHR = normalizedRole === "hr" || deriveUserRole(user) === "hr";
+  const canCreatePerformance = isAdmin || isHR;
+  const canViewPerformanceActions = canCreatePerformance;
   const isTL = !isAdmin && (
     isTeamLeadRole(normalizedRole, user) ||
     normalizedRole === "team_leader" ||
@@ -333,7 +336,7 @@ const Performance = () => {
   const [toolbarDeptFilter, setToolbarDeptFilter] = useState("all");
   const [selectedMonthYear, setSelectedMonthYear] = useState("all");
 
-  // Add / Edit Form State (aligned with backend fields: employeeID, performancePercentage, rating, feedback, remarks, date)
+  // Add / Edit Form State (date is selected as a performance month)
   const [modalForm, setModalForm] = useState({
     employeeID: "",
     employeeName: "",
@@ -343,7 +346,7 @@ const Performance = () => {
     feedback: "",
     remarks: "",
     remark: "",
-    date: new Date().toLocaleDateString("en-CA")
+    month: getCurrentPerformanceMonth()
   });
 
   // ============================================================
@@ -550,7 +553,7 @@ const Performance = () => {
     if (!isSilent) setLoading(true);
     try {
       let fetchedData = [];
-      if (isAdmin || isTL) {
+      if (isAdmin || isHR || isTL) {
         let liveSucceeded = false;
         try {
           const response = await fetch(
@@ -590,7 +593,7 @@ const Performance = () => {
               return true;
             }));
 
-            if (isAdmin) {
+            if (isAdmin || isHR) {
               // Update persistent cache so reviews remain synchronized
               try {
                 localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(filteredPerfs));
@@ -610,7 +613,7 @@ const Performance = () => {
         }
 
         if (liveSucceeded) return;
-        if (isAdmin) {
+        if (isAdmin || isHR) {
           const stored = getStoredPerformances();
           setPerformances(stored);
           return;
@@ -661,7 +664,7 @@ const Performance = () => {
       }
 
       // If TL, also merge all real stored performances from persistent store
-      if (isTL) {
+      if (isTL || isHR) {
         const stored = getStoredPerformances();
         const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
         setPerformances(dedupePerformanceRecords([...fetchedData, ...validStored]));
@@ -670,7 +673,7 @@ const Performance = () => {
       }
     } catch (err) {
       console.error("Backend performance fetch error:", err);
-      if (isAdmin || isTL) {
+      if (isAdmin || isHR || isTL) {
         const stored = getStoredPerformances();
         setPerformances(stored);
       } else {
@@ -679,7 +682,7 @@ const Performance = () => {
     } finally {
       if (!isSilent) setLoading(false);
     }
-  }, [headers, isAdmin, isTL, user]);
+  }, [headers, isAdmin, isHR, isTL, user]);
 
   // ============================================================
   // FETCH REAL EMPLOYEES (ONLY LIVE USERS, NO DUMMY DATA)
@@ -741,13 +744,13 @@ const Performance = () => {
 
   useEffect(() => {
     purgeStalePerformances();
-    if (!isAdmin && !isTL) {
+    if (!canCreatePerformance && !isTL) {
       try {
         localStorage.removeItem(PERF_CACHE_KEY);
         localStorage.removeItem(PERF_STORE_KEY);
       } catch { }
     }
-    if (isAdmin || isTL) {
+    if (canCreatePerformance || isTL) {
       fetchEmployees();
     }
     if (isTL) {
@@ -758,7 +761,7 @@ const Performance = () => {
     // Silent background auto-refresh every 10s for new performance reviews
     const interval = setInterval(() => {
       fetchAllPerformances(true);
-      if (isAdmin || isTL) fetchEmployees();
+      if (canCreatePerformance || isTL) fetchEmployees();
       if (isTL) fetchTeamLeadScope();
     }, 10000);
 
@@ -782,7 +785,7 @@ const Performance = () => {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [isAdmin, isTL, fetchAllPerformances, fetchEmployees, fetchTeamLeadScope]);
+  }, [canCreatePerformance, isAdmin, isTL, fetchAllPerformances, fetchEmployees, fetchTeamLeadScope]);
 
   useEffect(() => {
     if (notification.message) {
@@ -1019,17 +1022,31 @@ const Performance = () => {
     return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
   };
 
-  const formatRowDateToInput = (dateVal) => {
+  const formatRowMonth = (dateVal) => {
+    if (!dateVal) return "—";
+    const dateOnlyMatch = typeof dateVal === "string"
+      ? /^(\d{4})-(\d{2})-\d{2}$/.exec(dateVal.trim())
+      : null;
+    const date = dateOnlyMatch
+      ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, 1)
+      : new Date(dateVal);
+    if (isNaN(date.getTime())) return "—";
+    return date.toLocaleString("en-US", { month: "short", year: "numeric" });
+  };
+
+  const formatRowMonthToInput = (dateVal) => {
     if (!dateVal) return "";
-    if (typeof dateVal === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateVal.trim())) {
-      return dateVal.trim();
+    if (typeof dateVal === "string") {
+      const monthMatch = /^(\d{4})-(\d{2})/.exec(dateVal.trim());
+      if (monthMatch && isValidPerformanceMonth(`${monthMatch[1]}-${monthMatch[2]}`)) {
+        return `${monthMatch[1]}-${monthMatch[2]}`;
+      }
     }
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return "";
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return `${y}-${m}`;
   };
 
   // ============================================================
@@ -1307,7 +1324,7 @@ const Performance = () => {
   };
 
   const handleOpenAddModal = () => {
-    if (!isAdmin) return;
+    if (!canCreatePerformance) return;
     setModalForm({
       employeeID: "",
       employeeName: "",
@@ -1317,7 +1334,7 @@ const Performance = () => {
       feedback: "",
       remarks: "",
       remark: "",
-      date: new Date().toLocaleDateString("en-CA")
+      month: getCurrentPerformanceMonth()
     });
     setIsAddModalOpen(true);
   };
@@ -1331,7 +1348,7 @@ const Performance = () => {
     const rawRating = perf.rating !== undefined && perf.rating !== null ? String(perf.rating) : "";
     const existingRemarks = perf.remarks || perf.remark || "";
     const existingFeedback = perf.feedback || "";
-    const existingDate = formatRowDateToInput(perf.date || perf.createdAt || "") || new Date().toLocaleDateString("en-CA");
+    const existingMonth = formatRowMonthToInput(perf.date || perf.createdAt || "") || getCurrentPerformanceMonth();
 
     setModalForm({
       employeeID: String(perf.employeeID?._id || perf.employeeID || perf.employee?._id || ""),
@@ -1342,17 +1359,17 @@ const Performance = () => {
       feedback: existingFeedback,
       remarks: existingRemarks,
       remark: existingRemarks,
-      date: existingDate
+      month: existingMonth
     });
     setIsEditModalOpen(true);
   };
 
   const handleSubmitModal = async (e) => {
     if (e) e.preventDefault();
-    if (!isAdmin) return;
+    if (!canCreatePerformance || (isEditModalOpen && !isAdmin)) return;
 
-    if (!isValidPerformanceDate(modalForm.date)) {
-      showNotification("Please enter a valid date with a four-digit year.", "error");
+    if (!isValidPerformanceMonth(modalForm.month)) {
+      showNotification("Please select a valid performance month.", "error");
       return;
     }
 
@@ -1380,13 +1397,14 @@ const Performance = () => {
     const empType = empRole.includes("lead") || empRole === "tl" ? "Team Leader" : "Employee";
     const feedbackText = (modalForm.feedback || "").trim();
     const remarksText = (modalForm.remarks || modalForm.remark || "").trim();
-    const selectedDate = modalForm.date ? modalForm.date : new Date().toLocaleDateString("en-CA");
-    const [yearStr, monthStr, dayStr] = selectedDate.split("-");
+    const selectedMonth = modalForm.month || getCurrentPerformanceMonth();
+    const [yearStr, monthStr] = selectedMonth.split("-");
     const yearNum = parseInt(yearStr, 10);
     const monthNum = parseInt(monthStr, 10);
-    const dateObj = new Date(yearNum, monthNum - 1, parseInt(dayStr || "1", 10));
+    const selectedDate = `${selectedMonth}-01`;
+    const dateObj = new Date(yearNum, monthNum - 1, 1);
     const monthName = dateObj.toLocaleString("en-US", { month: "long" });
-    const isoDateTime = selectedDate ? new Date(`${selectedDate}T12:00:00.000Z`).toISOString() : new Date().toISOString();
+    const isoDateTime = new Date(`${selectedDate}T12:00:00.000Z`).toISOString();
 
     const evaluatorId = String(getRealAuthUserId(user) || user?._id || user?.id || "");
     const evaluatorName = String(user?.name || user?.fullName || "Admin").trim();
@@ -1588,7 +1606,7 @@ const Performance = () => {
         feedback: "",
         remarks: "",
         remark: "",
-        date: new Date().toLocaleDateString("en-CA")
+        month: getCurrentPerformanceMonth()
       });
     } catch (err) {
       console.error("Submit error:", err);
@@ -1827,7 +1845,7 @@ const Performance = () => {
           </div>
 
           <div className="flex items-center gap-2.5 self-end sm:self-auto">
-            {isAdmin && (
+            {canCreatePerformance && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
@@ -1927,7 +1945,7 @@ const Performance = () => {
                     ? "No performance evaluations recorded yet for employees under your team."
                     : "Your performance reviews and scores will appear here once assessed by administration."}
             </p>
-            {isAdmin && (
+            {canCreatePerformance && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
@@ -1950,8 +1968,12 @@ const Performance = () => {
                   <th className="py-3 px-4 text-left font-semibold">Rating</th>
                   <th className="py-3 px-4 text-left font-semibold">Feedback</th>
                   <th className="py-3 px-4 text-left font-semibold">Remark</th>
-                  <th className="py-3 px-4 text-left font-semibold">Date</th>
-                  <th className="py-3 px-4 text-center font-semibold">Action</th>
+                  <th className="py-3 px-4 text-left font-semibold">
+                    {canViewPerformanceActions ? "Date" : "Month"}
+                  </th>
+                  {canViewPerformanceActions && (
+                    <th className="py-3 px-4 text-center font-semibold">Action</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-poppins">
@@ -1963,7 +1985,10 @@ const Performance = () => {
                   const ratingVal = getRating(perf);
                   const feedbackText = getFeedback(perf);
                   const remarksText = getRemarks(perf);
-                  const dateFormatted = formatRowDate(perf.createdAt || perf.date);
+                  const recordDate = perf.createdAt || perf.date;
+                  const dateFormatted = canViewPerformanceActions
+                    ? formatRowDate(recordDate)
+                    : formatRowMonth(recordDate);
 
                   return (
                     <tr
@@ -2053,31 +2078,32 @@ const Performance = () => {
                         {dateFormatted}
                       </td>
 
-                      {/* Action */}
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-2.5">
-                          {isAdmin && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(perf)}
-                                className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer p-1"
-                                title="Edit performance"
-                              >
-                                <Edit3 size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeletePerformance(perf)}
-                                className="text-slate-600 hover:text-rose-600 transition-colors cursor-pointer p-1"
-                                title="Delete record"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
+                      {canViewPerformanceActions && (
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2.5">
+                            {isAdmin && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(perf)}
+                                  className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer p-1"
+                                  title="Edit performance"
+                                >
+                                  <Edit3 size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePerformance(perf)}
+                                  className="text-slate-600 hover:text-rose-600 transition-colors cursor-pointer p-1"
+                                  title="Delete record"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -2090,7 +2116,7 @@ const Performance = () => {
       {/* ==================================================== */}
       {/* 4. MODAL: ADD / EDIT PERFORMANCE EVALUATION */}
       {/* ==================================================== */}
-      {isAdmin && (isAddModalOpen || isEditModalOpen) && (
+      {((canCreatePerformance && isAddModalOpen) || (isAdmin && isEditModalOpen)) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
           <div className="bg-white border border-slate-200/80 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95">
             {/* Modal Header */}
@@ -2152,32 +2178,18 @@ const Performance = () => {
                 </div>
               </div>
 
-              {/* Date */}
+              {/* Performance Month */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Date *
+                  Month *
                 </label>
                 <div className="relative">
                   <input
-                    type="date"
+                    type="month"
                     required
-                    value={modalForm.date || ""}
-                    max="9999-12-31"
+                    value={modalForm.month || ""}
                     onChange={(e) => {
-                      const input = e.currentTarget;
-                      const value = input.value;
-                      if (input.validity.badInput || (value && !isValidPerformanceDate(value))) {
-                        input.value = modalForm.date;
-                        showNotification("Please enter a valid date with a four-digit year.", "error");
-                        return;
-                      }
-                      setModalForm((prev) => ({ ...prev, date: value }));
-                    }}
-                    onBlur={(e) => {
-                      if (e.currentTarget.validity.badInput) {
-                        e.currentTarget.value = modalForm.date;
-                        showNotification("Please enter a valid date with a four-digit year.", "error");
-                      }
+                      setModalForm((prev) => ({ ...prev, month: e.target.value }));
                     }}
                     className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer"
                   />
