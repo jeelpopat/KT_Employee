@@ -69,6 +69,9 @@ const getEmployeeRoleLabel = (employee) => {
 const isTeamLeadEmployee = (employee) =>
   Boolean(employee?.isTeamLead || employee?.isTeamLeader || getEmployeeRoleLabel(employee) === "Team Lead");
 
+const canDeleteOrAssignTeamLead = (employee) =>
+  !["HR", "Admin"].includes(getEmployeeRoleLabel(employee));
+
 export default function Employees() {
   const { confirm, confirmationDialog } = useConfirm();
   const [employees, setEmployees] = useState([]);
@@ -1136,48 +1139,52 @@ export default function Employees() {
                               Edit
                             </button>
 
-                            {/* DELETE */}
-                            <button
-                              onClick={() =>
-                                handleDeleteEmployee(
-                                  emp._id,
-                                  `${emp.firstName || ""} ${emp.lastName || ""
-                                    }`.trim()
-                                )
-                              }
-                              title="Delete Employee"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                              Delete
-                            </button>
+                            {canDeleteOrAssignTeamLead(emp) && (
+                              <>
+                                {/* DELETE */}
+                                <button
+                                  onClick={() =>
+                                    handleDeleteEmployee(
+                                      emp._id,
+                                      `${emp.firstName || ""} ${emp.lastName || ""
+                                        }`.trim()
+                                    )
+                                  }
+                                  title="Delete Employee"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                                  Delete
+                                </button>
 
-                            {/* TEAM LEAD */}
-                            <button
-                              onClick={() =>
-                                toggleTL(
-                                  emp._id,
-                                  isTeamLeadEmployee(emp)
-                                )
-                              }
-                              title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                                ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                                : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                                }`}
-                            >
-                              {isTeamLeadEmployee(emp) ? (
-                                <>
-                                  <UserMinus className="h-3.5 w-3.5 text-rose-500" />
-                                  Remove TL
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
-                                  Assign TL
-                                </>
-                              )}
-                            </button>
+                                {/* TEAM LEAD */}
+                                <button
+                                  onClick={() =>
+                                    toggleTL(
+                                      emp._id,
+                                      isTeamLeadEmployee(emp)
+                                    )
+                                  }
+                                  title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
+                                    ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+                                    : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
+                                    }`}
+                                >
+                                  {isTeamLeadEmployee(emp) ? (
+                                    <>
+                                      <UserMinus className="h-3.5 w-3.5 text-rose-500" />
+                                      Remove TL
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
+                                      Assign TL
+                                    </>
+                                  )}
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1289,45 +1296,49 @@ export default function Employees() {
                         Edit
                       </button>
 
-                      <button
-                        onClick={() =>
-                          handleDeleteEmployee(
-                            emp._id,
-                            `${emp.firstName || ""} ${emp.lastName || ""
-                              }`.trim()
-                          )
-                        }
-                        className="inline-flex min-w-[76px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                        Delete
-                      </button>
+                      {canDeleteOrAssignTeamLead(emp) && (
+                        <>
+                          <button
+                            onClick={() =>
+                              handleDeleteEmployee(
+                                emp._id,
+                                `${emp.firstName || ""} ${emp.lastName || ""
+                                  }`.trim()
+                              )
+                            }
+                            className="inline-flex min-w-[76px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                            Delete
+                          </button>
 
-                      <button
-                        onClick={() =>
-                          toggleTL(
-                            emp._id,
-                            isTeamLeadEmployee(emp)
-                          )
-                        }
-                        title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                        className={`inline-flex min-w-[104px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                          ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                          : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                          }`}
-                      >
-                        {isTeamLeadEmployee(emp) ? (
-                          <>
-                            <UserMinus className="h-3.5 w-3.5 text-rose-500" />
-                            Remove TL
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
-                            Assign TL
-                          </>
-                        )}
-                      </button>
+                          <button
+                            onClick={() =>
+                              toggleTL(
+                                emp._id,
+                                isTeamLeadEmployee(emp)
+                              )
+                            }
+                            title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
+                            className={`inline-flex min-w-[104px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
+                              ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+                              : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
+                              }`}
+                          >
+                            {isTeamLeadEmployee(emp) ? (
+                              <>
+                                <UserMinus className="h-3.5 w-3.5 text-rose-500" />
+                                Remove TL
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
+                                Assign TL
+                              </>
+                            )}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1437,45 +1448,49 @@ export default function Employees() {
                         Edit
                       </button>
 
-                      <button
-                        onClick={() =>
-                          handleDeleteEmployee(
-                            emp._id,
-                            `${emp.firstName || ""} ${emp.lastName || ""
-                              }`.trim()
-                          )
-                        }
-                        className="inline-flex min-w-[64px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="h-3 w-3 text-rose-500" />
-                        Delete
-                      </button>
+                      {canDeleteOrAssignTeamLead(emp) && (
+                        <>
+                          <button
+                            onClick={() =>
+                              handleDeleteEmployee(
+                                emp._id,
+                                `${emp.firstName || ""} ${emp.lastName || ""
+                                  }`.trim()
+                              )
+                            }
+                            className="inline-flex min-w-[64px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="h-3 w-3 text-rose-500" />
+                            Delete
+                          </button>
 
-                      <button
-                        onClick={() =>
-                          toggleTL(
-                            emp._id,
-                            isTeamLeadEmployee(emp)
-                          )
-                        }
-                        title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                        className={`inline-flex min-w-[86px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                          ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                          : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                          }`}
-                      >
-                        {isTeamLeadEmployee(emp) ? (
-                          <>
-                            <UserMinus className="h-3 w-3 text-rose-500" />
-                            Remove TL
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck className="h-3 w-3 text-emerald-500" />
-                            Assign TL
-                          </>
-                        )}
-                      </button>
+                          <button
+                            onClick={() =>
+                              toggleTL(
+                                emp._id,
+                                isTeamLeadEmployee(emp)
+                              )
+                            }
+                            title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
+                            className={`inline-flex min-w-[86px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
+                              ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+                              : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
+                              }`}
+                          >
+                            {isTeamLeadEmployee(emp) ? (
+                              <>
+                                <UserMinus className="h-3 w-3 text-rose-500" />
+                                Remove TL
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="h-3 w-3 text-emerald-500" />
+                                Assign TL
+                              </>
+                            )}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
