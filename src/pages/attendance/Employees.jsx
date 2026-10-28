@@ -72,6 +72,12 @@ const isTeamLeadEmployee = (employee) =>
 const canDeleteOrAssignTeamLead = (employee) =>
   !["HR", "Admin"].includes(getEmployeeRoleLabel(employee));
 
+const isHrOrAdminRole = (role) => {
+  const normalizedRole = String(role || "").trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+  return normalizedRole === "hr" || normalizedRole.startsWith("hr ") ||
+    normalizedRole === "admin" || normalizedRole === "administrator";
+};
+
 export default function Employees() {
   const { confirm, confirmationDialog } = useConfirm();
   const [employees, setEmployees] = useState([]);
@@ -379,7 +385,11 @@ export default function Employees() {
     }
 
     const rawRole = String(formData.role || "employee").trim().toLowerCase();
-    const cleanRole = rawRole === "hr" ? "hr" : rawRole === "team lead" || rawRole === "teamlead" ? "team lead" : "employee";
+    const cleanRole = isHrOrAdminRole(rawRole)
+      ? (rawRole.startsWith("hr") ? "hr" : "admin")
+      : rawRole === "team lead" || rawRole === "teamlead"
+        ? "team lead"
+        : "employee";
 
     const payload = {
       ...formData,
@@ -1700,24 +1710,26 @@ export default function Employees() {
 
               {/* ROW 3: ROLE & GENDER (2 per row) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="employee-system-role" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Role *
-                  </label>
+                {(!editMode || !isHrOrAdminRole(formData.role)) && (
+                  <div>
+                    <label htmlFor="employee-system-role" className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Role *
+                    </label>
 
-                  <select
-                    id="employee-system-role"
-                    name="role"
-                    value={formData.role || "employee"}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg bg-white"
-                  >
-                    <option value="employee">Employee</option>
-                    <option value="team lead">Team Lead</option>
-                    <option value="hr">HR</option>
-                  </select>
-                </div>
+                    <select
+                      id="employee-system-role"
+                      name="role"
+                      value={formData.role || "employee"}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg bg-white"
+                    >
+                      <option value="employee">Employee</option>
+                      <option value="team lead">Team Lead</option>
+                      <option value="hr">HR</option>
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="employee-gender" className="block text-sm font-medium text-gray-700 mb-1.5">
