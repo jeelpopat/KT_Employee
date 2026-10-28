@@ -889,12 +889,82 @@ export const DashboardView = () => {
       let segments = [];
       let todayDoc = null;
       let timelineItem = null;
+      let storedUser = null;
+      try {
+        storedUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
+      } catch (error) {
+        console.warn('Could not read the signed-in user for attendance matching:', error);
+      }
+
+      const identityValues = (values) => values.flatMap(value => {
+        if (!value) return [];
+        return typeof value === 'object'
+          ? [value._id, value.id, value.employeeId, value.userId]
+          : [value];
+      }).filter(Boolean).map(value => String(value).toLowerCase().trim());
+      const candidateIds = identityValues([
+        resolvedUserId,
+        actualUserIdRef.current,
+        user?._id,
+        user?.id,
+        user?.employeeId,
+        user?.employee?._id,
+        user?.employee?.id,
+        user?.employee?.employeeId,
+        user?.user?._id,
+        user?.user?.id,
+        storedUser?._id,
+        storedUser?.id,
+        storedUser?.employeeId,
+        storedUser?.employee?._id,
+        storedUser?.employee?.id,
+        storedUser?.user?._id,
+        storedUser?.user?.id
+      ]);
+      const candidateEmails = [
+        user?.email,
+        user?.user?.email,
+        user?.employee?.email,
+        storedUser?.email,
+        storedUser?.user?.email,
+        storedUser?.employee?.email
+      ].filter(Boolean).map(value => String(value).toLowerCase().trim());
+      const getAttendanceOwner = (record) => {
+        const ownerValues = [
+          record?.employeeId,
+          record?.employeeID,
+          record?.userId,
+          record?.employee,
+          record?.user
+        ].filter(Boolean);
+        const ids = identityValues(ownerValues);
+        const emails = [
+          record?.email,
+          record?.employeeEmail,
+          typeof record?.employee === 'object' ? record.employee?.email : null,
+          typeof record?.user === 'object' ? record.user?.email : null,
+          typeof record?.userId === 'object' ? record.userId?.email : null
+        ].filter(Boolean).map(value => String(value).toLowerCase().trim());
+        return { ids, emails, hasIdentity: ids.length > 0 || emails.length > 0 };
+      };
+      const isCurrentUsersAttendance = (record) => {
+        const owner = getAttendanceOwner(record);
+        return owner.hasIdentity && (
+          owner.ids.some(id => candidateIds.includes(id)) ||
+          owner.emails.some(email => candidateEmails.includes(email))
+        );
+      };
+      const isUnscopedOrCurrentUsersAttendance = (record) => {
+        const owner = getAttendanceOwner(record);
+        return !owner.hasIdentity || isCurrentUsersAttendance(record);
+      };
 
       // 1. Fetch Authoritative Attendance Document - ALWAYS (bypasses cache)
       try {
         const todayRes = await api.get('/api/attendance/today', { skipCache: true });
         const tData = todayRes.data?.attendance || todayRes.data?.data?.attendance || todayRes.data?.data || todayRes.data;
-        if (tData && (tData.checkInTime || tData.status || tData.approvalStatus || tData.adminStatus || tData._id)) {
+        if (tData && (tData.checkInTime || tData.status || tData.approvalStatus || tData.adminStatus || tData._id) &&
+          isUnscopedOrCurrentUsersAttendance(tData)) {
           // Verify that this attendance document is actually for today (and not an old record from yesterday)
           if (isTodayDate(tData.date) || isTodayDate(tData.createdAt) || (tData.checkInTime && isTodayDate(tData.checkInTime))) {
             todayDoc = tData;
@@ -909,7 +979,7 @@ export const DashboardView = () => {
         try {
           const dashRes = await api.get('/api/employee-panel/dashboard', { skipCache: true });
           const dAtt = dashRes.data?.data?.todayAttendance || dashRes.data?.todayAttendance;
-          if (dAtt && (dAtt.checkInTime || dAtt.status)) {
+          if (dAtt && (dAtt.checkInTime || dAtt.status) && isUnscopedOrCurrentUsersAttendance(dAtt)) {
             if (isTodayDate(dAtt.date) || isTodayDate(dAtt.createdAt) || (dAtt.checkInTime && isTodayDate(dAtt.checkInTime))) {
               todayDoc = {
                 ...dAtt,
@@ -928,12 +998,14 @@ export const DashboardView = () => {
           if (cachedAttId && /^[0-9a-fA-F]{24}$/.test(cachedAttId)) {
             const attByIdRes = await api.get(`/api/attendance/${cachedAttId}`, { skipCache: true });
             const attData = attByIdRes.data?.attendance || attByIdRes.data?.data || attByIdRes.data;
-            if (attData && (attData.checkInTime || attData.status)) {
+            if (attData && (attData.checkInTime || attData.status) && isCurrentUsersAttendance(attData)) {
               if (isTodayDate(attData.date) || isTodayDate(attData.createdAt) || (attData.checkInTime && isTodayDate(attData.checkInTime))) {
                 todayDoc = attData;
               } else {
                 localStorage.removeItem('kt_current_attendance_id');
               }
+            } else if (attData) {
+              localStorage.removeItem('kt_current_attendance_id');
             }
           }
         } catch (idErr) {}
@@ -949,9 +1021,12 @@ export const DashboardView = () => {
           tlList = [];
         }
 
-        // Find today's record in the returned list
+        // Timeline responses may include multiple employees; only use the signed-in user's record.
         let found = Array.isArray(tlList) 
-          ? tlList.find(r => isTodayDate(r.date) || isTodayDate(r.createdAt) || (r.checkInTime && isTodayDate(r.checkInTime)))
+          ? tlList.find(r =>
+            isCurrentUsersAttendance(r) &&
+            (isTodayDate(r.date) || isTodayDate(r.createdAt) || (r.checkInTime && isTodayDate(r.checkInTime)))
+          )
           : null;
 
         // Fallback: If not found with ?filter=today, fetch ?filter=last10days (which is the default in AttendanceView)
@@ -960,7 +1035,10 @@ export const DashboardView = () => {
             const tlRes10 = await api.get('/api/employee-panel/attendance/timeline?filter=last10days', { skipCache: true });
             const list10 = tlRes10.data?.data || tlRes10.data?.timeline || [];
             if (Array.isArray(list10)) {
-              found = list10.find(r => isTodayDate(r.date) || isTodayDate(r.createdAt) || (r.checkInTime && isTodayDate(r.checkInTime)));
+              found = list10.find(r =>
+                isCurrentUsersAttendance(r) &&
+                (isTodayDate(r.date) || isTodayDate(r.createdAt) || (r.checkInTime && isTodayDate(r.checkInTime)))
+              );
             }
           } catch (e10) {
             console.warn("Timeline last10days fallback notice:", e10.message);
