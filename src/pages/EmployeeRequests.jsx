@@ -144,6 +144,7 @@ const EmployeeRequests = () => {
   const [approvingUser, setApprovingUser] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [branches, setBranches] = useState([]);
+  const [branchLoadError, setBranchLoadError] = useState('');
   const [financialYears, setFinancialYears] = useState([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(false);
@@ -277,6 +278,7 @@ const EmployeeRequests = () => {
 
   // 2. Fetch Branches dynamically from API
   const fetchBranches = async (companyId) => {
+    setBranchLoadError('');
     if (!companyId) {
       setBranches([]);
       return [];
@@ -290,46 +292,16 @@ const EmployeeRequests = () => {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      try {
-        const branchRes = await api.get(`/api/branch?companyId=${encodeURIComponent(companyId)}`, { headers });
-        const bData = branchRes.data?.data || branchRes.data?.branches || branchRes.data || [];
-        if (Array.isArray(bData) && bData.length > 0) branchList = bData;
-      } catch (bErr) {
-        console.warn('GET /api/branch?companyId via api encountered error:', bErr?.message);
-      }
-
-      if (branchList.length === 0) {
-        try {
-          const fetchRes = await fetch(`https://kt-backend-ttzj.onrender.com/api/branch?companyId=${encodeURIComponent(companyId)}`, { headers });
-          if (fetchRes.ok) {
-            const bData = await fetchRes.json();
-            const list = bData?.data || bData?.branches || bData || [];
-            if (Array.isArray(list) && list.length > 0) branchList = list;
-          }
-        } catch { }
-      }
-
-      if (branchList.length === 0) {
-        try {
-          const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/branch', { headers });
-          if (fetchRes.ok) {
-            const bData = await fetchRes.json();
-            const list = bData?.data || bData?.branches || bData || [];
-            if (Array.isArray(list) && list.length > 0) {
-              branchList = list.filter(b => {
-                const cId = b.companyId?._id || b.companyId || b.company;
-                return !cId || String(cId) === String(companyId);
-              });
-            }
-          }
-        } catch { }
-      }
+      const branchRes = await api.get(`/api/branch?companyId=${encodeURIComponent(companyId)}`, { headers });
+      const bData = branchRes.data?.data || branchRes.data?.branches || branchRes.data || [];
+      if (Array.isArray(bData) && bData.length > 0) branchList = bData;
 
       setBranches(branchList);
       return branchList;
     } catch (err) {
       console.error('Failed to load branches:', err);
       setBranches([]);
+      setBranchLoadError(err.response?.data?.message || 'Failed to load branches for the selected company.');
       return [];
     } finally {
       setLoadingBranches(false);
@@ -466,22 +438,15 @@ const EmployeeRequests = () => {
     }
   };
 
-  // Initial load of metadata: fetch companies, initial branches, FY, team leads & live teams
+  // Initial load of metadata: fetch companies, team leads & live teams.
+  // Branches and financial years are loaded after the approval modal selects a company.
   const fetchApprovalMetadata = async () => {
     try {
       await Promise.all([
         fetchTeamLeads(),
         fetchBackendTeams()
       ]);
-      const compList = await fetchCompanies();
-      if (compList && compList.length > 0) {
-        const firstCompId = compList[0]._id || compList[0].id;
-        const bList = await fetchBranches(firstCompId);
-        if (bList && bList.length > 0) {
-          const firstBranchId = bList[0]._id || bList[0].id;
-          await fetchFinancialYears(firstBranchId, firstCompId);
-        }
-      }
+      await fetchCompanies();
     } catch (err) {
       console.error('Failed to load approval metadata:', err);
     }
@@ -2375,7 +2340,9 @@ const EmployeeRequests = () => {
                       </select>
                     </div>
                     {!selectedBranchId && selectedCompanyId && (
-                      <p className="text-[10px] text-rose-500 font-medium">Branch is required</p>
+                      <p className="text-[10px] text-rose-500 font-medium">
+                        {branchLoadError || 'Branch is required'}
+                      </p>
                     )}
                   </div>
 
