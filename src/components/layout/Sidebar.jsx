@@ -1,7 +1,92 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext.jsx';
 import { tabToPath } from '../../utils/navigation.js';
+import api from '../../api/axios.js';
+import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
+
+const getResponseRecords = (payload, arrayKeys, envelopeKeys = ['data', 'result', 'payload', 'response']) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+
+  for (const key of arrayKeys) {
+    if (Array.isArray(payload[key])) return payload[key];
+  }
+
+  for (const key of envelopeKeys) {
+    const records = getResponseRecords(payload[key], arrayKeys, envelopeKeys);
+    if (records.length > 0) return records;
+  }
+
+  return [];
+};
+
+const getCheckInRequestCount = (payload) => {
+  const pendingCount = payload?.pendingCount ?? payload?.summary?.pendingCount ?? payload?.data?.pendingCount;
+  if (Number.isFinite(Number(pendingCount))) return Number(pendingCount);
+
+  const records = getResponseRecords(payload, [
+    'pendingRequests',
+    'pending',
+    'requests',
+    'checkInRequests',
+    'attendanceRequests',
+    'attendance',
+    'logs',
+    'records',
+    'items',
+  ], ['data', 'result', 'payload', 'response', 'attendance', 'requests']);
+
+  return records.filter((record) => {
+    if (!record || isFinanceOrExcludedUser(record) || isUnknownEmployeeOrUser(record)) return false;
+    const status = String(record.approvalStatus || record.status || '').trim().toLowerCase();
+    return !['approved', 'approve', 'accepted', 'rejected', 'reject', 'denied'].includes(status);
+  }).length;
+};
+
+const getLeaveRequestCount = (payload) => {
+  const records = getResponseRecords(payload, ['leaves', 'data', 'requests', 'result']);
+
+  return records.filter((leave) => {
+    if (!leave || isFinanceOrExcludedUser(leave) || isUnknownEmployeeOrUser(leave)) return false;
+    const employee = leave.employeeId && typeof leave.employeeId === 'object'
+      ? leave.employeeId
+      : leave.employee || leave.user || leave.userId;
+    if (employee && (isFinanceOrExcludedUser(employee) || isUnknownEmployeeOrUser(employee))) return false;
+
+    const normalizeStatusValue = (status) => String(status || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+    const isApproved = (status) => ['approved', 'approve', 'accepted'].includes(normalizeStatusValue(status));
+    const isRejected = (status) => ['rejected', 'reject', 'denied'].includes(normalizeStatusValue(status));
+    const applicantRole = String(
+      leave.role?.roleName ||
+      leave.role?.name ||
+      leave.role ||
+      leave.applicantRole ||
+      employee?.role?.roleName ||
+      employee?.role?.name ||
+      employee?.role ||
+      ''
+    ).toLowerCase().replace(/[_\-\s]+/g, '');
+    const teamLeadStatus = leave.teamLeadStatus || '';
+    const hrStatus = leave.hrStatus || leave.hrApprovalStatus || '';
+    const adminStatus = leave.adminStatus || (
+      applicantRole === 'hr' ? leave.status || leave.approvalStatus : ''
+    );
+
+    if ([teamLeadStatus, hrStatus, adminStatus].some(isRejected)) return false;
+    if (applicantRole === 'hr' && isApproved(adminStatus)) return false;
+    if (['employee', 'teamlead'].includes(applicantRole) && isApproved(hrStatus)) return false;
+    return true;
+  }).length;
+};
+
+const getEmployeeRequestCount = (payload) => {
+  const users = getResponseRecords(payload, ['users', 'data', 'requests', 'result']);
+  return users.filter((user) => {
+    if (!user || isUnknownEmployeeOrUser(user)) return false;
+    return !(user.isApproved === true || user.approved === true || user.status === 'approved');
+  }).length;
+};
 
 // ==========================================================
 // EXACT REFERENCE ICONS MATCHING USER SCREENSHOT (media_1792663861944.png)
@@ -217,8 +302,69 @@ export const Sidebar = ({ onSignOut }) => {
     isMobileSidebarOpen, setIsMobileSidebarOpen,
     attendanceStatus, handleCheckOut, userRole
   } = useApp();
+  const [requestCountState, setRequestCountState] = useState({ role: '', checkIn: 0, leave: 0, employee: 0 });
+  const requestCounts = requestCountState.role === userRole
+    ? requestCountState
+    : { checkIn: 0, leave: 0, employee: 0 };
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    if (userRole !== 'admin' && userRole !== 'hr') {
+      return undefined;
+    }
+
+    let isMounted = true;
+    let isRefreshing = false;
+    const refreshRequestCounts = async () => {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      const results = await Promise.allSettled([
+        api.get(`/api/attendance/pending?_t=${Date.now()}`, { skipCache: true }),
+        api.get(`/api/leave/all?_t=${Date.now()}`, { skipCache: true }),
+        api.get(`/api/users/all?_t=${Date.now()}`, { skipCache: true }),
+      ]);
+
+      isRefreshing = false;
+      if (!isMounted) return;
+
+      const countUpdates = {};
+      const countGetters = [getCheckInRequestCount, getLeaveRequestCount, getEmployeeRequestCount];
+      const countKeys = ['checkIn', 'leave', 'employee'];
+
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          countUpdates[countKeys[index]] = countGetters[index](result.value.data);
+        } else {
+          console.warn(`Could not refresh sidebar ${countKeys[index]} request count:`, result.reason?.message || result.reason);
+        }
+      });
+
+      if (Object.keys(countUpdates).length > 0) {
+        setRequestCountState((previous) => ({
+          ...(previous.role === userRole ? previous : { checkIn: 0, leave: 0, employee: 0 }),
+          ...countUpdates,
+          role: userRole,
+        }));
+      }
+    };
+
+    refreshRequestCounts();
+    const intervalId = window.setInterval(refreshRequestCounts, 6000);
+    const handleFocus = () => refreshRequestCounts();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshRequestCounts();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [userRole]);
 
   const isTabActive = (itemTab) => {
     if (currentTab === itemTab) return true;
@@ -279,8 +425,8 @@ export const Sidebar = ({ onSignOut }) => {
       title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
-        { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon },
-        { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon },
+        { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon, requestCount: requestCounts.checkIn },
+        { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
         { tab: 'admin-adjustments', label: 'Adjustments', icon: AdjustmentsIcon },
         { tab: 'admin-holidays', label: 'Holidays and Events', icon: HolidaysIcon },
       ]
@@ -289,7 +435,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "PEOPLE AND ORGANIZATION",
       items: [
         { tab: 'admin-employees', label: 'Employee', icon: EmployeeIcon },
-        { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon },
+        { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon, requestCount: requestCounts.employee },
         { tab: 'admin-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'admin-team-lead', label: 'Team Leads', icon: TeamLeadsIcon },
         { tab: 'salary', label: 'Salary & Payroll', icon: SalaryIcon },
@@ -330,8 +476,8 @@ export const Sidebar = ({ onSignOut }) => {
       title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
-        { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon },
-        { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon },
+        { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon, requestCount: requestCounts.checkIn },
+        { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
         { tab: 'admin-adjustments', label: 'Adjustments', icon: AdjustmentsIcon },
         { tab: 'admin-holidays', label: 'Holidays and Events', icon: HolidaysIcon },
       ]
@@ -340,7 +486,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "PEOPLE AND ORGANIZATION",
       items: [
         { tab: 'admin-employees', label: 'Employees', icon: EmployeeIcon },
-        { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon },
+        { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon, requestCount: requestCounts.employee },
         { tab: 'admin-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'salary', label: 'Salary & Payroll', icon: SalaryIcon },
       ]
@@ -516,6 +662,11 @@ export const Sidebar = ({ onSignOut }) => {
                     {item.badge && (
                       <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/70 shrink-0">
                         {item.badge}
+                      </span>
+                    )}
+                    {item.requestCount !== undefined && (
+                      <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-semibold flex items-center justify-center shrink-0">
+                        {item.requestCount}
                       </span>
                     )}
                   </button>
