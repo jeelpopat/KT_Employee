@@ -57,6 +57,30 @@ const isValidPerformanceMonth = (value) => {
   return year >= 1 && month >= 1 && month <= 12;
 };
 
+const getPerformancePeriodDate = (performance) => {
+  if (!performance) return "";
+
+  const year = Number(performance.year);
+  const rawMonth = performance.month;
+  const numericMonth = Number(rawMonth);
+  const monthNames = [
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december"
+  ];
+  const namedMonth = String(performance.monthName || rawMonth || "").toLowerCase();
+  const month = Number.isInteger(numericMonth) && numericMonth >= 1 && numericMonth <= 12
+    ? numericMonth
+    : namedMonth
+      ? monthNames.findIndex((name) => name === namedMonth || name.slice(0, 3) === namedMonth) + 1
+      : 0;
+
+  if (Number.isInteger(year) && year >= 1 && month >= 1 && month <= 12) {
+    return `${year}-${String(month).padStart(2, "0")}-01`;
+  }
+
+  return performance.date || performance.createdAt || "";
+};
+
 // Storage keys for cross-role persistence and sync
 const PERF_CACHE_KEY = "kt_performance_all_records";
 const PERF_STORE_KEY = "kt_performance_records_store";
@@ -1158,8 +1182,8 @@ const Performance = () => {
 
       // Sort newest first
       const sorted = [...myPerformances].sort((a, b) => {
-        const da = new Date(a.createdAt || a.date || 0);
-        const db = new Date(b.createdAt || b.date || 0);
+        const da = new Date(getPerformancePeriodDate(a) || 0);
+        const db = new Date(getPerformancePeriodDate(b) || 0);
         return db - da;
       });
 
@@ -1208,7 +1232,7 @@ const Performance = () => {
   const monthYearOptions = useMemo(() => {
     const set = new Set();
     myPerformances.forEach((p) => {
-      const rawDate = p.createdAt || p.date;
+      const rawDate = getPerformancePeriodDate(p);
       if (!rawDate) return;
       const d = new Date(rawDate);
       if (!isNaN(d.getTime())) {
@@ -1269,7 +1293,7 @@ const Performance = () => {
 
       // Toolbar: Month / Year Filter
       if (selectedMonthYear !== "all") {
-        const rawDate = perf.createdAt || perf.date;
+        const rawDate = getPerformancePeriodDate(perf);
         if (!rawDate) return false;
         const pDate = new Date(rawDate);
         if (!isNaN(pDate.getTime())) {
@@ -1348,7 +1372,7 @@ const Performance = () => {
     const rawRating = perf.rating !== undefined && perf.rating !== null ? String(perf.rating) : "";
     const existingRemarks = perf.remarks || perf.remark || "";
     const existingFeedback = perf.feedback || "";
-    const existingMonth = formatRowMonthToInput(perf.date || perf.createdAt || "") || getCurrentPerformanceMonth();
+    const existingMonth = formatRowMonthToInput(getPerformancePeriodDate(perf)) || getCurrentPerformanceMonth();
 
     setModalForm({
       employeeID: String(perf.employeeID?._id || perf.employeeID || perf.employee?._id || ""),
@@ -1985,7 +2009,7 @@ const Performance = () => {
                   const ratingVal = getRating(perf);
                   const feedbackText = getFeedback(perf);
                   const remarksText = getRemarks(perf);
-                  const recordDate = perf.createdAt || perf.date;
+                  const recordDate = getPerformancePeriodDate(perf);
                   const dateFormatted = canViewPerformanceActions
                     ? formatRowDate(recordDate)
                     : formatRowMonth(recordDate);
@@ -2370,7 +2394,7 @@ const Performance = () => {
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Date</span>
                   <span className="font-medium text-slate-600">
-                    {formatRowDate(selectedFeedbackModal.perf.createdAt || selectedFeedbackModal.perf.date)}
+                    {formatRowDate(getPerformancePeriodDate(selectedFeedbackModal.perf))}
                   </span>
                 </div>
               </div>
