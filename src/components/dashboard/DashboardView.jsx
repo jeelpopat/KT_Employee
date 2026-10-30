@@ -24,6 +24,75 @@ import {
   normalizeBreakRecord,
   alignBreakRecordsToShift
 } from '../../utils/timelineUtils.js';
+import { filterOutFinanceUsers, filterOutUnknownUsers } from '../../utils/roleFilters.js';
+
+const parseBirthdayDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+
+  const dateValue = String(value).trim();
+  const isoMatch = dateValue.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  const dayFirstMatch = dateValue.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  const match = isoMatch || dayFirstMatch;
+
+  if (match) {
+    const [, first, second, third] = match;
+    const year = isoMatch ? Number(first) : Number(third);
+    const month = isoMatch ? Number(second) : Number(second);
+    const day = isoMatch ? Number(third) : Number(first);
+    const parsedDate = new Date(year, month - 1, day);
+    if (
+      parsedDate.getFullYear() === year &&
+      parsedDate.getMonth() === month - 1 &&
+      parsedDate.getDate() === day
+    ) {
+      return parsedDate;
+    }
+    return null;
+  }
+
+  const parsedDate = new Date(dateValue);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+const getUpcomingBirthdaysFromUsers = (users) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  return filterOutUnknownUsers(filterOutFinanceUsers(users))
+    .map((record) => {
+      const employee = record.employee || {};
+      const linkedUser = record.user || {};
+      const name =
+        record.name ||
+        record.fullName ||
+        record.employeeName ||
+        employee.name ||
+        employee.fullName ||
+        linkedUser.name ||
+        linkedUser.fullName ||
+        [record.firstName, record.lastName].filter(Boolean).join(' ') ||
+        [employee.firstName, employee.lastName].filter(Boolean).join(' ');
+      const dateOfBirth =
+        record.dob || record.dateOfBirth || record.birthDate || record.birthday ||
+        employee.dob || employee.dateOfBirth || employee.birthDate || employee.birthday ||
+        linkedUser.dob || linkedUser.dateOfBirth || linkedUser.birthDate || linkedUser.birthday;
+      const birthday = parseBirthdayDate(dateOfBirth);
+
+      if (!name || !birthday || birthday.getMonth() !== now.getMonth()) return null;
+
+      const birthdayDate = new Date(now.getFullYear(), birthday.getMonth(), birthday.getDate());
+      if (birthdayDate < today) return null;
+
+      return {
+        id: record._id || record.id || record.employeeId || record.email || name,
+        name,
+        birthdayDate,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.birthdayDate.getDate() - b.birthdayDate.getDate());
+};
 
 const isAttendanceApproved = (record) => {
   if (!record || record.isRejected === true || record.isRejectedCheckIn === true) return false;
@@ -1323,8 +1392,15 @@ export const DashboardView = () => {
       const uMap = {};
       try {
         const uRes = await api.get('/api/users/all', { skipCache: true });
-        const rawUsers = uRes.data?.users || uRes.data?.data || (Array.isArray(uRes.data) ? uRes.data : []);
+        const rawUsers =
+          uRes.data?.users ||
+          uRes.data?.data?.users ||
+          uRes.data?.data?.employees ||
+          uRes.data?.employees ||
+          uRes.data?.data ||
+          (Array.isArray(uRes.data) ? uRes.data : []);
         if (Array.isArray(rawUsers)) {
+          setUpcomingBirthdays(getUpcomingBirthdaysFromUsers(rawUsers));
           rawUsers.forEach(u => {
             const photo = cleanPhotoUrl(
               u.profilePhoto || u.profileImage || u.photoUrl || u.avatar || u.image || u.photo ||
