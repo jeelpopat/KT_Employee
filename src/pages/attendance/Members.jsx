@@ -26,7 +26,8 @@ import {
   Loader2,
   FolderOpen,
   FileText,
-  RefreshCw
+  RefreshCw,
+  Shield
 } from 'lucide-react';
 import { getEmploymentStatus, isFinanceOrExcludedUser, isTeamLeadRole, isUnknownEmployeeOrUser } from '../../utils/roleFilters';
 import { getTaskProgress } from '../../utils/taskUtils';
@@ -143,20 +144,28 @@ const getAttendanceId = (record) => {
 };
 
 const isAttendanceMatch = (member, record) => {
-  const memberId = String(member?.employeeId || member?.id || '').trim().toLowerCase();
-  const recordId = String(getAttendanceId(record)).trim().toLowerCase();
-
-  if (memberId && recordId && memberId === recordId) return true;
-
   const memberEmail = String(member?.email || '').trim().toLowerCase();
   const recordEmail = String(getAttendanceEmail(record)).trim().toLowerCase();
   if (memberEmail && recordEmail && memberEmail === recordEmail) return true;
 
+  const memberUserId = String(member?.userId || member?.id || '').trim().toLowerCase();
+  const recordUserId = String(getAttendanceId(record)).trim().toLowerCase();
+  if (memberUserId && recordUserId && memberUserId === recordUserId) return true;
+
   const memberName = String(member?.name || '').trim().toLowerCase();
   const recordName = String(getAttendanceName(record)).trim().toLowerCase();
+  if (memberName && recordName && (memberName === recordName || recordName.includes(memberName) || memberName.includes(recordName))) {
+    return true;
+  }
 
-  if (!memberName || !recordName) return false;
-  return memberName === recordName || recordName.includes(memberName) || memberName.includes(recordName);
+  const memberEmpId = String(member?.employeeId || '').trim().toLowerCase();
+  if (memberEmpId && recordUserId && memberEmpId === recordUserId) {
+    if (!memberEmail || !recordEmail || memberEmail === recordEmail) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 const PROJECT_API_BASE = 'https://kt-backend-ttzj.onrender.com/api/projectManage';
@@ -284,450 +293,471 @@ const fetchAllMembers = async () => {
   setError('');
 
   try {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
 
     const headers = token
       ? { Authorization: `Bearer ${token}` }
       : {};
 
     // ==========================================
-    // FETCH USERS
+    // 1. FETCH USERS: GET /api/users/all
     // ==========================================
-    const usersRes = await fetch(
-      'https://kt-backend-ttzj.onrender.com/api/users/all',
-      { headers }
-    );
-
-    if (!usersRes.ok) {
-      throw new Error('Failed to fetch users');
+    let usersList = [];
+    try {
+      const usersRes = await fetch(
+        'https://kt-backend-ttzj.onrender.com/api/users/all',
+        { headers }
+      );
+      if (usersRes.ok) {
+        const usersData = await usersRes.json();
+        usersList =
+          usersData?.users ||
+          usersData?.data ||
+          (Array.isArray(usersData) ? usersData : []);
+      }
+    } catch (uErr) {
+      console.warn('Error fetching /api/users/all:', uErr);
     }
 
-    const usersData = await usersRes.json();
-
-    const usersList =
-      usersData?.users ||
-      usersData?.data ||
-      usersData ||
-      [];
-
     // ==========================================
-    // FETCH EMPLOYEES
+    // 2. FETCH EMPLOYEES: GET /api/employee/list
     // ==========================================
-    const employeesRes = await fetch(
-      'https://kt-backend-ttzj.onrender.com/api/employee/list',
-      { headers }
-    );
-
     let employeesList = [];
-
-    if (employeesRes.ok) {
-      const employeesData = await employeesRes.json();
-
-      employeesList =
-        employeesData?.employees ||
-        employeesData?.data ||
-        employeesData?.employeesList ||
-        employeesData ||
-        [];
+    try {
+      const employeesRes = await fetch(
+        'https://kt-backend-ttzj.onrender.com/api/employee/list',
+        { headers }
+      );
+      if (employeesRes.ok) {
+        const employeesData = await employeesRes.json();
+        employeesList =
+          employeesData?.employees ||
+          employeesData?.data ||
+          employeesData?.employeesList ||
+          (Array.isArray(employeesData) ? employeesData : []);
+      }
+    } catch (eErr) {
+      console.warn('Error fetching /api/employee/list:', eErr);
     }
 
-    console.log('USERS:', usersList);
-    console.log('EMPLOYEES:', employeesList);
+    // ==========================================
+    // 3. FETCH TEAMS: GET /api/teamLead/team
+    // ==========================================
+    let teamsList = [];
+    try {
+      const teamsRes = await fetch(
+        'https://kt-backend-ttzj.onrender.com/api/teamLead/team',
+        { headers }
+      );
+      if (teamsRes.ok) {
+        const teamsData = await teamsRes.json();
+        teamsList =
+          teamsData?.teams ||
+          teamsData?.teamLeads ||
+          teamsData?.teamLead ||
+          teamsData?.data ||
+          (Array.isArray(teamsData) ? teamsData : []);
+      }
+    } catch (tErr) {
+      console.warn('Error fetching /api/teamLead/team:', tErr);
+    }
 
     // ==========================================
     // HELPERS
     // ==========================================
     const formatDate = (dateStr) => {
       if (!dateStr) return 'N/A';
-
       const date = new Date(dateStr);
-
-      return isNaN(date.getTime())
-        ? 'N/A'
-        : date.toLocaleDateString('en-GB');
+      return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-GB');
     };
 
     const normalize = (value) =>
-      value === null || value === undefined
-        ? ''
-        : String(value).trim().toLowerCase();
+      value === null || value === undefined ? '' : String(value).trim().toLowerCase();
 
     // ==========================================
-    // FIND EMPLOYEE FOR USER
+    // INDEX TEAM LEADS FROM /api/teamLead/team
     // ==========================================
-    const findEmployee = (user) => {
-      const userId = normalize(
-        user?._id ||
-        user?.id ||
-        user?.userID ||
-        user?.userId
-      );
+    const teamLeadIdSet = new Set();
+    const teamLeadEmailSet = new Set();
+    const teamLeadNameSet = new Set();
+    const teamLeadAssignedMap = new Map();
 
-      const employeeId = normalize(
-        user?.employeeID ||
-        user?.employeeId
-      );
+    teamsList.forEach((team) => {
+      if (!team || typeof team !== 'object') return;
+      const leadObj = team.teamLead || team.lead || null;
+      const tlId = team.teamLeadId || team.leadId || leadObj?._id || leadObj?.id || leadObj?.userId || leadObj?.employeeId;
+      if (tlId) teamLeadIdSet.add(normalize(tlId));
 
+      const uRef = team.teamLeadUser;
+      if (uRef) {
+        if (typeof uRef === 'string') teamLeadIdSet.add(normalize(uRef));
+        else if (typeof uRef === 'object') {
+          if (uRef._id) teamLeadIdSet.add(normalize(uRef._id));
+          if (uRef.email) teamLeadEmailSet.add(normalize(uRef.email));
+        }
+      }
+
+      const eRef = team.teamLeadEmployee;
+      if (eRef) {
+        if (typeof eRef === 'string') teamLeadIdSet.add(normalize(eRef));
+        else if (typeof eRef === 'object') {
+          if (eRef._id) teamLeadIdSet.add(normalize(eRef._id));
+          if (eRef.email) teamLeadEmailSet.add(normalize(eRef.email));
+        }
+      }
+
+      if (leadObj && typeof leadObj === 'object') {
+        if (leadObj._id) teamLeadIdSet.add(normalize(leadObj._id));
+        if (leadObj.id) teamLeadIdSet.add(normalize(leadObj.id));
+        if (leadObj.userId) teamLeadIdSet.add(normalize(leadObj.userId));
+        if (leadObj.employeeId) teamLeadIdSet.add(normalize(leadObj.employeeId));
+        if (leadObj.email) teamLeadEmailSet.add(normalize(leadObj.email));
+        const leadName = leadObj.name || leadObj.fullName;
+        if (leadName) teamLeadNameSet.add(normalize(leadName));
+      }
+
+      const assigned = team.employees || team.teamMembers || team.members || [];
+      const cleanAssigned = Array.isArray(assigned) ? assigned.filter(Boolean) : [];
+      if (tlId) teamLeadAssignedMap.set(normalize(tlId), cleanAssigned);
+    });
+
+    // ==========================================
+    // FIND EMPLOYEE RECORD FOR USER (Exact ID & Email, prevent EMP1001 duplicate collision)
+    // ==========================================
+    const findEmployeeForUser = (user) => {
+      const userId = normalize(user?._id || user?.id || user?.userID || user?.userId);
       const email = normalize(user?.email);
 
-      return employeesList.find((employee) => {
+      // Match 1: EXACT match by User ID
+      if (userId) {
+        const match = employeesList.find((emp) => {
+          const empUserId = normalize(
+            emp?.userID?._id || emp?.userID || emp?.userId?._id || emp?.userId
+          );
+          return empUserId && empUserId === userId;
+        });
+        if (match) return match;
+      }
 
-        const employeeUserId = normalize(
-          employee?.userID?._id ||
-          employee?.userID ||
-          employee?.userId?._id ||
-          employee?.userId
-        );
+      // Match 2: EXACT match by Email
+      if (email && email.includes('@')) {
+        const match = employeesList.find((emp) => {
+          const empEmail = normalize(
+            emp?.email || emp?.userID?.email || emp?.userId?.email
+          );
+          return empEmail && empEmail === email;
+        });
+        if (match) return match;
+      }
 
-        const employeeIdValue = normalize(
-          employee?.employeeID ||
-          employee?.employeeId
-        );
+      // Match 3: employeeID ONLY if email does NOT conflict
+      const userEmpId = normalize(user?.employeeID || user?.employeeId);
+      if (userEmpId) {
+        const match = employeesList.find((emp) => {
+          const empIdVal = normalize(emp?.employeeID || emp?.employeeId);
+          if (!empIdVal || empIdVal !== userEmpId) return false;
+          const empEmail = normalize(emp?.email || emp?.userID?.email || emp?.userId?.email);
+          if (empEmail && email && empEmail !== email) return false;
+          return true;
+        });
+        if (match) return match;
+      }
 
-        const employeeEmail = normalize(
-          employee?.email ||
-          employee?.userID?.email ||
-          employee?.userId?.email
-        );
-
-        return (
-          (userId && employeeUserId && userId === employeeUserId) ||
-          (employeeId && employeeIdValue && employeeId === employeeIdValue) ||
-          (email && employeeEmail && email === employeeEmail)
-        );
-      });
+      return null;
     };
 
     // ==========================================
-    // BUILD MEMBERS
+    // FIND USER RECORD FOR EMPLOYEE
     // ==========================================
-    const allMembers = usersList
-      .filter((user) => {
-        if (!user || isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return false;
+    const findUserForEmployee = (employee) => {
+      const employeeUserId = normalize(
+        employee?.userID?._id || employee?.userID || employee?.userId?._id || employee?.userId
+      );
+      const employeeEmail = normalize(
+        employee?.email || employee?.userID?.email || employee?.userId?.email
+      );
 
-        const name = user.name || user.fullName || [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-        const email = user.email || '';
-        if (!name || isUnknownEmployeeOrUser(name)) {
-          return false;
+      if (employeeUserId) {
+        const match = usersList.find((u) => {
+          const uId = normalize(u?._id || u?.id || u?.userID || u?.userId);
+          return uId && uId === employeeUserId;
+        });
+        if (match) return match;
+      }
+
+      if (employeeEmail && employeeEmail.includes('@')) {
+        const match = usersList.find((u) => {
+          const uEmail = normalize(u?.email);
+          return uEmail && uEmail === employeeEmail;
+        });
+        if (match) return match;
+      }
+
+      return null;
+    };
+
+    // ==========================================
+    // BUILD SINGLE MEMBER OBJECT
+    // ==========================================
+    const buildMember = (user, employee, index) => {
+      if (!user && !employee) return null;
+      if (user && isUnknownEmployeeOrUser(user)) return null;
+      if (!user && employee && isUnknownEmployeeOrUser(employee)) return null;
+
+      const getRoleText = (value) => {
+        if (value && typeof value === 'object') {
+          value = value.roleName || value.name || value.title || value.key || value.label || '';
         }
+        return String(value || '').toLowerCase().trim();
+      };
 
-        if (!email || email === "N/A" || !email.includes("@")) {
-          return false;
-        }
+      const roleValues = [
+        user?.role,
+        user?.userRole,
+        user?.roleName,
+        employee?.role,
+        employee?.userRole,
+        employee?.roleName,
+        user?.designation,
+        user?.designationName,
+        employee?.designation,
+        employee?.designationName
+      ].map(getRoleText).filter(Boolean);
 
-        return true;
-      })
-      .map((user, index) => {
+      const isAdmin =
+        roleValues.some((v) => /\badmin\b|administrator/i.test(v)) ||
+        normalize(user?.role) === 'admin' ||
+        normalize(employee?.role) === 'admin' ||
+        normalize(user?.designation).includes('system administrator') ||
+        normalize(user?.designation) === 'admin';
 
-        // --------------------------------------
-        // FIND EMPLOYEE RECORD
-        // --------------------------------------
-        const employee = findEmployee(user);
-        if (employee && isFinanceOrExcludedUser(employee)) {
-          return null;
-        }
+      if (isAdmin) return null;
 
-        console.log(
-          'USER:',
-          user?.email,
-          'EMPLOYEE:',
-          employee
+      const isHr =
+        roleValues.some((v) => /\bhr\b|human resources?/i.test(v)) ||
+        normalize(user?.role) === 'hr' ||
+        normalize(employee?.role) === 'hr' ||
+        normalize(user?.designation).includes('hr manager');
+
+      const isTl =
+        !isHr && (
+          teamLeadIdSet.has(normalize(user?._id)) ||
+          teamLeadIdSet.has(normalize(user?.id)) ||
+          teamLeadIdSet.has(normalize(employee?._id)) ||
+          teamLeadIdSet.has(normalize(employee?.userID)) ||
+          teamLeadIdSet.has(normalize(employee?.userId)) ||
+          teamLeadEmailSet.has(normalize(user?.email)) ||
+          teamLeadEmailSet.has(normalize(employee?.email)) ||
+          (user?.name && teamLeadNameSet.has(normalize(user?.name))) ||
+          isTeamLeadRole(user, employee) ||
+          employee?.isTeamLead === true ||
+          normalize(user?.role) === 'team lead' ||
+          normalize(employee?.role) === 'team lead'
         );
 
-        const getRoleText = (value) => {
-          if (value && typeof value === 'object') {
-            value = value.roleName || value.name || value.title || value.key || value.label || '';
-          }
-          return String(value || '').toLowerCase().trim();
-        };
-        const roleValues = [
-          user?.role,
-          user?.userRole,
-          user?.roleName,
-          employee?.role,
-          employee?.userRole,
-          employee?.roleName,
-          user?.designation,
-          user?.designationName,
-          employee?.designation,
-          employee?.designationName
-        ].map(getRoleText).filter(Boolean);
-        const role = roleValues[0] || '';
+      const roleType = isHr ? 'hr' : isTl ? 'tl' : 'employee';
 
-        const roleType =
-          roleValues.some(value => /\bhr\b|human resources?/i.test(value))
-            ? 'hr'
-            : isTeamLeadRole(user, employee)
-            ? 'tl'
-            : 'employee';
+      // Always choose unambiguous canonical name
+      const candidateNames = [
+        user?.name,
+        employee?.name,
+        [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim(),
+        [employee?.firstName, employee?.lastName].filter(Boolean).join(' ').trim(),
+        user?.fullName,
+        employee?.fullName
+      ].filter((n) => n && !isUnknownEmployeeOrUser(n));
 
-        // --------------------------------------
-        // NAME
-        // --------------------------------------
-        const fullName =
-          [
-            employee?.firstName || user?.firstName,
-            employee?.lastName || user?.lastName
-          ]
-            .filter(Boolean)
-            .join(' ') ||
-          employee?.name ||
-          user?.name ||
-          'Unnamed User';
+      const fullName = candidateNames[0] || 'Team Member';
 
-        // --------------------------------------
-        // DESIGNATION
-        // --------------------------------------
-        let designation =
-          roleType === 'hr'
-            ? 'HR'
-            : roleType === 'tl'
-            ? 'Team Lead'
-            : 'Employee';
+      // Designation
+      let designation =
+        roleType === 'hr'
+          ? 'HR'
+          : roleType === 'tl'
+          ? 'Team Lead'
+          : 'Employee';
 
-        if (employee?.designation) {
-          if (
-            typeof employee.designation === 'object'
-          ) {
-            designation =
-              employee.designation?.designationName ||
-              employee.designation?.name ||
-              designation;
-          } else {
-            designation = employee.designation;
-          }
-        }
+      const desigCandidate =
+        (typeof employee?.designation === 'object'
+          ? employee.designation?.designationName || employee.designation?.name
+          : employee?.designation) ||
+        employee?.designationName ||
+        (typeof user?.designation === 'object'
+          ? user.designation?.designationName || user.designation?.name
+          : user?.designation) ||
+        user?.designationName;
 
-        if (employee?.designationName) {
-          designation = employee.designationName;
-        }
+      if (desigCandidate && String(desigCandidate).trim()) {
+        designation = String(desigCandidate).trim();
+      }
 
-        if (user?.designation) {
-          if (
-            typeof user.designation === 'object'
-          ) {
-            designation =
-              user.designation?.designationName ||
-              user.designation?.name ||
-              designation;
-          } else {
-            designation = user.designation;
-          }
-        }
+      // Department
+      let department = 'Unassigned';
+      const deptCandidate =
+        (typeof employee?.department === 'object'
+          ? employee.department?.departmentName || employee.department?.name
+          : employee?.department) ||
+        employee?.departmentName ||
+        (typeof user?.department === 'object'
+          ? user.department?.departmentName || user.department?.name
+          : user?.department) ||
+        user?.departmentName;
 
-        if (user?.designationName) {
-          designation = user.designationName;
-        }
+      if (deptCandidate && String(deptCandidate).trim()) {
+        department = String(deptCandidate).trim();
+      }
 
-        // --------------------------------------
-        // DEPARTMENT
-        // --------------------------------------
-        let department = 'Unassigned';
+      // Personal details
+      const dob =
+        employee?.dob ||
+        employee?.dateOfBirth ||
+        user?.dob ||
+        user?.dateOfBirth ||
+        null;
 
-        const departmentValue =
-          employee?.department ||
-          employee?.departmentName ||
-          user?.department ||
-          user?.departmentName;
+      const bloodGroup =
+        employee?.bloodGroup ||
+        user?.bloodGroup ||
+        'N/A';
 
-        if (
-          typeof departmentValue === 'object'
-        ) {
-          department =
-            departmentValue?.departmentName ||
-            departmentValue?.name ||
-            'Unassigned';
-        } else if (departmentValue) {
-          department = departmentValue;
-        }
+      const currentAddress =
+        employee?.address ||
+        employee?.currentAddress ||
+        user?.address ||
+        user?.currentAddress ||
+        'N/A';
 
-        // --------------------------------------
-        // PERSONAL DETAILS
-        // EMPLOYEE FIRST, USER FALLBACK
-        // --------------------------------------
-        const dob =
-          employee?.dob ||
-          employee?.dateOfBirth ||
-          user?.dob ||
-          user?.dateOfBirth ||
-          null;
+      const permanentAddress =
+        employee?.permanentAddress ||
+        employee?.permanent_address ||
+        user?.permanentAddress ||
+        user?.permanent_address ||
+        'N/A';
 
-        const bloodGroup =
-          employee?.bloodGroup ||
-          user?.bloodGroup ||
-          'N/A';
+      const mobile =
+        employee?.mobile ||
+        employee?.phone ||
+        employee?.phoneNumber ||
+        user?.mobile ||
+        user?.phone ||
+        user?.phoneNumber ||
+        'N/A';
 
-        const currentAddress =
-          employee?.address ||
-          employee?.currentAddress ||
-          user?.address ||
-          user?.currentAddress ||
-          'N/A';
+      const skills =
+        Array.isArray(employee?.skills)
+          ? employee.skills
+          : Array.isArray(user?.skills)
+          ? user.skills
+          : [];
 
-        const permanentAddress =
-          employee?.permanentAddress ||
-          employee?.permanent_address ||
-          user?.permanentAddress ||
-          user?.permanent_address ||
-          'N/A';
+      const status = getEmploymentStatus(employee, user);
+      const joiningDate = employee?.joiningDate || user?.joiningDate || null;
 
-        const mobile =
-          employee?.mobile ||
-          employee?.phone ||
-          employee?.phoneNumber ||
-          user?.mobile ||
-          user?.phone ||
-          user?.phoneNumber ||
-          'N/A';
+      const finalEmployeeId =
+        employee?.employeeID ||
+        employee?.employeeId ||
+        user?.employeeID ||
+        user?.employeeId ||
+        `${roleType.toUpperCase()}${String(index + 1).padStart(4, '0')}`;
 
-        // --------------------------------------
-        // SKILLS
-        // --------------------------------------
-        const skills =
-          Array.isArray(employee?.skills)
-            ? employee.skills
-            : Array.isArray(user?.skills)
-            ? user.skills
-            : [];
+      const assignedEmployees =
+        teamLeadAssignedMap.get(normalize(user?._id)) ||
+        teamLeadAssignedMap.get(normalize(employee?._id)) ||
+        teamLeadAssignedMap.get(normalize(finalEmployeeId)) ||
+        teamLeadAssignedMap.get(normalize(user?.email)) ||
+        teamLeadAssignedMap.get(normalize(employee?.email)) ||
+        [];
 
-        // --------------------------------------
-        // STATUS
-        // --------------------------------------
-        const status = getEmploymentStatus(employee, user);
+      return {
+        id: employee?._id || user?._id || user?.id || `${roleType}-${index}`,
+        userId: user?._id || user?.id || employee?.userID || employee?.userId || '',
+        employeeId: finalEmployeeId,
+        name: fullName,
+        firstName: user?.firstName || employee?.firstName || '',
+        lastName: user?.lastName || employee?.lastName || '',
+        email: user?.email || employee?.email || 'No email',
+        mobile,
+        phone: employee?.phone || employee?.phoneNumber || user?.phone || user?.phoneNumber || 'N/A',
+        dob: formatDate(dob),
+        bloodGroup,
+        currentAddress,
+        permanentAddress,
+        designation,
+        department,
+        status,
+        currentAction: employee?.currentAction || user?.currentAction || 'Available',
+        skills,
+        joiningDate: formatDate(joiningDate),
+        role: roleValues[0] || (roleType === 'tl' ? 'team lead' : roleType),
+        roleType,
+        initials: getInitials(fullName),
+        avatarColor: getAvatarColor(index),
+        assignedEmployees
+      };
+    };
 
-        // --------------------------------------
-        // JOINING DATE
-        // --------------------------------------
-        const joiningDate =
-          employee?.joiningDate ||
-          user?.joiningDate ||
-          null;
+    // ==========================================
+    // STRICT DEDUPLICATION - NO EXTRA DATA ON REFRESH
+    // ==========================================
+    const membersMap = new Map();
 
-        // --------------------------------------
-        // EMPLOYEE ID
-        // --------------------------------------
-        const finalEmployeeId =
-          employee?.employeeID ||
-          employee?.employeeId ||
-          user?.employeeID ||
-          user?.employeeId ||
-          `${roleType.toUpperCase()}${String(
-            index + 1
-          ).padStart(4, '0')}`;
+    // Pass 1: Add from live users (/api/users/all) - TL, HR, EMPLOYEES (Admin excluded)
+    usersList.forEach((user, index) => {
+      if (!user || isUnknownEmployeeOrUser(user)) return;
+      const role = normalize(user.role);
+      const desig = normalize(user.designation);
+      if (role === 'admin' || desig.includes('administrator') || desig === 'admin') return;
 
-        // --------------------------------------
-        // RETURN MEMBER
-        // --------------------------------------
-        return {
-          id:
-            employee?._id ||
-            user?._id ||
-            user?.id ||
-            `${roleType}-${index}`,
+      const email = normalize(user.email);
+      const uid = normalize(user._id || user.id);
+      const dedupeKey = (email && email.includes('@')) ? email : uid;
+      if (!dedupeKey || membersMap.has(dedupeKey)) return;
 
-          userId:
-            user?._id ||
-            user?.id ||
-            employee?.userID ||
-            employee?.userId ||
-            '',
+      const employee = findEmployeeForUser(user);
 
-          employeeId: finalEmployeeId,
+      const member = buildMember(user, employee, index);
+      if (member) {
+        membersMap.set(dedupeKey, member);
+      }
+    });
 
-          name: fullName,
+    // Pass 2: Add any remaining employees from live employee list (/api/employee/list)
+    employeesList.forEach((employee, index) => {
+      if (!employee || isUnknownEmployeeOrUser(employee)) return;
+      const role = normalize(employee.role);
+      const desig = normalize(employee.designation);
+      if (role === 'admin' || desig.includes('administrator') || desig === 'admin') return;
 
-          firstName:
-            employee?.firstName ||
-            user?.firstName ||
-            '',
+      const email = normalize(employee.email || employee.userID?.email || employee.userId?.email);
+      const uid = normalize(employee.userID?._id || employee.userID || employee.userId?._id || employee.userId || employee._id);
+      const dedupeKey = (email && email.includes('@')) ? email : uid;
+      if (!dedupeKey || membersMap.has(dedupeKey)) return;
 
-          lastName:
-            employee?.lastName ||
-            user?.lastName ||
-            '',
+      const user = findUserForEmployee(employee);
 
-          email:
-            employee?.email ||
-            user?.email ||
-            'No email',
+      const member = buildMember(user, employee, membersMap.size + index);
+      if (member) {
+        membersMap.set(dedupeKey, member);
+      }
+    });
 
-          mobile,
-
-          phone:
-            employee?.phone ||
-            employee?.phoneNumber ||
-            user?.phone ||
-            user?.phoneNumber ||
-            'N/A',
-
-          dob: formatDate(dob),
-
-          bloodGroup,
-
-          currentAddress,
-
-          permanentAddress,
-
-          designation,
-
-          department,
-
-          status,
-
-          currentAction:
-            employee?.currentAction ||
-            user?.currentAction ||
-            'Available',
-
-          skills,
-
-          joiningDate:
-            formatDate(joiningDate),
-
-          role: role,
-
-          roleType,
-
-          initials: getInitials(fullName),
-
-          avatarColor:
-            getAvatarColor(index)
-        };
-      })
-      .filter(Boolean);
-
-    console.log(
-      'FINAL MEMBERS:',
-      allMembers
-    );
+    const allMembers = Array.from(membersMap.values());
 
     if (isMounted) {
       setMembers(allMembers);
       setFilteredMembers(allMembers);
     }
-
   } catch (err) {
-
-    console.error(
-      '❌ Error fetching members:',
-      err
-    );
-
+    console.error('❌ Error fetching members:', err);
     if (isMounted) {
-      setError(
-        err.message ||
-        'Unable to load team members.'
-      );
-
+      setError(err.message || 'Unable to load team members.');
       setMembers([]);
       setFilteredMembers([]);
     }
-
   } finally {
-
     if (isMounted) {
       setLoading(false);
-    } 
+    }
   }
 };
 
@@ -966,7 +996,7 @@ const fetchAllMembers = async () => {
 
   const getRoleLabel = (role) => {
     const labels = {
-      'hr': 'HR',
+      'hr': 'HR Executives',
       'tl': 'Team Leads',
       'employee': 'Employees',
       'all': 'All Roles'

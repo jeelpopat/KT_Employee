@@ -875,98 +875,101 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           role === 'team leader' ||
           role === 'tl' ||
           role.includes('team lead') ||
-          role.includes('lead') ||
           desig.includes('team lead') ||
-          desig.includes('team leader')
+          desig.includes('team leader') ||
+          isTeamLeadRole(u)
         );
       };
 
       const userTeamLeads = (Array.isArray(allUsers) ? allUsers : []).filter(isTeamLeadUser);
 
-        // Optional: check teamLead/team for assigned employees if available
-        let teamLeadsData = [];
-        try {
-          const res = await axios.get(TEAM_LEAD_URL, { headers });
-          const payload = res?.data?.data || res?.data?.teamLeads || res?.data?.teamLead || res?.data || [];
-          teamLeadsData = Array.isArray(payload) ? payload : [];
-        } catch (err) {
-          // Safe to ignore if endpoint is not used
-        }
+      // Optional: check teamLead/team for assigned employees if available
+      let teamLeadsData = [];
+      try {
+        const res = await axios.get(TEAM_LEAD_URL, { headers });
+        const payload = res?.data?.data || res?.data?.teamLeads || res?.data?.teamLead || res?.data || [];
+        teamLeadsData = Array.isArray(payload) ? payload : [];
+      } catch (err) {
+        // Safe to ignore if endpoint is not used
+      }
 
-        const userOptions = userTeamLeads
-          .filter((u) => u && !isUnknownEmployeeOrUser(u))
-          .map((u) => {
-            const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || '';
-            if (!name || isUnknownEmployeeOrUser({ name, email: u.email })) return null;
-            const matchingDoc = teamLeadsData.find((doc) => {
-              const docId = doc?.teamLead?.userId || doc?.teamLead?._id || doc?.teamLead?.employeeId || doc?.userId || doc?._id;
-              const docEmail = doc?.teamLead?.email || doc?.email;
-              return (docId && String(docId) === String(u._id)) || (docEmail && docEmail.toLowerCase() === (u.email || '').toLowerCase());
-            });
+      const optionsMap = new Map();
 
-            const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || [])
-              .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e));
+      // 1. Add from userTeamLeads
+      userTeamLeads
+        .filter((u) => u && !isFinanceOrExcludedUser(u) && !isUnknownEmployeeOrUser(u))
+        .forEach((u) => {
+          const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || '';
+          if (!name || isUnknownEmployeeOrUser({ name, email: u.email })) return;
 
-            return {
-              _id: String(u._id),
-              value: String(u._id),
-              name: name,
-              email: u.email || "",
-              department: u.department || "",
-              designation: typeof u.designation === 'object' ? (u.designation?.designationName || u.designation?.name || "") : (u.designation || ""),
-              employees: Array.isArray(employees) ? employees : [],
-            };
-          })
-          .filter(Boolean);
+          const emailKey = u.email ? String(u.email).toLowerCase().trim() : '';
+          const idKey = String(u._id || u.id || '');
+          const dedupeKey = emailKey || idKey || name.toLowerCase();
+          if (optionsMap.has(dedupeKey)) return;
 
-      // Include any extra TLs from teamLeadsData not yet present
-      const extraOptions = teamLeadsData
-        .map((lead) => {
-          const teamLeadRecord = lead?.teamLead || lead?.lead || lead?.user || lead?.employee || null;
-          if (lead && (isFinanceOrExcludedUser(lead) || isUnknownEmployeeOrUser(lead))) return null;
-          if (teamLeadRecord && (isFinanceOrExcludedUser(teamLeadRecord) || isUnknownEmployeeOrUser(teamLeadRecord))) return null;
+          const matchingDoc = teamLeadsData.find((doc) => {
+            const docId = doc?.teamLead?.userId || doc?.teamLead?._id || doc?.teamLead?.employeeId || doc?.userId || doc?._id;
+            const docEmail = doc?.teamLead?.email || doc?.email;
+            return (docId && String(docId) === String(u._id)) || (docEmail && docEmail.toLowerCase() === (u.email || '').toLowerCase());
+          });
 
-          const leadId =
-            teamLeadRecord?.userId ||
-            teamLeadRecord?.employeeId ||
-            teamLeadRecord?._id ||
-            lead?.teamLeadId ||
-            lead?._id ||
-            null;
-
-          const name =
-            teamLeadRecord?.name ||
-            teamLeadRecord?.fullName ||
-            lead?.name ||
-            lead?.fullName ||
-            "";
-
-          if (
-            !leadId ||
-            !name ||
-            isUnknownEmployeeOrUser({ name }) ||
-            userOptions.some(
-              (uo) =>
-                String(uo._id) === String(leadId) ||
-                uo.name.toLowerCase() === name.toLowerCase()
-            )
-          ) {
-            return null;
-          }
-
-          const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || [])
+          const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || [])
             .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e));
 
-          return {
-            _id: String(leadId),
-            value: String(leadId),
+          optionsMap.set(dedupeKey, {
+            _id: String(u._id || idKey),
+            value: String(u._id || idKey),
             name: name,
+            email: u.email || "",
+            department: u.department || "",
+            designation: typeof u.designation === 'object' ? (u.designation?.designationName || u.designation?.name || "") : (u.designation || ""),
             employees: Array.isArray(employees) ? employees : [],
-          };
-        })
-        .filter(Boolean);
+          });
+        });
 
-      setTeamLeadOptions([...userOptions, ...extraOptions]);
+      // 2. Include any extra confirmed TLs from teamLeadsData without duplication
+      teamLeadsData.forEach((lead) => {
+        const teamLeadRecord = lead?.teamLead || lead?.lead || lead?.user || lead?.employee || null;
+        if (lead && (isFinanceOrExcludedUser(lead) || isUnknownEmployeeOrUser(lead))) return;
+        if (teamLeadRecord && (isFinanceOrExcludedUser(teamLeadRecord) || isUnknownEmployeeOrUser(teamLeadRecord))) return;
+
+        const leadId =
+          teamLeadRecord?.userId ||
+          teamLeadRecord?.employeeId ||
+          teamLeadRecord?._id ||
+          lead?.teamLeadId ||
+          lead?._id ||
+          null;
+
+        const name =
+          teamLeadRecord?.name ||
+          teamLeadRecord?.fullName ||
+          lead?.name ||
+          lead?.fullName ||
+          "";
+
+        const email = teamLeadRecord?.email || lead?.email || "";
+        const emailKey = email ? String(email).toLowerCase().trim() : '';
+        const idKey = leadId ? String(leadId) : '';
+        const dedupeKey = emailKey || idKey || name.toLowerCase();
+
+        if (!leadId || !name || isUnknownEmployeeOrUser({ name, email }) || optionsMap.has(dedupeKey)) {
+          return;
+        }
+
+        const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || [])
+          .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e));
+
+        optionsMap.set(dedupeKey, {
+          _id: String(leadId),
+          value: String(leadId),
+          name: name,
+          email: email,
+          employees: Array.isArray(employees) ? employees : [],
+        });
+      });
+
+      setTeamLeadOptions(Array.from(optionsMap.values()));
     } catch (error) {
       console.error("Team lead options fetch error:", error);
       setTeamLeadOptions([]);
