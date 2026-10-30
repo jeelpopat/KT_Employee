@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
   Calendar,
@@ -19,6 +20,7 @@ import {
   RefreshCw,
   Loader2,
   FileText,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   isFinanceOrExcludedUser,
@@ -348,6 +350,18 @@ const mapLog = (item, index) => {
       item?._id ||
       item?.id ||
       `log-${index}`,
+
+    employeeId:
+      item?.userId?._id ||
+      (typeof item?.userId === 'string' ? item.userId : '') ||
+      item?.employee?._id ||
+      item?.employee?.id ||
+      item?.employeeId?._id ||
+      item?.employeeId?.id ||
+      (typeof item?.employeeId === 'string' ? item.employeeId : '') ||
+      item?.user?._id ||
+      item?.user?.id ||
+      '',
 
     name:
       item?.employeeName ||
@@ -803,6 +817,7 @@ const AttendanceTimeline = ({
    MAIN COMPONENT
 ========================================================= */
 export default function AttendanceLogs() {
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] =
     useState(getTodayLocal());
 
@@ -1890,6 +1905,7 @@ export default function AttendanceLogs() {
                   <th className="py-3 px-4 text-left font-semibold min-w-[320px]">TimeLine</th>
                   <th className="py-3 px-4 text-left font-semibold whitespace-nowrap">Total Hours</th>
                   <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Status</th>
+                  <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Adjustment</th>
                 </tr>
               </thead>
 
@@ -1951,6 +1967,25 @@ export default function AttendanceLogs() {
                         <div className="flex items-center justify-center">
                           <Clock size={16} className="text-[#0284c7]" />
                         </div>
+                      </td>
+
+                      {/* Adjustment */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          aria-label={`Adjust attendance for ${log.name}`}
+                          title="Adjust attendance"
+                          disabled={!log.employeeId}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate('/attendance/adjustments', {
+                              state: { adjustmentEmployeeId: String(log.employeeId) },
+                            });
+                          }}
+                          className="inline-flex items-center justify-center rounded-md p-1.5 text-[#034665] hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <SlidersHorizontal size={16} />
+                        </button>
                       </td>
                     </tr>
                   );

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import Toast, { showToast } from "../../components/common/Toast";
 import {
   Settings,
@@ -71,6 +72,8 @@ const isValidDateInput = (value) => {
 };
 
 export default function Adjustments() {
+  const location = useLocation();
+
   // ============================================================
   // DEFAULT ATTENDANCE SETTINGS
   // ============================================================
@@ -102,7 +105,9 @@ export default function Adjustments() {
   // ============================================================
 
   const initialForm = {
-    employeeId: "",
+    employeeId: location.state?.adjustmentEmployeeId
+      ? String(location.state.adjustmentEmployeeId)
+      : "",
     date: "",
     sessions: [{ ...emptySession }],
     reason: "",
