@@ -352,7 +352,7 @@ export const isUnknownEmployeeOrUser = (entity) => {
   ];
 
   if (invalidNames.includes(clean)) return true;
-  if (clean.includes('unknown employee') || clean.includes('unknown user')) return true;
+  if (clean.includes('unknown') || clean.includes('unnamed') || clean.includes('no name')) return true;
   if (clean.startsWith('unknown ') || clean.startsWith('unnamed ')) return true;
 
   return false;

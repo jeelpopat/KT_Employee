@@ -67,7 +67,7 @@ export const Modal = ({
         </div>
 
         {/* Content */}
-        <div className="px-4 py-3.5 overflow-y-auto space-y-3 grow text-xs sm:text-sm text-slate-700">{children}</div>
+        <div className="px-4 py-3.5 overflow-y-auto space-y-3 grow text-xs sm:text-sm text-slate-700 modal-scrollbar">{children}</div>
 
         {/* Footer */}
         {footer && (

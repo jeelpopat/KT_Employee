@@ -893,33 +893,38 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           // Safe to ignore if endpoint is not used
         }
 
-        const userOptions = userTeamLeads.map((u) => {
-          const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Team Lead';
-          const matchingDoc = teamLeadsData.find((doc) => {
-            const docId = doc?.teamLead?.userId || doc?.teamLead?._id || doc?.teamLead?.employeeId || doc?.userId || doc?._id;
-            const docEmail = doc?.teamLead?.email || doc?.email;
-            return (docId && String(docId) === String(u._id)) || (docEmail && docEmail.toLowerCase() === (u.email || '').toLowerCase());
-          });
+        const userOptions = userTeamLeads
+          .filter((u) => u && !isUnknownEmployeeOrUser(u))
+          .map((u) => {
+            const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || '';
+            if (!name || isUnknownEmployeeOrUser({ name, email: u.email })) return null;
+            const matchingDoc = teamLeadsData.find((doc) => {
+              const docId = doc?.teamLead?.userId || doc?.teamLead?._id || doc?.teamLead?.employeeId || doc?.userId || doc?._id;
+              const docEmail = doc?.teamLead?.email || doc?.email;
+              return (docId && String(docId) === String(u._id)) || (docEmail && docEmail.toLowerCase() === (u.email || '').toLowerCase());
+            });
 
-          const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || []).filter((e) => !isFinanceOrExcludedUser(e));
+            const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || [])
+              .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e));
 
-          return {
-            _id: String(u._id),
-            value: String(u._id),
-            name: name,
-            email: u.email || "",
-            department: u.department || "",
-            designation: typeof u.designation === 'object' ? (u.designation?.designationName || u.designation?.name || "") : (u.designation || ""),
-            employees: Array.isArray(employees) ? employees : [],
-          };
-        });
+            return {
+              _id: String(u._id),
+              value: String(u._id),
+              name: name,
+              email: u.email || "",
+              department: u.department || "",
+              designation: typeof u.designation === 'object' ? (u.designation?.designationName || u.designation?.name || "") : (u.designation || ""),
+              employees: Array.isArray(employees) ? employees : [],
+            };
+          })
+          .filter(Boolean);
 
       // Include any extra TLs from teamLeadsData not yet present
       const extraOptions = teamLeadsData
         .map((lead) => {
           const teamLeadRecord = lead?.teamLead || lead?.lead || lead?.user || lead?.employee || null;
-          if (lead && isFinanceOrExcludedUser(lead)) return null;
-          if (teamLeadRecord && isFinanceOrExcludedUser(teamLeadRecord)) return null;
+          if (lead && (isFinanceOrExcludedUser(lead) || isUnknownEmployeeOrUser(lead))) return null;
+          if (teamLeadRecord && (isFinanceOrExcludedUser(teamLeadRecord) || isUnknownEmployeeOrUser(teamLeadRecord))) return null;
 
           const leadId =
             teamLeadRecord?.userId ||
@@ -939,6 +944,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           if (
             !leadId ||
             !name ||
+            isUnknownEmployeeOrUser({ name }) ||
             userOptions.some(
               (uo) =>
                 String(uo._id) === String(leadId) ||
@@ -948,7 +954,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
             return null;
           }
 
-          const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || []).filter((e) => !isFinanceOrExcludedUser(e));
+          const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || [])
+            .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e));
 
           return {
             _id: String(leadId),
@@ -1188,7 +1195,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
   const getTeamLeadDisplayName = (lead) => {
     if (!lead) return "";
-    if (typeof lead === "string") return lead;
+    if (typeof lead === "string") return isUnknownEmployeeOrUser(lead) ? "" : lead;
 
     const direct =
       extractName(lead) ||
@@ -1197,13 +1204,13 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       extractName(lead.employee) ||
       extractName(lead.person);
 
-    if (direct) return direct;
+    if (direct && !isUnknownEmployeeOrUser(direct)) return direct;
     if (lead.user && typeof lead.user === "object") return getTeamLeadDisplayName(lead.user);
     if (lead.teamLead && typeof lead.teamLead === "object") return getTeamLeadDisplayName(lead.teamLead);
     if (lead.employee && typeof lead.employee === "object") return getTeamLeadDisplayName(lead.employee);
     if (lead.person && typeof lead.person === "object") return getTeamLeadDisplayName(lead.person);
 
-    return "Team Lead";
+    return "";
   };
 
   const getTeamLeadNameById = (value) => {
@@ -1213,30 +1220,37 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     const match = findEntity(teamLeadOptions, value) || findEntity(users, value) || findEntity(employees, value);
     if (match) return getTeamLeadDisplayName(match);
 
-    return getUserNameById(value);
+    const fallback = getUserNameById(value);
+    return isUnknownEmployeeOrUser(fallback) ? "" : fallback;
   };
 
   const getProjectTeamLeadName = (project) => {
     if (!project) return "Not Assigned";
     
-    if (project.teamLeadName) return project.teamLeadName;
-    if (project.teamLeadUser) return extractName(project.teamLeadUser);
-    if (project.teamLeadEmployee) return extractName(project.teamLeadEmployee);
+    if (project.teamLeadName && !isUnknownEmployeeOrUser(project.teamLeadName)) return project.teamLeadName;
+    if (project.teamLeadUser) {
+      const n = extractName(project.teamLeadUser);
+      if (n && !isUnknownEmployeeOrUser(n)) return n;
+    }
+    if (project.teamLeadEmployee) {
+      const n = extractName(project.teamLeadEmployee);
+      if (n && !isUnknownEmployeeOrUser(n)) return n;
+    }
     
     return "Not Assigned";
   };
 
   const getEmployeeName = (emp) => {
     if (!emp) return "";
-    if (typeof emp === "string") return emp;
+    if (typeof emp === "string") return isUnknownEmployeeOrUser(emp) ? "" : emp;
 
     const direct = extractName(emp);
-    if (direct) return direct;
+    if (direct && !isUnknownEmployeeOrUser(direct)) return direct;
 
     if (emp.employee) return getEmployeeName(emp.employee);
     if (emp.user) return getEmployeeName(emp.user);
 
-    return "Unknown"; 
+    return ""; 
   };
 
   const getEmployeeNameById = (value) => {
@@ -1246,7 +1260,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     const emp = findEntity(employees, value) || findEntity(users, value);
     if (emp) return getEmployeeName(emp);
 
-    return value;
+    return "";
   };
 
   const getProjectAssignedMembers = (project) => {

@@ -1569,7 +1569,10 @@ export default function CheckInRequest() {
                     {/* Employee (Avatar + Name & Role) */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#034665] text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-2xs select-none">
+                        <div
+                          className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-2xs select-none"
+                          style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
+                        >
                           {getEmployeeInitials(req)}
                         </div>
                         <div className="min-w-0">

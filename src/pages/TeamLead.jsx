@@ -1,10 +1,35 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { Crown } from "lucide-react";
-import { isFinanceOrExcludedUser } from "../utils/roleFilters";
+import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../utils/roleFilters";
 import { showToast } from "../components/common/Toast";
 
 const BASE_URL = "https://kt-backend-ttzj.onrender.com/api";
+
+const isInvalidName = (name) => {
+  if (!name || typeof name !== 'string') return true;
+  const trimmed = name.trim().toLowerCase();
+  if (!trimmed) return true;
+  const invalidTokens = [
+    'unnamed',
+    'no name',
+    'unknown',
+    'unknown employee',
+    'unknown user',
+    'n/a',
+    'na',
+    'null',
+    'undefined',
+    'none',
+    '—',
+    '-'
+  ];
+  if (invalidTokens.includes(trimmed)) return true;
+  if (trimmed.includes('unnamed') || trimmed.includes('unknown') || trimmed.includes('no name')) return true;
+  return false;
+};
+
+const isValidName = (name) => !isInvalidName(name);
 
 const getEmployeeReferenceId = (item) => {
   if (typeof item === 'string' || typeof item === 'number') return String(item);
@@ -112,23 +137,37 @@ const getDistinctAssignedEmployees = (rawList = [], empList = []) => {
     if (!item) return;
     const key = getCanonicalEmployeeKey(item, empList);
     if (!key || seenKeys.has(key)) return;
-    seenKeys.add(key);
 
     const matchedEmp = findEmployeeByIdOrUser(item, empList);
     if (matchedEmp) {
-      distinctEmployees.push(matchedEmp);
+      const name = getEmployeeName(matchedEmp);
+      const email = matchedEmp.email || matchedEmp.user?.email || '';
+      if (isValidName(name) || (email && email.includes('@') && !isInvalidName(email.split('@')[0]))) {
+        seenKeys.add(key);
+        distinctEmployees.push(matchedEmp);
+      }
     } else if (typeof item === 'object') {
-      distinctEmployees.push(item);
-    } else {
-      distinctEmployees.push({ _id: String(item), id: String(item), name: '' });
+      const name = getEmployeeName(item);
+      const email = item.email || item.user?.email || '';
+      if (isValidName(name) || (email && email.includes('@') && !isInvalidName(email.split('@')[0]))) {
+        seenKeys.add(key);
+        distinctEmployees.push(item);
+      }
     }
+    // Note: If item is an unresolvable ID string or has no valid name/email,
+    // do NOT push a dummy blank object! It is dropped so "Unnamed" NEVER appears!
   });
 
   return distinctEmployees;
 };
 
 const getEmployeeName = (employee) => {
-  if (!employee || typeof employee !== 'object') return '';
+  if (!employee) return '';
+  if (typeof employee === 'string') {
+    const trimmed = employee.trim();
+    return isValidName(trimmed) ? trimmed : '';
+  }
+  if (typeof employee !== 'object') return '';
 
   const records = [
     employee,
@@ -166,7 +205,7 @@ const getEmployeeName = (employee) => {
       record.userName ||
       record.username
     );
-    if (typeof name === 'string' && name.trim()) return name.trim();
+    if (typeof name === 'string' && isValidName(name)) return name.trim();
   }
 
   return '';
@@ -400,10 +439,28 @@ const AssignmentModal = ({
     }
     return { status: 'available', label: 'Available' };
   };
+  const getDisplayName = (person) => {
+    if (!person) return "";
+    const name = getEmployeeName(person);
+    if (isValidName(name)) return name;
+    if (person.email && person.email.includes('@')) {
+      const prefix = person.email.split('@')[0];
+      if (isValidName(prefix)) return prefix;
+    }
+    return "";
+  };
+
+  const validAvailableEmployees = useMemo(() => {
+    return (availableEmployees || []).filter((emp) => {
+      if (!emp) return false;
+      const name = getDisplayName(emp);
+      return Boolean(name && isValidName(name));
+    });
+  }, [availableEmployees]);
 
   const selectAll = () => {
     // Only select employees who are Available or already on Current Team
-    const safeEmployees = availableEmployees.filter((emp) => {
+    const safeEmployees = validAvailableEmployees.filter((emp) => {
       const { status } = getEmployeeAssignmentStatus(emp);
       return status === 'available' || status === 'current';
     });
@@ -416,13 +473,8 @@ const AssignmentModal = ({
 
   if (!isOpen) return null;
 
-  const getDisplayName = (person) => {
-    if (!person) return "Unnamed";
-    return getEmployeeName(person) || person.email || "Unnamed";
-  };
-
   // Filter & Search Logic
-  const filteredEmployees = availableEmployees.filter((emp) => {
+  const filteredEmployees = validAvailableEmployees.filter((emp) => {
     const name = getDisplayName(emp).toLowerCase();
     const email = (emp.email || '').toLowerCase();
     const code = (emp.employeeID || emp.employeeCode || '').toLowerCase();
@@ -445,9 +497,9 @@ const AssignmentModal = ({
     return true;
   });
 
-  const unassignedCount = availableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'available').length;
-  const currentTeamCount = availableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'current').length;
-  const otherTLCount = availableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'other').length;
+  const unassignedCount = validAvailableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'available').length;
+  const currentTeamCount = validAvailableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'current').length;
+  const otherTLCount = validAvailableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'other').length;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -470,7 +522,7 @@ const AssignmentModal = ({
                 <div>
                   <h2 className="text-lg font-bold text-white">Assign Team Members</h2>
                   <p className="text-blue-100 text-xs mt-0.5">
-                    Team Lead: <span className="font-semibold text-white">{lead?.name || lead?.firstName || "Unnamed"}</span>
+                    Team Lead: <span className="font-semibold text-white">{getUserName(lead) || lead?.name || lead?.fullName || "Team Lead"}</span>
                     {departmentName && departmentName !== "Unknown Department" && (
                       <span className="ml-2 bg-white/20 px-2 py-0.5 rounded-md font-medium">Dept: {departmentName}</span>
                     )}
@@ -516,7 +568,7 @@ const AssignmentModal = ({
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => setSearchQuery('')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   ✕
@@ -534,7 +586,7 @@ const AssignmentModal = ({
                     filterType === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  All ({availableEmployees.length})
+                  All ({validAvailableEmployees.length})
                 </button>
                 <button
                   type="button"
@@ -730,11 +782,14 @@ export const TeamLead = () => {
   const normalizeEmployeeId = getEmployeeReferenceId;
 
   const getEmployeeDisplayName = (employee) => {
-    if (!employee) return "Unnamed";
+    if (!employee) return "";
     const name = getEmployeeName(employee);
-    if (name) return name;
-    if (employee.email) return employee.email;
-    return "Unnamed";
+    if (isValidName(name)) return name;
+    if (employee.email && employee.email.includes('@')) {
+      const prefix = employee.email.split('@')[0];
+      if (isValidName(prefix)) return prefix;
+    }
+    return "";
   };
 
   // Get department name from lead data
@@ -868,29 +923,39 @@ const getDesignation = (lead) => {
 };
 
   const getUserName = (lead) => {
-    if (!lead) return "No Name";
+    if (!lead) return "";
     
     // Check teamLead first (from backend structure)
-    if (lead.teamLead?.name) return lead.teamLead.name;
+    if (lead.teamLead?.name && isValidName(lead.teamLead.name)) return lead.teamLead.name.trim();
+    if (lead.teamLead?.fullName && isValidName(lead.teamLead.fullName)) return lead.teamLead.fullName.trim();
     
     // Check other possible fields
-    if (lead.name) return lead.name;
-    if (lead.fullName) return lead.fullName;
-    if (lead.displayName) return lead.displayName;
-    if (lead.userName) return lead.userName;
-    if (lead.username) return lead.username;
+    if (lead.name && isValidName(lead.name)) return lead.name.trim();
+    if (lead.fullName && isValidName(lead.fullName)) return lead.fullName.trim();
+    if (lead.displayName && isValidName(lead.displayName)) return lead.displayName.trim();
+    if (lead.userName && isValidName(lead.userName)) return lead.userName.trim();
+    if (lead.username && isValidName(lead.username)) return lead.username.trim();
     
     if (lead.firstName || lead.lastName) {
-      return `${lead.firstName || ''} ${lead.lastName || ''}`.trim();
+      const full = `${lead.firstName || ''} ${lead.lastName || ''}`.trim();
+      if (isValidName(full)) return full;
     }
-    if (lead.user) return getUserName(lead.user);
-    if (lead.email) return lead.email.split('@')[0];
-    return "No Name";
+    if (lead.user) {
+      const uName = getUserName(lead.user);
+      if (isValidName(uName)) return uName;
+    }
+    if (lead.email && lead.email.includes('@')) {
+      const emailPrefix = lead.email.split('@')[0];
+      if (isValidName(emailPrefix)) return emailPrefix;
+    }
+    return "";
   };
 
   const getUserEmail = (lead) => {
-    if (lead.teamLead?.email) return lead.teamLead.email;
-    return lead.email || lead.user?.email || "N/A";
+    if (lead.teamLead?.email && lead.teamLead.email.includes('@')) return lead.teamLead.email;
+    if (lead.email && lead.email.includes('@')) return lead.email;
+    if (lead.user?.email && lead.user.email.includes('@')) return lead.user.email;
+    return "";
   };
 
   const getAssignedEmployeeIds = (lead) => {
@@ -924,22 +989,6 @@ const getDesignation = (lead) => {
       seen.add(String(key).toLowerCase());
       return true;
     });
-  };
-
-  const loadSavedEmployeeAssignments = () => {
-    try {
-      return JSON.parse(localStorage.getItem('teamLeadAssignedEmployees') || '{}') || {};
-    } catch {
-      return {};
-    }
-  };
-
-  const persistEmployeeAssignments = (assignments) => {
-    try {
-      localStorage.setItem('teamLeadAssignedEmployees', JSON.stringify(assignments));
-    } catch {
-      // ignore storage failures
-    }
   };
 
   // Helper to check if two lead records represent the same individual
@@ -984,8 +1033,7 @@ const getDesignation = (lead) => {
 
     const nameA = (getUserName(leadA) || '').toLowerCase().replace(/\s+/g, ' ').trim();
     const nameB = (getUserName(leadB) || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    const invalidNames = ['unnamed', 'no name', 'unknown employee', 'unknown user', 'n/a', ''];
-    if (nameA && nameB && !invalidNames.includes(nameA) && nameA === nameB) {
+    if (nameA && nameB && isValidName(nameA) && isValidName(nameB) && nameA === nameB) {
       return true;
     }
 
@@ -1050,39 +1098,45 @@ const getDesignation = (lead) => {
 
       const userTeamLeads = (Array.isArray(allUsers) ? allUsers : []).filter(isTeamLeadUser);
 
-      // Format team leads from api/user/all
-      const formattedUserTLs = userTeamLeads.map((u) => {
-        const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Team Lead';
-        const designation = typeof u.designation === 'object'
-          ? (u.designation?.designationName || u.designation?.name || u.designation?.title || '')
-          : (u.designation || '');
-        return {
-          _id: u._id,
-          teamLeadId: u._id,
-          name,
-          fullName: name,
-          email: u.email,
-          mobile: u.mobile || u.phone || u.phoneNumber,
-          phone: u.phone || u.phoneNumber || u.mobile,
-          department: u.department,
-          designation,
-          role: u.role || 'team lead',
-          isActive: u.isActive !== false,
-          profileImage: u.profileImage,
-          teamLead: {
+      // Format team leads from api/user/all (strictly filtering out unnamed or unknown users)
+      const formattedUserTLs = userTeamLeads
+        .filter((u) => {
+          if (!u || isFinanceOrExcludedUser(u) || isUnknownEmployeeOrUser(u)) return false;
+          const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim();
+          return Boolean(name && isValidName(name));
+        })
+        .map((u) => {
+          const name = (u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim()).trim();
+          const designation = typeof u.designation === 'object'
+            ? (u.designation?.designationName || u.designation?.name || u.designation?.title || '')
+            : (u.designation || '');
+          return {
             _id: u._id,
-            userId: u._id,
+            teamLeadId: u._id,
             name,
             fullName: name,
             email: u.email,
-            role: u.role || 'team lead',
+            mobile: u.mobile || u.phone || u.phoneNumber,
+            phone: u.phone || u.phoneNumber || u.mobile,
             department: u.department,
             designation,
-            profileImage: u.profileImage
-          },
-          assignedEmployees: []
-        };
-      });
+            role: u.role || 'team lead',
+            isActive: u.isActive !== false,
+            profileImage: u.profileImage,
+            teamLead: {
+              _id: u._id,
+              userId: u._id,
+              name,
+              fullName: name,
+              email: u.email,
+              role: u.role || 'team lead',
+              department: u.department,
+              designation,
+              profileImage: u.profileImage
+            },
+            assignedEmployees: []
+          };
+        });
 
       // Optional: fetch teamLead/team to attach any existing assignments or raw team docs
       let teamLeadsData = [];
@@ -1112,38 +1166,44 @@ const getDesignation = (lead) => {
       // Extract all employees from database marked as team lead (e.g. Yash Vaghasiya)
       const employeeTeamLeads = (fetchedEmployees || []).filter((emp) => {
         if (!emp) return false;
-        if (isFinanceOrExcludedUser(emp)) return false;
+        if (isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
         const role = String(emp.role || emp.designation || '').toLowerCase().trim();
         return emp.isTeamLead === true || role === 'team lead' || role === 'team_leader' || role === 'tl' || role.includes('lead');
       });
 
       // Format employee TLs to match teamLead structure
-      const formattedEmployeeTLs = employeeTeamLeads.map((emp) => {
-        const name = emp.name || emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Team Lead';
-        return {
-          _id: emp._id,
-          teamLeadId: emp._id,
-          name,
-          fullName: name,
-          email: emp.email,
-          mobile: emp.mobile || emp.phone,
-          phone: emp.phone || emp.mobile,
-          department: emp.department,
-          designation: emp.designation,
-          role: 'team lead',
-          teamLead: {
+      const formattedEmployeeTLs = employeeTeamLeads
+        .filter((emp) => {
+          if (!emp || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
+          const name = emp.name || emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+          return Boolean(name && isValidName(name));
+        })
+        .map((emp) => {
+          const name = (emp.name || emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim()).trim();
+          return {
             _id: emp._id,
-            userId: emp._id,
+            teamLeadId: emp._id,
             name,
             fullName: name,
             email: emp.email,
-            role: 'team lead',
+            mobile: emp.mobile || emp.phone,
+            phone: emp.phone || emp.mobile,
             department: emp.department,
-            designation: emp.designation
-          },
-          assignedEmployees: []
-        };
-      });
+            designation: emp.designation,
+            role: 'team lead',
+            teamLead: {
+              _id: emp._id,
+              userId: emp._id,
+              name,
+              fullName: name,
+              email: emp.email,
+              role: 'team lead',
+              department: emp.department,
+              designation: emp.designation
+            },
+            assignedEmployees: []
+          };
+        });
 
       // 1. Start merged leads with the formatted team leads from api/user/all
       const mergedLeads = [...formattedUserTLs];
@@ -1151,11 +1211,11 @@ const getDesignation = (lead) => {
       // 2. Merge in any employeeTeamLeads (e.g. Yash Vaghasiya)
       (formattedEmployeeTLs || []).forEach((empLead) => {
         if (!empLead) return;
-        if (isFinanceOrExcludedUser(empLead)) return;
+        if (isFinanceOrExcludedUser(empLead) || isUnknownEmployeeOrUser(empLead)) return;
 
         const leadName = getUserName(empLead);
         const leadEmail = getUserEmail(empLead);
-        if (!leadName || leadName === "Unnamed" || leadName === "No Name" || leadName === "Unknown Employee" || leadName === "Unknown User" || leadName === "N/A") return;
+        if (!leadName || isInvalidName(leadName)) return;
         if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) return;
 
         const existingIdx = mergedLeads.findIndex(m => isSameLead(m, empLead));
@@ -1174,10 +1234,11 @@ const getDesignation = (lead) => {
       (teamLeadsData || []).forEach((apiLead) => {
         if (!apiLead) return;
         if (isFinanceOrExcludedUser(apiLead) || (apiLead.teamLead && isFinanceOrExcludedUser(apiLead.teamLead))) return;
+        if (isUnknownEmployeeOrUser(apiLead) || (apiLead.teamLead && isUnknownEmployeeOrUser(apiLead.teamLead))) return;
 
         const leadName = getUserName(apiLead);
         const leadEmail = getUserEmail(apiLead);
-        if (!leadName || leadName === "Unnamed" || leadName === "No Name" || leadName === "Unknown Employee" || leadName === "Unknown User" || leadName === "N/A") return;
+        if (!leadName || isInvalidName(leadName)) return;
         if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) return;
 
         const leadId = 
@@ -1213,7 +1274,7 @@ const getDesignation = (lead) => {
         }
       });
 
-      const savedEmployeeAssignments = loadSavedEmployeeAssignments();
+      // 4. Pure live API assignments only - DO NOT LOAD OR MERGE FROM LOCAL STORAGE
       const employeeAssignments = {};
       const globallyAssignedEmpKeys = new Set();
 
@@ -1235,37 +1296,27 @@ const getDesignation = (lead) => {
           typeof lead.teamLead === 'string' ? lead.teamLead : null
         ].filter(Boolean).map(String);
 
-        // Check if any employee directly references this lead
+        // Check if any employee directly references this lead in live API response
         const directlyAssignedEmployees = (fetchedEmployees || [])
           .filter(emp => emp && allAssociatedIds.some(id => String(emp.teamLeadId) === id || String(emp.teamLead) === id))
           .map(emp => String(emp._id));
 
-        const savedEmps = allAssociatedIds.flatMap(id => savedEmployeeAssignments[id] || []);
-
-        const mergedLiveEmployees = [...apiEmployees, ...directlyAssignedEmployees, ...savedEmps];
+        // PURE LIVE API DATA ONLY
+        const mergedLiveEmployees = [...apiEmployees, ...directlyAssignedEmployees];
         const distinctAssigned = getDistinctAssignedEmployees(mergedLiveEmployees, fetchedEmployees);
 
-        // Filter out employees who are assigned to a DIFFERENT lead in savedEmployeeAssignments
-        // to prevent stale backend data from reclaiming an employee that was transferred
-        const filteredLiveEmployees = distinctAssigned.filter((emp) => {
-          const empKey = getCanonicalEmployeeKey(emp, fetchedEmployees);
-          if (!empKey) return false;
-
-          const isSavedToAnotherLead = Object.entries(savedEmployeeAssignments).some(([otherId, list]) => {
-            if (allAssociatedIds.includes(String(otherId))) return false;
-            if (!Array.isArray(list)) return false;
-            return list.some(item => getCanonicalEmployeeKey(item, fetchedEmployees) === empKey);
-          });
-
-          if (isSavedToAnotherLead) {
-            return false;
-          }
-
+        // Strictly filter out any employee without a valid resolved name (NO "Unnamed" or unknown)
+        const validNamedEmployees = distinctAssigned.filter((emp) => {
+          if (!emp) return false;
+          const name = getEmployeeName(emp);
+          const email = emp.email || emp.user?.email || '';
+          if (!isValidName(name) && (!email || !email.includes('@'))) return false;
+          if (name && isInvalidName(name)) return false;
           return true;
         });
 
         // Strictly enforce 1 TL per employee across the whole system
-        const singleTlEmployees = filteredLiveEmployees.filter((emp) => {
+        const singleTlEmployees = validNamedEmployees.filter((emp) => {
           const empKey = getCanonicalEmployeeKey(emp, fetchedEmployees);
           if (!empKey) return false;
           if (globallyAssignedEmpKeys.has(empKey)) {
@@ -1288,9 +1339,15 @@ const getDesignation = (lead) => {
         employeeAssignments[leadId] = distinctIds;
       });
 
-      setTeamLeads([...mergedLeads]);
+      // Strict filter on leads: NEVER display any team lead that has an invalid or unnamed name!
+      const cleanedLeads = mergedLeads.filter((lead) => {
+        if (!lead) return false;
+        const name = getUserName(lead);
+        return Boolean(name && isValidName(name));
+      });
+
+      setTeamLeads(cleanedLeads);
       setAssignedEmployees(employeeAssignments);
-      persistEmployeeAssignments(employeeAssignments);
 
     } catch (error) {
       console.error("Error fetching team leads:", error);
@@ -1325,9 +1382,9 @@ const getDesignation = (lead) => {
       }
 
       const validEmployees = allEmployees.filter((emp) => {
-        if (!emp || isFinanceOrExcludedUser(emp)) return false;
+        if (!emp || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
         const name = getEmployeeName(emp);
-        if (!name || name === "Unnamed" || name === "No Name" || name === "Unknown Employee" || name === "Unknown User") return false;
+        if (!name || isInvalidName(name)) return false;
         return true;
       });
       const distinctEmployeesList = getDistinctAssignedEmployees(validEmployees, validEmployees);
@@ -1356,9 +1413,13 @@ const getDesignation = (lead) => {
   const handleOpenModal = (lead) => {
     const rawAssigned = assignedEmployees[lead._id] || lead.assignedEmployees || [];
     const distinctAssigned = getDistinctAssignedEmployees(rawAssigned, employees);
+    const validAssigned = distinctAssigned.filter((emp) => {
+      const name = getEmployeeName(emp);
+      return Boolean(name && isValidName(name));
+    });
     const leadWithAssignments = {
       ...lead,
-    assignedEmployees: distinctAssigned.map(getEmployeeReferenceId).filter(Boolean)
+      assignedEmployees: validAssigned.map(getEmployeeReferenceId).filter(Boolean)
     };
     setSelectedLead(leadWithAssignments);
     setModalOpen(true);
@@ -1461,47 +1522,6 @@ const getDesignation = (lead) => {
       });
       nextAssignedEmployees[targetLeadId] = cleanEmployeeIds;
 
-      // 3. Update localStorage for cross-panel sync
-      persistEmployeeAssignments(nextAssignedEmployees);
-      try {
-        localStorage.setItem('kt_assigned_employees', JSON.stringify(nextAssignedEmployees));
-        
-        // Also sync kt_user_assigned_tl for all possible employee keys (empId, userId, email, employeeID)
-        const userTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
-        const targetLeadName = getUserName(targetLeadObj) || 'Team Lead';
-        const targetLeadEmail = getUserEmail(targetLeadObj) || '';
-
-        cleanEmployeeIds.forEach((empId) => {
-          const matched = findEmployeeByIdOrUser(empId, employees);
-          const allIdentifiers = [
-            String(empId).trim(),
-            matched?._id ? String(matched._id).trim() : null,
-            matched?.id ? String(matched.id).trim() : null,
-            matched?.userId ? String(matched.userId).trim() : null,
-            matched?.userID ? String(matched.userID).trim() : null,
-            matched?.user?._id ? String(matched.user._id).trim() : null,
-            matched?.email ? String(matched.email).trim().toLowerCase() : null,
-            matched?.user?.email ? String(matched.user.email).trim().toLowerCase() : null,
-            matched?.employeeID ? String(matched.employeeID).trim() : null,
-            matched?.employeeCode ? String(matched.employeeCode).trim() : null
-          ].filter(Boolean);
-
-          allIdentifiers.forEach((ident) => {
-            userTLMap[ident] = {
-              id: targetLeadId,
-              teamLeadId: targetLeadId,
-              name: targetLeadName,
-              email: targetLeadEmail,
-              assignedAt: new Date().toISOString()
-            };
-          });
-        });
-        localStorage.setItem('kt_user_assigned_tl', JSON.stringify(userTLMap));
-        window.dispatchEvent(new Event('kt_team_assignment_updated'));
-      } catch (e) {
-        console.warn('Storage sync note:', e);
-      }
-
       // Update React state immediately
       setTeamLeads(nextTeamLeads);
       setAssignedEmployees(nextAssignedEmployees);
@@ -1519,7 +1539,7 @@ const getDesignation = (lead) => {
           { headers }
         );
       } catch (backendErr) {
-        console.warn('Backend team assign endpoint note (persisting locally):', backendErr?.response?.data || backendErr.message);
+        console.warn('Backend team assign endpoint note:', backendErr?.response?.data || backendErr.message);
       }
 
       // 5. Save updated assignments to backend for any other leads that lost employees
@@ -1566,6 +1586,9 @@ const getDesignation = (lead) => {
         } catch {}
       });
 
+      // Reload live data from backend to guarantee UI displays fresh API truth
+      await fetchTeamLeads(true);
+
       window.dispatchEvent(new Event('kt_team_assignment_updated'));
 
       showToast("Assignments saved successfully! Each employee is assigned to at most 1 Team Lead.", "success");
@@ -1576,6 +1599,9 @@ const getDesignation = (lead) => {
   };
 
   useEffect(() => {
+    try {
+      localStorage.removeItem('teamLeadAssignedEmployees');
+    } catch {}
     fetchTeamLeads(false);
 
     // Silent background auto-refresh every 12 seconds for real-time team assignments & updates
@@ -1724,10 +1750,16 @@ const getDesignation = (lead) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
           {teamLeads.map((lead, index) => {
+            const leadName = getUserName(lead);
+            if (!leadName || isInvalidName(leadName)) return null;
+
             const rawAssigned = assignedEmployees[lead._id] || lead.assignedEmployees || [];
             const assignedList = getDistinctAssignedEmployees(rawAssigned, employees);
-            const totalAssignments = assignedList.length;
-            const leadName = getUserName(lead);
+            const validAssignedList = assignedList.filter((emp) => {
+              const disp = getEmployeeDisplayName(emp);
+              return Boolean(disp && isValidName(disp));
+            });
+            const totalAssignments = validAssignedList.length;
             const leadEmail = getUserEmail(lead);
             const departmentName = getDepartment(lead, employees);
 
@@ -1809,12 +1841,16 @@ const getDesignation = (lead) => {
                       <div className="mt-4 pt-3 border-t border-gray-200">
                         <p className="text-xs text-gray-500 font-medium mb-2">Team Members</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {assignedList.slice(0, 6).map((emp) => (
-                            <span key={emp._id || emp.email || emp.name} className="inline-flex items-center px-2.5 py-1 bg-purple-100 text-purple-800 text-xs rounded-full border border-purple-200">
-                              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1.5"></span>
-                              {getEmployeeDisplayName(emp)}
-                            </span>
-                          ))}
+                          {validAssignedList.slice(0, 6).map((emp) => {
+                            const dispName = getEmployeeDisplayName(emp);
+                            if (!dispName || isInvalidName(dispName)) return null;
+                            return (
+                              <span key={emp._id || emp.email || emp.name} className="inline-flex items-center px-2.5 py-1 bg-purple-100 text-purple-800 text-xs rounded-full border border-purple-200">
+                                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1.5"></span>
+                                {dispName}
+                              </span>
+                            );
+                          })}
                           {totalAssignments > 6 && (
                             <span className="inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-full border border-gray-200">
                               +{totalAssignments - 6} more

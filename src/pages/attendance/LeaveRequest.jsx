@@ -15,6 +15,7 @@ import {
   XCircle,
   RefreshCw,
   User,
+  Users,
   ShieldCheck,
   Loader2,
 } from "lucide-react";
@@ -906,17 +907,18 @@ export default function LeaveRequest() {
       leave.role
     );
 
+    // If already finalized (approved or rejected), never show action buttons
+    if (isLeaveFinalized(leave)) {
+      return false;
+    }
+
     // ========================================================
     // ADMIN
-    // CAN ALWAYS EDIT HR LEAVE STATUS
+    // CAN APPROVE/REJECT HR LEAVE (if not already finalized)
     // ========================================================
 
     if (loggedRole === "admin") {
-      return applicantRole === "hr";
-    }
-
-    if (isLeaveFinalized(leave)) {
-      return false;
+      return applicantRole === "hr" && !isApproved(leave.adminStatus) && !isRejected(leave.adminStatus);
     }
 
     // ========================================================
@@ -1394,27 +1396,27 @@ export default function LeaveRequest() {
   // ==========================================================
 
   const StatusBadge = ({ status }) => {
-    const normalized =
-      normalizeStatus(status);
-
-    let classes =
-      "bg-amber-50 text-amber-700 border-amber-200";
+    const normalized = normalizeStatus(status);
 
     if (normalized === "Approved") {
-      classes =
-        "bg-emerald-50 text-emerald-700 border-emerald-200";
+      return (
+        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] font-poppins select-none whitespace-nowrap">
+          Approved
+        </span>
+      );
     }
 
     if (normalized === "Rejected") {
-      classes =
-        "bg-red-50 text-red-700 border-red-200";
+      return (
+        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] font-poppins select-none whitespace-nowrap">
+          Rejected
+        </span>
+      );
     }
 
     return (
-      <span
-        className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${classes}`}
-      >
-        {normalized}
+      <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] font-poppins select-none whitespace-nowrap">
+        Pending
       </span>
     );
   };
@@ -1430,7 +1432,7 @@ export default function LeaveRequest() {
 
     if (isNotApplicable) {
       return (
-        <span className="text-sm text-gray-400">
+        <span className="text-sm text-slate-400 font-medium select-none">
           -
         </span>
       );
@@ -1448,32 +1450,30 @@ export default function LeaveRequest() {
       if (loggedRole === "hr" && applicantRole === "employee") {
         if (isPending(leave?.teamLeadStatus)) {
           return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-              <Clock className="w-3.5 h-3.5 text-amber-600" />
-              Waiting for TL Approval
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 font-poppins select-none whitespace-nowrap">
+              <Clock className="w-3 h-3 text-amber-600" />
+              Waiting for TL
             </span>
           );
         }
         if (isRejected(leave?.teamLeadStatus)) {
           return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 font-poppins select-none whitespace-nowrap">
+              <XCircle className="w-3 h-3 text-rose-600" />
               Rejected by TL
             </span>
           );
         }
         if (isApproved(leave?.hrStatus)) {
           return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] font-poppins select-none whitespace-nowrap">
               Approved by HR
             </span>
           );
         }
         if (isRejected(leave?.hrStatus)) {
           return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] font-poppins select-none whitespace-nowrap">
               Rejected by HR
             </span>
           );
@@ -1484,17 +1484,15 @@ export default function LeaveRequest() {
       if (loggedRole === "teamlead") {
         if (isApproved(leave?.teamLeadStatus)) {
           return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-              Approved by You (Sent to HR)
+            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] font-poppins select-none whitespace-nowrap">
+              Approved
             </span>
           );
         }
         if (isRejected(leave?.teamLeadStatus)) {
           return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-              <XCircle className="w-3.5 h-3.5 text-rose-600" />
-              Rejected by You
+            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] font-poppins select-none whitespace-nowrap">
+              Rejected
             </span>
           );
         }
@@ -1512,8 +1510,7 @@ export default function LeaveRequest() {
 
     if (currentStatus === "Approved") {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] font-poppins select-none whitespace-nowrap">
           Approved
         </span>
       );
@@ -1521,18 +1518,16 @@ export default function LeaveRequest() {
 
     if (currentStatus === "Rejected") {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+        <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] font-poppins select-none whitespace-nowrap">
           Rejected
         </span>
       );
     }
 
     const isActioning = actioningId === leave.id;
-    const ApproveIcon = Check;
 
     return (
-      <div className="flex items-center gap-2 whitespace-nowrap">
+      <div className="flex items-center gap-1.5 whitespace-nowrap font-poppins" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={(event) => {
@@ -1542,12 +1537,12 @@ export default function LeaveRequest() {
           disabled={isActioning}
           aria-label="Approve Leave"
           title="Approve Leave"
-          className="w-8 h-8 shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center shadow-sm transition active:scale-90 disabled:opacity-50"
+          className="h-7 w-7 rounded-md bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center shadow-2xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
         >
           {isActioning ? (
-            <Loader2 className="w-4 h-4 animate-spin text-white" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
           ) : (
-            <ApproveIcon className="w-4 h-4 stroke-[2.5]" />
+            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
           )}
         </button>
 
@@ -1558,13 +1553,14 @@ export default function LeaveRequest() {
             openActionModal(leave, "rejected");
           }}
           disabled={isActioning}
+          aria-label="Reject Leave"
           title="Reject Leave"
-          className="w-8 h-8 shrink-0 rounded-full bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white flex items-center justify-center shadow-sm transition active:scale-90 disabled:opacity-50"
+          className="h-7 w-7 rounded-md bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white flex items-center justify-center shadow-2xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
         >
           {isActioning ? (
-            <Loader2 className="w-4 h-4 animate-spin text-white" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
           ) : (
-            <X className="w-4 h-4 stroke-[2.5]" />
+            <X className="w-3.5 h-3.5 stroke-[2.5]" />
           )}
         </button>
       </div>
@@ -1589,88 +1585,67 @@ export default function LeaveRequest() {
   // ==========================================================
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-5 font-poppins text-slate-800">
       {/* ====================================================
-          HEADER
+          PAGE HEADER (Matches Screenshot cite [2])
       ==================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-            <CalendarDays size={18} />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Leave Requests
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Review, approve, or reject employee leave applications
-            </p>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 font-poppins">
+        <div>
+          <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
+            Leave Requests
+          </h1>
+          <p className="text-xs sm:text-[13px] text-slate-500 font-normal font-poppins mt-0.5">
+            Review And Manage Leave Applications
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Total Count Badge */}
+          <div className="h-9 bg-white border border-slate-300 rounded-md px-3 sm:px-3.5 shadow-2xs text-xs font-medium flex items-center select-none font-poppins text-slate-600 gap-1.5">
+            <Users size={14} className="text-slate-600 shrink-0" />
+            <span>Total:</span>
+            <span className="font-bold text-slate-900">{requests.length}</span>
+          </div>
+
           {/* Refresh Button */}
           <button
+            type="button"
             onClick={() => fetchLeaves()}
             disabled={loading}
-            title="Refresh from Database"
-            className="h-10 px-3.5 py-1 bg-white border border-slate-200/80 rounded-lg shadow-xs text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Refresh requests"
+            aria-label="Refresh requests"
+            className="h-9 w-9 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer font-poppins"
           >
-            <RefreshCw className={`h-3.5 w-3.5 text-slate-600 ${loading ? "animate-spin text-[#0088cc]" : ""}`} />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw size={13} className={`text-slate-600 ${loading ? "animate-spin text-[#0088cc]" : ""}`} />
           </button>
         </div>
       </div>
 
-      {/* 4 METRIC CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {[
-          { label: "TOTAL REQUESTS", value: requests.length },
-          { label: "PENDING", value: requests.filter((r) => isPending(r.approvalStatus || r.status)).length },
-          { label: "APPROVED", value: requests.filter((r) => isApproved(r.approvalStatus || r.status)).length },
-          { label: "REJECTED", value: requests.filter((r) => isRejected(r.approvalStatus || r.status)).length }
-        ].map((item, idx) => (
-          <div
-            key={idx}
-            className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
-          </div>
-        ))}
-      </div>
-
       {/* ====================================================
-            SUCCESS
-        ==================================================== */}
-
+            SUCCESS & ERROR NOTIFICATIONS
+      ==================================================== */}
       {success && (
-        <div className="mb-4 flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
-          <CheckCircle className="w-5 h-5" />
-          <span>{success}</span>
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-xs sm:text-sm font-poppins animate-in fade-in duration-200 shadow-2xs">
+          <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="flex-1">{success}</span>
+          <button
+            type="button"
+            onClick={() => setSuccess("")}
+            className="text-emerald-700 hover:text-emerald-900 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      {/* ====================================================
-            ERROR
-        ==================================================== */}
-
       {error && (
-        <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
-          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-
-          <span className="flex-1">
-            {error}
-          </span>
-
+        <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl px-4 py-3 text-xs sm:text-sm font-poppins animate-in fade-in duration-200 shadow-2xs">
+          <AlertCircle className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
+          <span className="flex-1">{error}</span>
           <button
             type="button"
-            onClick={() =>
-              setError("")
-            }
+            onClick={() => setError("")}
+            className="text-rose-700 hover:text-rose-900 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -1679,12 +1654,11 @@ export default function LeaveRequest() {
 
       {/* ====================================================
             TEAM LEAD ASSIGNED BANNER
-        ==================================================== */}
-
+      ==================================================== */}
       {normalizeRole(currentRole) === "teamlead" && (
-        <div className="mb-4">
+        <div>
           {assignedTeams.length > 0 ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs font-poppins">
               <div className="flex items-center gap-2 text-indigo-900 font-medium">
                 <User className="w-4 h-4 text-indigo-600 shrink-0" />
                 <span>
@@ -1696,10 +1670,10 @@ export default function LeaveRequest() {
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-poppins">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
-                No specific team assigned to your Team Lead account in <code>/api/teamLead/team</code>. Only leaves for your assigned team members will appear here.
+                No specific team assigned to your Team Lead account. Only leaves for your assigned team members will appear here.
               </span>
             </div>
           )}
@@ -1707,461 +1681,215 @@ export default function LeaveRequest() {
       )}
 
       {/* ====================================================
-            MAIN CARD
-        ==================================================== */}
-
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            MAIN DATA CONTAINER (Clean White Background #FFFFFF)
+      ==================================================== */}
+      <div className="bg-white border border-slate-200/80 rounded-xl sm:rounded-2xl p-4 sm:p-5 lg:p-6 shadow-2xs space-y-4 font-poppins">
 
         {/* ==================================================
-              SEARCH
+              SEARCH & FILTERS TOOLBAR
           ================================================== */}
-
-        <div className="p-4 border-b border-gray-200">
-
-          <div className="flex flex-col sm:flex-row gap-3">
-
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) =>
-                  setSearchTerm(
-                    e.target.value
-                  )
-                }
-                placeholder="Search employee, role, leave type..."
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="relative" ref={filterDropdownRef}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 font-poppins">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search employee, role, leave type..."
+              className="w-full h-10 pl-10 pr-9 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition bg-white font-poppins"
+            />
+            {searchTerm && (
               <button
                 type="button"
-                aria-expanded={showFilters}
-                aria-haspopup="true"
-                onClick={() =>
-                  setShowFilters(
-                    (previous) =>
-                      !previous
-                  )
-                }
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                title="Clear search"
               >
-                <Filter className="w-4 h-4" />
-
-                Filters
-
-                <ChevronDown
-                  className={`w-4 h-4 transition ${showFilters
-                    ? "rotate-180"
-                    : ""
-                    }`}
-                />
+                <X className="w-3.5 h-3.5" />
               </button>
+            )}
+          </div>
 
-              {showFilters && (
-                <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-                  <p className="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-600">
-                    Leave Type
-                  </p>
-
-                  <div className="max-h-72 overflow-y-auto p-1.5">
-                    {[{ value: "all", label: "All Types" }, ...availableLeaveTypes.map((type) => ({
-                      value: type,
-                      label: formatLeaveType(type),
-                    }))].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => {
-                          setFilterType(option.value);
-                          setShowFilters(false);
-                        }}
-                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm transition ${filterType === option.value
-                          ? "bg-blue-50 font-semibold text-blue-700"
-                          : "text-gray-700 hover:bg-gray-50"
-                          }`}
-                      >
-                        {option.label}
-                        {filterType === option.value && (
-                          <Check className="h-4 w-4" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          <div className="relative" ref={filterDropdownRef}>
+            <button
+              type="button"
+              aria-expanded={showFilters}
+              aria-haspopup="true"
+              onClick={() => setShowFilters((prev) => !prev)}
+              className="h-10 inline-flex items-center justify-center gap-2 px-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs sm:text-sm font-medium font-poppins shadow-2xs transition cursor-pointer"
+            >
+              <Filter className="w-3.5 h-3.5 text-slate-500" />
+              <span>Filters</span>
+              {filterType !== "all" && (
+                <span className="w-2 h-2 rounded-full bg-[#034665]" />
               )}
-            </div>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-500 transition-transform ${showFilters ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {showFilters && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl font-poppins p-1.5 animate-in fade-in zoom-in-95 duration-100">
+                <p className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Leave Type
+                </p>
+
+                <div className="max-h-72 overflow-y-auto modal-scrollbar p-1">
+                  {[{ value: "all", label: "All Types" }, ...availableLeaveTypes.map((type) => ({
+                    value: type,
+                    label: formatLeaveType(type),
+                  }))].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setFilterType(option.value);
+                        setShowFilters(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs sm:text-sm transition cursor-pointer ${
+                        filterType === option.value
+                          ? "bg-[#034665]/10 font-semibold text-[#034665]"
+                          : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{option.label}</span>
+                      {filterType === option.value && (
+                        <Check className="h-4 w-4 text-[#034665]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ==================================================
-              LOADING
+              LOADING & EMPTY STATES
           ================================================== */}
-
         {loading ? (
           <Loader />
         ) : filteredRequests.length === 0 ? (
-
-          <div className="py-16 text-center">
-
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-50 mb-4">
-              <Calendar className="w-7 h-7 text-blue-500" />
+          <div className="py-16 text-center font-poppins">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-slate-100 mb-4 text-[#034665]">
+              <Calendar className="w-7 h-7" />
             </div>
-
-            <h3 className="text-lg font-semibold text-gray-800">
-              {searchTerm ||
-                filterType !== "all"
+            <h3 className="text-base font-bold text-slate-800 font-poppins">
+              {searchTerm || filterType !== "all"
                 ? "No Results Found"
                 : "No Leave Requests"}
             </h3>
-
-            <p className="text-sm text-gray-500 mt-1">
-              {searchTerm ||
-                filterType !== "all"
-                ? "Try changing your search or filter."
-                : "Leave applications will appear here."}
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 font-poppins">
+              {searchTerm || filterType !== "all"
+                ? "Try adjusting your search keywords or leave type filter."
+                : "Leave applications submitted by team members will appear here."}
             </p>
           </div>
-
         ) : (
-
           <>
             {/* ==================================================
-                  DESKTOP TABLE
+                  DESKTOP TABLE (Clean White Row Background, Navy Headers)
               ================================================== */}
-
-            <div className="hidden xl:block overflow-hidden">
-
-              <table className="w-full table-fixed text-xs">
+            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/80">
+              <table className="w-full table-fixed text-xs font-poppins">
                 <colgroup>
                   <col className="w-[4%]" />
-                  <col className="w-[15%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[11%]" />
                   <col className="w-[12%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[14%]" />
+                  <col className="w-[12%]" />
                   <col className="w-[9%]" />
                   <col className="w-[8%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[11%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[10%]" />
                   <col className="w-[11%]" />
                 </colgroup>
 
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
-                      #
+                <thead style={{ backgroundColor: "#0346651A" }}>
+                  <tr className="border-b border-slate-200/80">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                      No.
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       Employee
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       Leave
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       Duration
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       Dates
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       Team Lead
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       HR
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       Admin
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       Workflow
                     </th>
-
-                    <th className="px-2 py-3 text-left text-xs font-bold text-gray-500">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
                       Approve / Reject Reason
                     </th>
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {filteredRequests.map((request, index) => (
+                    <tr
+                      key={request.id}
+                      onClick={() => setSelectedLeave(request)}
+                      className="hover:bg-slate-50/70 cursor-pointer transition-colors"
+                    >
+                      <td className="px-3 py-3 text-slate-500 font-medium font-poppins text-xs">
+                        {index + 1}
+                      </td>
 
-                  {filteredRequests.map(
-                    (request, index) => (
-
-                      <tr
-                        key={request.id}
-                        onClick={() =>
-                          setSelectedLeave(
-                            request
-                          )
-                        }
-                        className="hover:bg-blue-50 cursor-pointer transition"
-                      >
-
-                        <td className="px-2 py-3 text-gray-500">
-                          {index + 1}
-                        </td>
-
-                        <td className="px-2 py-3">
-
-                          <div className="flex min-w-0 items-center gap-2">
-
-                            <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                              {getInitials(
-                                request.name
-                              )}
-                            </div>
-
-                            <div className="min-w-0">
-                              <p className="break-words font-semibold text-gray-800">
-                                {request.name}
-                              </p>
-
-                              <p className="text-xs text-gray-500">
-                                {formatRole(
-                                  request.role
-                                )}
-                              </p>
-                            </div>
-
-                          </div>
-                        </td>
-
-                        <td className="px-2 py-3">
-
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${getLeaveTypeStyle(
-                              request.leaveType
-                            )}`}
+                      <td className="px-3 py-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <div
+                            className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0 font-poppins shadow-2xs"
+                            style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
                           >
-                            {getLeaveTypeIcon(
-                              request.leaveType
-                            )}
-
-                            {formatLeaveType(request.leaveType)}
-                          </span>
-                        </td>
-
-                        <td className="px-2 py-3 font-semibold text-gray-800">
-                          {formatDuration(request)}
-                        </td>
-
-                        <td className="px-2 py-3 text-xs text-gray-600">
-                          <span className="block">{formatDate(request.startDate)}</span>
-                          <span className="block">to {formatDate(request.endDate)}</span>
-                          {request.dateIssue && (
-                            <DateCorrectionNotice issue={request.dateIssue} />
-                          )}
-                        </td>
-
-                        <td className="px-2 py-3">
-                          {normalizeRole(currentRole) === "teamlead" && canTakeAction(request) ? (
-                            <ApprovalActions leave={request} />
-                          ) : (
-                            <ApprovalStatus
-                              leave={request}
-                              stage="teamlead"
-                              status={request.teamLeadStatus}
-                            />
-                          )}
-                        </td>
-
-                        <td className="px-2 py-3">
-                          {normalizeRole(currentRole) === "hr" && canTakeAction(request) ? (
-                            <ApprovalActions leave={request} />
-                          ) : (
-                            <ApprovalStatus
-                              leave={request}
-                              stage="hr"
-                              status={request.hrStatus}
-                            />
-                          )}
-                        </td>
-
-                        <td className="px-2 py-3">
-                          {normalizeRole(request.role) === "hr" ? (
-                            normalizeRole(currentRole) === "admin" && canTakeAction(request) ? (
-                              <ApprovalActions leave={request} />
-                            ) : (
-                              <StatusBadge status={request.adminStatus} />
-                            )
-                          ) : (
-                            <span className="text-sm text-gray-400">
-                              -
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-2 py-3">
-                          <span className="text-xs font-medium text-gray-600">
-                            {getWorkflowText(
-                              request
-                            )}
-                          </span>
-                        </td>
-
-                        <td className="px-2 py-3">
-                          {request.teamLeadRemark || request.hrRemark || request.adminRemark || request.remark || request.description ? (
-                            <div className="space-y-1.5 text-xs">
-                              {request.teamLeadRemark && (
-                                <div className="flex items-start gap-1">
-                                  <span className="font-bold text-amber-700 shrink-0">TL:</span>
-                                  <span className="text-gray-700 whitespace-normal break-words">
-                                    {request.teamLeadRemark}
-                                  </span>
-                                </div>
-                              )}
-                              {request.hrRemark && (
-                                <div className="flex items-start gap-1">
-                                  <span className="font-bold text-purple-700 shrink-0">HR:</span>
-                                  <span className="text-gray-700 whitespace-normal break-words">
-                                    {request.hrRemark}
-                                  </span>
-                                </div>
-                              )}
-                              {request.adminRemark && (
-                                <div className="flex items-start gap-1">
-                                  <span className="font-bold text-blue-700 shrink-0">Admin:</span>
-                                  <span className="text-gray-700 whitespace-normal break-words">
-                                    {request.adminRemark}
-                                  </span>
-                                </div>
-                              )}
-                              {!request.teamLeadRemark && !request.hrRemark && !request.adminRemark && (request.remark || request.description) && (
-                                <span className="text-gray-700 whitespace-normal break-words">
-                                  {request.remark || request.description}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">-</span>
-                          )}
-                        </td>
-
-                      </tr>
-                    )
-                  )}
-
-                </tbody>
-              </table>
-            </div>
-
-            {/* ==================================================
-                  MOBILE CARDS
-              ================================================== */}
-
-            <div className="xl:hidden p-3 space-y-3">
-
-              {filteredRequests.map(
-                (request) => (
-
-                  <div
-                    key={request.id}
-                    onClick={() =>
-                      setSelectedLeave(
-                        request
-                      )
-                    }
-                    className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer transition"
-                  >
-
-                    <div className="flex items-start justify-between gap-3">
-
-                      <div className="flex items-center gap-3">
-
-                        <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
-                          {getInitials(
-                            request.name
-                          )}
+                            {getInitials(request.name)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 text-xs sm:text-[13px] font-poppins truncate">
+                              {request.name}
+                            </p>
+                            <p className="text-[11px] text-slate-400 font-normal font-poppins truncate">
+                              {formatRole(request.role)}
+                            </p>
+                          </div>
                         </div>
+                      </td>
 
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            {request.name}
-                          </p>
+                      <td className="px-3 py-3">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-medium font-poppins shadow-2xs whitespace-nowrap">
+                          {getLeaveTypeIcon(request.leaveType)}
+                          <span>{getCanonicalLeaveType(formatLeaveType(request.leaveType), request)}</span>
+                        </span>
+                      </td>
 
-                          <p className="text-xs text-gray-500">
-                            {formatRole(
-                              request.role
-                            )}
-                          </p>
-                        </div>
+                      <td className="px-3 py-3 font-bold text-slate-900 text-xs sm:text-[13px] font-poppins whitespace-nowrap">
+                        {formatDuration(request)}
+                      </td>
 
-                      </div>
-
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium ${getLeaveTypeStyle(
-                          request.leaveType
-                        )}`}
-                      >
-                        {getLeaveTypeIcon(
-                          request.leaveType
-                        )}
-
-                        {formatLeaveType(request.leaveType)}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-
-                      <div>
-                        <p className="text-[11px] text-gray-400 uppercase">
-                          Dates
-                        </p>
-
-                        <p className="text-xs font-medium text-gray-700 mt-1">
-                          {formatDate(
-                            request.startDate
-                          )}
-                          {" - "}
-                          {formatDate(
-                            request.endDate
-                          )}
-                        </p>
+                      <td className="px-3 py-3 text-[11px] font-poppins leading-tight">
+                        <span className="block font-medium text-slate-700 whitespace-nowrap">{formatDate(request.startDate)}</span>
+                        <span className="block text-slate-400 whitespace-nowrap">to {formatDate(request.endDate)}</span>
                         {request.dateIssue && (
                           <DateCorrectionNotice issue={request.dateIssue} />
                         )}
-                      </div>
+                      </td>
 
-                      <div>
-                        <p className="text-[11px] text-gray-400 uppercase">
-                          Duration
-                        </p>
-
-                        <p className="text-xs font-semibold text-gray-700 mt-1">
-                          {formatDuration(request)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {request.reason && (
-                      <div className="mt-3 flex items-start gap-2">
-                        <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-
-                        <p className="text-xs text-gray-500 line-clamp-2">
-                          {request.reason}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="mt-4 pt-3 border-t border-gray-200 grid grid-cols-3 gap-2">
-
-                      <div>
-                        <p className="text-[10px] text-gray-400 mb-1">
-                          TEAM LEAD
-                        </p>
-
+                      <td className="px-3 py-3">
                         {normalizeRole(currentRole) === "teamlead" && canTakeAction(request) ? (
                           <ApprovalActions leave={request} />
                         ) : (
@@ -2171,13 +1899,9 @@ export default function LeaveRequest() {
                             status={request.teamLeadStatus}
                           />
                         )}
-                      </div>
+                      </td>
 
-                      <div>
-                        <p className="text-[10px] text-gray-400 mb-1">
-                          HR
-                        </p>
-
+                      <td className="px-3 py-3">
                         {normalizeRole(currentRole) === "hr" && canTakeAction(request) ? (
                           <ApprovalActions leave={request} />
                         ) : (
@@ -2187,67 +1911,198 @@ export default function LeaveRequest() {
                             status={request.hrStatus}
                           />
                         )}
-                      </div>
+                      </td>
 
-                      <div>
-                        <p className="text-[10px] text-gray-400 mb-1">
-                          ADMIN
-                        </p>
-
+                      <td className="px-3 py-3">
                         {normalizeRole(request.role) === "hr" ? (
                           normalizeRole(currentRole) === "admin" && canTakeAction(request) ? (
                             <ApprovalActions leave={request} />
                           ) : (
-                            <StatusBadge
-                              status={
-                                request.adminStatus
-                              }
-                            />
+                            <StatusBadge status={request.adminStatus} />
                           )
                         ) : (
-                          <span className="text-sm text-gray-400">
-                            -
-                          </span>
+                          <span className="text-sm text-slate-400 font-medium select-none">-</span>
                         )}
-                      </div>
+                      </td>
 
+                      <td className="px-3 py-3">
+                        <span className="text-xs font-medium text-slate-700 font-poppins whitespace-nowrap">
+                          {getWorkflowText(request)}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-3">
+                        {request.teamLeadRemark || request.hrRemark || request.adminRemark || request.remark || request.description ? (
+                          <div className="space-y-1 text-xs font-poppins max-w-[200px]">
+                            {request.teamLeadRemark && (
+                              <div className="text-[11px] leading-tight break-words">
+                                <span className="font-bold text-amber-700 mr-1 font-poppins">TL:</span>
+                                <span className="text-slate-700 font-poppins">{request.teamLeadRemark}</span>
+                              </div>
+                            )}
+                            {request.hrRemark && (
+                              <div className="text-[11px] leading-tight break-words">
+                                <span className="font-bold text-purple-700 mr-1 font-poppins">HR:</span>
+                                <span className="text-slate-700 font-poppins">{request.hrRemark}</span>
+                              </div>
+                            )}
+                            {request.adminRemark && (
+                              <div className="text-[11px] leading-tight break-words">
+                                <span className="font-bold text-blue-700 mr-1 font-poppins">Admin:</span>
+                                <span className="text-slate-700 font-poppins">{request.adminRemark}</span>
+                              </div>
+                            )}
+                            {!request.teamLeadRemark && !request.hrRemark && !request.adminRemark && (request.remark || request.description) && (
+                              <p className="text-[11px] text-slate-700 font-poppins leading-tight break-words">
+                                {request.remark || request.description}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium select-none">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ==================================================
+                  MOBILE & TABLET CARDS (< 1024px)
+              ================================================== */}
+            <div className="lg:hidden space-y-3 font-poppins">
+              {filteredRequests.map((request) => (
+                <div
+                  key={request.id}
+                  onClick={() => setSelectedLeave(request)}
+                  className="bg-white border border-slate-200/80 rounded-xl p-4 hover:border-[#034665]/30 hover:shadow-xs cursor-pointer transition font-poppins space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className="w-9 h-9 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0 font-poppins shadow-2xs"
+                        style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
+                      >
+                        {getInitials(request.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 text-sm font-poppins truncate">
+                          {request.name}
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-normal font-poppins truncate">
+                          {formatRole(request.role)}
+                        </p>
+                      </div>
                     </div>
 
-                    {(request.teamLeadRemark || request.hrRemark || request.adminRemark || request.remark || request.description) && (
-                      <div className="mt-2.5 pt-2 border-t border-gray-100 space-y-1 text-xs">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                          Approve / Reject Reason
-                        </p>
-                        {request.teamLeadRemark && (
-                          <p className="text-xs text-gray-600">
-                            <span className="font-semibold text-amber-700">TL: </span>
-                            {request.teamLeadRemark}
-                          </p>
-                        )}
-                        {request.hrRemark && (
-                          <p className="text-xs text-gray-600">
-                            <span className="font-semibold text-purple-700">HR: </span>
-                            {request.hrRemark}
-                          </p>
-                        )}
-                        {request.adminRemark && (
-                          <p className="text-xs text-gray-600">
-                            <span className="font-semibold text-blue-700">Admin: </span>
-                            {request.adminRemark}
-                          </p>
-                        )}
-                        {!request.teamLeadRemark && !request.hrRemark && !request.adminRemark && (request.remark || request.description) && (
-                          <p className="text-xs text-gray-600">
-                            {request.remark || request.description}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-medium font-poppins shadow-2xs shrink-0">
+                      {getLeaveTypeIcon(request.leaveType)}
+                      <span>{getCanonicalLeaveType(formatLeaveType(request.leaveType), request)}</span>
+                    </span>
                   </div>
-                )
-              )}
 
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 text-xs font-poppins">
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-poppins">
+                        Duration
+                      </p>
+                      <p className="font-bold text-slate-800 text-xs mt-0.5 font-poppins">
+                        {formatDuration(request)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-poppins">
+                        Dates
+                      </p>
+                      <p className="text-slate-600 text-xs mt-0.5 font-poppins">
+                        {formatDate(request.startDate)} - {formatDate(request.endDate)}
+                      </p>
+                      {request.dateIssue && (
+                        <DateCorrectionNotice issue={request.dateIssue} />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 border-t border-slate-100 grid grid-cols-3 gap-2 font-poppins">
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 font-poppins">
+                        Team Lead
+                      </p>
+                      {normalizeRole(currentRole) === "teamlead" && canTakeAction(request) ? (
+                        <ApprovalActions leave={request} />
+                      ) : (
+                        <ApprovalStatus
+                          leave={request}
+                          stage="teamlead"
+                          status={request.teamLeadStatus}
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 font-poppins">
+                        HR
+                      </p>
+                      {normalizeRole(currentRole) === "hr" && canTakeAction(request) ? (
+                        <ApprovalActions leave={request} />
+                      ) : (
+                        <ApprovalStatus
+                          leave={request}
+                          stage="hr"
+                          status={request.hrStatus}
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 font-poppins">
+                        Admin
+                      </p>
+                      {normalizeRole(request.role) === "hr" ? (
+                        normalizeRole(currentRole) === "admin" && canTakeAction(request) ? (
+                          <ApprovalActions leave={request} />
+                        ) : (
+                          <StatusBadge status={request.adminStatus} />
+                        )
+                      ) : (
+                        <span className="text-sm text-slate-400 font-medium select-none">-</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {(request.teamLeadRemark || request.hrRemark || request.adminRemark || request.remark || request.description) && (
+                    <div className="pt-2 border-t border-slate-100 text-xs space-y-1 font-poppins">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-poppins">
+                        Approve / Reject Reason
+                      </p>
+                      {request.teamLeadRemark && (
+                        <p className="text-slate-600 font-poppins text-xs">
+                          <span className="font-bold text-amber-700">TL: </span>
+                          {request.teamLeadRemark}
+                        </p>
+                      )}
+                      {request.hrRemark && (
+                        <p className="text-slate-600 font-poppins text-xs">
+                          <span className="font-bold text-purple-700">HR: </span>
+                          {request.hrRemark}
+                        </p>
+                      )}
+                      {request.adminRemark && (
+                        <p className="text-slate-600 font-poppins text-xs">
+                          <span className="font-bold text-blue-700">Admin: </span>
+                          {request.adminRemark}
+                        </p>
+                      )}
+                      {!request.teamLeadRemark && !request.hrRemark && !request.adminRemark && (request.remark || request.description) && (
+                        <p className="text-slate-600 font-poppins text-xs">
+                          {request.remark || request.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -2256,241 +2111,160 @@ export default function LeaveRequest() {
       {/* ========================================================
           DETAILS MODAL
       ======================================================== */}
-
       {selectedLeave && (
         <div
-          className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5"
-          onClick={() =>
-            setSelectedLeave(null)
-          }
+          className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 font-poppins animate-in fade-in duration-150"
+          onClick={() => setSelectedLeave(null)}
         >
-
           <div
-            className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-xl border border-slate-200/80 shadow-2xl"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
+            className="w-full max-w-2xl max-h-[calc(100vh-3.5rem)] my-auto flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-2xl overflow-hidden font-poppins animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
           >
-
-            {/* ==================================================
-                MODAL HEADER
-            ================================================== */}
-
-            <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-
+            {/* STICKY HEADER */}
+            <div className="shrink-0 bg-white border-b border-slate-200 px-5 sm:px-6 py-4 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-gray-800">
+                <h2 className="text-lg font-bold text-slate-900 font-poppins">
                   Leave Details
                 </h2>
-
-                <p className="text-xs text-gray-500 mt-1">
-                  Complete leave approval information
+                <p className="text-xs text-slate-500 font-poppins mt-0.5">
+                  Complete leave application & approval workflow
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  setSelectedLeave(null)
-                }
-                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                onClick={() => setSelectedLeave(null)}
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition cursor-pointer"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* ==================================================
-                MODAL BODY
-            ================================================== */}
-
-            <div className="p-5 space-y-5">
-
-              {/* EMPLOYEE */}
-
-              <div className="flex items-center gap-4">
-
-                <div className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg font-bold">
-                  {getInitials(
-                    selectedLeave.name
-                  )}
+            {/* SCROLLABLE BODY */}
+            <div className="flex-1 overflow-y-auto modal-scrollbar p-5 sm:p-6 space-y-4">
+              {/* EMPLOYEE HEADER */}
+              <div className="flex items-center gap-3.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                <div
+                  className="w-12 h-12 rounded-full text-white flex items-center justify-center text-sm font-bold shrink-0 font-poppins shadow-2xs"
+                  style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
+                >
+                  {getInitials(selectedLeave.name)}
                 </div>
 
-                <div className="flex-1">
-
-                  <h3 className="text-lg font-semibold text-gray-800">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-bold text-slate-900 font-poppins truncate">
                     {selectedLeave.name}
                   </h3>
-
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-
-                    <span className="text-sm text-gray-500">
-                      {formatRole(
-                        selectedLeave.role
-                      )}
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs">
+                    <span className="font-medium text-slate-600 font-poppins">
+                      {formatRole(selectedLeave.role)}
                     </span>
-
                     {selectedLeave.email && (
                       <>
-                        <span className="text-gray-300">
-                          •
-                        </span>
-
-                        <span className="text-xs text-gray-500">
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-500 font-poppins truncate">
                           {selectedLeave.email}
                         </span>
                       </>
                     )}
-
                   </div>
                 </div>
               </div>
 
-              {/* LEAVE INFO */}
-
+              {/* LEAVE STATS GRID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-                <div className="border border-gray-200 rounded-xl p-4">
-
-                  <div className="flex items-center gap-2 text-gray-500 mb-2">
-                    <FileText className="w-4 h-4" />
-
-                    <span className="text-xs font-semibold">
-                      Leave Type
-                    </span>
+                <div className="border border-slate-200/80 rounded-xl p-3.5 bg-white shadow-2xs">
+                  <div className="flex items-center gap-2 text-slate-400 mb-1.5 text-xs font-semibold uppercase tracking-wider font-poppins">
+                    <FileText className="w-3.5 h-3.5 text-[#034665]" />
+                    <span>Leave Type</span>
                   </div>
-
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${getLeaveTypeStyle(
-                      selectedLeave.leaveType
-                    )}`}
-                  >
-                    {getLeaveTypeIcon(
-                      selectedLeave.leaveType
-                    )}
-
-                    {formatLeaveType(selectedLeave.leaveType)}
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-800 text-xs font-semibold font-poppins shadow-2xs">
+                    {getLeaveTypeIcon(selectedLeave.leaveType)}
+                    <span>{getCanonicalLeaveType(formatLeaveType(selectedLeave.leaveType), selectedLeave)}</span>
                   </span>
                 </div>
 
-                <div className="border border-gray-200 rounded-xl p-4">
-
-                  <div className="flex items-center gap-2 text-gray-500 mb-2">
-                    <Clock className="w-4 h-4" />
-
-                    <span className="text-xs font-semibold">
-                      Duration
-                    </span>
+                <div className="border border-slate-200/80 rounded-xl p-3.5 bg-white shadow-2xs">
+                  <div className="flex items-center gap-2 text-slate-400 mb-1.5 text-xs font-semibold uppercase tracking-wider font-poppins">
+                    <Clock className="w-3.5 h-3.5 text-[#034665]" />
+                    <span>Duration</span>
                   </div>
-
-                  <p className="text-sm font-bold text-gray-800">
+                  <p className="text-sm font-bold text-slate-900 font-poppins">
                     {formatDuration(selectedLeave)}
                   </p>
                 </div>
 
-                <div className="border border-gray-200 rounded-xl p-4">
-
-                  <div className="flex items-center gap-2 text-gray-500 mb-2">
-                    <Calendar className="w-4 h-4" />
-
-                    <span className="text-xs font-semibold">
-                      Start Date
-                    </span>
+                <div className="border border-slate-200/80 rounded-xl p-3.5 bg-white shadow-2xs">
+                  <div className="flex items-center gap-2 text-slate-400 mb-1.5 text-xs font-semibold uppercase tracking-wider font-poppins">
+                    <Calendar className="w-3.5 h-3.5 text-[#034665]" />
+                    <span>Start Date</span>
                   </div>
-
-                  <p className="text-sm font-semibold text-gray-800">
-                    {formatDate(
-                      selectedLeave.startDate
-                    )}
+                  <p className="text-sm font-semibold text-slate-800 font-poppins">
+                    {formatDate(selectedLeave.startDate)}
                   </p>
                 </div>
 
-                <div className="border border-gray-200 rounded-xl p-4">
-
-                  <div className="flex items-center gap-2 text-gray-500 mb-2">
-                    <CalendarDays className="w-4 h-4" />
-
-                    <span className="text-xs font-semibold">
-                      End Date
-                    </span>
+                <div className="border border-slate-200/80 rounded-xl p-3.5 bg-white shadow-2xs">
+                  <div className="flex items-center gap-2 text-slate-400 mb-1.5 text-xs font-semibold uppercase tracking-wider font-poppins">
+                    <CalendarDays className="w-3.5 h-3.5 text-[#034665]" />
+                    <span>End Date</span>
                   </div>
-
-                  <p className="text-sm font-semibold text-gray-800">
-                    {formatDate(
-                      selectedLeave.endDate
-                    )}
+                  <p className="text-sm font-semibold text-slate-800 font-poppins">
+                    {formatDate(selectedLeave.endDate)}
                   </p>
-
                 </div>
-
-                {selectedLeave.dateIssue && (
-                  <div className="border border-rose-200 bg-rose-50 rounded-xl p-3 text-sm text-rose-800">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="font-semibold">Date correction required</p>
-                        <p className="mt-0.5">{selectedLeave.dateIssue} This request cannot be approved or rejected until its dates are corrected.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
               </div>
 
+              {selectedLeave.dateIssue && (
+                <div className="border border-rose-200 bg-rose-50 rounded-xl p-3 text-xs sm:text-sm text-rose-800 font-poppins">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-bold">Date correction required</p>
+                      <p className="mt-0.5">{selectedLeave.dateIssue} This request cannot be approved or rejected until its dates are corrected.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* REASON */}
-
-              <div className="border border-gray-200 rounded-xl p-4">
-
-                <div className="flex items-center gap-2 text-gray-600 mb-2">
-                  <MessageSquare className="w-4 h-4" />
-
-                  <span className="text-sm font-semibold">
+              <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-2xs">
+                <div className="flex items-center gap-2 text-slate-700 mb-2 font-poppins">
+                  <MessageSquare className="w-4 h-4 text-[#034665]" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Reason
                   </span>
                 </div>
-
-                <p className="text-sm text-gray-600 leading-6">
-                  {selectedLeave.reason ||
-                    "No reason provided."}
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-poppins whitespace-pre-wrap">
+                  {selectedLeave.reason || "No reason provided by applicant."}
                 </p>
               </div>
 
-              {/* ==================================================
-                  APPROVAL FLOW
-              ================================================== */}
-
-              <div className="border border-gray-200 rounded-xl p-4">
-
-                <div className="flex items-center gap-2 mb-4">
-                  <ShieldCheck className="w-5 h-5 text-blue-600" />
-
-                  <h3 className="text-sm font-bold text-gray-800">
+              {/* APPROVAL FLOW */}
+              <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-2xs">
+                <div className="flex items-center gap-2 mb-3.5 font-poppins">
+                  <ShieldCheck className="w-4 h-4 text-[#034665]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-poppins">
                     Approval Flow
                   </h3>
                 </div>
 
-                <div className="space-y-4">
-
+                <div className="space-y-3 font-poppins divide-y divide-slate-100">
                   {/* TEAM LEAD */}
-
-                  <div className="flex items-center justify-between gap-3">
-
-                    <div className="flex items-center gap-3">
-
-                      <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center">
-                        <User className="w-4 h-4 text-blue-600" />
+                  <div className="pt-2 first:pt-0 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#034665] flex items-center justify-center shrink-0">
+                        <User className="w-4 h-4" />
                       </div>
-
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">
+                        <p className="text-xs font-bold text-slate-800 font-poppins">
                           Team Lead
                         </p>
-
-                        <p className="text-xs text-gray-500">
-                          First approval
+                        <p className="text-[11px] text-slate-400 font-poppins">
+                          Initial team assessment
                         </p>
                       </div>
                     </div>
-
                     <ApprovalStatus
                       leave={selectedLeave}
                       stage="teamlead"
@@ -2499,26 +2273,20 @@ export default function LeaveRequest() {
                   </div>
 
                   {/* HR */}
-
-                  <div className="flex items-center justify-between gap-3">
-
-                    <div className="flex items-center gap-3">
-
-                      <div className="w-9 h-9 rounded-full bg-purple-50 flex items-center justify-center">
-                        <ShieldCheck className="w-4 h-4 text-purple-600" />
+                  <div className="pt-2 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-4 h-4" />
                       </div>
-
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">
+                        <p className="text-xs font-bold text-slate-800 font-poppins">
                           HR
                         </p>
-
-                        <p className="text-xs text-gray-500">
-                          HR approval
+                        <p className="text-[11px] text-slate-400 font-poppins">
+                          HR Department review
                         </p>
                       </div>
                     </div>
-
                     <ApprovalStatus
                       leave={selectedLeave}
                       stage="hr"
@@ -2527,57 +2295,37 @@ export default function LeaveRequest() {
                   </div>
 
                   {/* ADMIN */}
-
-                  <div className="flex items-center justify-between gap-3">
-
-                    <div className="flex items-center gap-3">
-
-                      <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center">
-                        <ShieldCheck className="w-4 h-4 text-amber-600" />
+                  <div className="pt-2 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-4 h-4" />
                       </div>
-
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">
+                        <p className="text-xs font-bold text-slate-800 font-poppins">
                           Admin
                         </p>
-
-                        <p className="text-xs text-gray-500">
-                          Required for HR leave
+                        <p className="text-[11px] text-slate-400 font-poppins">
+                          Required for HR personnel leave
                         </p>
                       </div>
                     </div>
-
                     {normalizeRole(selectedLeave.role) === "hr" ? (
-                      <StatusBadge
-                        status={
-                          selectedLeave.adminStatus
-                        }
-                      />
+                      <StatusBadge status={selectedLeave.adminStatus} />
                     ) : (
-                      <span className="text-sm text-gray-400">
-                        -
-                      </span>
+                      <span className="text-sm text-slate-400 font-medium select-none">-</span>
                     )}
                   </div>
-
                 </div>
               </div>
 
-              {/* ==================================================
-                  CURRENT WORKFLOW
-              ================================================== */}
-
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-
-                <p className="text-xs font-semibold text-blue-600">
-                  Current Workflow
-                </p>
-
-                <p className="text-sm font-bold text-blue-800 mt-1">
-                  {getWorkflowText(
-                    selectedLeave
-                  )}
-                </p>
+              {/* CURRENT WORKFLOW */}
+              <div className="bg-[#034665]/5 border border-[#034665]/20 rounded-xl p-3.5 flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-[#034665] font-poppins">
+                  Workflow Status:
+                </span>
+                <span className="text-xs font-bold text-[#034665] font-poppins">
+                  {getWorkflowText(selectedLeave)}
+                </span>
               </div>
 
               {/* REMARKS & DESCRIPTIONS */}
@@ -2585,231 +2333,167 @@ export default function LeaveRequest() {
                 selectedLeave.hrRemark ||
                 selectedLeave.adminRemark ||
                 selectedLeave.remark) && (
-                  <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/70 space-y-3">
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <MessageSquare className="w-4 h-4 text-blue-600" />
-                      <span className="text-xs font-bold uppercase tracking-wider">
-                        Remarks & Descriptions
-                      </span>
-                    </div>
-
-                    {selectedLeave.teamLeadRemark && (
-                      <div className="bg-white border border-blue-100 rounded-lg p-3">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                            Team Lead Remark
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-700">
-                          {selectedLeave.teamLeadRemark}
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedLeave.hrRemark && (
-                      <div className="bg-white border border-purple-100 rounded-lg p-3">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                            HR Remark
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-700">
-                          {selectedLeave.hrRemark}
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedLeave.adminRemark && (
-                      <div className="bg-white border border-amber-100 rounded-lg p-3">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            Admin Remark
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-700">
-                          {selectedLeave.adminRemark}
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedLeave.remark &&
-                      selectedLeave.remark !== selectedLeave.teamLeadRemark &&
-                      selectedLeave.remark !== selectedLeave.hrRemark &&
-                      selectedLeave.remark !== selectedLeave.adminRemark && (
-                        <div className="bg-white border border-gray-200 rounded-lg p-3">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                              Description / Remark
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-700">
-                            {selectedLeave.remark}
-                          </p>
-                        </div>
-                      )}
-                  </div>
-                )}
-
-            </div>
-
-            {/* ==================================================
-                MODAL FOOTER
-            ================================================== */}
-
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-5 py-4">
-
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-
-                {/* ACTION */}
-
-                {canTakeAction(
-                  selectedLeave
-                ) ? (
-
-                  <div className="flex flex-wrap items-center gap-2">
-
-                    <span className="text-xs text-gray-500 mr-1">
-                      Action as{" "}
-                      <b className="text-gray-700">
-                        {getActionRoleLabel()}
-                      </b>
+                <div className="border border-slate-200/80 rounded-xl p-4 bg-slate-50/70 space-y-2.5 font-poppins">
+                  <div className="flex items-center gap-2 text-slate-700 font-poppins">
+                    <MessageSquare className="w-4 h-4 text-[#034665]" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Remarks & Descriptions
                     </span>
-
-                    {/* APPROVE */}
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openActionModal(
-                          selectedLeave,
-                          "approved"
-                        )
-                      }
-                      disabled={
-                        actioningId === selectedLeave.id ||
-                        isApprovalAlreadyApproved(selectedLeave)
-                      }
-                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-2xs"
-                    >
-                      {actioningId === selectedLeave.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <CheckCircle className="w-4 h-4" />
-                      )}
-
-                      {actioningId === selectedLeave.id
-                        ? "Approving..."
-                        : "Approve"}
-                    </button>
-
-                    {/* REJECT */}
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openActionModal(
-                          selectedLeave,
-                          "rejected"
-                        )
-                      }
-                      disabled={
-                        actioningId ===
-                        selectedLeave.id
-                      }
-                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-2xs"
-                    >
-                      {actioningId === selectedLeave.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <XCircle className="w-4 h-4" />
-                      )}
-
-                      {actioningId === selectedLeave.id
-                        ? "Rejecting..."
-                        : "Reject"}
-                    </button>
-
                   </div>
 
-                ) : (
+                  {selectedLeave.teamLeadRemark && (
+                    <div className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
+                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 mb-1 font-poppins">
+                        Team Lead Remark
+                      </span>
+                      <p className="text-slate-700 font-poppins leading-relaxed">
+                        {selectedLeave.teamLeadRemark}
+                      </p>
+                    </div>
+                  )}
 
-                  <div className="text-xs text-gray-500">
+                  {selectedLeave.hrRemark && (
+                    <div className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
+                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 mb-1 font-poppins">
+                        HR Remark
+                      </span>
+                      <p className="text-slate-700 font-poppins leading-relaxed">
+                        {selectedLeave.hrRemark}
+                      </p>
+                    </div>
+                  )}
 
-                    {normalizeRole(
-                      currentRole
-                    ) === "admin"
-                      ? "View only. Admin can approve/reject only HR leave pending for Admin approval."
-                      : normalizeRole(
-                        currentRole
-                      ) === "hr"
-                        ? "View only. HR can act after Team Lead approval or directly on Team Lead leave."
-                        : normalizeRole(
-                          currentRole
-                        ) === "teamlead"
-                          ? "View only. Team Lead can act only on Employee pending leaves."
-                          : "View only. No action is required from your role."}
+                  {selectedLeave.adminRemark && (
+                    <div className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
+                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 mb-1 font-poppins">
+                        Admin Remark
+                      </span>
+                      <p className="text-slate-700 font-poppins leading-relaxed">
+                        {selectedLeave.adminRemark}
+                      </p>
+                    </div>
+                  )}
 
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedLeave(null)
-                  }
-                  className="px-5 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm font-medium"
-                >
-                  Close
-                </button>
-
-              </div>
+                  {selectedLeave.remark &&
+                    selectedLeave.remark !== selectedLeave.teamLeadRemark &&
+                    selectedLeave.remark !== selectedLeave.hrRemark &&
+                    selectedLeave.remark !== selectedLeave.adminRemark && (
+                      <div className="bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
+                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 mb-1 font-poppins">
+                          Description / Remark
+                        </span>
+                        <p className="text-slate-700 font-poppins leading-relaxed">
+                          {selectedLeave.remark}
+                        </p>
+                      </div>
+                    )}
+                </div>
+              )}
             </div>
 
+            {/* STICKY FOOTER */}
+            <div className="shrink-0 bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-poppins">
+              {canTakeAction(selectedLeave) ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-500 mr-1 font-poppins">
+                    Action as <b className="text-slate-800">{getActionRoleLabel()}</b>:
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => openActionModal(selectedLeave, "approved")}
+                    disabled={actioningId === selectedLeave.id || isApprovalAlreadyApproved(selectedLeave)}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-2xs font-poppins transition cursor-pointer"
+                  >
+                    {actioningId === selectedLeave.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-3.5 h-3.5" />
+                    )}
+                    <span>{actioningId === selectedLeave.id ? "Approving..." : "Approve"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openActionModal(selectedLeave, "rejected")}
+                    disabled={actioningId === selectedLeave.id}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-2xs font-poppins transition cursor-pointer"
+                  >
+                    {actioningId === selectedLeave.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <XCircle className="w-3.5 h-3.5" />
+                    )}
+                    <span>{actioningId === selectedLeave.id ? "Rejecting..." : "Reject"}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="text-xs text-slate-500 font-poppins">
+                  {normalizeRole(currentRole) === "admin"
+                    ? "View only. Admin can act only on HR leave applications."
+                    : normalizeRole(currentRole) === "hr"
+                      ? "View only. HR can act after Team Lead approval or directly on Team Lead leaves."
+                      : normalizeRole(currentRole) === "teamlead"
+                        ? "View only. Team Lead can act only on assigned employee pending leaves."
+                        : "View only. No pending action is required from your account."}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setSelectedLeave(null)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs sm:text-sm font-medium font-poppins transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ========================================================
-          APPROVE / REJECT ACTION MODAL WITH DESCRIPTION
+          APPROVE / REJECT ACTION MODAL WITH REQUIRED DESCRIPTION
       ======================================================== */}
       {actionModal.isOpen && actionModal.leave && (
         <div
-          className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5"
+          className="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 font-poppins animate-in fade-in duration-150"
           onClick={closeActionModal}
         >
           <div
-            className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-200/80 animate-in fade-in zoom-in-95 duration-150"
+            className="w-full max-w-md max-h-[calc(100vh-3.5rem)] my-auto flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200/80 font-poppins animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* MODAL HEADER */}
             <div
-              className={`p-5 flex items-start gap-4 border-b ${actionModal.status === "approved"
-                ? "bg-emerald-50/70 border-emerald-100"
-                : "bg-rose-50/70 border-rose-100"
-                }`}
+              className={`p-5 flex items-start gap-3.5 border-b shrink-0 ${
+                actionModal.status === "approved"
+                  ? "bg-emerald-50/80 border-emerald-100"
+                  : "bg-rose-50/80 border-rose-100"
+              }`}
             >
               <div
-                className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${actionModal.status === "approved"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-rose-600 text-white"
-                  }`}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
+                  actionModal.status === "approved"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-rose-600 text-white"
+                }`}
               >
                 {actionModal.status === "approved" ? (
-                  <CheckCircle className="w-6 h-6" />
+                  <CheckCircle className="w-5 h-5" />
                 ) : (
-                  <XCircle className="w-6 h-6" />
+                  <XCircle className="w-5 h-5" />
                 )}
               </div>
 
-              <div className="flex-1">
-                <h3 className="text-base font-bold text-gray-800">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-slate-900 font-poppins truncate">
                   {actionModal.status === "approved"
                     ? "Approve Leave Request"
                     : "Reject Leave Request"}
                 </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-slate-500 font-poppins mt-0.5">
                   Confirm action as{" "}
-                  <span className="font-semibold text-gray-700">
+                  <span className="font-semibold text-slate-700">
                     {getActionRoleLabel()}
                   </span>
                 </p>
@@ -2818,29 +2502,29 @@ export default function LeaveRequest() {
               <button
                 type="button"
                 onClick={closeActionModal}
-                className="w-8 h-8 rounded-full bg-white/80 hover:bg-white text-gray-400 hover:text-gray-600 flex items-center justify-center transition"
+                className="w-8 h-8 rounded-lg bg-white/80 hover:bg-white text-slate-400 hover:text-slate-600 flex items-center justify-center transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* LEAVE SUMMARY PILL */}
-            <div className="p-5 space-y-4">
-              <div className="bg-gray-50 border border-gray-200/80 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs">
+            <div className="flex-1 overflow-y-auto modal-scrollbar p-5 space-y-4">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs">
                 <div>
-                  <p className="font-bold text-gray-800 text-sm">
+                  <p className="font-bold text-slate-900 text-sm font-poppins">
                     {actionModal.leave.name}
                   </p>
-                  <p className="text-gray-500 mt-0.5">
+                  <p className="text-slate-500 font-poppins mt-0.5">
                     {formatRole(actionModal.leave.role)} • {formatLeaveType(actionModal.leave.leaveType)}
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="inline-block px-2.5 py-1 rounded-full bg-white border border-gray-200 font-bold text-gray-800">
+                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-white border border-slate-200 font-bold text-slate-800 text-xs font-poppins">
                     {actionModal.leave.totalDays}{" "}
                     {actionModal.leave.totalDays === 1 ? "Day" : "Days"}
                   </span>
-                  <p className="text-[11px] text-gray-500 mt-1">
+                  <p className="text-[11px] text-slate-500 font-poppins mt-1">
                     {formatDate(actionModal.leave.startDate)} -{" "}
                     {formatDate(actionModal.leave.endDate)}
                   </p>
@@ -2849,11 +2533,9 @@ export default function LeaveRequest() {
 
               {/* DESCRIPTION / REMARK INPUT */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center justify-between">
-                  <span>
-                    Description / Remark{" "}
-                    <span className="text-rose-500 font-bold">* (Required)</span>
-                  </span>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 font-poppins">
+                  Description / Remark{" "}
+                  <span className="text-rose-500 font-bold">* (Required)</span>
                 </label>
                 <textarea
                   rows={3}
@@ -2869,11 +2551,11 @@ export default function LeaveRequest() {
                       ? "Enter approval description / remark (Required)..."
                       : "Enter rejection reason / description (Required)..."
                   }
-                  className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-gray-400 resize-none transition"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] bg-white placeholder:text-slate-400 resize-none transition font-poppins"
                   autoFocus
                 />
                 {!actionModal.remark?.trim() && (
-                  <p className="text-[11px] text-rose-500 mt-1">
+                  <p className="text-[11px] text-rose-500 mt-1 font-poppins">
                     * Description is required to {actionModal.status === "approved" ? "approve" : "reject"} this leave.
                   </p>
                 )}
@@ -2881,12 +2563,12 @@ export default function LeaveRequest() {
             </div>
 
             {/* MODAL ACTIONS */}
-            <div className="bg-gray-50 border-t border-gray-200 px-5 py-3.5 flex items-center justify-end gap-2.5">
+            <div className="shrink-0 bg-slate-50 border-t border-slate-200 px-5 py-3.5 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={closeActionModal}
                 disabled={actioningId === actionModal.leave?.id}
-                className="px-4 py-2 border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold transition disabled:opacity-50 font-poppins cursor-pointer"
               >
                 Cancel
               </button>
@@ -2904,10 +2586,11 @@ export default function LeaveRequest() {
                   actioningId === actionModal.leave?.id ||
                   !actionModal.remark?.trim()
                 }
-                className={`inline-flex items-center gap-1.5 px-5 py-2 text-white rounded-lg text-xs font-semibold shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${actionModal.status === "approved"
-                  ? "bg-emerald-600 hover:bg-emerald-700"
-                  : "bg-rose-600 hover:bg-rose-700"
-                  }`}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 text-white rounded-lg text-xs font-semibold shadow-2xs transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed font-poppins cursor-pointer ${
+                  actionModal.status === "approved"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-rose-600 hover:bg-rose-700"
+                }`}
               >
                 {actioningId === actionModal.leave?.id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2916,11 +2599,13 @@ export default function LeaveRequest() {
                 ) : (
                   <X className="w-4 h-4 stroke-[2.5]" />
                 )}
-                {actioningId === actionModal.leave?.id
-                  ? "Processing..."
-                  : actionModal.status === "approved"
-                    ? "Confirm Approve"
-                    : "Confirm Reject"}
+                <span>
+                  {actioningId === actionModal.leave?.id
+                    ? "Processing..."
+                    : actionModal.status === "approved"
+                      ? "Confirm Approve"
+                      : "Confirm Reject"}
+                </span>
               </button>
             </div>
           </div>

@@ -203,3 +203,30 @@
 .font-poppins {
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
+
+/* Custom Modal Brand Scrollbar */
+.modal-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 9999px;
+  margin: 4px 0;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb {
+  background: #068dcb80;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #034665;
+}
+
+.modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #068dcb80 #f8fafc;
+}

@@ -2141,19 +2141,29 @@ const Performance = () => {
       {/* 4. MODAL: ADD / EDIT PERFORMANCE EVALUATION */}
       {/* ==================================================== */}
       {((canCreatePerformance && isAddModalOpen) || (isAdmin && isEditModalOpen)) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white border border-slate-200/80 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center">
-                  {isEditModalOpen ? <Edit3 size={16} /> : <Plus size={16} />}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-5 md:p-6 overflow-y-auto font-poppins animate-in fade-in"
+          onClick={() => {
+            setIsAddModalOpen(false);
+            setIsEditModalOpen(false);
+            setEditingRecord(null);
+          }}
+        >
+          <div
+            className="relative bg-white border border-slate-200/80 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 my-auto max-h-[calc(100vh-3rem)] sm:max-h-[calc(100vh-4rem)] flex flex-col font-poppins"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header (Fixed at top) */}
+            <div className="shrink-0 px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#e0f2fe] text-[#034665] flex items-center justify-center shadow-2xs shrink-0">
+                  {isEditModalOpen ? <Edit3 size={17} /> : <Plus size={17} />}
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
                     {isEditModalOpen ? "Edit Performance Record" : "Add Performance Record"}
                   </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                     {isEditModalOpen
                       ? "Update score, rating, and evaluator feedback"
                       : "Select employee, set score, rating, and feedback"}
@@ -2167,156 +2177,160 @@ const Performance = () => {
                   setIsEditModalOpen(false);
                   setEditingRecord(null);
                 }}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                aria-label="Close dialog"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <X size={16} />
+                <X size={17} />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSubmitModal} className="p-4 sm:p-5 space-y-4">
-              {/* 1. Select Employee Option */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Select Employee *
-                </label>
-                <div className="relative">
-                  <select
-                    disabled={isEditModalOpen}
-                    value={modalForm.employeeID}
-                    onChange={(e) => handleSelectEmployee(e.target.value)}
-                    required
-                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] cursor-pointer pr-8 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
-                  >
-                    <option value="">-- Choose Employee --</option>
-                    {employees.map((emp) => (
-                      <option key={emp._id} value={emp._id}>
-                        {emp.name} {emp.email ? `(${emp.email})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  />
-                </div>
-              </div>
-
-              {/* Performance Month */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Month *
-                </label>
-                <div className="relative">
-                  <input
-                    type="month"
-                    required
-                    value={modalForm.month || ""}
-                    onChange={(e) => {
-                      setModalForm((prev) => ({ ...prev, month: e.target.value }));
-                    }}
-                    className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              {/* 2. Performance % & 3. Rating in 2-column row */}
-              <div className="grid grid-cols-2 gap-3">
+            {/* Modal Form with Scrollable Body & Sticky Footer */}
+            <form onSubmit={handleSubmitModal} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              {/* Scrollable Form Body */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 modal-scrollbar">
+                {/* 1. Select Employee Option */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Performance % (out of 100) *
+                    Select Employee *
+                  </label>
+                  <div className="relative">
+                    <select
+                      disabled={isEditModalOpen}
+                      value={modalForm.employeeID}
+                      onChange={(e) => handleSelectEmployee(e.target.value)}
+                      required
+                      className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] cursor-pointer pr-8 disabled:opacity-70 disabled:cursor-not-allowed transition-all font-poppins"
+                    >
+                      <option value="">-- Choose Employee --</option>
+                      {employees.map((emp) => (
+                        <option key={emp._id} value={emp._id}>
+                          {emp.name} {emp.email ? `(${emp.email})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Performance Month */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Month *
                   </label>
                   <div className="relative">
                     <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="any"
+                      type="month"
                       required
-                      placeholder="e.g. 85"
-                      value={modalForm.percentage}
-                      onChange={(e) => handlePercentageChange(e.target.value)}
-                      className="w-full h-10 pl-3 pr-7 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all"
+                      value={modalForm.month || ""}
+                      onChange={(e) => {
+                        setModalForm((prev) => ({ ...prev, month: e.target.value }));
+                      }}
+                      className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all cursor-pointer font-poppins"
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
-                      %
+                  </div>
+                </div>
+
+                {/* 2. Performance % & 3. Rating in 2-column row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Performance % (out of 100) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="any"
+                        required
+                        placeholder="e.g. 85"
+                        value={modalForm.percentage}
+                        onChange={(e) => handlePercentageChange(e.target.value)}
+                        className="w-full h-10 pl-3 pr-7 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all font-poppins"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
+                        %
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Rating (out of 10) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="any"
+                        required
+                        placeholder="e.g. 8.5"
+                        value={modalForm.rating}
+                        onChange={(e) => handleRatingChange(e.target.value)}
+                        className="w-full h-10 pl-3 pr-9 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all font-poppins"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
+                        / 10
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Feedback */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Feedback
+                  </label>
+                  <div className="relative">
+                    <textarea
+                      name="feedback"
+                      rows={3}
+                      maxLength={500}
+                      placeholder="Enter constructive performance feedback..."
+                      value={modalForm.feedback}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setModalForm((prev) => ({ ...prev, feedback: val }));
+                      }}
+                      className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] resize-none transition-all font-poppins"
+                    />
+                    <span className="absolute bottom-2.5 right-3 text-[10px] text-slate-400 font-medium">
+                      {(modalForm.feedback || "").length}/500
                     </span>
                   </div>
                 </div>
 
+                {/* 4. Remarks */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Rating (out of 10) *
+                    Remarks
                   </label>
                   <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="any"
-                      required
-                      placeholder="e.g. 8.5"
-                      value={modalForm.rating}
-                      onChange={(e) => handleRatingChange(e.target.value)}
-                      className="w-full h-10 pl-3 pr-9 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all"
+                    <textarea
+                      name="remarks"
+                      rows={2}
+                      maxLength={500}
+                      placeholder="Enter evaluator remarks..."
+                      value={modalForm.remarks}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setModalForm((prev) => ({ ...prev, remarks: val, remark: val }));
+                      }}
+                      className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] resize-none transition-all font-poppins"
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
-                      / 10
+                    <span className="absolute bottom-2.5 right-3 text-[10px] text-slate-400 font-medium">
+                      {(modalForm.remarks || "").length}/500
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* 3. Feedback */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Feedback
-                </label>
-                <div className="relative">
-                  <textarea
-                    name="feedback"
-                    rows={3}
-                    maxLength={500}
-                    placeholder="Enter constructive performance feedback..."
-                    value={modalForm.feedback}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setModalForm((prev) => ({ ...prev, feedback: val }));
-                    }}
-                    className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] resize-none transition-all"
-                  />
-                  <span className="absolute bottom-2.5 right-3 text-[10px] text-slate-400 font-medium">
-                    {(modalForm.feedback || "").length}/500
-                  </span>
-                </div>
-              </div>
-
-              {/* 4. Remarks */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Remarks
-                </label>
-                <div className="relative">
-                  <textarea
-                    name="remarks"
-                    rows={2}
-                    maxLength={500}
-                    placeholder="Enter evaluator remarks..."
-                    value={modalForm.remarks}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setModalForm((prev) => ({ ...prev, remarks: val, remark: val }));
-                    }}
-                    className="w-full p-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] resize-none transition-all"
-                  />
-                  <span className="absolute bottom-2.5 right-3 text-[10px] text-slate-400 font-medium">
-                    {(modalForm.remarks || "").length}/500
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              {/* Action Buttons (Fixed Footer) */}
+              <div className="shrink-0 flex items-center justify-end gap-2.5 px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50/70">
                 <button
                   type="button"
                   disabled={submitting}
@@ -2325,7 +2339,7 @@ const Performance = () => {
                     setIsEditModalOpen(false);
                     setEditingRecord(null);
                   }}
-                  className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer shadow-xs"
+                  className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer shadow-2xs font-poppins"
                 >
                   Cancel
                 </button>
@@ -2333,8 +2347,8 @@ const Performance = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 btn-brand-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-60"
-                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                  className="px-4.5 py-2 text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer disabled:opacity-60 font-poppins"
+                  style={{ background: 'linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)' }}
                 >
                   {submitting && <RefreshCw size={13} className="animate-spin" />}
                   <span>{isEditModalOpen ? "Update Record" : "Submit Record"}</span>
@@ -2349,16 +2363,23 @@ const Performance = () => {
       {/* 5. MODAL: FEEDBACK DETAIL PREVIEW */}
       {/* ==================================================== */}
       {selectedFeedbackModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white border border-slate-200/80 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center">
-                  <FileText size={16} />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-5 md:p-6 overflow-y-auto font-poppins animate-in fade-in"
+          onClick={() => setSelectedFeedbackModal(null)}
+        >
+          <div
+            className="relative bg-white border border-slate-200/80 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 my-auto max-h-[calc(100vh-3rem)] sm:max-h-[calc(100vh-4rem)] flex flex-col font-poppins"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="shrink-0 px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#e0f2fe] text-[#034665] flex items-center justify-center shadow-2xs shrink-0">
+                  <FileText size={17} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Performance Evaluation Details</h3>
-                  <p className="text-[11px] text-slate-500">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">Performance Evaluation Details</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                     {getEmployeeDisplayName(selectedFeedbackModal.perf)}
                   </p>
                 </div>
@@ -2366,16 +2387,19 @@ const Performance = () => {
               <button
                 type="button"
                 onClick={() => setSelectedFeedbackModal(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                aria-label="Close dialog"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <X size={16} />
+                <X size={17} />
               </button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-xs">
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 modal-scrollbar">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 text-xs">
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Score</span>
-                  <span className="font-bold text-slate-900 text-sm">
+                  <span className="font-bold text-slate-900 text-sm font-mono">
                     {getNumericPercentage(selectedFeedbackModal.perf)}%
                   </span>
                 </div>
@@ -2393,42 +2417,43 @@ const Performance = () => {
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Date</span>
-                  <span className="font-medium text-slate-600">
+                  <span className="font-medium text-slate-600 font-mono">
                     {formatRowDate(getPerformancePeriodDate(selectedFeedbackModal.perf))}
                   </span>
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Feedback
                   </label>
-                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg text-xs sm:text-sm text-slate-700 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap">
+                  <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs sm:text-sm text-slate-700 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap modal-scrollbar">
                     {selectedFeedbackModal.perf.feedback || "No feedback recorded."}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Remarks
                   </label>
-                  <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg text-xs sm:text-sm text-slate-700 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap">
+                  <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs sm:text-sm text-slate-700 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-wrap modal-scrollbar">
                     {selectedFeedbackModal.perf.remarks || selectedFeedbackModal.perf.remark || "No remarks recorded."}
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedFeedbackModal(null)}
-                  className="px-4 py-2 btn-brand-primary text-white rounded-lg text-xs font-medium cursor-pointer shadow-xs transition-all"
-                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
-                >
-                  Close
-                </button>
-              </div>
+            {/* Fixed Footer */}
+            <div className="shrink-0 flex items-center justify-end px-5 py-3.5 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={() => setSelectedFeedbackModal(null)}
+                className="px-4.5 py-2 text-white rounded-lg text-xs sm:text-sm font-medium cursor-pointer shadow-2xs transition-all font-poppins"
+                style={{ background: 'linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)' }}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
