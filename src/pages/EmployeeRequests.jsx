@@ -128,6 +128,11 @@ export const isTeamLeadUser = (u) => {
   );
 };
 
+const isUserApproved = (user) =>
+  user?.isApproved === true ||
+  user?.approved === true ||
+  String(user?.status || '').trim().toLowerCase() === 'approved';
+
 const EmployeeRequests = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -160,6 +165,7 @@ const EmployeeRequests = () => {
   const [teamLeads, setTeamLeads] = useState([]);
   const [loadingTeamLeads, setLoadingTeamLeads] = useState(false);
   const [selectedTeamLeadId, setSelectedTeamLeadId] = useState('');
+  const [tlAssignmentMode, setTlAssignmentMode] = useState('existing');
   const [backendTeams, setBackendTeams] = useState([]);
 
   // Fetch users from API
@@ -904,6 +910,7 @@ const EmployeeRequests = () => {
 
     // If applicant role is Team Lead, TL assignment is not applicable
     const isApplicantTL = isTeamLeadUser(user);
+    setTlAssignmentMode('existing');
     if (isApplicantTL) {
       setSelectedTeamLeadId('');
     } else {
@@ -1009,21 +1016,25 @@ const EmployeeRequests = () => {
     if (e) e.preventDefault();
     if (!approvingUser) return;
 
+    const isAlreadyApproved = isUserApproved(approvingUser);
     const isApplicantTL = isTeamLeadUser(approvingUser);
+    const shouldPromoteToTeamLead = !isApplicantTL && tlAssignmentMode === 'promote';
 
-    // Strict validation: Team Leader (only if not applicant TL), Company Name, Branch, and Financial Year are mandatory!
+    // Validate the selected assignment mode and required organization details.
     const missingFields = [];
-    if (!isApplicantTL && (!selectedTeamLeadId || !String(selectedTeamLeadId).trim())) {
+    if (!isApplicantTL && !shouldPromoteToTeamLead && (!selectedTeamLeadId || !String(selectedTeamLeadId).trim())) {
       missingFields.push('Team Leader (TL)');
     }
-    if (!selectedCompanyId || !String(selectedCompanyId).trim()) {
-      missingFields.push('Company Name');
-    }
-    if (!selectedBranchId || !String(selectedBranchId).trim()) {
-      missingFields.push('Branch');
-    }
-    if (!selectedFinancialYearId || !String(selectedFinancialYearId).trim()) {
-      missingFields.push('Financial Year');
+    if (!isAlreadyApproved) {
+      if (!selectedCompanyId || !String(selectedCompanyId).trim()) {
+        missingFields.push('Company Name');
+      }
+      if (!selectedBranchId || !String(selectedBranchId).trim()) {
+        missingFields.push('Branch');
+      }
+      if (!selectedFinancialYearId || !String(selectedFinancialYearId).trim()) {
+        missingFields.push('Financial Year');
+      }
     }
 
     if (missingFields.length > 0) {
@@ -1097,6 +1108,15 @@ const EmployeeRequests = () => {
       isApproved: true,
       approved: true,
       status: 'approved',
+      ...(shouldPromoteToTeamLead ? {
+        role: 'team_leader',
+        userRole: 'team_leader',
+        isTeamLead: true,
+        isTeamLeader: true,
+        position: 'TL',
+        positionShort: 'TL',
+        positionLabel: 'Team Leader'
+      } : {}),
       // Assigned Team Lead Details (only set if not applicant TL)
       teamLead: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
       teamLeadId: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
@@ -1113,6 +1133,24 @@ const EmployeeRequests = () => {
       let isSuccess = false;
       let resData = null;
 
+      if (isAlreadyApproved && shouldPromoteToTeamLead) {
+        const token = getAuthToken();
+        const response = await fetch(
+          `https://kt-backend-ttzj.onrender.com/api/employee/assign-tl/${encodeURIComponent(String(userId))}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {})
+            }
+          }
+        );
+        resData = await response.json().catch(() => ({}));
+        if (!response.ok || resData?.success === false) {
+          throw new Error(resData?.message || 'Failed to promote this employee to Team Lead.');
+        }
+        isSuccess = true;
+      } else {
       // 1. Primary: PUT /api/users/approve using authenticated api instance
       try {
         const response = await api.put('/api/users/approve', payload);
@@ -1141,6 +1179,8 @@ const EmployeeRequests = () => {
           const errData = await fetchRes.json().catch(() => ({}));
           throw new Error(errData.message || apiErr.response?.data?.message || 'Approval request failed');
         }
+      }
+
       }
 
       // 2. Synchronize Team Lead and Team Linkage via backend API: POST /api/teamLead/create-team
@@ -1424,6 +1464,15 @@ const EmployeeRequests = () => {
               financialYearId: selectedFinancialYearId || null,
               financialYearLabel: fyLabelVal || null,
               yearLabel: fyLabelVal || null,
+              ...(shouldPromoteToTeamLead ? {
+                role: 'team_leader',
+                userRole: 'team_leader',
+                isTeamLead: true,
+                isTeamLeader: true,
+                position: 'TL',
+                positionShort: 'TL',
+                positionLabel: 'Team Leader'
+              } : {}),
               teamLead: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
               teamLeadId: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
               assignedTL: (!isApplicantTL && selectedTeamLeadId) ? selectedTeamLeadId : null,
@@ -1436,8 +1485,34 @@ const EmployeeRequests = () => {
           })
         );
 
+        if (shouldPromoteToTeamLead) {
+          const promotedLeadId = String(approvingUser?._id || approvingUser?.id || userId);
+          const promotedLead = {
+            ...approvingUser,
+            _id: promotedLeadId,
+            id: promotedLeadId,
+            userId: promotedLeadId,
+            userID: promotedLeadId,
+            role: 'team_leader',
+            userRole: 'team_leader',
+            isTeamLead: true,
+            isTeamLeader: true
+          };
+          setTeamLeads((currentLeads) => {
+            const existingIndex = currentLeads.findIndex((lead) =>
+              String(lead._id || lead.id || lead.userId) === promotedLeadId
+            );
+            if (existingIndex < 0) return [...currentLeads, promotedLead];
+            return currentLeads.map((lead, index) => index === existingIndex ? { ...lead, ...promotedLead } : lead);
+          });
+          window.dispatchEvent(new Event('kt_team_assignment_updated'));
+          window.dispatchEvent(new Event('storage'));
+        }
+
         const approvedName = approvingUser?.name || approvingUser?.fullName || (approvingUser?.email ? approvingUser.email.split('@')[0] : 'User');
-        const successMsg = isApplicantTL
+        const successMsg = isAlreadyApproved && shouldPromoteToTeamLead
+          ? `Promoted ${approvedName} to Team Leader successfully!`
+          : isApplicantTL || shouldPromoteToTeamLead
           ? `Approved Team Leader ${approvedName} successfully!`
           : tlNameVal
             ? `Approved ${approvedName} and assigned Team Lead "${tlNameVal}" successfully!`
@@ -2298,10 +2373,14 @@ const EmployeeRequests = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 leading-tight">
-                    Approve Employee & Assign Team Lead
+                    {isUserApproved(approvingUser) ? 'Update Employee Role' : 'Approve Employee'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Assign Team Lead (TL) & Organization Details
+                    {isUserApproved(approvingUser) && tlAssignmentMode === 'promote'
+                      ? 'Promote this approved employee directly to Team Lead.'
+                      : isTeamLeadUser(approvingUser)
+                        ? 'Confirm organization details and approve this Team Lead.'
+                      : 'Choose an existing Team Lead or approve this employee as a Team Lead.'}
                   </p>
                 </div>
               </div>
@@ -2381,9 +2460,7 @@ const EmployeeRequests = () => {
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-                          <span>1. Assign Team Lead (TL)</span>
-                          <span className="text-rose-500 font-bold">*</span>
-                          <span className="text-rose-600 font-semibold text-[10px] lowercase bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">required</span>
+                          <span>1. Team Lead Option</span>
                         </label>
                       </div>
                     </div>
@@ -2395,58 +2472,102 @@ const EmployeeRequests = () => {
                     )}
                   </div>
 
-                  <div className="relative">
-                    <Crown size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
-                    <select
-                      value={selectedTeamLeadId}
-                      onChange={(e) => {
-                        setSelectedTeamLeadId(e.target.value);
-                        if (approvalError) setApprovalError('');
-                      }}
-                      disabled={submittingApproval || loadingTeamLeads}
-                      className={`w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white rounded-xl focus:outline-none focus:ring-2 transition text-slate-900 font-medium ${!selectedTeamLeadId && approvalError
-                        ? 'border-2 border-rose-400 ring-2 ring-rose-100 focus:border-rose-600 focus:ring-rose-200'
-                        : 'border border-blue-300 focus:ring-blue-500/20 focus:border-blue-600'
-                        }`}
-                    >
-                      <option value="">
-                        -- {loadingTeamLeads ? 'Loading Team Leads...' : teamLeads.length === 0 ? 'No Team Leads available' : 'Select Team Leader (Required) *'} --
-                      </option>
-                      {teamLeads.map((tl) => {
-                        const tlId = String(tl._id || tl.id || tl.userId);
-                        const tlName = tl.name || tl.fullName || 'Team Lead';
-                        const desig = tl.designation || tl.department || tl.role || '';
-                        return (
-                          <option key={tlId} value={tlId}>
-                            {tlName} {desig ? `(${desig})` : ''} {tl.email ? `• ${tl.email}` : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 transition ${tlAssignmentMode === 'existing' ? 'border-blue-400 bg-white ring-1 ring-blue-200' : 'border-blue-200 bg-white/60 hover:bg-white'}`}>
+                      <input
+                        type="radio"
+                        name="tlAssignmentMode"
+                        value="existing"
+                        checked={tlAssignmentMode === 'existing'}
+                        onChange={() => {
+                          setTlAssignmentMode('existing');
+                          if (approvalError) setApprovalError('');
+                        }}
+                        disabled={submittingApproval}
+                        className="mt-0.5 accent-blue-600"
+                      />
+                      <span>
+                        <span className="block text-xs font-semibold text-slate-800">Assign an existing TL</span>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">Choose a Team Lead from the dropdown.</span>
+                      </span>
+                    </label>
+                    <label className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 transition ${tlAssignmentMode === 'promote' ? 'border-purple-400 bg-white ring-1 ring-purple-200' : 'border-blue-200 bg-white/60 hover:bg-white'}`}>
+                      <input
+                        type="radio"
+                        name="tlAssignmentMode"
+                        value="promote"
+                        checked={tlAssignmentMode === 'promote'}
+                        onChange={() => {
+                          setTlAssignmentMode('promote');
+                          setSelectedTeamLeadId('');
+                          if (approvalError) setApprovalError('');
+                        }}
+                        disabled={submittingApproval}
+                        className="mt-0.5 accent-purple-600"
+                      />
+                      <span>
+                        <span className="block text-xs font-semibold text-slate-800">Make this employee a TL</span>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">Approve them directly as a Team Lead.</span>
+                      </span>
+                    </label>
                   </div>
 
-                  {selectedTeamLeadId ? (() => {
-                    const currentTL = teamLeads.find(t => String(t._id || t.id || t.userId) === String(selectedTeamLeadId));
-                    if (!currentTL) return null;
-                    return (
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-blue-200 text-xs shadow-xs">
-                        <div className="flex items-center gap-2">
-                          <UserCheck size={14} className="text-blue-600" />
-                          <span className="font-semibold text-slate-800">{currentTL.name || currentTL.fullName}</span>
-                          {currentTL.department && (
-                            <span className="text-[10px] text-slate-500">Dept: {currentTL.department}</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] font-bold text-blue-800 uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-200">
-                          {currentTL.designation || 'Team Lead'}
-                        </span>
+                  {tlAssignmentMode === 'existing' && (
+                    <>
+                      <div className="relative">
+                        <Crown size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
+                        <select
+                          value={selectedTeamLeadId}
+                          onChange={(e) => {
+                            setSelectedTeamLeadId(e.target.value);
+                            if (approvalError) setApprovalError('');
+                          }}
+                          disabled={submittingApproval || loadingTeamLeads}
+                          className={`w-full h-11 pl-10 pr-8 text-xs sm:text-sm bg-white rounded-xl focus:outline-none focus:ring-2 transition text-slate-900 font-medium ${!selectedTeamLeadId && approvalError
+                            ? 'border-2 border-rose-400 ring-2 ring-rose-100 focus:border-rose-600 focus:ring-rose-200'
+                            : 'border border-blue-300 focus:ring-blue-500/20 focus:border-blue-600'
+                            }`}
+                        >
+                          <option value="">
+                            -- {loadingTeamLeads ? 'Loading Team Leads...' : teamLeads.length === 0 ? 'No Team Leads available' : 'Select Team Leader'} --
+                          </option>
+                          {teamLeads.map((tl) => {
+                            const tlId = String(tl._id || tl.id || tl.userId);
+                            const tlName = tl.name || tl.fullName || 'Team Lead';
+                            const desig = tl.designation || tl.department || tl.role || '';
+                            return (
+                              <option key={tlId} value={tlId}>
+                                {tlName} {desig ? `(${desig})` : ''} {tl.email ? `• ${tl.email}` : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
                       </div>
-                    );
-                  })() : (
-                    <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
-                      <AlertCircle size={13} className="shrink-0 text-rose-500" />
-                      <span>Team Leader must be assigned before approval</span>
-                    </p>
+
+                      {selectedTeamLeadId ? (() => {
+                        const currentTL = teamLeads.find(t => String(t._id || t.id || t.userId) === String(selectedTeamLeadId));
+                        if (!currentTL) return null;
+                        return (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-blue-200 text-xs shadow-xs">
+                            <div className="flex items-center gap-2">
+                              <UserCheck size={14} className="text-blue-600" />
+                              <span className="font-semibold text-slate-800">{currentTL.name || currentTL.fullName}</span>
+                              {currentTL.department && (
+                                <span className="text-[10px] text-slate-500">Dept: {currentTL.department}</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] font-bold text-blue-800 uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-200">
+                              {currentTL.designation || 'Team Lead'}
+                            </span>
+                          </div>
+                        );
+                      })() : (
+                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
+                          <AlertCircle size={13} className="shrink-0 text-rose-500" />
+                          <span>Select an existing Team Lead or choose to make this employee a TL.</span>
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -2624,7 +2745,7 @@ const EmployeeRequests = () => {
 
               {/* Footer Actions */}
               <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                {(!selectedTeamLeadId || !selectedCompanyId || !selectedBranchId || !selectedFinancialYearId) ? (
+                {((!isTeamLeadUser(approvingUser) && tlAssignmentMode === 'existing' && !selectedTeamLeadId) || (!isUserApproved(approvingUser) && (!selectedCompanyId || !selectedBranchId || !selectedFinancialYearId))) ? (
                   <div className="flex items-center gap-1.5 text-[11px] text-amber-700 font-medium">
 
                   </div>
@@ -2647,16 +2768,20 @@ const EmployeeRequests = () => {
                     type="submit"
                     disabled={
                       submittingApproval ||
-                      (!isTeamLeadUser(approvingUser) && !selectedTeamLeadId) ||
-                      !selectedCompanyId ||
-                      !selectedBranchId ||
-                      !selectedFinancialYearId
+                      (!isTeamLeadUser(approvingUser) && tlAssignmentMode === 'existing' && !selectedTeamLeadId) ||
+                      (!isUserApproved(approvingUser) && (
+                        !selectedCompanyId ||
+                        !selectedBranchId ||
+                        !selectedFinancialYearId
+                      ))
                     }
                     className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     title={
-                      (!isTeamLeadUser(approvingUser) && !selectedTeamLeadId) || !selectedCompanyId || !selectedBranchId || !selectedFinancialYearId
+                      (!isTeamLeadUser(approvingUser) && tlAssignmentMode === 'existing' && !selectedTeamLeadId) || (!isUserApproved(approvingUser) && (!selectedCompanyId || !selectedBranchId || !selectedFinancialYearId))
                         ? 'Please fill in all required details to approve'
-                        : 'Confirm and Approve Employee'
+                        : isUserApproved(approvingUser) && tlAssignmentMode === 'promote'
+                          ? 'Promote employee to Team Lead'
+                          : 'Confirm and Approve Employee'
                     }
                   >
                     {submittingApproval ? (
@@ -2667,7 +2792,11 @@ const EmployeeRequests = () => {
                     ) : (
                       <>
                         <CheckCircle size={16} />
-                        <span>Confirm & Approve</span>
+                        <span>
+                          {isUserApproved(approvingUser) && tlAssignmentMode === 'promote'
+                            ? 'Promote to Team Lead'
+                            : 'Confirm & Approve'}
+                        </span>
                       </>
                     )}
                   </button>
