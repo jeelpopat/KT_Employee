@@ -5,8 +5,8 @@ import {
   HeartPulse, MapPin, GraduationCap, 
   Code, Users, Loader2, Lock, KeyRound,
   Camera, Upload, Eye, EyeOff, Download, Trash2,
-  Plus, FileText, FileCheck, CreditCard,
-  Image as ImageIcon, ExternalLink, X,
+  Plus, FileText, FileCheck,
+  ExternalLink, X,
   ZoomIn, ZoomOut, RotateCw, RefreshCw,
   FileBadge, ArrowRight, Edit3, Check,
   AlertCircle
@@ -14,7 +14,11 @@ import {
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js'; 
 import companyLogo from '../../assets/Logo.png';
+import aadharProofIcon from '../../assets/profile/aadhar-proof-icon.png';
+import panProofIcon from '../../assets/profile/pan-proof-icon.png';
+import passportProofIcon from '../../assets/profile/passport-proof-icon.png';
 import { showToast } from '../common/Toast.jsx';
+import './ProfileView.css';
 
 // Deterministically convert any string/id into a 24-char hex string for MongoDB ObjectId
 const toValidObjectId = (id) => {
@@ -904,7 +908,12 @@ export const ProfileView = () => {
         }
       } catch (error) {
         console.error(`Could not save ${docId.toUpperCase()} number:`, error);
-        showToast(`Could not save ${docId.toUpperCase()} number. Please try again.`, 'error');
+        const errorMessage =
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          error.message ||
+          'Please try again.';
+        showToast(`Could not save ${docId.toUpperCase()} number: ${errorMessage}`, 'error');
         setIsSavingDocNumber(false);
         return;
       }
@@ -1238,7 +1247,7 @@ export const ProfileView = () => {
   const customDocs = documents.filter(d => !d.isCore);
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="profile-view w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       
       {/* Hidden File Inputs for Document & Photo Upload */}
       <input 
@@ -1257,7 +1266,7 @@ export const ProfileView = () => {
       />
 
       {/* Standard Unified Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="profile-page-heading flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
             <User size={18} />
@@ -1274,16 +1283,16 @@ export const ProfileView = () => {
       </div>
 
       {/* Profile Header Card */}
-      <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs relative overflow-hidden">
+      <div className="profile-overview bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs relative overflow-hidden">
         
         {/* Subtle background brand accent */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="profile-overview-accent absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 w-full md:w-auto text-center md:text-left">
+        <div className="profile-overview-content flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+          <div className="profile-overview-main flex flex-col md:flex-row items-center md:items-start gap-6 w-full md:w-auto text-center md:text-left">
             
             {/* Profile Photo Avatar with Interactive Camera Overlay */}
-            <div className="relative group shrink-0">
+            <div className="profile-avatar relative group shrink-0">
               <div className="w-28 h-28 rounded-2xl border-2 border-slate-200 bg-white p-1 flex items-center justify-center overflow-hidden shadow-md relative">
                 {activePhotoUrl && !imgError ? (
                   <img 
@@ -1336,7 +1345,7 @@ export const ProfileView = () => {
             </div>
 
             {/* Profile Details & Photo Actions */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="profile-overview-identity flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex flex-col md:flex-row items-center gap-3">
                 <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{fullName}</h2>
                 <span className="px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono text-xs font-bold uppercase tracking-wider">
@@ -1357,30 +1366,6 @@ export const ProfileView = () => {
                 </div>
               </div>
 
-              {/* Quick Action Buttons for Photo */}
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 mt-4">
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  disabled={isPhotoUploading}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
-                >
-                  {isPhotoUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                  {isPhotoUploading ? 'Uploading...' : 'Update Photo'}
-                </button>
-
-                {activePhotoUrl && (
-                  <button
-                    type="button"
-                    onClick={handleResetProfilePhoto}
-                    className="px-3 py-1.5 bg-transparent hover:bg-red-50 text-slate-500 hover:text-red-600 border border-transparent hover:border-red-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                    title="Reset back to company dark blue logo"
-                  >
-                    Reset to Logo
-                  </button>
-                )}
-              </div>
-
               {photoFeedback.text && (
                 <div className={`mt-3 inline-flex items-center gap-2 text-xs font-medium px-3 py-1 rounded-md border ${
                   photoFeedback.type === 'error'
@@ -1395,7 +1380,28 @@ export const ProfileView = () => {
           </div>
 
           {/* Quick Stats / Navigation Switch */}
-          <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto justify-center md:items-end">
+          <div className="profile-overview-actions flex flex-row md:flex-col gap-2 w-full md:w-auto justify-center md:items-end">
+            <div className="profile-photo-controls">
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={isPhotoUploading}
+                className="profile-upload-photo px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+              >
+                {isPhotoUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                {isPhotoUploading ? 'Uploading...' : 'Upload Photo'}
+              </button>
+              {activePhotoUrl && (
+                <button
+                  type="button"
+                  onClick={handleResetProfilePhoto}
+                  className="profile-reset-photo px-3 py-1.5 bg-transparent hover:bg-red-50 text-slate-500 hover:text-red-600 border border-transparent hover:border-red-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                  title="Reset back to company dark blue logo"
+                >
+                  Reset to Logo
+                </button>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => fetchProfile(true)}
@@ -1422,11 +1428,11 @@ export const ProfileView = () => {
       </div>
 
       {/* Main Tab Navigation Bar */}
-      <div className="flex border-b border-slate-200/80 bg-white rounded-xl px-3 pt-1 shadow-xs transition-colors">
+      <div className="profile-tabs flex border-b border-slate-200/80 bg-white rounded-xl px-3 pt-1 shadow-xs transition-colors">
         <button
           type="button"
           onClick={() => setActiveTab('details')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`profile-tab flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'details'
               ? 'border-[#0088cc] text-[#004b73]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -1439,7 +1445,7 @@ export const ProfileView = () => {
         <button
           type="button"
           onClick={() => setActiveTab('documents')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`profile-tab flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'documents'
               ? 'border-[#0088cc] text-[#004b73]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -1459,7 +1465,7 @@ export const ProfileView = () => {
         <button
           type="button"
           onClick={() => setActiveTab('security')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`profile-tab flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'security'
               ? 'border-[#0088cc] text-[#004b73]'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -1474,28 +1480,28 @@ export const ProfileView = () => {
       {/* TAB 1: PERSONAL DETAILS & PROFILE INFO */}
       {/* ========================================================================= */}
       {activeTab === 'details' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="profile-details-layout grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Left Column: Read-Only Identity & Skills */}
-          <div className="space-y-6 lg:col-span-1">
+          <div className="profile-side-column space-y-6 lg:col-span-1">
             
             {/* Identity Info */}
-            <div className="bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+            <div className="profile-identity-card bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
+              <h3 className="profile-section-title text-sm font-bold text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
                 <User size={16} className="text-slate-400" /> Identity Info
               </h3>
-              <div className="space-y-4">
-                <div>
+              <div className="profile-identity-fields space-y-4">
+                <div className="profile-identity-field">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Date of Birth</span>
-                  <span className="text-sm font-medium text-slate-900 font-mono">{dob}</span>
+                  <span className="profile-identity-value text-sm font-medium text-slate-900 font-mono">{dob}</span>
                 </div>
-                <div>
+                <div className="profile-identity-field">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Gender</span>
-                  <span className="text-sm font-medium text-slate-900">{gender}</span>
+                  <span className="profile-identity-value text-sm font-medium text-slate-900">{gender}</span>
                 </div>
-                <div>
+                <div className="profile-identity-field">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Blood Group</span>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-50 text-red-600 text-xs font-bold font-mono border border-red-100">
+                  <span className="profile-identity-value inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-50 text-red-600 text-xs font-bold font-mono border border-red-100">
                     <HeartPulse size={12} /> {bloodGroup}
                   </span>
                 </div>
@@ -1503,22 +1509,22 @@ export const ProfileView = () => {
             </div>
 
             {/* Documents Quick Widget */}
-            <div className="bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
+            <div className="profile-documents-widget bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                <h3 className="profile-section-title profile-proof-title text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
                   <FileCheck size={16} className="text-indigo-500" /> Identity Proofs
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
-                  {documents.filter(d => d.status === 'uploaded').length}/{documents.length} Done
+                <span className="profile-proof-count text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
+                  {[aadharDoc, panDoc, passportPhotoDoc].filter(doc => doc?.status === 'uploaded').length}/3 Done
                 </span>
               </div>
 
               <div className="space-y-3">
                 {/* Aadhar summary */}
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="p-1.5 rounded bg-indigo-50 text-indigo-600 shrink-0">
-                      <CreditCard size={14} />
+                      <img src={aadharProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
                     </div>
                     <div className="truncate">
                       <p className="text-xs font-bold text-slate-900 truncate">Aadhar Card</p>
@@ -1537,10 +1543,10 @@ export const ProfileView = () => {
                 </div>
 
                 {/* PAN summary */}
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="p-1.5 rounded bg-amber-100 text-amber-600 shrink-0">
-                      <FileText size={14} />
+                      <img src={panProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
                     </div>
                     <div className="truncate">
                       <p className="text-xs font-bold text-slate-900 truncate">PAN Card</p>
@@ -1559,10 +1565,10 @@ export const ProfileView = () => {
                 </div>
 
                 {/* Passport Photo summary */}
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="p-1.5 rounded bg-purple-100 text-purple-600 shrink-0">
-                      <ImageIcon size={14} />
+                      <img src={passportProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
                     </div>
                     <div className="truncate">
                       <p className="text-xs font-bold text-slate-900 truncate">Passport Photo</p>
@@ -1582,7 +1588,7 @@ export const ProfileView = () => {
 
                 <button
                   onClick={() => setActiveTab('documents')}
-                  className="w-full mt-2 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg border border-dashed border-indigo-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  className="profile-manage-documents w-full mt-2 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg border border-dashed border-indigo-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   Manage All Documents <ArrowRight size={12} />
                 </button>
@@ -1625,11 +1631,11 @@ export const ProfileView = () => {
           </div>
 
           {/* Right Column: Editable Contact Form & Education */}
-          <div className="space-y-6 lg:col-span-2">
+          <div className="profile-contact-column space-y-6 lg:col-span-2">
             
             {/* Contact & Personal Details Form */}
-            <div className="bg-white border border-slate-200/80 rounded-xl transition-colors shadow-xs">
-              <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/50">
+            <div className="profile-contact-card bg-white border border-slate-200/80 rounded-xl transition-colors shadow-xs">
+              <div className="profile-contact-header px-6 py-5 border-b border-slate-200 bg-slate-50/50">
                 <h3 className="text-base font-semibold text-slate-900">Personal & Contact Details</h3>
                 <p className="text-xs text-slate-500 mt-1">Update your display name, phone number, and physical address.</p>
               </div>
@@ -1790,7 +1796,7 @@ export const ProfileView = () => {
               <button
                 type="button"
                 onClick={() => setIsAddDocModalOpen(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+                className="profile-documents-primary-button px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
               >
                 <Plus size={16} />
                 <span>Add Document</span>
@@ -1823,13 +1829,13 @@ export const ProfileView = () => {
               
               {/* ---------------- 1. AADHAR CARD ---------------- */}
               {aadharDoc && (
-                <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between transition-all hover:border-indigo-400">
+                <div className="profile-document-card profile-document-aadhar bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col justify-between transition-all hover:border-indigo-400">
                   <div>
                     {/* Header */}
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
-                          <CreditCard size={22} />
+                        <div className="profile-document-icon p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                          <img src={aadharProofIcon} alt="" className="profile-proof-icon" />
                         </div>
                         <div>
                           <h5 className="text-base font-bold text-slate-900">{aadharDoc.title}</h5>
@@ -1869,7 +1875,7 @@ export const ProfileView = () => {
                           <button
                             type="button"
                             onClick={() => handleStartEditNumber(aadharDoc)}
-                            className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
+                            className="profile-document-edit text-[11px] font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                           >
                             <Edit3 size={11} /> Edit
                           </button>
@@ -1915,7 +1921,7 @@ export const ProfileView = () => {
                     <button
                       type="button"
                       onClick={() => handleOpenDocViewer(aadharDoc)}
-                      className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                     >
                       <Eye size={14} /> View
                     </button>
@@ -1924,7 +1930,7 @@ export const ProfileView = () => {
                       type="button"
                       onClick={() => handleTriggerDocUpload(aadharDoc.id)}
                       disabled={uploadingDocId === aadharDoc.id}
-                      className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 shadow-xs"
+                      className="profile-document-update profile-document-update-aadhar w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 shadow-xs"
                     >
                       {uploadingDocId === aadharDoc.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -1939,13 +1945,13 @@ export const ProfileView = () => {
 
               {/* ---------------- 2. PAN CARD ---------------- */}
               {panDoc && (
-                <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex flex-col justify-between transition-all hover:border-amber-400">
+                <div className="profile-document-card profile-document-pan bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex flex-col justify-between transition-all hover:border-amber-400">
                   <div>
                     {/* Header */}
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600">
-                          <FileText size={22} />
+                        <div className="profile-document-icon p-2.5 rounded-lg bg-amber-50 text-amber-600">
+                          <img src={panProofIcon} alt="" className="profile-proof-icon" />
                         </div>
                         <div>
                           <h5 className="text-base font-bold text-slate-900">{panDoc.title}</h5>
@@ -1985,7 +1991,7 @@ export const ProfileView = () => {
                           <button
                             type="button"
                             onClick={() => handleStartEditNumber(panDoc)}
-                            className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
+                            className="profile-document-edit text-[11px] font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                           >
                             <Edit3 size={11} /> Edit
                           </button>
@@ -2031,7 +2037,7 @@ export const ProfileView = () => {
                     <button
                       type="button"
                       onClick={() => handleOpenDocViewer(panDoc)}
-                      className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Eye size={14} /> View
                     </button>
@@ -2040,7 +2046,7 @@ export const ProfileView = () => {
                       type="button"
                       onClick={() => handleTriggerDocUpload(panDoc.id)}
                       disabled={uploadingDocId === panDoc.id}
-                      className="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                      className="profile-document-update profile-document-update-pan w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
                     >
                       {uploadingDocId === panDoc.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -2055,13 +2061,13 @@ export const ProfileView = () => {
 
               {/* ---------------- 3. PASSPORT SIZE PHOTO ---------------- */}
               {passportPhotoDoc && (
-                <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex flex-col justify-between transition-all hover:border-purple-400">
+                <div className="profile-document-card profile-document-passport bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex flex-col justify-between transition-all hover:border-purple-400">
                   <div>
                     {/* Header */}
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-lg bg-purple-50 text-purple-600">
-                          <ImageIcon size={22} />
+                        <div className="profile-document-icon p-2.5 rounded-lg bg-purple-50 text-purple-600">
+                          <img src={passportProofIcon} alt="" className="profile-proof-icon" />
                         </div>
                         <div>
                           <h5 className="text-base font-bold text-slate-900">{passportPhotoDoc.title}</h5>
@@ -2135,7 +2141,7 @@ export const ProfileView = () => {
                     <button
                       type="button"
                       onClick={() => handleOpenDocViewer(passportPhotoDoc)}
-                      className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Eye size={14} /> View
                     </button>
@@ -2144,7 +2150,7 @@ export const ProfileView = () => {
                       type="button"
                       onClick={() => handleTriggerDocUpload(passportPhotoDoc.id)}
                       disabled={uploadingDocId === passportPhotoDoc.id}
-                      className="w-full py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                      className="profile-document-update profile-document-update-passport w-full py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
                     >
                       {uploadingDocId === passportPhotoDoc.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -2158,7 +2164,7 @@ export const ProfileView = () => {
                       type="button"
                       onClick={handleDeletePassportPhoto}
                       disabled={!passportPhotoDoc.fileUrl || isDeletingPassportPhoto || uploadingDocId === passportPhotoDoc.id}
-                      className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="profile-document-delete w-full py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete passport size photo"
                       aria-label="Delete passport size photo"
                     >
@@ -2207,7 +2213,7 @@ export const ProfileView = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddDocModalOpen(true)}
-                  className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  className="profile-documents-primary-button mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                 >
                   <Plus size={14} /> Upload Custom Document
                 </button>
