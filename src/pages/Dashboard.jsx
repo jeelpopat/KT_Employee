@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Users,
   FolderKanban,
@@ -27,6 +28,7 @@ import {
 
 export default function Dashboard() {
   const { confirmationDialog } = useConfirm();
+  const navigate = useNavigate();
   const [stats, setStats] = useState([
     {
       id: 1,
@@ -769,13 +771,15 @@ export default function Dashboard() {
           {/* Top 4 Summary Cards matching exact Figma 2-card specification */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
             {[
-              { label: "TOTAL EMPLOYEES", value: dashboardCounts.employeeCount },
-              { label: "TOTAL PROJECTS", value: dashboardCounts.projectCount },
-              { label: "TOTAL TEAM LEADS", value: dashboardCounts.teamLeadCount },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="relative flex items-center h-[60px] w-full"
+              { label: "TOTAL EMPLOYEES", value: dashboardCounts.employeeCount, path: "/attendance/employees" },
+              { label: "TOTAL PROJECTS", value: dashboardCounts.projectCount, path: "/projects" },
+              { label: "TOTAL TEAM LEADS", value: dashboardCounts.teamLeadCount, path: "/team-lead" },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => navigate(item.path)}
+                className="relative flex items-center h-[60px] w-full text-left cursor-pointer transition-transform hover:scale-[1.01]"
               >
                 {/* Left card for the border: width: 22; height: 80; border-top-left-radius: 10px; border-bottom-left-radius: 10px; */}
                 <div
@@ -794,7 +798,7 @@ export default function Dashboard() {
                     {item.value}
                   </p>
                 </div>
-              </div>
+              </button>
             ))}
 
             {/* Absent Today Card */}

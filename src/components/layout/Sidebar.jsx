@@ -664,7 +664,7 @@ export const Sidebar = ({ onSignOut }) => {
                         {item.badge}
                       </span>
                     )}
-                    {item.requestCount !== undefined && (
+                    {item.requestCount > 0 && (
                       <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-semibold flex items-center justify-center shrink-0">
                         {item.requestCount}
                       </span>
