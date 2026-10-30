@@ -186,11 +186,11 @@
 
 /* Custom Brand Gradient */
 .bg-brand-gradient {
-  background: linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%) !important;
+  background: linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%) !important;
 }
 
 .btn-brand-primary {
-  background: linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%) !important;
+  background: linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%) !important;
   color: #ffffff !important;
   transition: all 0.2s ease-in-out;
 }

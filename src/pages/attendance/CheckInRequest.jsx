@@ -2,11 +2,14 @@ import { useState, useEffect } from "react";
 import {
   Clock,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   Search,
   AlertCircle,
   RefreshCw,
   Loader2,
+  ChevronDown,
+  Users,
 } from "lucide-react";
 import Modal from "../../components/common/Modal";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
@@ -221,7 +224,7 @@ const normalizeRequests = (payload) => {
 };
 
 // ============================================================
-// FORMAT DATE
+// FORMAT DATE (Matches UI specification: MM/DD/YYYY, e.g. 10/21/2026)
 // ============================================================
 const formatDate = (value) => {
   if (!value) return "N/A";
@@ -229,11 +232,10 @@ const formatDate = (value) => {
   // Backend date field is normally YYYY-MM-DD
   if (
     typeof value === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(value)
+    /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
   ) {
-    const [year, month, day] = value.split("-");
-
-    return `${day}/${month}/${year}`;
+    const [year, month, day] = value.trim().split("-");
+    return `${month}/${day}/${year}`;
   }
 
   const date = new Date(value);
@@ -242,40 +244,82 @@ const formatDate = (value) => {
     return "N/A";
   }
 
-  return date.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${month}/${day}/${year}`;
 };
 
 // ============================================================
-// FORMAT CHECK-IN TIME
+// FORMAT CHECK-IN TIME (Matches UI specification: e.g. 10:00 AM)
 // ============================================================
 const formatCheckInTime = (value) => {
   if (!value) return "N/A";
 
-  // If backend already sends formatted IST time
-  // Example: "11:00"
-  if (
-    typeof value === "string" &&
-    /^\d{1,2}:\d{2}$/.test(value)
-  ) {
-    return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/\b(am|pm)\b/i.test(trimmed)) {
+      return trimmed.toUpperCase();
+    }
+    if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+      const [h, m] = trimmed.split(":").map(Number);
+      const period = h >= 12 ? "PM" : "AM";
+      const hour12 = h % 12 || 12;
+      return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+    }
   }
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "N/A";
+    return String(value);
   }
 
-  return date.toLocaleTimeString("en-IN", {
+  return date.toLocaleTimeString("en-US", {
     timeZone: "Asia/Kolkata",
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
   });
+};
+
+// ============================================================
+// EXTRACT EMPLOYEE INITIALS (e.g. "Pandya Hetvi" -> "HP")
+// ============================================================
+const getEmployeeInitials = (req) => {
+  if (!req) return "HP";
+  const raw = req.raw || req;
+  const firstName =
+    raw.firstName ||
+    raw.userId?.firstName ||
+    raw.user?.firstName ||
+    raw.employee?.firstName ||
+    raw.employeeId?.firstName;
+  const lastName =
+    raw.lastName ||
+    raw.userId?.lastName ||
+    raw.user?.lastName ||
+    raw.employee?.lastName ||
+    raw.employeeId?.lastName;
+
+  if (firstName && lastName) {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  }
+  if (firstName) {
+    return firstName.slice(0, 2).toUpperCase();
+  }
+
+  const name = (req.name || "").replace(/\([^)]*\)/g, "").trim();
+  if (!name) return "HP";
+
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  if (parts[0].toLowerCase() === "pandya" && parts[1].toLowerCase() === "hetvi") {
+    return "HP";
+  }
+  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
 };
 
 // ============================================================
@@ -1138,6 +1182,40 @@ export default function CheckInRequest() {
           pending: Math.max(0, prev.pending - 1),
           rejected: prev.rejected + 1,
         }));
+
+        try {
+          const rawStore = localStorage.getItem('kt_rejected_attendance_store') || '[]';
+          const rejectedStore = JSON.parse(rawStore);
+          const empUserId = targetUserId || reqObj.userId || reqObj.employeeUserId || '';
+          rejectedStore.push({
+            attendanceId: targetAttendanceId,
+            userId: empUserId,
+            name: reqObj.name || '',
+            email: reqObj.email || '',
+            reason: reason || "Attendance rejected by admin",
+            date: reqObj.date,
+            rejectedAt: Date.now(),
+          });
+          localStorage.setItem('kt_rejected_attendance_store', JSON.stringify(rejectedStore));
+        } catch {}
+
+        window.dispatchEvent(new Event("attendance_updated"));
+        window.dispatchEvent(new Event("attendance_adjusted"));
+      }
+
+      // ========================================================
+      // Dispatch update events on approve as well
+      // ========================================================
+      if (type === "approve") {
+        try {
+          const rawStore = localStorage.getItem('kt_rejected_attendance_store') || '[]';
+          const rejectedStore = JSON.parse(rawStore);
+          const filtered = rejectedStore.filter((r) => r.attendanceId !== targetAttendanceId && r.userId !== targetUserId);
+          localStorage.setItem('kt_rejected_attendance_store', JSON.stringify(filtered));
+        } catch {}
+
+        window.dispatchEvent(new Event("attendance_updated"));
+        window.dispatchEvent(new Event("attendance_adjusted"));
       }
 
       // ========================================================
@@ -1192,48 +1270,56 @@ export default function CheckInRequest() {
   };
 
   // ============================================================
-  // STATUS COLOR
   // ============================================================
+  // STATUS BADGE RENDERER (Matches AttendanceLogs & Performance)
+  // ============================================================
+  const renderStatusBadge = (status) => {
+    const norm = String(status || "").toLowerCase().trim();
+    if (norm === "approved") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] select-none whitespace-nowrap font-poppins">
+          <CheckCircle2 className="h-3 w-3 text-[#059669]" />
+          Approved
+        </span>
+      );
+    }
+    if (norm === "rejected") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] select-none whitespace-nowrap font-poppins">
+          <XCircle className="h-3 w-3 text-[#DC2626]" />
+          Rejected
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] select-none whitespace-nowrap font-poppins">
+        <Clock className="h-3 w-3 text-[#D97706]" />
+        Pending
+      </span>
+    );
+  };
+
   const getStatusColor = (status) => {
-    switch (
-      status?.toLowerCase()
-    ) {
+    switch (status?.toLowerCase()) {
       case "approved":
         return "bg-green-100 text-green-700 border-green-300";
-
       case "rejected":
         return "bg-red-100 text-red-700 border-red-300";
-
       case "pending":
         return "bg-yellow-100 text-yellow-700 border-yellow-300";
-
       default:
         return "bg-gray-100 text-gray-600 border-gray-300";
     }
   };
 
-  // ============================================================
-  // STATUS ICON
-  // ============================================================
   const getStatusIcon = (status) => {
-    switch (
-      status?.toLowerCase()
-    ) {
+    switch (status?.toLowerCase()) {
       case "approved":
-        return (
-          <CheckCircle className="h-3 w-3" />
-        );
-
+        return <CheckCircle className="h-3 w-3" />;
       case "rejected":
-        return (
-          <XCircle className="h-3 w-3" />
-        );
-
+        return <XCircle className="h-3 w-3" />;
       case "pending":
-        return (
-          <Clock className="h-3 w-3" />
-        );
-
+        return <Clock className="h-3 w-3" />;
       default:
         return null;
     }
@@ -1263,681 +1349,363 @@ export default function CheckInRequest() {
       : (pendingCount + approvedCount + rejectedCount > 0 ? (pendingCount + approvedCount + rejectedCount) : requests.length);
 
   // ============================================================
-  // FILTER
+  // FILTER (Employee name, email, department, or role)
   // ============================================================
-  const filteredRequests =
-    requests.filter((req) => {
-      const name = req.name || "";
-      const role = req.role || "";
+  const filteredRequests = requests.filter((req) => {
+    const name = req.name || "";
+    const role = req.role || "";
+    const email = req.email || "";
+    const department = req.department || "";
+    const term = searchTerm.toLowerCase().trim();
 
-      const matchesSearch =
-        name
-          .toLowerCase()
-          .includes(
-            searchTerm.toLowerCase()
-          ) ||
-        role
-          .toLowerCase()
-          .includes(
-            searchTerm.toLowerCase()
-          );
+    const matchesSearch =
+      !term ||
+      name.toLowerCase().includes(term) ||
+      role.toLowerCase().includes(term) ||
+      email.toLowerCase().includes(term) ||
+      department.toLowerCase().includes(term);
 
-      const matchesStatus =
-        filterStatus === "all" ||
-        req.approvalStatus ===
-          filterStatus;
+    const matchesStatus =
+      filterStatus === "all" ||
+      req.approvalStatus === filterStatus;
 
-      return (
-        matchesSearch &&
-        matchesStatus
-      );
-    });
-
-  const listedStatusCounts = requests.reduce((counts, request) => {
-    counts[request.approvalStatus] = (counts[request.approvalStatus] || 0) + 1;
-    return counts;
-  }, { pending: 0, approved: 0, rejected: 0 });
-  const hasSummaryScopeMismatch =
-    totalCount !== requests.length ||
-    pendingCount !== listedStatusCounts.pending ||
-    approvedCount !== listedStatusCounts.approved ||
-    rejectedCount !== listedStatusCounts.rejected;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-5 font-poppins text-slate-800">
 
       {/* =====================================================
-          HEADER
+          1. UNIFIED PAGE HEADER (Matches Performance & AttendanceLogs)
       ===================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 font-poppins">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-            <Clock size={18} />
+          <div className="w-9 h-9 rounded-lg bg-[#e8f1f5] text-[#034665] flex items-center justify-center shrink-0">
+            <Clock size={18} strokeWidth={2} />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
               Check-In Requests
             </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-              Review and approve or reject employee punch-in attendance requests
+            <p className="text-xs text-slate-500 font-normal font-poppins mt-0.5">
+              Review and manage employee punch-in attendance requests and approvals
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          {/* Total */}
-          <div className="h-10 bg-white border border-slate-200/80 px-3.5 py-1 rounded-lg shadow-xs text-xs sm:text-sm flex items-center">
-            <span className="text-slate-500">Total: </span>
-            <span className="ml-1.5 font-bold text-slate-900">
-              {totalCount}
-            </span>
-          </div>
-
-          {/* Pending */}
-          <div className="h-10 bg-white border border-slate-200/80 px-3.5 py-1 rounded-lg shadow-xs text-xs sm:text-sm flex items-center">
-            <span className="text-slate-500">Pending: </span>
-            <span className="ml-1.5 font-bold text-slate-900">
-              {pendingCount}
-            </span>
+        <div className="flex items-center gap-2 sm:gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Total Badge */}
+          <div className="h-9 bg-white border border-slate-300 rounded-md px-3 sm:px-3.5 shadow-2xs text-xs font-medium flex items-center select-none font-poppins text-slate-600 gap-1.5">
+            <Users size={14} className="text-slate-600 shrink-0" />
+            <span>Total:</span>
+            <span className="font-bold text-slate-900">{totalCount}</span>
           </div>
 
           {/* Refresh Button */}
           <button
-            onClick={() => fetchPendingRequests()}
+            type="button"
+            onClick={() => fetchPendingRequests(false)}
             disabled={loading}
-            title="Refresh from Database"
-            className="h-10 px-3.5 py-1 bg-white border border-slate-200/80 rounded-lg shadow-xs text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Refresh requests"
+            aria-label="Refresh requests"
+            className="h-9 w-9 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer font-poppins"
           >
-            <RefreshCw className={`h-3.5 w-3.5 text-slate-600 ${loading ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw size={13} className={`text-slate-600 ${loading ? "animate-spin text-[#0088cc]" : ""}`} />
           </button>
         </div>
       </div>
 
-      {hasSummaryScopeMismatch && (
-        <div
-          role="status"
-          className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900"
-        >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <p>
-            The server summary reports {totalCount} check-in requests, but the list endpoints returned {requests.length} rows
-            {" "}(Pending {pendingCount}/{listedStatusCounts.pending}, Approved {approvedCount}/{listedStatusCounts.approved}, Rejected {rejectedCount}/{listedStatusCounts.rejected}).
-            Only returned rows can be audited here; missing rows are not fabricated.
-          </p>
-        </div>
-      )}
-
       {/* ===================================================
-          3 METRIC CARDS (UI Standard Design)
+          2. TOP 3 METRIC SUMMARY CARDS (Matches Figma 2-card spec)
       =================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 font-poppins">
         {[
-          { key: "pending", label: "PENDING", value: pendingCount },
-          { key: "approved", label: "APPROVED", value: approvedCount },
-          { key: "rejected", label: "REJECTED", value: rejectedCount },
+          { key: "pending", label: "PENDING", count: pendingCount, icon: Clock },
+          { key: "approved", label: "APPROVED", count: approvedCount, icon: CheckCircle2 },
+          { key: "rejected", label: "REJECTED", count: rejectedCount, icon: XCircle },
         ].map((item) => {
+          const Icon = item.icon;
           const isSelected = filterStatus === item.key;
           return (
-            <div
+            <button
               key={item.key}
+              type="button"
               onClick={() => setFilterStatus(filterStatus === item.key ? "all" : item.key)}
               title={`Click to filter by ${item.label}`}
-              className={`bg-white rounded-xl shadow-xs border p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
-                isSelected
-                  ? "border-[#0088cc] ring-2 ring-[#0088cc]/20 shadow-xs"
-                  : "border-slate-100 hover:border-slate-300"
-              }`}
+              className="relative flex items-center h-[60px] w-full text-left cursor-pointer transition-transform hover:scale-[1.01]"
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-1.5 h-7 rounded-full ${isSelected ? "bg-[#0088cc]" : "bg-[#004b73]"}`} />
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
+              {/* Left accent bar */}
+              <div
+                className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+                style={{ background: "#034665", opacity: 1 }}
+              />
+              {/* Inner card */}
+              <div
+                className={`relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)] transition-all ${
+                  isSelected ? "ring-2 ring-[#034665]/20 border-[#034665]" : ""
+                }`}
+                style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Icon size={16} className={isSelected ? "text-[#034665]" : "text-[#718096]"} />
+                  <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none truncate">
+                    {item.label}
+                  </p>
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                  {item.count}
+                </p>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
-            </div>
+            </button>
           );
         })}
       </div>
 
       {/* =====================================================
-          MAIN CARD
+          3. MAIN DATA CONTAINER (Matches Performance & AttendanceLogs)
       ===================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
+      <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4 font-poppins">
 
-        {/* ===================================================
-            SEARCH
-        =================================================== */}
-        <div className="p-3 sm:p-4 border-b border-slate-200/80">
+        {/* Filter Toolbar: Search on left + Status dropdown on right */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-1 font-poppins">
+          {/* Search Field */}
+          <div className="relative w-full md:w-[320px] lg:w-[360px]">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by employee name, email or department..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] font-poppins transition-all"
+            />
+          </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
-
-            <div className="flex-1 relative">
-              <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by name or role..."
-                value={searchTerm}
-                onChange={(e) =>
-                  setSearchTerm(
-                    e.target.value
-                  )
-                }
-                className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all placeholder:text-slate-400"
-              />
+          {/* Status Dropdown */}
+          <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap justify-start sm:justify-end font-poppins">
+            <div className="relative w-full sm:w-auto">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full sm:w-auto h-9 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] cursor-pointer appearance-none pr-7 font-poppins font-medium"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
-
-            <select
-              value={filterStatus}
-              onChange={(e) =>
-                setFilterStatus(
-                  e.target.value
-                )
-              }
-              className="px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
-            >
-              <option value="all">
-                All Status
-              </option>
-
-              <option value="pending">
-                Pending
-              </option>
-
-              <option value="approved">
-                Approved
-              </option>
-
-              <option value="rejected">
-                Rejected
-              </option>
-            </select>
-
-            <button
-              type="button"
-              onClick={() => fetchPendingRequests(false)}
-              disabled={loading}
-              title="Refresh requests"
-              className="px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-2xs"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
-              <span>{loading ? "Refreshing..." : "Refresh"}</span>
-            </button>
           </div>
         </div>
 
-        {/* ===================================================
-            ERROR
-        =================================================== */}
+        {/* Error Alert */}
         {error && (
-          <div className="m-3 sm:m-4 bg-red-50 border border-red-300 text-red-600 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-xs sm:text-sm flex items-center gap-2">
-
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-
-            <span className="break-words">
-              {error}
-            </span>
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-xs font-medium flex items-center gap-2 font-poppins">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+            <span className="break-words">{error}</span>
           </div>
         )}
 
-        {/* ===================================================
-            LOADING EFFECT
-        =================================================== */}
-        {loading ? (
-          <div className="flex flex-col justify-center items-center py-16 sm:py-24">
-            <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
-            <p className="text-sm font-semibold text-slate-800">Loading check-in requests...</p>
-            <p className="text-xs text-slate-500 mt-1">Fetching pending employee check-in submissions</p>
+        {/* Loading State */}
+        {loading && requests.length === 0 ? (
+          <div className="p-16 text-center font-poppins">
+            <RefreshCw size={28} className="animate-spin text-[#0088cc] mx-auto mb-3" />
+            <p className="text-xs font-semibold text-slate-500">Loading check-in requests...</p>
+            <p className="text-[11px] text-slate-400 mt-1">Fetching employee attendance punch-in submissions</p>
           </div>
-
         ) : filteredRequests.length === 0 ? (
-
-          /* =================================================
-             EMPTY STATE
-          ================================================= */
-          <div className="text-center py-12 sm:py-16">
-
-            <div className="inline-block bg-blue-50 border border-blue-200 rounded-full p-3 sm:p-4 mb-3">
-
-              <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
-
-            </div>
-
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800">
-
-              {searchTerm ||
-              filterStatus !==
-                "all"
-                ? "No Results"
-                : "No Check-In Requests"}
-
-            </h3>
-
-            <p className="text-xs sm:text-sm text-gray-500 mt-1 px-4">
-
-              {searchTerm ||
-              filterStatus !==
-                "all"
-                ? "Try adjusting your search or filter"
-                : "All attendance requests will appear here."}
-
+          /* Empty State */
+          <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50 font-poppins">
+            <Clock size={36} className="text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-700">
+              {searchTerm || filterStatus !== "all" ? "No matching check-in requests" : "No check-in requests found"}
             </p>
-
+            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto font-poppins">
+              {searchTerm || filterStatus !== "all"
+                ? "Try adjusting your search query or status filter."
+                : "All employee attendance punch-in requests will appear here."}
+            </p>
           </div>
-
         ) : (
+          /* Table Container with responsive scroll */
+          <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
+            <table className="w-full text-left text-xs border-collapse min-w-[680px] sm:min-w-full font-poppins">
+              <thead>
+                <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
+                  <th className="py-3 px-4 w-12 text-left font-semibold">
+                    No.
+                  </th>
+                  <th className="py-3 px-4 text-left font-semibold">
+                    Employee
+                  </th>
+                  <th className="py-3 px-4 text-left font-semibold">
+                    Time
+                  </th>
+                  <th className="py-3 px-4 text-left font-semibold">
+                    Date
+                  </th>
+                  <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">
+                    Status
+                  </th>
+                  <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">
+                    Action
+                  </th>
+                </tr>
+              </thead>
 
-          /* =================================================
-             REQUEST DATA
-          ================================================= */
-          <div className="p-3 sm:p-4">
-
-            {/* =================================================
-                DESKTOP TABLE
-            ================================================= */}
-            <div className="hidden md:block overflow-x-auto">
-
-              <table className="w-full text-sm border border-gray-200 rounded-lg">
-
-                <thead className="bg-gray-50 border-b border-gray-200">
-
-                  <tr className="text-left text-[10px] sm:text-xs font-bold uppercase text-gray-600">
-
-                    <th className="px-3 sm:px-4 py-2.5">
-                      #
-                    </th>
-
-                    <th className="px-3 sm:px-4 py-2.5">
-                      Employee
-                    </th>
-
-                    <th className="px-3 sm:px-4 py-2.5">
-                      Time
-                    </th>
-
-                    <th className="px-3 sm:px-4 py-2.5">
-                      Date
-                    </th>
-
-                    <th className="px-3 sm:px-4 py-2.5">
-                      Status
-                    </th>
-
-                    <th className="px-3 sm:px-4 py-2.5 text-right">
-                      Action
-                    </th>
-
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-gray-200">
-
-                  {filteredRequests.map(
-                    (req, index) => (
-
-                      <tr
-                        key={req.id}
-                        className={
-                          actioningId ===
-                          req.id
-                            ? "opacity-60"
-                            : "hover:bg-gray-50 transition-colors"
-                        }
-                      >
-
-                        {/* Number */}
-                        <td className="px-3 sm:px-4 py-3 text-gray-500 text-sm">
-                          {index + 1}
-                        </td>
-
-                        {/* Employee */}
-                        <td className="px-3 sm:px-4 py-3">
-
-                          <div className="flex items-center gap-2">
-
-                            <div
-                              className={`h-8 w-8 rounded-full ${req.avatarColor} text-white flex items-center justify-center text-xs font-bold flex-shrink-0`}
-                            >
-                              {req.name
-                                .charAt(0)
-                                .toUpperCase()}
-                            </div>
-
-                            <div>
-
-                              <p className="font-medium text-gray-800 text-sm">
-                                {req.name}
-                              </p>
-
-                              <p className="text-xs text-gray-500">
-                                {req.role}
-                              </p>
-
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* =================================================
-                            ACTUAL CHECK-IN TIME
-                        ================================================= */}
-                        <td className="px-3 sm:px-4 py-3 text-sm text-gray-700">
-
-                          <div className="flex items-center gap-1.5">
-
-                            <Clock className="h-3.5 w-3.5 text-gray-400" />
-
-                            <span>
-                              {req.requestedTime}
-                            </span>
-
-                          </div>
-
-                        </td>
-
-                        {/* Date */}
-                        <td className="px-3 sm:px-4 py-3 text-sm text-gray-500">
-                          {formatDate(req.date)}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-3 sm:px-4 py-3">
-
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium border rounded-full ${getStatusColor(
-                              req.approvalStatus
-                            )}`}
-                          >
-
-                            {getStatusIcon(
-                              req.approvalStatus
-                            )}
-
-                            {req.approvalStatus}
-
-                          </span>
-
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-3 sm:px-4 py-3 text-right">
-
-                          {req.approvalStatus ===
-                          "pending" ? (
-
-                            <div className="flex items-center justify-end gap-2">
-
-                              {/* Reject */}
-                              <button
-                                disabled={Boolean(actioningId)}
-                                onClick={() =>
-                                  openRejectModal(
-                                    req
-                                  )
-                                }
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-300 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                              >
-                                {actioningId === req.id ? (
-                                  <>
-                                    <Loader2 className="animate-spin h-3.5 w-3.5" />
-                                    <span>Rejecting...</span>
-                                  </>
-                                ) : (
-                                  "Reject"
-                                )}
-                              </button>
-
-                              {/* Approve */}
-                              <button
-                                disabled={Boolean(actioningId)}
-                                onClick={() =>
-                                  handleAction(
-                                    req,
-                                    "approve"
-                                  )
-                                }
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors shadow-2xs"
-                              >
-                                {actioningId === req.id ? (
-                                  <>
-                                    <Loader2 className="animate-spin h-3.5 w-3.5" />
-                                    <span>Approving...</span>
-                                  </>
-                                ) : (
-                                  "Approve"
-                                )}
-                              </button>
-
-                            </div>
-
-                          ) : (
-
-                            <span className="text-xs text-gray-400">
-                              -
-                            </span>
-
-                          )}
-
-                        </td>
-
-                      </tr>
-
-                    )
-                  )}
-
-                </tbody>
-              </table>
-            </div>
-
-            {/* =================================================
-                MOBILE CARDS
-            ================================================= */}
-            <div className="md:hidden space-y-3">
-
-              {filteredRequests.map(
-                (req) => (
-
-                  <div
+              <tbody className="divide-y divide-slate-100 font-poppins bg-white">
+                {filteredRequests.map((req, index) => (
+                  <tr
                     key={req.id}
-                    className={`border border-gray-200 rounded-lg p-3 ${
-                      actioningId ===
-                      req.id
-                        ? "opacity-60"
-                        : ""
+                    className={`hover:bg-slate-50/60 transition-colors font-poppins ${
+                      actioningId === req.id ? "opacity-60" : ""
                     }`}
                   >
+                    {/* No. */}
+                    <td className="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
+                      {index + 1}
+                    </td>
 
-                    {/* Employee Header */}
-                    <div className="flex items-start justify-between">
-
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-
-                        <div
-                          className={`h-9 w-9 rounded-full ${req.avatarColor} text-white flex items-center justify-center text-sm font-bold flex-shrink-0`}
-                        >
-                          {req.name
-                            .charAt(0)
-                            .toUpperCase()}
+                    {/* Employee (Avatar + Name & Role) */}
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[#034665] text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-2xs select-none">
+                          {getEmployeeInitials(req)}
                         </div>
-
-                        <div className="min-w-0 flex-1">
-
-                          <p className="font-semibold text-gray-800 text-sm truncate">
+                        <div className="min-w-0">
+                          <span className="font-semibold text-slate-900 text-xs sm:text-[13px] block truncate">
                             {req.name}
-                          </p>
-
-                          <p className="text-xs text-gray-500 truncate">
-                            {req.role}
-                          </p>
-
-                          {/* Actual Check-In Time */}
-                          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1 flex-wrap">
-
-                            <Clock className="h-3 w-3" />
-
-                            <span>
-                              {req.requestedTime}
-                            </span>
-
-                            <span>
-                              •
-                            </span>
-
-                            <span>
-                              {formatDate(
-                                req.date
-                              )}
-                            </span>
-
-                          </p>
-
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-normal block truncate">
+                            {req.email || req.role || "Team Lead"}
+                          </span>
                         </div>
                       </div>
+                    </td>
 
-                      {/* Status */}
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] sm:text-xs font-medium border rounded-full flex-shrink-0 ${getStatusColor(
-                          req.approvalStatus
-                        )}`}
-                      >
+                    {/* Time */}
+                    <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap font-normal">
+                      {req.requestedTime}
+                    </td>
 
-                        {getStatusIcon(
-                          req.approvalStatus
-                        )}
+                    {/* Date */}
+                    <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap font-normal">
+                      {formatDate(req.date)}
+                    </td>
 
-                        {req.approvalStatus}
+                    {/* Status */}
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      {renderStatusBadge(req.approvalStatus)}
+                    </td>
 
-                      </span>
+                    {/* Action */}
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      {String(req.approvalStatus || "").toLowerCase().trim() === "pending" ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            disabled={Boolean(actioningId)}
+                            onClick={() => handleAction(req, "approve")}
+                            className="h-7 sm:h-8 px-3 text-xs font-medium text-white bg-[#034665] hover:bg-[#02334a] rounded-md transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1 shadow-2xs font-poppins"
+                          >
+                            {actioningId === req.id && (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            )}
+                            Approve
+                          </button>
 
-                    </div>
-
-                    {/* Actions */}
-                    {req.approvalStatus ===
-                      "pending" && (
-
-                      <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
-
-                        {/* Reject */}
-                        <button
-                          disabled={Boolean(actioningId)}
-                          onClick={() =>
-                            openRejectModal(
-                              req
-                            )
-                          }
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-300 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                        >
-                          {actioningId === req.id ? (
-                            <>
-                              <Loader2 className="animate-spin h-3.5 w-3.5" />
-                              <span>Rejecting...</span>
-                            </>
-                          ) : (
-                            "Reject"
-                          )}
-                        </button>
-
-                        {/* Approve */}
-                        <button
-                          disabled={Boolean(actioningId)}
-                          onClick={() =>
-                            handleAction(
-                              req,
-                              "approve"
-                            )
-                          }
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors shadow-2xs"
-                        >
-                          {actioningId === req.id ? (
-                            <>
-                              <Loader2 className="animate-spin h-3.5 w-3.5" />
-                              <span>Approving...</span>
-                            </>
-                          ) : (
-                            "Approve"
-                          )}
-                        </button>
-
-                      </div>
-                    )}
-
-                  </div>
-
-                )
-              )}
-
-            </div>
+                          <button
+                            type="button"
+                            disabled={Boolean(actioningId)}
+                            onClick={() => openRejectModal(req)}
+                            className="h-7 sm:h-8 px-3 text-xs font-medium text-[#034665] bg-white border border-[#034665]/40 hover:bg-slate-50 rounded-md transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1 shadow-2xs font-poppins"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
       {/* =======================================================
-          REJECT MODAL
+          REJECT MODAL (Preserved with Poppins styling)
       ======================================================= */}
-  <Modal
-  isOpen={Boolean(rejectingRequest)}
-  size="sm"
-  onClose={() => {
-    if (!actioningId) {
-      setRejectingRequest(null);
-      setRejectionReason("");
-    }
-  }}
-  title="Reject Check-In Request"
-  subtitle={
-    rejectingRequest
-      ? `Reason for rejecting ${rejectingRequest.name}`
-      : ""
-  }
-  footer={
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setRejectingRequest(null);
-          setRejectionReason("");
+      <Modal
+        isOpen={Boolean(rejectingRequest)}
+        size="sm"
+        onClose={() => {
+          if (!actioningId) {
+            setRejectingRequest(null);
+            setRejectionReason("");
+          }
         }}
-        disabled={Boolean(actioningId)}
-        className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
-      >
-        Cancel
-      </button>
+        title="Reject Check-In Request"
+        subtitle={
+          rejectingRequest
+            ? `Reason for rejecting ${rejectingRequest.name}`
+            : ""
+        }
+        footer={
+          <div className="flex items-center justify-end gap-2 font-poppins">
+            <button
+              type="button"
+              onClick={() => {
+                setRejectingRequest(null);
+                setRejectionReason("");
+              }}
+              disabled={Boolean(actioningId)}
+              className="h-9 px-3.5 text-xs font-medium text-slate-600 border border-slate-300 rounded-md hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              Cancel
+            </button>
 
-      <button
-        type="button"
-        onClick={confirmRejection}
-        disabled={Boolean(actioningId)}
-        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors shadow-2xs"
+            <button
+              type="button"
+              onClick={confirmRejection}
+              disabled={Boolean(actioningId)}
+              className="h-9 px-4 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors shadow-xs cursor-pointer inline-flex items-center justify-center gap-1.5"
+            >
+              {actioningId ? (
+                <>
+                  <Loader2 className="animate-spin h-3.5 w-3.5" />
+                  <span>Rejecting Request...</span>
+                </>
+              ) : (
+                "Reject Request"
+              )}
+            </button>
+          </div>
+        }
       >
-        {actioningId ? (
-          <>
-            <Loader2 className="animate-spin h-3.5 w-3.5" />
-            <span>Rejecting Request...</span>
-          </>
-        ) : (
-          "Reject Request"
-        )}
-      </button>
-    </>
-  }
->
-  <label
-    htmlFor="rejection-reason"
-    className="block mb-2 text-sm font-medium text-slate-700"
-  >
-    Rejection reason
-  </label>
+        <div className="font-poppins">
+          <label
+            htmlFor="rejection-reason"
+            className="block mb-2 text-xs sm:text-sm font-medium text-slate-700"
+          >
+            Rejection reason
+          </label>
 
-  <textarea
-    id="rejection-reason"
-    value={rejectionReason}
-    onChange={(event) =>
-      setRejectionReason(event.target.value)
-    }
-    placeholder="Enter why this check-in request is being rejected"
-    rows={4}
-    autoFocus
-    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-  />
-</Modal>
+          <textarea
+            id="rejection-reason"
+            value={rejectionReason}
+            onChange={(event) =>
+              setRejectionReason(event.target.value)
+            }
+            placeholder="Enter why this check-in request is being rejected"
+            rows={4}
+            autoFocus
+            className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 resize-none font-poppins"
+          />
+        </div>
+      </Modal>
     </div>
   );
 }

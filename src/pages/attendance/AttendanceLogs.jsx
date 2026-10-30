@@ -21,6 +21,7 @@ import {
   Loader2,
   FileText,
   SlidersHorizontal,
+  XCircle,
 } from 'lucide-react';
 import {
   isFinanceOrExcludedUser,
@@ -31,6 +32,9 @@ import { showToast } from '../../components/common/Toast';
 
 const ATTENDANCE_URL =
   'https://kt-backend-ttzj.onrender.com/api/attendance/admin/all';
+
+const PENDING_URL =
+  'https://kt-backend-ttzj.onrender.com/api/attendance/pending';
 
 const AVATAR_COLORS = [
   'bg-blue-600',
@@ -93,6 +97,125 @@ export const normalizeLogs = (payload) => {
 };
 
 /* =========================================================
+   NORMALIZE CHECK-IN REQUESTS FROM /api/attendance/pending
+========================================================= */
+export const normalizeRequests = (payload) => {
+  const arrayKeys = [
+    'pendingRequests',
+    'approvedRequests',
+    'rejectedRequests',
+    'pending',
+    'approved',
+    'rejected',
+    'pendingAttendances',
+    'approvedAttendances',
+    'rejectedAttendances',
+    'approvedCheckIns',
+    'rejectedCheckIns',
+    'checkIns',
+    'checkInRequests',
+    'attendanceRequests',
+    'attendanceRecords',
+    'allRequests',
+    'allRecords',
+    'allAttendances',
+    'requests',
+    'data',
+    'attendance',
+    'logs',
+    'records',
+    'result',
+    'items',
+  ];
+  const envelopeKeys = ['data', 'result', 'payload', 'response', 'summary', 'attendance', 'requests', 'records', 'items'];
+  const visited = new WeakSet();
+  const records = [];
+
+  const visit = (value, depth = 0) => {
+    if (!value || typeof value !== 'object' || depth > 5 || visited.has(value)) return;
+    visited.add(value);
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item && typeof item === 'object' && !Array.isArray(item)) records.push(item);
+      });
+      return;
+    }
+
+    arrayKeys.forEach((key) => {
+      if (!Array.isArray(value[key])) return;
+      const statusHint = key.toLowerCase().startsWith('approved')
+        ? 'approved'
+        : key.toLowerCase().startsWith('rejected')
+          ? 'rejected'
+          : key.toLowerCase().startsWith('pending')
+            ? 'pending'
+            : '';
+
+      value[key].forEach((item) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+        records.push(statusHint ? { ...item, __approvalStatusHint: statusHint } : item);
+      });
+    });
+
+    envelopeKeys.forEach((key) => {
+      if (value[key] && typeof value[key] === 'object') visit(value[key], depth + 1);
+    });
+
+    if (value._id || value.id || value.userId || value.attendanceId) {
+      records.push(value);
+    }
+  };
+
+  visit(payload);
+  return records;
+};
+
+/* =========================================================
+   ATTENDANCE RECORD STATUS EVALUATORS
+========================================================= */
+export const isRecordApproved = (item) => {
+  if (!item) return false;
+  const s = String(item.approvalStatus || item.status || '').toLowerCase().trim();
+  if (['approved', 'accepted', 'approved by admin'].includes(s)) return true;
+  if (item.isApproved === true || item.isApprovedCheckIn === true) return true;
+  if (Boolean(item.approvedCheckInTime) || Boolean(item.approvedBy) || Boolean(item.approverId)) return true;
+  return false;
+};
+
+export const isRecordRejected = (item) => {
+  if (!item) return false;
+  const s = String(item.approvalStatus || item.status || item.attendanceStatus || item.adminDecision || item.decision || '').toLowerCase().trim();
+  if (['rejected', 'declined', 'denied'].includes(s) || s.includes('reject')) return true;
+  if (item.isRejected === true || item.isRejectedCheckIn === true) return true;
+  if (Boolean(item.rejectionReason) || Boolean(item.rejectedBy)) return true;
+  if (item.checkIn && typeof item.checkIn === 'object') {
+    const cs = String(item.checkIn.approvalStatus || item.checkIn.status || '').toLowerCase().trim();
+    if (['rejected', 'declined', 'denied'].includes(cs) || cs.includes('reject')) return true;
+  }
+  if (item.attendance && typeof item.attendance === 'object') {
+    if (isRecordRejected(item.attendance)) return true;
+  }
+  return false;
+};
+
+export const isRecordPending = (item) => {
+  if (!item) return false;
+  if (isRecordRejected(item)) return false;
+  const s = String(item.approvalStatus || item.status || item.attendanceStatus || item.adminDecision || item.decision || '').toLowerCase().trim();
+  if (['pending', 'waiting for approval', 'waiting', 'pending approval'].includes(s) || s.includes('pending')) return true;
+  if (item.isPending === true || item.isPendingCheckIn === true) return true;
+  if (item.checkIn && typeof item.checkIn === 'object') {
+    const cs = String(item.checkIn.approvalStatus || item.checkIn.status || '').toLowerCase().trim();
+    if (['pending', 'waiting for approval', 'waiting'].includes(cs) || cs.includes('pending')) return true;
+  }
+  if (item.attendance && typeof item.attendance === 'object') {
+    if (isRecordPending(item.attendance)) return true;
+  }
+  return false;
+};
+
+/* =========================================================
    FORMAT TIME
 ========================================================= */
 const formatTime = (value) => {
@@ -111,6 +234,10 @@ const formatTime = (value) => {
 };
 
 const getApprovalState = (item) => {
+  if (isRecordRejected(item)) return 'rejected';
+  if (isRecordPending(item)) return 'pending';
+  if (isRecordApproved(item)) return 'approved';
+
   const rawCandidates = [
     item?.approvalStatus,
     item?.attendance?.approvalStatus,
@@ -132,11 +259,11 @@ const getApprovalState = (item) => {
       return 'approved';
     }
 
-    if (['pending', 'waiting for approval'].includes(normalized)) {
+    if (['pending', 'waiting for approval', 'waiting', 'pending approval'].includes(normalized) || normalized.includes('pending')) {
       return 'pending';
     }
 
-    if (['rejected', 'declined', 'denied'].includes(normalized)) {
+    if (['rejected', 'declined', 'denied'].includes(normalized) || normalized.includes('reject')) {
       return 'rejected';
     }
   }
@@ -305,8 +432,21 @@ const mapLog = (item, index) => {
     .trim()
     .toLowerCase();
 
-  // =========================================================
-  // IMPORTANT:
+  const isRejected =
+    isRecordRejected(item) ||
+    approvalStatus === 'rejected' ||
+    rawStatus === 'rejected' ||
+    rawStatus === 'declined' ||
+    item?.isRejected === true;
+
+  const isPending =
+    !isRejected && (
+      isRecordPending(item) ||
+      approvalStatus === 'pending' ||
+      rawStatus === 'pending' ||
+      item?.isPending === true
+    );
+
   // =========================================================
   // AUTHENTIC CHECK-IN RESOLUTION (NO DUMMY / SYNTHETIC DATA)
   // =========================================================
@@ -324,6 +464,8 @@ const mapLog = (item, index) => {
   );
 
   const isApproved =
+    !isRejected &&
+    !isPending &&
     hasCheckIn && (
       approvalStatus === 'approved' ||
       rawStatus === 'approved' ||
@@ -333,7 +475,7 @@ const mapLog = (item, index) => {
       ['present', 'late', 'on time', 'half day', 'half-day', 'working', 'completed', 'checked_out', 'checked out'].includes(rawStatus)
     );
 
-  const approvedCheckIn = (hasCheckIn && isApproved) ? rawCheckInVal : '';
+  const approvedCheckIn = isApproved ? rawCheckInVal : '';
 
   const rawCheckOutVal =
     item?.checkOutTime ||
@@ -341,9 +483,25 @@ const mapLog = (item, index) => {
     firstSession.checkout ||
     '';
 
-  const approvedCheckOut = (hasCheckIn && isApproved) ? rawCheckOutVal : '';
+  const approvedCheckOut = isApproved ? rawCheckOutVal : '';
 
-  const approvedBreaks = (hasCheckIn && isApproved) ? breaks : [];
+  const approvedBreaks = isApproved ? breaks : [];
+
+  const finalApprovalStatus = isApproved
+    ? 'approved'
+    : isRejected
+      ? 'rejected'
+      : isPending
+        ? 'pending'
+        : (hasCheckIn ? (approvalStatus || 'pending') : (rawStatus === 'on leave' || rawStatus === 'leave' ? 'on leave' : (rawStatus === 'absent' ? 'absent' : (approvalStatus || 'not_checked_in'))));
+
+  const finalStatus = isRejected
+    ? 'rejected'
+    : isPending
+      ? 'pending'
+      : (hasCheckIn && isApproved
+        ? normalizeStatus(item)
+        : (rawStatus === 'on leave' || rawStatus === 'leave' ? 'on leave' : 'absent'));
 
   return {
     id:
@@ -399,7 +557,7 @@ const mapLog = (item, index) => {
     // =======================================================
     breaks: approvedBreaks,
 
-    totalHours: (hasCheckIn && isApproved)
+    totalHours: isApproved
       ? (
         item?.totalWorkTimeDisplay ||
         item?.totalWorkTimeHours ||
@@ -411,10 +569,15 @@ const mapLog = (item, index) => {
 
     isLate: isApproved && item?.isLate === true,
 
-    // Keep approval status separately
-    approvalStatus: isApproved ? 'approved' : (hasCheckIn ? approvalStatus : (rawStatus === 'absent' ? 'absent' : (approvalStatus || 'not_checked_in'))),
+    approvalStatus: finalApprovalStatus,
 
-    status: hasCheckIn ? normalizeStatus(item) : (rawStatus === 'on leave' || rawStatus === 'leave' ? 'on leave' : 'absent'),
+    status: finalStatus,
+
+    rejectionReason:
+      item?.rejectionReason ||
+      item?.reason ||
+      item?.attendance?.rejectionReason ||
+      '',
 
     avatarColor:
       item?.avatarColor ||
@@ -713,18 +876,63 @@ const AttendanceTimeline = ({
   breaks,
   checkOut,
   approvalStatus,
+  status,
+  rejectionReason = '',
 }) => {
+  const isRejected =
+    approvalStatus === 'rejected' ||
+    status === 'rejected';
+
+  const isPending =
+    !isRejected && (
+      approvalStatus === 'pending' ||
+      status === 'pending'
+    );
+
+  const isOnLeave =
+    status === 'on leave' ||
+    status === 'leave';
+
+  if (isRejected) {
+    return (
+      <div
+        className="w-full max-w-[420px] bg-rose-50/70 border border-rose-200/80 text-rose-700 h-7 rounded-md flex items-center justify-center gap-1.5 px-3 text-[11px] font-medium font-poppins select-none shadow-2xs"
+        title={rejectionReason ? `Reason: ${rejectionReason}` : 'Admin rejects the check in'}
+      >
+        <XCircle size={13} className="text-rose-500 shrink-0" />
+        <span className="truncate">Admin rejects the check in</span>
+      </div>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div
+        className="w-full max-w-[420px] bg-amber-50/70 border border-amber-200/80 text-amber-700 h-7 rounded-md flex items-center justify-center gap-1.5 px-3 text-[11px] font-medium font-poppins select-none shadow-2xs"
+        title="Check-in request waiting for admin approval"
+      >
+        <Clock size={13} className="text-amber-500 shrink-0" />
+        <span className="truncate">Pending request</span>
+      </div>
+    );
+  }
+
+  if (isOnLeave) {
+    return (
+      <div className="w-full max-w-[420px] bg-purple-50/70 border border-purple-200/80 text-purple-700 h-7 rounded-md flex items-center justify-center gap-1.5 px-3 text-[11px] font-medium font-poppins select-none shadow-2xs">
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
+        <span className="truncate">On Leave</span>
+      </div>
+    );
+  }
+
   // =========================================================
   // NEVER RUN TIMER UNTIL APPROVED AND VALID CHECK-IN EXISTS
   // =========================================================
   if (approvalStatus !== 'approved' || !checkIn || checkIn === '—' || checkIn === '--:--') {
     return (
-      <div className="w-full bg-slate-50 h-7 rounded-md flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/50">
-        {approvalStatus === 'pending'
-          ? 'Pending approval'
-          : approvalStatus === 'rejected'
-            ? 'Rejected from Admin'
-            : 'No timeline data available'}
+      <div className="w-full max-w-[420px] bg-slate-50 h-7 rounded-md flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/50 select-none">
+        No timeline data available
       </div>
     );
   }
@@ -739,7 +947,7 @@ const AttendanceTimeline = ({
 
   if (segments.length === 0) {
     return (
-      <div className="w-full bg-slate-50 h-7 rounded-md flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/50">
+      <div className="w-full max-w-[420px] bg-slate-50 h-7 rounded-md flex items-center justify-center text-[11px] text-slate-400 font-medium border border-slate-200/50 select-none">
         No timeline data available
       </div>
     );
@@ -905,6 +1113,127 @@ export default function AttendanceLogs() {
         console.warn('Attendance logs fetch error:', aErr);
       }
 
+      // 1b. Fetch check-in requests (pending / approved / rejected) from /api/attendance/pending
+      let requestItems = [];
+      try {
+        const pUrl = `${PENDING_URL}?_t=${Date.now()}`;
+        const pResponse = await fetch(pUrl, {
+          method: 'GET',
+          headers: {
+            ...headers,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+          cache: 'no-store',
+        });
+        if (pResponse.ok) {
+          const pData = await pResponse.json();
+          requestItems = normalizeRequests(pData);
+        }
+      } catch (pErr) {
+        console.warn('Pending requests fetch error:', pErr);
+      }
+
+      // 1c. Load local persistent rejection store (synced from Check-In Requests actions)
+      let localRejected = [];
+      try {
+        const rawStore = localStorage.getItem('kt_rejected_attendance_store');
+        if (rawStore) {
+          localRejected = JSON.parse(rawStore);
+          if (!Array.isArray(localRejected)) localRejected = [];
+        }
+      } catch {}
+
+      const isDateMatch = (recordDate, targetDate) => {
+        if (!recordDate || !targetDate) return false;
+        const rStr = String(recordDate).trim();
+        if (rStr.startsWith(targetDate)) return true;
+        const d = new Date(recordDate);
+        if (!Number.isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          if (`${y}-${m}-${day}` === targetDate) return true;
+        }
+        const parts = rStr.split(/[-/]/);
+        if (parts.length === 3) {
+          if (parts[0].length === 4 && `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}` === targetDate) return true;
+          if (parts[2].length === 4) {
+            const y = parts[2];
+            const p1 = parts[0].padStart(2, '0');
+            const p2 = parts[1].padStart(2, '0');
+            if (`${y}-${p2}-${p1}` === targetDate || `${y}-${p1}-${p2}` === targetDate) return true;
+          }
+        }
+        return false;
+      };
+
+      // Filter requestItems and localRejected for selected date
+      const relevantRequests = requestItems.filter((req) => {
+        if (!req) return false;
+        const rDate = req.date || req.attendanceDate || req.createdAt || req.requestedTime;
+        return isDateMatch(rDate, date) || (!rDate && date === getTodayLocal());
+      });
+
+      const relevantLocalRejected = localRejected.filter((rej) => {
+        if (!rej) return false;
+        return isDateMatch(rej.date, date) || (!rej.date && date === getTodayLocal()) || (rej.rejectedAt && isDateMatch(rej.rejectedAt, date));
+      });
+
+      // Build quick lookup map by all possible user identifier keys (lowercased)
+      const userRequestMap = new Map();
+      const registerUserRequest = (userKeys, reqObj) => {
+        userKeys.filter(Boolean).map((k) => String(k).toLowerCase().trim()).forEach((k) => {
+          if (!userRequestMap.has(k) || isRecordRejected(reqObj)) {
+            userRequestMap.set(k, reqObj);
+          }
+        });
+      };
+
+      relevantRequests.forEach((req) => {
+        const uKeys = [
+          req.userId?._id,
+          req.userId?.id,
+          req.userId,
+          req.user?._id,
+          req.user?.id,
+          req.employee?._id,
+          req.employee?.id,
+          req.employeeId?._id,
+          req.employeeId?.id,
+          req.employeeId,
+          req.employeeID,
+          req.email,
+          req.user?.email,
+          req.employee?.email,
+          req.name,
+          req.employeeName,
+          req.user?.name,
+          req.employee?.name,
+          req._id,
+          req.id,
+          req.attendanceId,
+        ];
+        registerUserRequest(uKeys, req);
+      });
+
+      relevantLocalRejected.forEach((rej) => {
+        const uKeys = [
+          rej.userId,
+          rej.attendanceId,
+          rej.email,
+          rej.name,
+        ];
+        registerUserRequest(uKeys, {
+          ...rej,
+          approvalStatus: 'rejected',
+          status: 'rejected',
+          isRejected: true,
+          rejectionReason: rej.reason || 'Attendance rejected by admin',
+        });
+      });
+
       // Map attendance items by canonical ID and build lookup index for all identifiers
       const attendanceMap = new Map();
       const userLookupMap = new Map();
@@ -923,10 +1252,6 @@ export default function AttendanceLogs() {
           item?._id
         );
 
-        if (!attendanceMap.has(canonicalKey)) {
-          attendanceMap.set(canonicalKey, item);
-        }
-
         const candidateKeys = [
           canonicalKey,
           item?._id,
@@ -942,14 +1267,51 @@ export default function AttendanceLogs() {
           item?.employeeId,
           item?.employee?.email,
           item?.user?.email,
-          item?.email
-        ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+          item?.email,
+          item?.employee?.name,
+          item?.user?.name,
+          item?.employeeName,
+          item?.name,
+        ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
 
-        candidateKeys.forEach(k => {
+        candidateKeys.forEach((k) => {
           if (!userLookupMap.has(k)) {
             userLookupMap.set(k, canonicalKey);
           }
         });
+
+        // Check if there is a matching pending or rejected request for this user
+        const matchedReq = candidateKeys.reduce((found, k) => found || userRequestMap.get(k), null);
+        let enhancedItem = item;
+        if (matchedReq) {
+          const reqIsRej = isRecordRejected(matchedReq) || matchedReq.approvalStatus === 'rejected';
+          const reqIsPend = !reqIsRej && (isRecordPending(matchedReq) || matchedReq.approvalStatus === 'pending');
+          if (reqIsRej) {
+            enhancedItem = {
+              ...item,
+              approvalStatus: 'rejected',
+              status: 'rejected',
+              isRejected: true,
+              rejectionReason: matchedReq.rejectionReason || matchedReq.reason || item.rejectionReason || 'Attendance rejected by admin',
+            };
+          } else if (reqIsPend && !isRecordApproved(item)) {
+            enhancedItem = {
+              ...item,
+              approvalStatus: 'pending',
+              status: 'pending',
+              isPending: true,
+            };
+          }
+        }
+
+        if (!attendanceMap.has(canonicalKey)) {
+          attendanceMap.set(canonicalKey, enhancedItem);
+        } else {
+          const existing = attendanceMap.get(canonicalKey);
+          if (enhancedItem.approvalStatus === 'rejected') {
+            attendanceMap.set(canonicalKey, { ...existing, ...enhancedItem });
+          }
+        }
       });
 
       // 2. Fetch all users from /users/all to guarantee HR, TL, Employee are all in table (Excluding Admin & Finance)
@@ -967,8 +1329,13 @@ export default function AttendanceLogs() {
               user.id,
               user.employeeId,
               user.uniqueID,
-              user.email
-            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+              user.email,
+              user.name,
+            ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
+
+            const matchedReq = userKeys.reduce((found, k) => found || userRequestMap.get(k), null);
+            const reqIsRej = matchedReq && (isRecordRejected(matchedReq) || matchedReq.approvalStatus === 'rejected');
+            const reqIsPend = !reqIsRej && matchedReq && (isRecordPending(matchedReq) || matchedReq.approvalStatus === 'pending');
 
             const matchedCanonical = userKeys.reduce((found, k) => found || userLookupMap.get(k), null);
             if (!matchedCanonical || !attendanceMap.has(matchedCanonical)) {
@@ -992,15 +1359,33 @@ export default function AttendanceLogs() {
                   role: user.role || 'employee',
                 },
                 date,
-                status: 'absent',
-                approvalStatus: 'not_checked_in',
-                checkInTime: null,
+                status: reqIsRej ? 'rejected' : (reqIsPend ? 'pending' : 'absent'),
+                approvalStatus: reqIsRej ? 'rejected' : (reqIsPend ? 'pending' : 'not_checked_in'),
+                rejectionReason: reqIsRej ? (matchedReq.rejectionReason || matchedReq.reason || 'Attendance rejected by admin') : '',
+                checkInTime: matchedReq?.checkInTime || matchedReq?.requestedTime || null,
                 checkOutTime: null,
                 totalWorkTime: 0,
                 totalBreakTime: 0,
                 breaks: [],
               });
-              userKeys.forEach(k => userLookupMap.set(k, uIdKey));
+              userKeys.forEach((k) => userLookupMap.set(k, uIdKey));
+            } else {
+              // User already in attendanceMap (e.g. from attendanceItems as absent or pending)
+              const existing = attendanceMap.get(matchedCanonical);
+              if (reqIsRej && existing.approvalStatus !== 'approved') {
+                attendanceMap.set(matchedCanonical, {
+                  ...existing,
+                  status: 'rejected',
+                  approvalStatus: 'rejected',
+                  rejectionReason: matchedReq.rejectionReason || matchedReq.reason || 'Attendance rejected by admin',
+                });
+              } else if (reqIsPend && existing.approvalStatus !== 'approved' && existing.approvalStatus !== 'rejected') {
+                attendanceMap.set(matchedCanonical, {
+                  ...existing,
+                  status: 'pending',
+                  approvalStatus: 'pending',
+                });
+              }
             }
           });
         }
@@ -1177,18 +1562,18 @@ export default function AttendanceLogs() {
             />
           ),
           color: 'amber',
-          label: 'Pending',
+          label: 'Pending request',
         };
 
       case 'rejected':
         return {
           icon: (
-            <AlertCircle
-              className={`${iconClass} text-red-600`}
+            <XCircle
+              className={`${iconClass} text-rose-600`}
             />
           ),
-          color: 'red',
-          label: 'Rejected from Admin',
+          color: 'rose',
+          label: 'Admin rejects the check in',
         };
 
       default:
@@ -1248,13 +1633,13 @@ export default function AttendanceLogs() {
         return {
           bg: 'bg-amber-50 text-amber-700 border-amber-200/80',
           dot: 'bg-amber-500',
-          label: 'Pending',
+          label: 'Pending Request',
         };
       case 'rejected':
         return {
-          bg: 'bg-red-50 text-red-700 border-red-200/80',
-          dot: 'bg-red-500',
-          label: 'Rejected',
+          bg: 'bg-rose-50 text-rose-700 border-rose-200/80',
+          dot: 'bg-rose-500',
+          label: 'Admin Rejects Check-In',
         };
       default:
         return {
@@ -1841,6 +2226,8 @@ export default function AttendanceLogs() {
                   <option value="half day">Half Day</option>
                   <option value="absent">Absent</option>
                   <option value="on leave">On Leave</option>
+                  <option value="pending">Pending</option>
+                  <option value="rejected">Rejected</option>
                 </select>
                 <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
@@ -1896,7 +2283,7 @@ export default function AttendanceLogs() {
           </div>
         ) : (
           <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-xs border-collapse min-w-[800px] sm:min-w-full font-poppins">
               <thead>
                 <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
                   <th className="py-3 px-4 w-12 text-left font-semibold">No.</th>
@@ -1954,6 +2341,8 @@ export default function AttendanceLogs() {
                           breaks={log.breaks}
                           checkOut={log.checkOut}
                           approvalStatus={log.approvalStatus}
+                          status={log.status}
+                          rejectionReason={log.rejectionReason}
                         />
                       </td>
 
@@ -1964,8 +2353,11 @@ export default function AttendanceLogs() {
 
                       {/* Status */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center">
-                          <Clock size={16} className="text-[#0284c7]" />
+                        <div
+                          className="flex items-center justify-center"
+                          title={getStatusIconAndColor(log.status).label}
+                        >
+                          {getStatusIconAndColor(log.status).icon}
                         </div>
                       </td>
 
@@ -2098,6 +2490,16 @@ export default function AttendanceLogs() {
                           </span>
                         </div>
                       ))}
+                    </div>
+                  ) : activeLog.status === 'rejected' || activeLog.approvalStatus === 'rejected' ? (
+                    <div className="border border-rose-200/80 bg-rose-50/70 rounded-xl px-3.5 py-3 text-center text-xs text-rose-700 font-medium flex items-center justify-center gap-2">
+                      <XCircle size={14} className="text-rose-500 shrink-0" />
+                      <span>Admin rejects the check in{activeLog.rejectionReason ? `: ${activeLog.rejectionReason}` : ''}</span>
+                    </div>
+                  ) : activeLog.status === 'pending' || activeLog.approvalStatus === 'pending' ? (
+                    <div className="border border-amber-200/80 bg-amber-50/70 rounded-xl px-3.5 py-3 text-center text-xs text-amber-700 font-medium flex items-center justify-center gap-2">
+                      <Clock size={14} className="text-amber-500 shrink-0" />
+                      <span>Pending request</span>
                     </div>
                   ) : (
                     <p className="border border-slate-200/80 rounded-xl px-3 py-4 text-center text-xs text-slate-400">

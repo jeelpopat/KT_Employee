@@ -665,7 +665,10 @@ export const Header = ({ onSignOut }) => {
   const activeUnreadCount = isAdmin ? adminUnreadCount : employeeUnreadCount;
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 h-16 border-b border-[#083b4e] bg-[#0b4d68] text-white transition-colors shadow-xs font-poppins">
+    <header
+      className="fixed top-0 left-0 right-0 w-full z-50 h-16 border-b border-[#083b4e] text-white transition-colors shadow-xs font-poppins"
+      style={{ background: 'linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)' }}
+    >
       <div className="flex h-full items-center justify-between px-3 sm:px-6">
 
         {/* Left: Mobile Sidebar Toggle & White Brand Logo */}

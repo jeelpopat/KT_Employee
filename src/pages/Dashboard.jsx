@@ -1059,15 +1059,15 @@ export default function Dashboard() {
                 </div>
 
                 {/* Modal Content */}
-                <div className="p-5">
+                <div className="p-4 sm:p-5">
                   {absentRecords.length === 0 ? (
                     <div className="text-center py-10 text-xs text-slate-400 font-poppins">
                       No absent records today
                     </div>
                   ) : (
                     <>
-                      {/* 3 columns x 2 rows grid (6 per page) */}
-                      <div className="grid grid-cols-3 gap-3">
+                      {/* Responsive grid: 2 cols on mobile, 3 cols on tablet/desktop */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
                         {absentRecords
                           .slice((absentPage - 1) * 6, absentPage * 6)
                           .map((record, index) => {

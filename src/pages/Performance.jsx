@@ -1676,7 +1676,7 @@ const Performance = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-poppins">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-5 font-poppins">
       {confirmationDialog}
 
       {/* Floating Toast Notification */}
@@ -1983,7 +1983,7 @@ const Performance = () => {
           </div>
         ) : (
           <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-xs border-collapse min-w-[760px] sm:min-w-full font-poppins">
               <thead>
                 <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
                   <th className="py-3 px-4 w-12 text-left font-semibold">No.</th>
