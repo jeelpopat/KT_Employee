@@ -222,6 +222,35 @@ const extractPeople = (payload) => {
   return [];
 };
 
+const getUserName = (lead) => {
+  if (!lead) return "";
+  
+  // Check teamLead first (from backend structure)
+  if (lead.teamLead?.name && isValidName(lead.teamLead.name)) return lead.teamLead.name.trim();
+  if (lead.teamLead?.fullName && isValidName(lead.teamLead.fullName)) return lead.teamLead.fullName.trim();
+  
+  // Check other possible fields
+  if (lead.name && isValidName(lead.name)) return lead.name.trim();
+  if (lead.fullName && isValidName(lead.fullName)) return lead.fullName.trim();
+  if (lead.displayName && isValidName(lead.displayName)) return lead.displayName.trim();
+  if (lead.userName && isValidName(lead.userName)) return lead.userName.trim();
+  if (lead.username && isValidName(lead.username)) return lead.username.trim();
+  
+  if (lead.firstName || lead.lastName) {
+    const full = `${lead.firstName || ''} ${lead.lastName || ''}`.trim();
+    if (isValidName(full)) return full;
+  }
+  if (lead.user) {
+    const uName = getUserName(lead.user);
+    if (isValidName(uName)) return uName;
+  }
+  if (lead.email && lead.email.includes('@')) {
+    const emailPrefix = lead.email.split('@')[0];
+    if (isValidName(emailPrefix)) return emailPrefix;
+  }
+  return "";
+};
+
 // Modal Component for Assignments
 const AssignmentModal = ({
   isOpen,
@@ -922,35 +951,6 @@ const getDesignation = (lead) => {
   return "-";
 };
 
-  const getUserName = (lead) => {
-    if (!lead) return "";
-    
-    // Check teamLead first (from backend structure)
-    if (lead.teamLead?.name && isValidName(lead.teamLead.name)) return lead.teamLead.name.trim();
-    if (lead.teamLead?.fullName && isValidName(lead.teamLead.fullName)) return lead.teamLead.fullName.trim();
-    
-    // Check other possible fields
-    if (lead.name && isValidName(lead.name)) return lead.name.trim();
-    if (lead.fullName && isValidName(lead.fullName)) return lead.fullName.trim();
-    if (lead.displayName && isValidName(lead.displayName)) return lead.displayName.trim();
-    if (lead.userName && isValidName(lead.userName)) return lead.userName.trim();
-    if (lead.username && isValidName(lead.username)) return lead.username.trim();
-    
-    if (lead.firstName || lead.lastName) {
-      const full = `${lead.firstName || ''} ${lead.lastName || ''}`.trim();
-      if (isValidName(full)) return full;
-    }
-    if (lead.user) {
-      const uName = getUserName(lead.user);
-      if (isValidName(uName)) return uName;
-    }
-    if (lead.email && lead.email.includes('@')) {
-      const emailPrefix = lead.email.split('@')[0];
-      if (isValidName(emailPrefix)) return emailPrefix;
-    }
-    return "";
-  };
-
   const getUserEmail = (lead) => {
     if (lead.teamLead?.email && lead.teamLead.email.includes('@')) return lead.teamLead.email;
     if (lead.email && lead.email.includes('@')) return lead.email;
@@ -1236,12 +1236,8 @@ const getDesignation = (lead) => {
         if (isFinanceOrExcludedUser(apiLead) || (apiLead.teamLead && isFinanceOrExcludedUser(apiLead.teamLead))) return;
         if (isUnknownEmployeeOrUser(apiLead) || (apiLead.teamLead && isUnknownEmployeeOrUser(apiLead.teamLead))) return;
 
-        const leadName = getUserName(apiLead);
-        const leadEmail = getUserEmail(apiLead);
-        if (!leadName || isInvalidName(leadName)) return;
-        if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) return;
-
         const leadId = 
+          (typeof apiLead?.teamLead === 'string' ? apiLead.teamLead : null) ||
           apiLead?.teamLead?.userId || 
           apiLead?.teamLead?.employeeId || 
           apiLead?.teamLead?._id ||
@@ -1249,6 +1245,33 @@ const getDesignation = (lead) => {
           apiLead?.employeeId || 
           apiLead?.user?._id || 
           apiLead?._id;
+
+        // Check if this team belongs to an existing lead in mergedLeads
+        const existingIdx = mergedLeads.findIndex(m => {
+          if (leadId) {
+            const mIds = [
+              m._id, m.id, m.teamLeadId, m.userId, m.employeeId,
+              m.teamLead?._id, m.teamLead?.userId, m.teamLead?.employeeId
+            ].filter(Boolean).map(String);
+            if (mIds.includes(String(leadId))) return true;
+          }
+          return isSameLead(m, apiLead);
+        });
+
+        if (existingIdx >= 0) {
+          const existing = mergedLeads[existingIdx];
+          const empsA = getAssignedEmployeeIds(existing);
+          const empsB = getAssignedEmployeeIds(apiLead);
+          const distinctCombined = getDistinctAssignedEmployees([...empsA, ...empsB], fetchedEmployees);
+          existing.assignedEmployees = distinctCombined.map((employee) => normalizeEmployeeId(employee) || employee);
+          if (!existing.rawTeamDocId) existing.rawTeamDocId = apiLead._id;
+          return;
+        }
+
+        const leadName = getUserName(apiLead) || (apiLead.teamLead && typeof apiLead.teamLead === 'object' ? getUserName(apiLead.teamLead) : '');
+        const leadEmail = getUserEmail(apiLead) || (apiLead.teamLead && typeof apiLead.teamLead === 'object' ? getUserEmail(apiLead.teamLead) : '');
+        if (!leadName || isInvalidName(leadName)) return;
+        if (!leadEmail || leadEmail === "N/A" || !leadEmail.includes("@")) return;
 
         const normalizedLead = {
           ...apiLead,
@@ -1261,17 +1284,7 @@ const getDesignation = (lead) => {
           rawTeamDocId: apiLead._id
         };
 
-        const existingIdx = mergedLeads.findIndex(m => isSameLead(m, normalizedLead));
-        if (existingIdx >= 0) {
-          const existing = mergedLeads[existingIdx];
-          const empsA = getAssignedEmployeeIds(existing);
-          const empsB = getAssignedEmployeeIds(normalizedLead);
-          const distinctCombined = getDistinctAssignedEmployees([...empsA, ...empsB], fetchedEmployees);
-          existing.assignedEmployees = distinctCombined.map((employee) => normalizeEmployeeId(employee) || employee);
-          if (!existing.rawTeamDocId) existing.rawTeamDocId = apiLead._id;
-        } else {
-          mergedLeads.push(normalizedLead);
-        }
+        mergedLeads.push(normalizedLead);
       });
 
       // 4. Pure live API assignments only - DO NOT LOAD OR MERGE FROM LOCAL STORAGE

@@ -520,6 +520,17 @@ const EmployeeRequests = () => {
       const userTLs = roster.filter(u => u && !isFinanceOrExcludedUser(u) && isTeamLeadUser(u));
       leads.push(...userTLs);
 
+      // Also include team leads from GET /api/teamLead/team
+      try {
+        const teams = await fetchTeamsList();
+        (teams || []).forEach(team => {
+          const rawLead = team.teamLead || team.lead;
+          if (rawLead && typeof rawLead === 'object' && !isFinanceOrExcludedUser(rawLead)) {
+            leads.push(rawLead);
+          }
+        });
+      } catch {}
+
       // Deduplicate leads by identifier or normalized name
       const seen = new Set();
       const uniqueLeads = [];
@@ -1142,23 +1153,19 @@ const EmployeeRequests = () => {
             ...(token ? { Authorization: `Bearer ${token}` } : {})
           };
 
-          // Step A: Fetch current teams from backend to ensure we merge and preserve existing members
+          // Step A: Fetch current teams from backend
           let currentTeams = [];
           try {
-            const teamRes = await api.get('/api/teamLead/team', { headers });
-            currentTeams = teamRes.data?.data || teamRes.data?.teams || (Array.isArray(teamRes.data) ? teamRes.data : []);
+            currentTeams = await fetchTeamsList();
           } catch {
             try {
-              const fetchTeamsRes = await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/team', { headers });
-              if (fetchTeamsRes.ok) {
-                const tData = await fetchTeamsRes.json().catch(() => ({}));
-                currentTeams = tData?.data || tData?.teams || (Array.isArray(tData) ? tData : []);
-              }
+              const teamRes = await api.get('/api/teamLead/team', { headers });
+              currentTeams = teamRes.data?.data || teamRes.data?.teams || (Array.isArray(teamRes.data) ? teamRes.data : []);
             } catch {}
           }
           if (!Array.isArray(currentTeams)) currentTeams = [];
 
-          // Resolve IDs from the roster loaded by /api/users/all.
+          // Step B: Resolve IDs from the roster and /api/employee/list
           const matchedEmp = users.find(e => {
             if (!e) return false;
             const eEmail = String(e.email || '').toLowerCase().trim();
@@ -1182,75 +1189,149 @@ const EmployeeRequests = () => {
             resolvedEmpRecordId = String(employeeRecordId);
           }
 
-          const employeeIdentifiersToAdd = [resolvedEmpRecordId, String(userId)].filter(Boolean);
+          // Also check live /api/employee/list for the newly created employee record
+          let freshEmployeeId = null;
+          try {
+            const empListRes = await api.get('/api/employee/list', { headers });
+            const empList = empListRes.data?.data || empListRes.data?.employees || (Array.isArray(empListRes.data) ? empListRes.data : []);
+            const foundEmp = (Array.isArray(empList) ? empList : []).find(e => {
+              if (!e) return false;
+              const eUId = String(typeof e.user === 'object' ? (e.user?._id || e.user?.id) : (e.user || e.userId || e.userID || '')).toLowerCase().trim();
+              if (eUId && eUId === String(userId).toLowerCase().trim()) return true;
+              const eEmail = String(e.email || '').toLowerCase().trim();
+              const uEmail = String(approvingUser?.email || '').toLowerCase().trim();
+              return Boolean(eEmail && uEmail && eEmail === uEmail);
+            });
+            if (foundEmp?._id) freshEmployeeId = String(foundEmp._id);
+          } catch {}
 
-          // Step C: If employee was already in another Team Lead's team in currentTeams, remove them from that other team lead
-          const targetTLIds = [
+          const employeeIdentifiersToAdd = [freshEmployeeId, resolvedEmpRecordId, String(userId)].filter(Boolean);
+          const empIdentifiersLower = employeeIdentifiersToAdd.map(x => String(x).toLowerCase().trim());
+
+          const extractMemberId = (emp) => {
+            if (!emp) return null;
+            if (typeof emp === 'string' || typeof emp === 'number') return String(emp).trim();
+            if (typeof emp === 'object') {
+              return String(emp._id || emp.id || emp.userId || emp.employeeId || '').trim();
+            }
+            return null;
+          };
+
+          // Step C: If employee was already in another Team Lead's team, remove them from that other team lead
+          const targetTLIdentifiers = [
             selectedTeamLeadId,
             selectedTL?._id,
             selectedTL?.id,
-            selectedTL?.userId
+            selectedTL?.userId,
+            selectedTL?.userID,
+            selectedTL?.employeeId,
+            selectedTL?.employeeID,
           ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+          const targetTLEmail = selectedTL?.email ? String(selectedTL.email).toLowerCase().trim() : '';
+          const targetTLName = (selectedTL?.name || selectedTL?.fullName || '').toLowerCase().trim();
+
+          const isTeamMatchingTarget = (team) => {
+            if (!team) return false;
+            const rawLead = team.teamLead || team.lead || team.teamLeadId;
+            const leadIds = [
+              team.teamLeadId,
+              team.leadId,
+              typeof rawLead === 'object' ? (rawLead?._id || rawLead?.id || rawLead?.userId || rawLead?.employeeId) : rawLead,
+              rawLead?.user?._id || rawLead?.user,
+              rawLead?.employee?._id || rawLead?.employee,
+            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
+
+            if (leadIds.some(id => targetTLIdentifiers.includes(id))) return true;
+
+            const leadEmail = typeof rawLead === 'object' ? String(rawLead?.email || '').toLowerCase().trim() : '';
+            if (leadEmail && targetTLEmail && leadEmail === targetTLEmail) return true;
+
+            const leadName = typeof rawLead === 'object' ? String(rawLead?.name || rawLead?.fullName || '').toLowerCase().trim() : '';
+            if (leadName && targetTLName && leadName === targetTLName) return true;
+
+            return false;
+          };
 
           for (const team of currentTeams) {
-            const rawLead = team.teamLead || team.lead || team.teamLeadId;
-            const leadIdStr = String(typeof rawLead === 'object' ? (rawLead._id || rawLead.id || rawLead.userId) : rawLead).toLowerCase().trim();
-            const isThisTargetTeam = targetTLIds.includes(leadIdStr);
-
+            const isThisTargetTeam = isTeamMatchingTarget(team);
             if (!isThisTargetTeam && Array.isArray(team.employees)) {
               const prevCount = team.employees.length;
               const remainingEmps = team.employees.filter(emp => {
-                const empStr = String(typeof emp === 'object' ? (emp._id || emp.id || emp.userId) : emp).toLowerCase().trim();
-                return !employeeIdentifiersToAdd.map(x => x.toLowerCase().trim()).includes(empStr);
+                if (!emp) return false;
+                const mId = extractMemberId(emp)?.toLowerCase();
+                const mEmail = typeof emp === 'object' && emp.email ? String(emp.email).toLowerCase().trim() : '';
+                return !empIdentifiersLower.includes(mId) && (!mEmail || !empIdentifiersLower.includes(mEmail));
               });
 
               if (remainingEmps.length !== prevCount) {
-                // Employee was in another team lead; remove and update that team lead via create-team
                 try {
-                  const otherLeadBackendId = typeof rawLead === 'object' ? (rawLead._id || rawLead.id) : rawLead;
-                  await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/create-team', {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({
-                      teamLead: otherLeadBackendId,
-                      employees: remainingEmps.map(e => typeof e === 'object' ? String(e._id || e.id) : String(e))
-                    })
-                  }).catch(() => {});
+                  const rawLead = team.teamLead || team.lead || team.teamLeadId;
+                  const otherLeadBackendId = typeof rawLead === 'object' ? (rawLead._id || rawLead.id || rawLead.userId) : rawLead;
+                  if (otherLeadBackendId) {
+                    const removePayload = {
+                      teamLead: String(otherLeadBackendId),
+                      employees: remainingEmps.map(extractMemberId).filter(Boolean)
+                    };
+                    await api.post('/api/teamLead/create-team', removePayload, { headers }).catch(async () => {
+                      await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/create-team', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify(removePayload)
+                      }).catch(() => {});
+                    });
+                  }
                 } catch {}
               }
             }
           }
 
           // Step D: Find existing team document for target team lead and merge members
-          const targetTeamDoc = currentTeams.find(t => {
-            const rawLead = t.teamLead || t.lead || t.teamLeadId;
-            const leadIdStr = String(typeof rawLead === 'object' ? (rawLead._id || rawLead.id || rawLead.userId) : rawLead).toLowerCase().trim();
-            return targetTLIds.includes(leadIdStr);
-          });
+          const targetTeamDoc = currentTeams.find(isTeamMatchingTarget);
 
           const existingTargetMembers = Array.isArray(targetTeamDoc?.employees)
-            ? targetTeamDoc.employees.map(e => typeof e === 'object' ? String(e._id || e.id) : String(e))
+            ? targetTeamDoc.employees.map(extractMemberId).filter(Boolean)
             : [];
 
           const mergedTargetMembers = Array.from(new Set([
             ...existingTargetMembers,
             ...employeeIdentifiersToAdd
-          ]));
+          ])).filter(Boolean);
 
           // Step E: Call POST https://kt-backend-ttzj.onrender.com/api/teamLead/create-team
-          const backendTLId = targetTeamDoc?.teamLead?._id || targetTeamDoc?.teamLead || selectedTL?._id || selectedTeamLeadId;
+          const rawTargetLead = targetTeamDoc?.teamLead || targetTeamDoc?.lead || targetTeamDoc?.teamLeadId;
+          const existingLeadId = typeof rawTargetLead === 'object' ? (rawTargetLead?._id || rawTargetLead?.id || rawTargetLead?.userId) : rawTargetLead;
+          const backendTLId = existingLeadId ? String(existingLeadId) : String(selectedTL?._id || selectedTeamLeadId);
+
           if (backendTLId) {
-            await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/create-team', {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                teamLead: backendTLId,
-                employees: mergedTargetMembers
-              })
-            }).catch(() => {});
+            const teamPayload = {
+              teamLead: backendTLId,
+              employees: mergedTargetMembers
+            };
+
+            let createSuccess = false;
+            try {
+              const postRes = await api.post('/api/teamLead/create-team', teamPayload, { headers });
+              if (postRes.status >= 200 && postRes.status < 300) {
+                createSuccess = true;
+              }
+            } catch (err) {
+              console.warn('api.post to /api/teamLead/create-team error, attempting raw fetch:', err?.message);
+            }
+
+            if (!createSuccess) {
+              try {
+                await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/create-team', {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify(teamPayload)
+                });
+              } catch (rawErr) {
+                console.error('fetch to /api/teamLead/create-team error:', rawErr?.message);
+              }
+            }
           }
 
-          // Step G: Refresh local backendTeams
+          // Step F: Refresh local backendTeams
           await fetchBackendTeams();
         } catch (linkErr) {
           console.warn('Backend team linkage notice:', linkErr?.message);
