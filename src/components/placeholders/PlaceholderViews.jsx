@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Wallet, TrendingUp, Briefcase, Users, BookOpen, GraduationCap,
   FileBadge, PhoneCall, ListTodo, CalendarX, ClipboardCheck,
@@ -28,55 +28,166 @@ export { ProjectView };
 export { SalaryView } from '../salary/SalaryView.jsx';
 
 
+// Deep equality comparison helper for a performance record
+const isRecordEqual = (a, b) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    String(a._id || a.id || '') === String(b._id || b.id || '') &&
+    Number(a.performancePercentage ?? a.percentage ?? 0) === Number(b.performancePercentage ?? b.percentage ?? 0) &&
+    String(a.rating ?? '') === String(b.rating ?? '') &&
+    String(a.feedback ?? '') === String(b.feedback ?? '') &&
+    String(a.remarks ?? a.remark ?? '') === String(b.remarks ?? b.remark ?? '') &&
+    String(a.updatedAt || a.createdAt || '') === String(b.updatedAt || b.createdAt || '')
+  );
+};
+
 // 2. PERFORMANCE VIEW - Live API integration using GET /api/performance/:id (My Performance Only)
 export const PerformanceView = () => {
   const { user } = useApp();
   const [performanceData, setPerformanceData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch logged-in user's performance using GET /api/performance/:id
+  // Separate initial loading from silent background refreshing
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isFetchingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+
+  // Fetch logged-in user's performance using new API flow:
+  // /api/teamLead/team (for Team Lead structure) + /api/performance/all (overall dataset matching)
   const fetchMyPerformance = async (isSilent = false) => {
-    if (!isSilent) setIsLoading(true);
+    // Avoid concurrent duplicate network calls
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    if (!isSilent && !hasLoadedRef.current) {
+      setInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+
     try {
       const uEmail = (user?.email || '').toLowerCase().trim();
       const uName = (user?.name || '').toLowerCase().trim();
-      const uId = String(user?._id || user?.id || user?.employeeId || '');
+      const uId = String(user?._id || user?.id || user?.employeeId || '').toLowerCase().trim();
+      const isTL = Boolean(
+        user?.role === 'team_leader' ||
+        user?.role === 'teamlead' ||
+        user?.role === 'team_lead' ||
+        user?.role === 'tl' ||
+        user?.isTeamLeader ||
+        user?.isTeamLead
+      );
 
-      let matchedId = null;
+      // 1. If Team Lead, fetch /api/teamLead/team first to resolve team structure
+      let teamMemberIds = new Set();
+      let teamMemberEmails = new Set();
+      if (isTL) {
+        try {
+          const teamRes = await api.get('/api/teamLead/team');
+          const teams = Array.isArray(teamRes.data)
+            ? teamRes.data
+            : Array.isArray(teamRes.data?.data)
+              ? teamRes.data.data
+              : Array.isArray(teamRes.data?.teams)
+                ? teamRes.data.teams
+                : [];
+          teams.forEach((t) => {
+            const pool = [
+              ...(Array.isArray(t.employees) ? t.employees : []),
+              ...(Array.isArray(t.assignedEmployees) ? t.assignedEmployees : []),
+              ...(Array.isArray(t.assignedMembers) ? t.assignedMembers : []),
+              ...(Array.isArray(t.teamMembers) ? t.teamMembers : []),
+              ...(Array.isArray(t.members) ? t.members : []),
+              ...(Array.isArray(t.teamEmployees) ? t.teamEmployees : []),
+              ...(Array.isArray(t.employeeIds) ? t.employeeIds : []),
+              ...(Array.isArray(t.team?.employees) ? t.team.employees : []),
+            ];
+            pool.forEach((m) => {
+              if (typeof m === 'string') teamMemberIds.add(m.toLowerCase().trim());
+              else if (typeof m === 'object' && m) {
+                if (m._id) teamMemberIds.add(String(m._id).toLowerCase().trim());
+                if (m.id) teamMemberIds.add(String(m.id).toLowerCase().trim());
+                if (m.employeeId) teamMemberIds.add(String(m.employeeId).toLowerCase().trim());
+                if (m.userId) teamMemberIds.add(String(m.userId).toLowerCase().trim());
+                if (m.email) teamMemberEmails.add(String(m.email).toLowerCase().trim());
+              }
+            });
+          });
+        } catch (teamErr) {
+          console.warn('Error fetching team structure:', teamErr);
+        }
+      }
+
       let matchedData = null;
 
-      // 1. Resolve current user's performance record ID
-      // Only call /api/performance/all if user is admin to avoid 403 Forbidden
-      const isAdmin = user?.role === 'admin' || (user?.roleName || '').toLowerCase().includes('admin');
-      if (isAdmin) {
-        try {
-          const allRes = await api.get('/api/performance/all');
-          const list = allRes.data?.data || allRes.data?.performances || allRes.data || [];
-          if (Array.isArray(list)) {
-            const matched = list.find(p =>
-              (p.employeeEmail && p.employeeEmail.toLowerCase().trim() === uEmail) ||
-              (p.employeeName && p.employeeName.toLowerCase().trim() === uName) ||
-              (p.employeeID && String(p.employeeID) === uId) ||
-              (p.employeeId && String(p.employeeId) === uId)
+      // 2. Fetch overall dataset from /api/performance/all and filter/match records
+      try {
+        const allRes = await api.get('/api/performance/all');
+        const list = allRes.data?.data || allRes.data?.performances || allRes.data || [];
+        if (Array.isArray(list)) {
+          const matched = list.find((p) => {
+            if (!p || String(p.remarks || '').toLowerCase().trim() === 'nice work') return false;
+            const pEmail = String(p.employeeEmail || p.email || '').toLowerCase().trim();
+            const pName = String(p.employeeName || p.name || p.fullName || '').toLowerCase().trim();
+            const pEmpId = String(
+              (typeof p.employeeID === 'object' ? p.employeeID?._id || p.employeeID?.id : p.employeeID) ||
+              (typeof p.employeeId === 'object' ? p.employeeId?._id || p.employeeId?.id : p.employeeId) ||
+              p.userId ||
+              ''
+            ).toLowerCase().trim();
+
+            return (
+              (uEmail && pEmail === uEmail) ||
+              (uName && pName === uName) ||
+              (uId && pEmpId === uId)
             );
-            if (matched?._id) {
-              matchedId = matched._id;
-              matchedData = matched;
+          });
+
+          if (matched) {
+            matchedData = matched;
+          } else if (isTL) {
+            // If TL doesn't have a personal evaluation record, find team member evaluation
+            const teamMemberRecord = list.find((p) => {
+              if (!p || String(p.remarks || '').toLowerCase().trim() === 'nice work') return false;
+              const pEmail = String(p.employeeEmail || p.email || '').toLowerCase().trim();
+              const pEmpId = String(
+                (typeof p.employeeID === 'object' ? p.employeeID?._id || p.employeeID?.id : p.employeeID) ||
+                (typeof p.employeeId === 'object' ? p.employeeId?._id || p.employeeId?.id : p.employeeId) ||
+                p.userId ||
+                ''
+              ).toLowerCase().trim();
+              const pSubmittedBy = String(
+                (typeof p.submittedBy === 'object' ? p.submittedBy?._id || p.submittedBy?.id : p.submittedBy) || ''
+              ).toLowerCase().trim();
+              const pEvaluatorName = String(p.evaluatorName || '').toLowerCase().trim();
+
+              return (
+                teamMemberIds.has(pEmpId) ||
+                teamMemberEmails.has(pEmail) ||
+                (uId && pSubmittedBy === uId) ||
+                (uName && pEvaluatorName === uName)
+              );
+            });
+            if (teamMemberRecord) {
+              matchedData = teamMemberRecord;
             }
           }
-        } catch (allErr) {
-          // ignore error
         }
-      } else {
-        // Query user candidate endpoints directly; do not load old stale records
-        const uCandidateEndpoints = [
+      } catch (allErr) {
+        console.warn('Could not fetch from /api/performance/all:', allErr);
+      }
+
+      // Fallback candidate endpoints if /api/performance/all is restricted or didn't find the record
+      // Note: Deprecated /api/performance/employee/:id and /api/performance/team endpoints are completely removed
+      if (!matchedData && uId) {
+        const candidateEndpoints = [
           `/api/performance/user/${uId}`,
-          `/api/performance/employee/${uId}`,
           `/api/performance/${uId}`,
           '/api/performance/my'
         ];
 
-        for (const ep of uCandidateEndpoints) {
+        for (const ep of candidateEndpoints) {
           try {
             const res = await api.get(ep);
             const list = Array.isArray(res.data?.data)
@@ -85,7 +196,7 @@ export const PerformanceView = () => {
                 ? res.data.performances
                 : res.data?.data || res.data?.performance || res.data;
             if (Array.isArray(list) && list.length > 0) {
-              const clean = list.find(p => p && String(p.remarks || '').toLowerCase().trim() !== 'nice work');
+              const clean = list.find((p) => p && String(p.remarks || '').toLowerCase().trim() !== 'nice work');
               if (clean) {
                 matchedData = clean;
                 break;
@@ -94,21 +205,24 @@ export const PerformanceView = () => {
               matchedData = list;
               break;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
 
-      if (matchedData) {
-        setPerformanceData(matchedData);
-      } else {
-        // No performance records from live API: keep empty state
-        setPerformanceData(null);
-      }
+      // Only update state if data actually changed to prevent re-renders
+      setPerformanceData((prev) => {
+        if (isRecordEqual(prev, matchedData)) {
+          return prev;
+        }
+        return matchedData || null;
+      });
     } catch (err) {
       console.error('My Performance fetch error:', err);
-      setPerformanceData(null);
     } finally {
-      if (!isSilent) setIsLoading(false);
+      hasLoadedRef.current = true;
+      setInitialLoading(false);
+      setIsRefreshing(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -188,16 +302,16 @@ export const PerformanceView = () => {
         </div>
 
         <button
-          onClick={fetchMyPerformance}
-          disabled={isLoading}
+          onClick={() => fetchMyPerformance(false)}
+          disabled={isRefreshing}
           className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition cursor-pointer self-start sm:self-auto"
         >
-          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
           Refresh
         </button>
       </div>
 
-      {isLoading ? (
+      {initialLoading && !hasLoadedRef.current && !performanceData ? (
         <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white border border-slate-200/80 rounded-xl">
           <Loader2 size={32} className="animate-spin text-indigo-500" />
           <p className="text-xs text-slate-500 font-medium">Loading your performance metrics...</p>

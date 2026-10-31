@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useConfirm } from "../components/common/ConfirmDialog";
 import {
   BarChart3,
@@ -308,6 +308,54 @@ const deleteFromPersistentStore = (perfId) => {
   }
 };
 
+// Equality comparison helpers to preserve reference stability & prevent unnecessary re-renders
+const arePerformancesEqual = (prevList, nextList) => {
+  if (prevList === nextList) return true;
+  if (!Array.isArray(prevList) || !Array.isArray(nextList)) return false;
+  if (prevList.length !== nextList.length) return false;
+  for (let i = 0; i < prevList.length; i++) {
+    const p1 = prevList[i];
+    const p2 = nextList[i];
+    if (!p1 || !p2) return false;
+    if (String(p1._id || p1.id || "") !== String(p2._id || p2.id || "")) return false;
+    if (Number(p1.percentage ?? p1.performancePercentage ?? 0) !== Number(p2.percentage ?? p2.performancePercentage ?? 0)) return false;
+    if (String(p1.rating ?? "") !== String(p2.rating ?? "")) return false;
+    if (String(p1.feedback ?? "") !== String(p2.feedback ?? "")) return false;
+    if (String(p1.remarks ?? p1.remark ?? "") !== String(p2.remarks ?? p2.remark ?? "")) return false;
+    if (String(p1.updatedAt || p1.createdAt || p1.date || "") !== String(p2.updatedAt || p2.createdAt || p2.date || "")) return false;
+    if (String(p1.month ?? "") !== String(p2.month ?? "")) return false;
+    if (String(p1.year ?? "") !== String(p2.year ?? "")) return false;
+  }
+  return true;
+};
+
+const areTeamScopesEqual = (scopeA, scopeB) => {
+  if (scopeA === scopeB) return true;
+  if (!scopeA || !scopeB) return false;
+  if (scopeA.memberIds?.size !== scopeB.memberIds?.size) return false;
+  if (scopeA.memberEmails?.size !== scopeB.memberEmails?.size) return false;
+  for (const id of scopeA.memberIds) {
+    if (!scopeB.memberIds.has(id)) return false;
+  }
+  for (const email of scopeA.memberEmails) {
+    if (!scopeB.memberEmails.has(email)) return false;
+  }
+  return true;
+};
+
+const areEmployeesEqual = (listA, listB) => {
+  if (listA === listB) return true;
+  if (!Array.isArray(listA) || !Array.isArray(listB)) return false;
+  if (listA.length !== listB.length) return false;
+  for (let i = 0; i < listA.length; i++) {
+    const e1 = listA[i];
+    const e2 = listB[i];
+    if (String(e1._id || e1.id) !== String(e2._id || e2.id)) return false;
+    if (e1.name !== e2.name || e1.email !== e2.email || e1.department !== e2.department) return false;
+  }
+  return true;
+};
+
 const Performance = () => {
   const { user, userRole } = useApp();
   const normalizedRole = String(userRole || deriveUserRole(user) || "").toLowerCase().trim();
@@ -349,8 +397,21 @@ const Performance = () => {
   }, []);
 
   const [employees, setEmployees] = useState([]);
-  const [performances, setPerformances] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [performances, setPerformances] = useState(() => {
+    try {
+      return getStoredPerformances() || [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Separate initial mount loading from silent background refreshing
+  const [initialLoading, setInitialLoading] = useState(() => getStoredPerformances().length === 0);
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  const isFetchingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  const loading = initialLoading && performances.length === 0;
+
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState({ message: "", type: "" });
 
@@ -362,6 +423,34 @@ const Performance = () => {
 
   // Team Leader assigned team scope
   const [teamEmployeesScope, setTeamEmployeesScope] = useState(null);
+
+  // Smart state update helpers to preserve reference stability & prevent UI flickers
+  const updatePerformancesIfChanged = useCallback((nextList) => {
+    setPerformances((current) => {
+      if (arePerformancesEqual(current, nextList)) {
+        return current;
+      }
+      return nextList;
+    });
+  }, []);
+
+  const updateTeamScopeIfChanged = useCallback((nextScope) => {
+    setTeamEmployeesScope((current) => {
+      if (areTeamScopesEqual(current, nextScope)) {
+        return current;
+      }
+      return nextScope;
+    });
+  }, []);
+
+  const updateEmployeesIfChanged = useCallback((nextEmployees) => {
+    setEmployees((current) => {
+      if (areEmployeesEqual(current, nextEmployees)) {
+        return current;
+      }
+      return nextEmployees;
+    });
+  }, []);
 
   // History Toolbar Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -383,16 +472,40 @@ const Performance = () => {
   });
 
   // ============================================================
-  // FETCH TEAM LEAD SCOPE (EMPLOYEES ASSIGNED UNDER THIS TL)
+  // ROLE ISOLATION: EMPLOYEE / TL OWN RECORD MATCHING
+  // ============================================================
+  const isMyRecord = useCallback((perf) => {
+    if (!perf) return false;
+    const myIdentity = getPerformanceEmployeeIdentity(user);
+    [
+      getRealAuthUserId(user),
+      user?._id,
+      user?.id,
+      user?.employeeId,
+      user?.uniqueID,
+      user?.employeeID,
+      user?.uniqueId,
+      user?.empId
+    ].filter(Boolean).forEach((id) => myIdentity.ids.add(String(id).toLowerCase().trim()));
+    const perfIdentity = getPerformanceEmployeeIdentity(perf);
+
+    return [...perfIdentity.ids].some((id) => myIdentity.ids.has(id)) ||
+      [...perfIdentity.emails].some((email) => myIdentity.emails.has(email)) ||
+      [...perfIdentity.names].some((name) => myIdentity.names.has(name));
+  }, [user]);
+
+  // ============================================================
+  // FETCH TEAM LEAD SCOPE (NEW API WORKFLOW: /api/teamLead/team)
   // ============================================================
   const fetchTeamLeadScope = useCallback(async () => {
-    if (!isTL) return;
+    if (!isTL) return null;
     try {
-      const [teamsData, empRes, usersRes, projRes] = await Promise.allSettled([
-        fetchTeamsList(),
+      // 1. Fetch Team Lead team structure from /api/teamLead/team
+      // along with employee and user lists for resolving identifiers
+      const [teamsRes, empRes, usersRes] = await Promise.allSettled([
+        fetch("https://kt-backend-ttzj.onrender.com/api/teamLead/team", { headers }).then((r) => r.json().catch(() => ([]))),
         fetch("https://kt-backend-ttzj.onrender.com/api/employee/list", { headers }).then((r) => r.json().catch(() => ({}))),
-        fetch("https://kt-backend-ttzj.onrender.com/api/users/all", { headers }).then((r) => r.json().catch(() => ({}))),
-        fetch("https://kt-backend-ttzj.onrender.com/api/projectManage/project/all", { headers }).then((r) => r.json().catch(() => ({})))
+        fetch("https://kt-backend-ttzj.onrender.com/api/users/all", { headers }).then((r) => r.json().catch(() => ({})))
       ]);
 
       let uMap = {};
@@ -439,7 +552,23 @@ const Performance = () => {
         });
       }
 
-      const allTeams = teamsData.status === "fulfilled" && Array.isArray(teamsData.value) ? teamsData.value : [];
+      let allTeams = [];
+      if (teamsRes.status === "fulfilled" && teamsRes.value) {
+        const val = teamsRes.value;
+        allTeams = Array.isArray(val)
+          ? val
+          : Array.isArray(val.data)
+            ? val.data
+            : Array.isArray(val.teamLeads)
+              ? val.teamLeads
+              : Array.isArray(val.teams)
+                ? val.teams
+                : [];
+      }
+      if (!allTeams || allTeams.length === 0) {
+        allTeams = await fetchTeamsList();
+      }
+
       const userIdent = getLoggedInUserIdentifiers(user);
       const myId = String(getRealAuthUserId(user) || user?._id || user?.id || "").toLowerCase().trim();
       const myEmail = String(user?.email || "hetvi.kevalon@gmail.com").toLowerCase().trim();
@@ -449,38 +578,53 @@ const Performance = () => {
         if (!leadObj) return false;
         if (typeof leadObj === "string" || typeof leadObj === "number") {
           const s = String(leadObj).toLowerCase().trim();
-          return (
-            (myId && s === myId) ||
-            (myEmail && s === myEmail) ||
-            userIdent.ids?.has(s) ||
-            userIdent.emails?.has(s) ||
-            s.includes("hetvi")
-          );
+          if (myId && s === myId) return true;
+          if (myEmail && s === myEmail) return true;
+          if (userIdent.ids?.has(s)) return true;
+          if (userIdent.emails?.has(s)) return true;
+          if (userIdent.names?.has(s)) return true;
+          if (s.includes("hetvi") && (myEmail.includes("hetvi") || myId.includes("hetvi") || [...userIdent.names].some((n) => n.includes("hetvi")))) return true;
+          const resolved = uMap[s];
+          if (resolved && resolved !== leadObj) return isLeadMatch(resolved);
+          return false;
         }
         if (typeof leadObj === "object") {
-          const lId = String(leadObj._id || leadObj.id || leadObj.userId || "").toLowerCase().trim();
-          const lEmail = String(leadObj.email || "").toLowerCase().trim();
-          const lName = String(leadObj.name || leadObj.fullName || "").toLowerCase().trim();
-          return (
-            (myId && lId === myId) ||
-            (myEmail && lEmail === myEmail) ||
-            userIdent.ids?.has(lId) ||
-            userIdent.emails?.has(lEmail) ||
-            lEmail.includes("hetvi") ||
-            lName.includes("hetvi")
-          );
+          const lIds = [
+            leadObj._id, leadObj.id, leadObj.userId, leadObj.employeeId, leadObj.employeeID, leadObj.empId,
+            leadObj.user?._id, leadObj.user?.id, leadObj.employee?._id, leadObj.employee?.id
+          ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
+          if (lIds.some((id) => (myId && id === myId) || userIdent.ids?.has(id))) return true;
+
+          const lEmails = [
+            leadObj.email, leadObj.user?.email, leadObj.employee?.email
+          ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
+          if (lEmails.some((em) => (myEmail && em === myEmail) || userIdent.emails?.has(em))) return true;
+
+          const lNames = [
+            leadObj.name, leadObj.fullName, leadObj.displayName,
+            `${leadObj.firstName || ""} ${leadObj.lastName || ""}`.trim()
+          ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
+          if (lNames.some((nm) => userIdent.names?.has(nm))) return true;
+
+          if (lEmails.some((em) => em.includes("hetvi")) || lNames.some((nm) => nm.includes("hetvi"))) {
+            if (myEmail.includes("hetvi") || [...userIdent.names].some((n) => n.includes("hetvi"))) return true;
+          }
+          return false;
         }
         return false;
       };
 
-      const myTeams = allTeams.filter(
+      const myTeams = (allTeams || []).filter(
         (t) =>
           isTeamOwnedByLead(t, userIdent) ||
           isLeadMatch(t.teamLead) ||
           isLeadMatch(t.lead) ||
           isLeadMatch(t.teamLeadId) ||
+          isLeadMatch(t.leadId) ||
           isLeadMatch(t.teamLeadUser) ||
-          isLeadMatch(t.teamLeadEmployee)
+          isLeadMatch(t.teamLeadEmployee) ||
+          isLeadMatch(t.userId) ||
+          isLeadMatch(t.assignedTL)
       );
 
       const teamScope = extractAssignedTeamEmployees(myTeams, uMap);
@@ -537,19 +681,31 @@ const Performance = () => {
       };
       teamScope.memberRecords.forEach(addTeamMemberIdentifiers);
 
-      // Check projects for team members assigned under this Team Leader
-      const projData = projRes.status === "fulfilled" ? projRes.value : {};
-      const rawProjs = projData?.data || projData?.projects || (Array.isArray(projData) ? projData : []);
-      if (Array.isArray(rawProjs)) {
-        rawProjs.forEach((p) => {
-          if (!p) return;
-          const isProjectLead =
-            isLeadMatch(p.teamLeadUser) ||
-            isLeadMatch(p.teamLeadEmployee) ||
-            isLeadMatch(p.teamLead) ||
-            isLeadMatch(p.assignedTL);
-          if (isProjectLead && Array.isArray(p.employees)) {
-            p.employees.forEach(addTeamMemberIdentifiers);
+      // Check all team docs directly for candidate employee lists
+      myTeams.forEach((team) => {
+        const pool = [
+          ...(Array.isArray(team.employees) ? team.employees : []),
+          ...(Array.isArray(team.assignedEmployees) ? team.assignedEmployees : []),
+          ...(Array.isArray(team.assignedMembers) ? team.assignedMembers : []),
+          ...(Array.isArray(team.teamMembers) ? team.teamMembers : []),
+          ...(Array.isArray(team.members) ? team.members : []),
+          ...(Array.isArray(team.teamEmployees) ? team.teamEmployees : []),
+          ...(Array.isArray(team.employeeIds) ? team.employeeIds : []),
+          ...(Array.isArray(team.team?.employees) ? team.team.employees : []),
+          ...(Array.isArray(team.team?.members) ? team.team.members : []),
+          ...(Array.isArray(team.user?.employees) ? team.user.employees : []),
+          ...(Array.isArray(team.teamLead?.employees) ? team.teamLead.employees : [])
+        ];
+        pool.forEach(addTeamMemberIdentifiers);
+      });
+
+      // Check employees roster from /api/employee/list for direct team lead references
+      if (Array.isArray(rawEmps)) {
+        rawEmps.forEach((emp) => {
+          if (!emp) return;
+          const assignedLead = emp.teamLeadId || emp.teamLead || emp.tlId || emp.assignedTL || emp.teamLeaderId;
+          if (assignedLead && isLeadMatch(assignedLead)) {
+            addTeamMemberIdentifiers(emp);
           }
         });
       }
@@ -573,149 +729,233 @@ const Performance = () => {
         });
       } catch { }
 
-      setTeamEmployeesScope(teamScope);
+      updateTeamScopeIfChanged(teamScope);
+      return teamScope;
     } catch (err) {
       console.warn("Failed to fetch Team Lead scope:", err);
+      return null;
     }
-  }, [isTL, headers, user]);
+  }, [isTL, headers, user, updateTeamScopeIfChanged]);
 
   // ============================================================
-  // FETCH ALL PERFORMANCES (LIVE API + SYNCHRONIZED STORAGE)
+  // FETCH ALL PERFORMANCES (NEW WORKFLOW: /api/teamLead/team -> /api/performance/all)
   // ============================================================
   const fetchAllPerformances = useCallback(async (isSilent = false) => {
-    if (!isSilent) setLoading(true);
+    // Avoid concurrent duplicate network calls
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    if (!isSilent) {
+      if (performances.length === 0 && !hasLoadedRef.current) {
+        setInitialLoading(true);
+      } else {
+        setIsBackgroundRefreshing(true);
+      }
+    } else {
+      setIsBackgroundRefreshing(true);
+    }
+
     try {
-      let fetchedData = [];
-      if (isAdmin || isHR || isTL) {
-        let liveSucceeded = false;
-        try {
-          const response = await fetch(
-            "https://kt-backend-ttzj.onrender.com/api/performance/all",
-            { headers }
-          );
-
-          if (response.ok) {
-            const data = await response.json();
-            const rawPerfs = Array.isArray(data.data)
-              ? data.data
-              : Array.isArray(data.performances)
-                ? data.performances
-                : Array.isArray(data)
-                  ? data
-                  : [];
-
-            if (isAdmin) {
-              // Clean any old test records from backend if present
-              rawPerfs.forEach((perf) => {
-                if (isDummyPerformanceRecord(perf) && perf._id && !String(perf._id).startsWith("perf-")) {
-                  try {
-                    fetch(`https://kt-backend-ttzj.onrender.com/api/performance/delete/${perf._id}`, {
-                      method: "DELETE",
-                      headers
-                    }).catch(() => { });
-                  } catch { }
-                }
-              });
-            }
-
-            const filteredPerfs = dedupePerformanceRecords(rawPerfs.filter((perf) => {
-              if (!perf || isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf)) return false;
-              if (isFinanceOrExcludedUser(perf)) return false;
-              if (perf.employeeID && (isFinanceOrExcludedUser(perf.employeeID) || isUnknownEmployeeOrUser(perf.employeeID))) return false;
-              if (perf.employee && (isFinanceOrExcludedUser(perf.employee) || isUnknownEmployeeOrUser(perf.employee))) return false;
-              return true;
-            }));
-
-            if (isAdmin || isHR) {
-              // Update persistent cache so reviews remain synchronized
-              try {
-                localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(filteredPerfs));
-                localStorage.setItem(PERF_STORE_KEY, JSON.stringify(filteredPerfs));
-              } catch { }
-
-              setPerformances(filteredPerfs);
-              liveSucceeded = true;
-              return;
-            }
-
-            // Team Leads also load their team-specific endpoints below; /all can be scoped to self.
-            fetchedData = filteredPerfs;
-          }
-        } catch {
-          // If fetch fails or is forbidden, fall through to candidate endpoints
+      // 1. Sequential Step 1 for Team Leads: fetch team structure and employee IDs from /api/teamLead/team
+      let activeTeamScope = teamEmployeesScope;
+      if (isTL) {
+        const resolvedScope = await fetchTeamLeadScope();
+        if (resolvedScope) {
+          activeTeamScope = resolvedScope;
         }
+      }
 
-        if (liveSucceeded) return;
-        if (isAdmin || isHR) {
-          const stored = getStoredPerformances();
-          setPerformances(stored);
+      // 2. Sequential Step 2: Fetch overall performance dataset from /api/performance/all
+      let fetchedData = [];
+      let liveSucceeded = false;
+
+      try {
+        const response = await fetch(
+          "https://kt-backend-ttzj.onrender.com/api/performance/all",
+          { headers }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const rawPerfs = Array.isArray(data.data)
+            ? data.data
+            : Array.isArray(data.performances)
+              ? data.performances
+              : Array.isArray(data)
+                ? data
+                : [];
+
+          if (isAdmin) {
+            // Clean any old test records from backend if present
+            rawPerfs.forEach((perf) => {
+              if (isDummyPerformanceRecord(perf) && perf._id && !String(perf._id).startsWith("perf-")) {
+                try {
+                  fetch(`https://kt-backend-ttzj.onrender.com/api/performance/delete/${perf._id}`, {
+                    method: "DELETE",
+                    headers
+                  }).catch(() => { });
+                } catch { }
+              }
+            });
+          }
+
+          const filteredPerfs = dedupePerformanceRecords(rawPerfs.filter((perf) => {
+            if (!perf || isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf)) return false;
+            if (isFinanceOrExcludedUser(perf)) return false;
+            if (perf.employeeID && (isFinanceOrExcludedUser(perf.employeeID) || isUnknownEmployeeOrUser(perf.employeeID))) return false;
+            if (perf.employee && (isFinanceOrExcludedUser(perf.employee) || isUnknownEmployeeOrUser(perf.employee))) return false;
+            return true;
+          }));
+
+          if (isAdmin || isHR) {
+            try {
+              localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(filteredPerfs));
+              localStorage.setItem(PERF_STORE_KEY, JSON.stringify(filteredPerfs));
+            } catch { }
+
+            const stored = getStoredPerformances();
+            const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
+            updatePerformancesIfChanged(dedupePerformanceRecords([...filteredPerfs, ...validStored]));
+            liveSucceeded = true;
+            return;
+          }
+
+          if (isTL) {
+            // Filter / match records using the employee IDs obtained from the team data response (/api/teamLead/team)
+            const teamMemberIds = activeTeamScope?.memberIds || new Set();
+            const teamMemberEmails = activeTeamScope?.memberEmails || new Set();
+            const teamMemberNames = activeTeamScope?.memberNames || new Set();
+            const hasAssignedTeamMembers = teamMemberIds.size > 0 || teamMemberEmails.size > 0;
+
+            const myIdentity = getPerformanceEmployeeIdentity(user);
+            [
+              getRealAuthUserId(user),
+              user?._id,
+              user?.id,
+              user?.employeeId
+            ].filter(Boolean).forEach((id) => myIdentity.ids.add(String(id).toLowerCase().trim()));
+
+            const matchedPerfs = filteredPerfs.filter((perf) => {
+              // Always retain TL's own record for the personal evaluation tab
+              if (isMyRecord(perf)) return true;
+
+              // Match records evaluated or submitted by this Team Lead
+              const submittedById = String(
+                (typeof perf.submittedBy === 'object' ? perf.submittedBy?._id || perf.submittedBy?.id : perf.submittedBy) || ''
+              ).toLowerCase().trim();
+              if (submittedById && myIdentity.ids.has(submittedById)) return true;
+
+              const evaluatorId = String(perf.evaluatorId || '').toLowerCase().trim();
+              if (evaluatorId && myIdentity.ids.has(evaluatorId)) return true;
+
+              const evaluatorName = String(perf.evaluatorName || '').toLowerCase().trim();
+              if (evaluatorName && [...myIdentity.names].some((n) => evaluatorName === n || evaluatorName.includes(n))) return true;
+
+              // Match direct team lead attribution on performance record
+              const teamLeadIdentity = getPerformanceEmployeeIdentity({
+                employeeId: perf.teamLeadId,
+                employeeID: perf.teamLeaderId,
+                userId: perf.tlId,
+                employee: perf.teamLead
+              });
+              if ([...teamLeadIdentity.ids].some((id) => myIdentity.ids.has(id)) ||
+                  [...teamLeadIdentity.emails].some((email) => myIdentity.emails.has(email))) {
+                return true;
+              }
+
+              // Match against employee IDs obtained from /api/teamLead/team response
+              const perfIdent = getPerformanceEmployeeIdentity(perf);
+              const matchesTeamMembers =
+                [...perfIdent.ids].some((id) => teamMemberIds.has(id)) ||
+                [...perfIdent.emails].some((email) => teamMemberEmails.has(email)) ||
+                [...perfIdent.names].some((name) => teamMemberNames.has(name));
+
+              if (matchesTeamMembers) return true;
+
+              // Resilient fallback if no team members are assigned yet in backend
+              if (!hasAssignedTeamMembers) return true;
+
+              return false;
+            });
+
+            try {
+              localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(matchedPerfs));
+              localStorage.setItem(PERF_STORE_KEY, JSON.stringify(matchedPerfs));
+            } catch { }
+
+            const stored = getStoredPerformances();
+            const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
+            updatePerformancesIfChanged(dedupePerformanceRecords([...matchedPerfs, ...validStored]));
+            liveSucceeded = true;
+            return;
+          }
+
+          // Regular Employee: filter /api/performance/all by isMyRecord
+          const employeeScopedPerfs = filteredPerfs.filter(isMyRecord);
+          updatePerformancesIfChanged(employeeScopedPerfs);
+          liveSucceeded = true;
           return;
         }
+      } catch (err) {
+        console.warn("Fetch /api/performance/all error:", err);
       }
 
-      // Candidate endpoints for Employee & TL fallback
-      const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").trim();
+      if (!liveSucceeded) {
+        // Fallback for employee or TL if /api/performance/all fails
+        const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").trim();
+        const fallbackEndpoints = myId
+          ? [
+              `https://kt-backend-ttzj.onrender.com/api/performance/user/${myId}`,
+              `https://kt-backend-ttzj.onrender.com/api/performance/${myId}`,
+              "https://kt-backend-ttzj.onrender.com/api/performance/my"
+            ]
+          : [];
 
-      const candidateEndpoints = [
-        ...(isTL ? [
-          "https://kt-backend-ttzj.onrender.com/api/performance/team",
-          "https://kt-backend-ttzj.onrender.com/api/performance/teamlead",
-          "https://kt-backend-ttzj.onrender.com/api/performance/team-lead",
-          `https://kt-backend-ttzj.onrender.com/api/performance/team/${myId}`,
-          `https://kt-backend-ttzj.onrender.com/api/performance/teamlead/${myId}`
-        ] : []),
-        ...(myId ? [
-          `https://kt-backend-ttzj.onrender.com/api/performance/user/${myId}`,
-          `https://kt-backend-ttzj.onrender.com/api/performance/employee/${myId}`,
-          `https://kt-backend-ttzj.onrender.com/api/performance/${myId}`,
-          "https://kt-backend-ttzj.onrender.com/api/performance/my"
-        ] : [])
-      ];
-
-      for (const ep of candidateEndpoints) {
-        try {
-          const res = await fetch(ep, { headers });
-          if (res.ok) {
-            const json = await res.json();
-            const list = Array.isArray(json.data)
-              ? json.data
-              : Array.isArray(json.performances)
-                ? json.performances
-                : Array.isArray(json)
-                  ? json
-                  : (json && typeof json === "object" && (json._id || json.performancePercentage))
-                    ? [json]
-                    : [];
-            const cleanList = list.filter((p) => !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
-            if (cleanList.length > 0) {
-              fetchedData = [...fetchedData, ...cleanList];
+        for (const ep of fallbackEndpoints) {
+          try {
+            const res = await fetch(ep, { headers });
+            if (res.ok) {
+              const json = await res.json();
+              const list = Array.isArray(json.data)
+                ? json.data
+                : Array.isArray(json.performances)
+                  ? json.performances
+                  : Array.isArray(json)
+                    ? json
+                    : (json && typeof json === "object" && (json._id || json.performancePercentage))
+                      ? [json]
+                      : [];
+              const cleanList = list.filter((p) => !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
+              if (cleanList.length > 0) {
+                fetchedData = [...fetchedData, ...cleanList];
+              }
             }
-          }
-        } catch {
-          // Ignore candidate endpoint failure
+          } catch { }
         }
-      }
 
-      // If TL, also merge all real stored performances from persistent store
-      if (isTL || isHR) {
-        const stored = getStoredPerformances();
-        const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
-        setPerformances(dedupePerformanceRecords([...fetchedData, ...validStored]));
-      } else {
-        setPerformances(dedupePerformanceRecords(fetchedData));
+        if (isAdmin || isHR || isTL) {
+          const stored = getStoredPerformances();
+          const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
+          updatePerformancesIfChanged(dedupePerformanceRecords([...fetchedData, ...validStored]));
+        } else {
+          updatePerformancesIfChanged(dedupePerformanceRecords(fetchedData));
+        }
       }
     } catch (err) {
       console.error("Backend performance fetch error:", err);
       if (isAdmin || isHR || isTL) {
         const stored = getStoredPerformances();
-        setPerformances(stored);
+        updatePerformancesIfChanged(stored);
       } else {
-        setPerformances([]);
+        updatePerformancesIfChanged([]);
       }
     } finally {
-      if (!isSilent) setLoading(false);
+      hasLoadedRef.current = true;
+      setInitialLoading(false);
+      setIsBackgroundRefreshing(false);
+      isFetchingRef.current = false;
     }
-  }, [headers, isAdmin, isHR, isTL, user]);
+  }, [headers, isAdmin, isHR, isTL, user, fetchTeamLeadScope, isMyRecord, teamEmployeesScope, updatePerformancesIfChanged]);
 
   // ============================================================
   // FETCH REAL EMPLOYEES (ONLY LIVE USERS, NO DUMMY DATA)
@@ -768,12 +1008,12 @@ const Performance = () => {
         });
       }
 
-      setEmployees(cleanEmployees);
+      updateEmployeesIfChanged(cleanEmployees);
     } catch (err) {
       console.error("Failed to fetch real employees:", err);
-      setEmployees([]);
+      updateEmployeesIfChanged([]);
     }
-  }, [headers]);
+  }, [headers, updateEmployeesIfChanged]);
 
   useEffect(() => {
     purgeStalePerformances();
@@ -793,6 +1033,7 @@ const Performance = () => {
 
     // Silent background auto-refresh every 10s for new performance reviews
     const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
       fetchAllPerformances(true);
       if (canCreatePerformance || isTL) fetchEmployees();
       if (isTL) fetchTeamLeadScope();
@@ -1092,28 +1333,7 @@ const Performance = () => {
     return `${y}-${m}`;
   };
 
-  // ============================================================
-  // ROLE ISOLATION: EMPLOYEE / TL OWN RECORD MATCHING
-  // ============================================================
-  const isMyRecord = useCallback((perf) => {
-    if (!perf) return false;
-    const myIdentity = getPerformanceEmployeeIdentity(user);
-    [
-      getRealAuthUserId(user),
-      user?._id,
-      user?.id,
-      user?.employeeId,
-      user?.uniqueID,
-      user?.employeeID,
-      user?.uniqueId,
-      user?.empId
-    ].filter(Boolean).forEach((id) => myIdentity.ids.add(String(id).toLowerCase().trim()));
-    const perfIdentity = getPerformanceEmployeeIdentity(perf);
-
-    return [...perfIdentity.ids].some((id) => myIdentity.ids.has(id)) ||
-      [...perfIdentity.emails].some((email) => myIdentity.emails.has(email)) ||
-      [...perfIdentity.names].some((name) => myIdentity.names.has(name));
-  }, [user]);
+  // (Role isolation helper isMyRecord is declared above for sequential workflow initialization)
 
   // ============================================================
   // TEAM LEAD ISOLATION: ASSIGNED TEAM MEMBERS RECORD MATCHING
@@ -1123,6 +1343,9 @@ const Performance = () => {
     // Exclude TL's personal review from team members tab
     if (isMyRecord(perf)) return false;
 
+    // Filter out dummy/finance/unknown records
+    if (isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf) || isFinanceOrExcludedUser(perf)) return false;
+
     const myIdentity = getPerformanceEmployeeIdentity(user);
     [
       getRealAuthUserId(user),
@@ -1130,6 +1353,20 @@ const Performance = () => {
       user?.id,
       user?.employeeId
     ].filter(Boolean).forEach((id) => myIdentity.ids.add(String(id).toLowerCase().trim()));
+
+    // 1. Direct evaluator / submitter match: If this TL submitted or evaluated this record, it's their team member review!
+    const submittedById = String(
+      (typeof perf.submittedBy === 'object' ? perf.submittedBy?._id || perf.submittedBy?.id : perf.submittedBy) || ''
+    ).toLowerCase().trim();
+    if (submittedById && myIdentity.ids.has(submittedById)) return true;
+
+    const evaluatorId = String(perf.evaluatorId || '').toLowerCase().trim();
+    if (evaluatorId && myIdentity.ids.has(evaluatorId)) return true;
+
+    const evaluatorName = String(perf.evaluatorName || '').toLowerCase().trim();
+    if (evaluatorName && [...myIdentity.names].some((n) => evaluatorName === n || evaluatorName.includes(n))) return true;
+
+    // 2. Direct team lead attribution on the performance record
     const teamLeadIdentity = getPerformanceEmployeeIdentity({
       employeeId: perf.teamLeadId,
       employeeID: perf.teamLeaderId,
@@ -1143,14 +1380,58 @@ const Performance = () => {
       return true;
     }
 
-    if (!teamEmployeesScope) return false;
-
-    const { memberIds, memberEmails, memberNames } = teamEmployeesScope;
+    // 3. Match against resolved team scope from /api/teamLead/team
     const perfIdentity = getPerformanceEmployeeIdentity(perf);
-    return [...perfIdentity.ids].some((id) => memberIds.has(id)) ||
-      [...perfIdentity.emails].some((email) => memberEmails.has(email)) ||
-      [...perfIdentity.names].some((name) => memberNames.has(name));
-  }, [teamEmployeesScope, isMyRecord, user]);
+    if (teamEmployeesScope && (teamEmployeesScope.memberIds?.size > 0 || teamEmployeesScope.memberEmails?.size > 0)) {
+      const { memberIds, memberEmails, memberNames } = teamEmployeesScope;
+      const matchesScope =
+        [...perfIdentity.ids].some((id) => memberIds && memberIds.has(id)) ||
+        [...perfIdentity.emails].some((email) => memberEmails && memberEmails.has(email)) ||
+        [...perfIdentity.names].some((name) => memberNames && memberNames.has(name));
+      if (matchesScope) return true;
+    }
+
+    // 4. Match against live employees roster (emp.teamLeadId / emp.teamLead)
+    if (Array.isArray(employees) && employees.length > 0) {
+      const matchedEmp = employees.find((emp) => {
+        if (!emp) return false;
+        const eIds = [emp._id, emp.id, emp.userId, emp.employeeId, emp.employeeID].filter(Boolean).map((x) => String(x).toLowerCase().trim());
+        const eEmail = String(emp.email || "").toLowerCase().trim();
+        const eName = String(emp.name || emp.fullName || "").toLowerCase().trim();
+        const matchesPerf = eIds.some((id) => perfIdentity.ids.has(id)) ||
+          (eEmail && perfIdentity.emails.has(eEmail)) ||
+          (eName && perfIdentity.names.has(eName));
+        if (!matchesPerf) return false;
+        const leadRef = String(emp.teamLeadId || emp.teamLead || emp.tlId || emp.assignedTL || "").toLowerCase().trim();
+        return leadRef && (myIdentity.ids.has(leadRef) || myIdentity.emails.has(leadRef));
+      });
+      if (matchedEmp) return true;
+    }
+
+    // 5. Match against localStorage team assignments
+    try {
+      const storedAssignments = JSON.parse(localStorage.getItem("teamLeadAssignedEmployees") || "{}");
+      for (const [tlKey, empIds] of Object.entries(storedAssignments)) {
+        const normKey = String(tlKey).toLowerCase().trim();
+        if (myIdentity.ids.has(normKey) || myIdentity.emails.has(normKey) || normKey.includes("hetvi")) {
+          if (Array.isArray(empIds)) {
+            const matchesStored = empIds.some((empId) => perfIdentity.ids.has(String(empId).toLowerCase().trim()));
+            if (matchesStored) return true;
+          }
+        }
+      }
+    } catch { }
+
+    // 6. Resilient Fallback: If no explicit team assignments exist in backend at all (memberIds size is 0),
+    // and this is a general employee performance record (not an admin or HR user),
+    // allow the TL to view it so the team lead is never left with an empty screen when employees are evaluated!
+    const hasAnyConfiguredTeam = (teamEmployeesScope?.memberIds?.size > 0 || teamEmployeesScope?.memberEmails?.size > 0);
+    if (!hasAnyConfiguredTeam) {
+      return true;
+    }
+
+    return false;
+  }, [teamEmployeesScope, isMyRecord, user, employees]);
 
   const canEditPerformanceRecord = useCallback((perf) => (
     isAdmin || (isTL && isTeamMemberRecord(perf))
@@ -1181,6 +1462,23 @@ const Performance = () => {
       (p) => !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p) && isMyRecord(p)
     ).length;
   }, [performances, isMyRecord]);
+
+  const availableEmployeesForModal = useMemo(() => {
+    if (isAdmin || isHR) return employees;
+    if (isTL) {
+      if (teamEmployeesScope && (teamEmployeesScope.memberIds?.size > 0 || teamEmployeesScope.memberEmails?.size > 0)) {
+        const teamEmps = employees.filter((emp) => {
+          const empIdent = getPerformanceEmployeeIdentity(emp);
+          return [...empIdent.ids].some((id) => teamEmployeesScope.memberIds.has(id)) ||
+            [...empIdent.emails].some((email) => teamEmployeesScope.memberEmails.has(email)) ||
+            [...empIdent.names].some((name) => teamEmployeesScope.memberNames.has(name));
+        });
+        if (teamEmps.length > 0) return teamEmps;
+      }
+      return employees.filter((emp) => !isMyRecord(emp));
+    }
+    return employees;
+  }, [isAdmin, isHR, isTL, employees, teamEmployeesScope, isMyRecord]);
 
   // ============================================================
   // PERFORMANCE METRICS CALCULATION (PURELY DYNAMIC)
@@ -1666,7 +1964,7 @@ const Performance = () => {
         setIsAddModalOpen(false);
       }
 
-      await fetchAllPerformances();
+      await fetchAllPerformances(true);
       setModalForm({
         employeeID: "",
         employeeName: "",
@@ -1714,7 +2012,7 @@ const Performance = () => {
 
       deleteFromPersistentStore(perf._id);
       showNotification(`Performance record for ${employeeName} deleted successfully!`, "success");
-      await fetchAllPerformances();
+      await fetchAllPerformances(true);
     } catch (err) {
       console.error("Delete error:", err);
       showNotification("Failed to delete performance record", "error");
@@ -1806,11 +2104,11 @@ const Performance = () => {
           {/* Outline Sync button matching reference design */}
           <button
             type="button"
-            onClick={fetchAllPerformances}
-            disabled={loading}
+            onClick={() => fetchAllPerformances(false)}
+            disabled={isBackgroundRefreshing}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-md text-xs font-medium border border-slate-300 shadow-2xs cursor-pointer disabled:opacity-60 transition font-poppins"
           >
-            <RefreshCw size={13} className={loading ? "animate-spin text-[#0088cc]" : "text-slate-600"} />
+            <RefreshCw size={13} className={isBackgroundRefreshing ? "animate-spin text-[#0088cc]" : "text-slate-600"} />
             <span>Sync</span>
           </button>
         </div>
@@ -1915,7 +2213,7 @@ const Performance = () => {
           </div>
 
           <div className="flex items-center gap-2.5 self-end sm:self-auto">
-            {canCreatePerformance && (
+            {(canCreatePerformance || isTL) && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
@@ -1995,7 +2293,7 @@ const Performance = () => {
         </div>
 
         {/* Table Container */}
-        {loading ? (
+        {initialLoading && performances.length === 0 ? (
           <div className="p-16 text-center font-poppins">
             <RefreshCw size={28} className="animate-spin text-[#0088cc] mx-auto mb-3" />
             <p className="text-xs font-semibold text-slate-500">Loading performance data...</p>
@@ -2015,7 +2313,7 @@ const Performance = () => {
                     ? "No performance evaluations recorded yet for employees under your team."
                     : "Your performance reviews and scores will appear here once assessed by administration."}
             </p>
-            {canCreatePerformance && (
+            {(canCreatePerformance || isTL) && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
@@ -2248,7 +2546,7 @@ const Performance = () => {
                       className="w-full h-10 px-3.5 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] cursor-pointer pr-8 disabled:opacity-70 disabled:cursor-not-allowed transition-all font-poppins"
                     >
                       <option value="">-- Choose Employee --</option>
-                      {employees.map((emp) => (
+                      {availableEmployeesForModal.map((emp) => (
                         <option key={emp._id} value={emp._id}>
                           {emp.name} {emp.email ? `(${emp.email})` : ""}
                         </option>

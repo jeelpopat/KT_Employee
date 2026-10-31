@@ -2400,30 +2400,149 @@ export default function AttendanceLogs() {
           breakMinutes,
         } = getLogDetails(activeLog);
 
+        const formatPopupDate = (dateVal) => {
+          const str = String(dateVal || '').trim();
+          if (!str) return '—';
+          const ymdMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(str);
+          if (ymdMatch) {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const y = ymdMatch[1];
+            const m = months[parseInt(ymdMatch[2], 10) - 1] || ymdMatch[2];
+            const d = parseInt(ymdMatch[3], 10);
+            return `${d} ${m}, ${y}`;
+          }
+          const dateObj = new Date(str);
+          if (!Number.isNaN(dateObj.getTime())) {
+            const d = dateObj.getDate();
+            const m = dateObj.toLocaleDateString('en-US', { month: 'short' });
+            const y = dateObj.getFullYear();
+            return `${d} ${m}, ${y}`;
+          }
+          return dateVal;
+        };
+
+        const formatPopupTime = (value) => {
+          if (!value || value === '—' || value === '--:--') return '--:--';
+          const str = String(value).trim();
+          const ampmMatch = /^(\d{1,2}):(\d{2})\s*(am|pm)$/i.exec(str);
+          if (ampmMatch) {
+            return `${parseInt(ampmMatch[1], 10)}:${ampmMatch[2]} ${ampmMatch[3].toLowerCase()}`;
+          }
+          if (str.includes('T') || (str.includes('-') && str.length > 10)) {
+            const d = new Date(str);
+            if (!Number.isNaN(d.getTime())) {
+              const h = d.getHours();
+              const m = String(d.getMinutes()).padStart(2, '0');
+              const period = h >= 12 ? 'pm' : 'am';
+              const hour12 = h % 12 || 12;
+              return `${hour12}:${m} ${period}`;
+            }
+          }
+          const timeMatch = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(str);
+          if (timeMatch) {
+            let hour = parseInt(timeMatch[1], 10);
+            const minute = timeMatch[2];
+            const period = hour >= 12 ? 'pm' : 'am';
+            hour = hour % 12 || 12;
+            return `${hour}:${minute} ${period}`;
+          }
+          const d = new Date(str);
+          if (!Number.isNaN(d.getTime())) {
+            const h = d.getHours();
+            const m = String(d.getMinutes()).padStart(2, '0');
+            const period = h >= 12 ? 'pm' : 'am';
+            const hour12 = h % 12 || 12;
+            return `${hour12}:${m} ${period}`;
+          }
+          return str.toLowerCase();
+        };
+
+        const formatSegmentTimeStr = (val) => {
+          if (!val) return '';
+          const str = String(val).trim();
+          if (/^\d{1,2}:\d{2}$/.test(str)) {
+            return str;
+          }
+          return formatPopupTime(str);
+        };
+
+        const formatPopupDuration = (minutes) => {
+          if (!Number.isFinite(minutes) || minutes <= 0) {
+            return '0h 0m';
+          }
+          const hours = Math.floor(minutes / 60);
+          const remainingMinutes = minutes % 60;
+          if (hours > 0) {
+            return `${hours}h ${remainingMinutes}m`;
+          }
+          return `${remainingMinutes}m`;
+        };
+
+        const formatPopupTotalHours = (val) => {
+          if (!val || val === '—' || val === '0h') return '0h 0m';
+          const str = String(val).trim();
+          if (/^\d+h$/.test(str)) {
+            return `${str} 0m`;
+          }
+          return str;
+        };
+
+        const getPopupStatusStyle = (status) => {
+          const s = String(status || '').toLowerCase().trim();
+          switch (s) {
+            case 'on time':
+            case 'present':
+              return { text: 'text-[#16a34a]', label: 'On Time' };
+            case 'late':
+              return { text: 'text-[#d97706]', label: 'Late' };
+            case 'half day':
+            case 'half-day':
+            case 'halfday':
+              return { text: 'text-[#0284c7]', label: 'Half Day' };
+            case 'on leave':
+            case 'leave':
+              return { text: 'text-[#9333ea]', label: 'On Leave' };
+            case 'absent':
+              return { text: 'text-[#ef4444]', label: 'Absent' };
+            case 'pending':
+              return { text: 'text-[#d97706]', label: 'Pending' };
+            case 'rejected':
+              return { text: 'text-[#ef4444]', label: 'Rejected' };
+            default:
+              return { text: 'text-[#16a34a]', label: status || 'On Time' };
+          }
+        };
+
+        const statusStyle = getPopupStatusStyle(activeLog.status);
+
         return (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 sm:p-6 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 sm:p-6 backdrop-blur-xs font-poppins"
             role="presentation"
             onClick={() => setSelectedLog(null)}
           >
             <div
-              className="max-w-lg w-full max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden"
+              className="max-w-[540px] w-full max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-xl border border-slate-200/90 p-5 sm:p-6 space-y-4 sm:space-y-5"
               role="dialog"
               aria-modal="true"
               aria-labelledby="attendance-details-title"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200/80 bg-white px-5 py-4 sm:px-6">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className={`h-11 w-11 rounded-full ${activeLog.avatarColor} flex flex-shrink-0 items-center justify-center text-sm font-bold text-white shadow-xs`}>
+              {/* Header: Avatar, Name, Date, Close Button */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div
+                    className="w-14 h-14 rounded-full text-white flex items-center justify-center text-xl font-bold shrink-0 shadow-xs"
+                    style={{ backgroundColor: '#0284c7' }}
+                  >
                     {getInitials(activeLog.name)}
                   </div>
                   <div className="min-w-0">
-                    <h2 id="attendance-details-title" className="truncate text-base sm:text-lg font-bold text-slate-900">
+                    <h2 id="attendance-details-title" className="truncate text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                       {activeLog.name}
                     </h2>
-                    <p className="truncate text-xs text-slate-400 mt-0.5">
-                      {activeLog.email} • {formatIndianDate(activeLog.date)}
+                    <p className="text-sm text-slate-400 font-normal mt-0.5">
+                      {formatPopupDate(activeLog.date || selectedDate)}
                     </p>
                   </div>
                 </div>
@@ -2438,76 +2557,108 @@ export default function AttendanceLogs() {
                 </button>
               </div>
 
-              <div className="space-y-4 px-5 py-5 sm:px-6">
-                <div className="flex items-center justify-between gap-3">
-                  {(() => {
-                    const badge = getStatusBadge(activeLog.status);
-                    return (
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${badge.bg}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
-                        <span>{badge.label}</span>
-                      </span>
-                    );
-                  })()}
-                  <span className="text-xs text-slate-500 font-medium">
-                    Total Work Hours: <strong className="text-slate-900 font-bold font-mono">{activeLog.totalHours}</strong>
+              {/* Divider */}
+              <div className="border-b border-slate-200/90 -mx-5 sm:-mx-6" />
+
+              {/* Status and Total Row */}
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <span className={`text-base sm:text-[17px] font-semibold ${statusStyle.text}`}>
+                  {statusStyle.label}
+                </span>
+                <span className="text-sm sm:text-base text-slate-500 font-normal">
+                  Total: <strong className="font-bold text-slate-900">{formatPopupTotalHours(activeLog.totalHours)}</strong>
+                </span>
+              </div>
+
+              {/* 4 Metric Boxes */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Check In */}
+                <div className="bg-[#ecfdf5] border border-[#86efac] rounded-lg p-3 sm:p-3.5 flex flex-col justify-between">
+                  <span className="text-xs sm:text-[13px] font-medium text-[#16a34a]">Check In</span>
+                  <span className="mt-1 text-base sm:text-lg font-medium text-slate-900 font-poppins">
+                    {formatPopupTime(activeLog.checkIn)}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  <div className="border border-emerald-200/80 bg-emerald-50/70 p-3 rounded-xl shadow-2xs">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Check In</p>
-                    <p className="mt-1 text-sm font-bold text-emerald-900 font-mono">{formatTime(activeLog.checkIn)}</p>
-                  </div>
-                  <div className="border border-rose-200/80 bg-rose-50/70 p-3 rounded-xl shadow-2xs">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Check Out</p>
-                    <p className="mt-1 text-sm font-bold text-rose-900 font-mono">{formatTime(activeLog.checkOut)}</p>
-                  </div>
-                  <div className="border border-blue-200/80 bg-blue-50/70 p-3 rounded-xl shadow-2xs">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Working</p>
-                    <p className="mt-1 text-sm font-bold text-blue-900 font-mono">{formatDuration(workingMinutes)}</p>
-                  </div>
-                  <div className="border border-amber-200/80 bg-amber-50/70 p-3 rounded-xl shadow-2xs">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Break</p>
-                    <p className="mt-1 text-sm font-bold text-amber-900 font-mono">{formatDuration(breakMinutes)}</p>
-                  </div>
+                {/* Check Out */}
+                <div className="bg-[#fef2f2] border border-[#fca5a5] rounded-lg p-3 sm:p-3.5 flex flex-col justify-between">
+                  <span className="text-xs sm:text-[13px] font-medium text-[#ef4444]">Check Out</span>
+                  <span className="mt-1 text-base sm:text-lg font-medium text-slate-900 font-poppins">
+                    {formatPopupTime(activeLog.checkOut)}
+                  </span>
                 </div>
 
-                <div>
-                  <h3 className="mb-2 text-xs font-bold text-slate-700 uppercase tracking-wider">Break & Segment Details</h3>
-                  {segments.length > 0 ? (
-                    <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-xl overflow-hidden bg-slate-50/30">
-                      {segments.map((segment, index) => (
-                        <div key={`${segment.label}-${index}`} className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className={`h-2.5 w-2.5 rounded-full ${segment.color === 'yellow' ? 'bg-amber-400' : segment.color === 'gray' ? 'bg-slate-400' : 'bg-blue-500'}`} />
-                            <span className="font-semibold text-slate-800">{segment.label}</span>
-                          </div>
-                          <span className="text-slate-500 font-medium">
-                            {segment.startTime} - {segment.endTime}
-                            <span className="ml-2 font-bold text-slate-700 font-mono">
-                              ({formatDuration(segment.end - segment.start)})
-                            </span>
+                {/* Working */}
+                <div className="bg-[#f0f9ff] border border-[#7dd3fc] rounded-lg p-3 sm:p-3.5 flex flex-col justify-between">
+                  <span className="text-xs sm:text-[13px] font-medium text-[#0284c7]">Working</span>
+                  <span className="mt-1 text-base sm:text-lg font-medium text-slate-900 font-poppins">
+                    {workingMinutes > 0 ? formatPopupDuration(workingMinutes) : (activeLog.totalHours && activeLog.totalHours !== '0h' ? activeLog.totalHours : '0h 0m')}
+                  </span>
+                </div>
+
+                {/* Break */}
+                <div className="bg-[#fffbeb] border border-[#fde68a] rounded-lg p-3 sm:p-3.5 flex flex-col justify-between">
+                  <span className="text-xs sm:text-[13px] font-medium text-[#d97706]">Break</span>
+                  <span className="mt-1 text-base sm:text-lg font-medium text-slate-900 font-poppins">
+                    {breakMinutes > 0 ? formatPopupDuration(breakMinutes) : '0h 0m'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Time Details */}
+              <div className="pt-1">
+                <h3 className="text-sm sm:text-base font-semibold text-slate-900 mb-2.5">
+                  Time Details
+                </h3>
+
+                {segments.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {segments.map((segment, index) => (
+                      <div
+                        key={`${segment.label}-${index}`}
+                        className="flex items-center justify-between border border-[#cbd5e1] rounded-lg p-3 sm:p-3.5 bg-white text-xs sm:text-sm"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                              segment.color === 'yellow'
+                                ? 'bg-[#eab308]'
+                                : segment.color === 'gray'
+                                ? 'bg-slate-400'
+                                : 'bg-[#0284c7]'
+                            }`}
+                          />
+                          <span className="font-medium text-slate-900">
+                            {segment.label}
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  ) : activeLog.status === 'rejected' || activeLog.approvalStatus === 'rejected' ? (
-                    <div className="border border-rose-200/80 bg-rose-50/70 rounded-xl px-3.5 py-3 text-center text-xs text-rose-700 font-medium flex items-center justify-center gap-2">
-                      <XCircle size={14} className="text-rose-500 shrink-0" />
-                      <span>Admin rejects the check in{activeLog.rejectionReason ? `: ${activeLog.rejectionReason}` : ''}</span>
-                    </div>
-                  ) : activeLog.status === 'pending' || activeLog.approvalStatus === 'pending' ? (
-                    <div className="border border-amber-200/80 bg-amber-50/70 rounded-xl px-3.5 py-3 text-center text-xs text-amber-700 font-medium flex items-center justify-center gap-2">
-                      <Clock size={14} className="text-amber-500 shrink-0" />
-                      <span>Pending request</span>
-                    </div>
-                  ) : (
-                    <p className="border border-slate-200/80 rounded-xl px-3 py-4 text-center text-xs text-slate-400">
-                      No timeline data available
-                    </p>
-                  )}
-                </div>
+
+                        <div className="flex items-center gap-1 text-slate-500 font-normal">
+                          <span>
+                            {formatSegmentTimeStr(segment.startTime)} - {formatSegmentTimeStr(segment.endTime)}
+                          </span>
+                          <span className="font-semibold text-slate-900 ml-1.5">
+                            ({formatPopupDuration(segment.end - segment.start)})
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : activeLog.status === 'rejected' || activeLog.approvalStatus === 'rejected' ? (
+                  <div className="border border-rose-200 bg-rose-50/70 rounded-lg p-3.5 text-center text-xs sm:text-sm text-rose-700 font-medium flex items-center justify-center gap-2">
+                    <XCircle size={16} className="text-rose-500 shrink-0" />
+                    <span>Admin rejects the check in{activeLog.rejectionReason ? `: ${activeLog.rejectionReason}` : ''}</span>
+                  </div>
+                ) : activeLog.status === 'pending' || activeLog.approvalStatus === 'pending' ? (
+                  <div className="border border-amber-200 bg-amber-50/70 rounded-lg p-3.5 text-center text-xs sm:text-sm text-amber-700 font-medium flex items-center justify-center gap-2">
+                    <Clock size={16} className="text-amber-500 shrink-0" />
+                    <span>Pending request</span>
+                  </div>
+                ) : (
+                  <div className="border border-[#cbd5e1] rounded-lg p-4 text-center text-xs sm:text-sm text-slate-400">
+                    No timeline data available
+                  </div>
+                )}
               </div>
             </div>
           </div>

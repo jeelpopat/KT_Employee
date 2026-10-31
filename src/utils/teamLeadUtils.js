@@ -219,7 +219,7 @@ export const fetchTeamsList = async () => {
  */
 export const isTeamOwnedByLead = (teamDoc, userIdent) => {
   if (!teamDoc || !userIdent) return false;
-  const { ids, emails } = userIdent;
+  const { ids, emails, names = new Set() } = userIdent;
 
   // 1. Check teamLeadId
   const tlId = teamDoc.teamLeadId || teamDoc.leadId;
@@ -253,14 +253,27 @@ export const isTeamOwnedByLead = (teamDoc, userIdent) => {
     }
   }
 
-  // 4. Check nested teamLead object if present (e.g. { teamLead: { _id, email, ... } })
+  // 4. Check nested or string teamLead object (e.g. { teamLead: "6724..." } or { teamLead: { _id, email, ... } })
   const rawTL = teamDoc.teamLead || teamDoc.lead;
-  if (rawTL && typeof rawTL === 'object') {
-    if (rawTL._id && ids.has(String(rawTL._id).toLowerCase().trim())) return true;
-    if (rawTL.id && ids.has(String(rawTL.id).toLowerCase().trim())) return true;
-    if (rawTL.userId && ids.has(String(rawTL.userId).toLowerCase().trim())) return true;
-    if (rawTL.employeeId && ids.has(String(rawTL.employeeId).toLowerCase().trim())) return true;
-    if (rawTL.email && emails.has(String(rawTL.email).toLowerCase().trim())) return true;
+  if (rawTL) {
+    if (typeof rawTL === 'string' || typeof rawTL === 'number') {
+      const s = String(rawTL).toLowerCase().trim();
+      if (ids.has(s) || emails.has(s)) return true;
+    } else if (typeof rawTL === 'object') {
+      if (rawTL._id && ids.has(String(rawTL._id).toLowerCase().trim())) return true;
+      if (rawTL.id && ids.has(String(rawTL.id).toLowerCase().trim())) return true;
+      if (rawTL.userId && ids.has(String(rawTL.userId).toLowerCase().trim())) return true;
+      if (rawTL.employeeId && ids.has(String(rawTL.employeeId).toLowerCase().trim())) return true;
+      if (rawTL.email && emails.has(String(rawTL.email).toLowerCase().trim())) return true;
+      const rawName = String(rawTL.name || rawTL.fullName || '').toLowerCase().trim();
+      if (rawName && names.has(rawName)) return true;
+    }
+  }
+
+  // 5. Check direct userId / employeeId / assignedTL on teamDoc
+  const directId = teamDoc.userId || teamDoc.employeeId || teamDoc.assignedTL;
+  if (directId && ids.has(String(directId).toLowerCase().trim())) {
+    return true;
   }
 
   return false;
@@ -320,8 +333,16 @@ export const extractAssignedTeamEmployees = (myTeams, usersMap = {}) => {
   myTeams.forEach((team) => {
     const pool = [
       ...(Array.isArray(team.employees) ? team.employees : []),
+      ...(Array.isArray(team.assignedEmployees) ? team.assignedEmployees : []),
+      ...(Array.isArray(team.assignedMembers) ? team.assignedMembers : []),
       ...(Array.isArray(team.teamMembers) ? team.teamMembers : []),
       ...(Array.isArray(team.members) ? team.members : []),
+      ...(Array.isArray(team.teamEmployees) ? team.teamEmployees : []),
+      ...(Array.isArray(team.employeeIds) ? team.employeeIds : []),
+      ...(Array.isArray(team.team?.employees) ? team.team.employees : []),
+      ...(Array.isArray(team.team?.members) ? team.team.members : []),
+      ...(Array.isArray(team.user?.employees) ? team.user.employees : []),
+      ...(Array.isArray(team.teamLead?.employees) ? team.teamLead.employees : []),
     ];
     pool.forEach(addMemberItem);
   });
