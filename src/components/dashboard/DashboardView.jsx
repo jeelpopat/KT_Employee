@@ -1620,16 +1620,47 @@ export const DashboardView = () => {
       } catch (e) { }
 
       try {
-        const holRes = await api.get('/api/holiday/all');
-        if (holRes.data?.success && holRes.data?.holidays) {
-          const currentMonth = new Date().getMonth();
-          const currentYear = new Date().getFullYear();
-          setHolidays(holRes.data.holidays.filter(h => {
-            const hDate = new Date(h.holidayDate);
-            return hDate.getMonth() === currentMonth && hDate.getFullYear() === currentYear && hDate >= new Date();
-          }));
+        const holRes = await api.get('/api/holiday/current-month', { skipCache: true });
+        const holidayPayload = holRes.data;
+        const holidayList = Array.isArray(holidayPayload)
+          ? holidayPayload
+          : holidayPayload?.holidays ||
+            holidayPayload?.data?.holidays ||
+            holidayPayload?.data ||
+            holidayPayload?.currentMonthHolidays ||
+            holidayPayload?.result;
+
+        if (!Array.isArray(holidayList)) {
+          console.warn('Unexpected current-month holidays response:', holidayPayload);
+          setHolidays([]);
+        } else {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const currentMonth = today.getMonth();
+          const currentYear = today.getFullYear();
+
+          setHolidays(holidayList
+            .map((holiday) => ({
+              ...holiday,
+              holidayDate: holiday.holidayDate || holiday.date,
+              holidayName: holiday.holidayName || holiday.name || 'Holiday',
+            }))
+            .filter((holiday) => {
+              const dateParts = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(holiday.holidayDate || ''));
+              if (!dateParts) return false;
+
+              const [, year, month, day] = dateParts;
+              const holidayDate = new Date(Number(year), Number(month) - 1, Number(day));
+              return holidayDate.getFullYear() === currentYear &&
+                holidayDate.getMonth() === currentMonth &&
+                holidayDate >= today;
+            })
+            .sort((a, b) => String(a.holidayDate).localeCompare(String(b.holidayDate))));
         }
-      } catch (e) { }
+      } catch (holidayErr) {
+        console.warn('Current-month holidays fetch failed:', holidayErr);
+        setHolidays([]);
+      }
 
       // 5. Fetch Tasks stats once
       try {
