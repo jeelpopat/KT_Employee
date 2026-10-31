@@ -1133,10 +1133,58 @@ const EmployeeRequests = () => {
       let isSuccess = false;
       let resData = null;
 
-      if (isAlreadyApproved && shouldPromoteToTeamLead) {
+      const assignAsTeamLead = async () => {
+        const getEmployeeRecordId = (employee) => {
+          const employeeId = employee?.employeeId;
+          const employeeID = employee?.employeeID;
+          const directIds = [
+            employee?.employee?._id,
+            employee?.employee?.id,
+            typeof employeeId === 'object' ? employeeId?._id || employeeId?.id : employeeId,
+            typeof employeeID === 'object' ? employeeID?._id || employeeID?.id : employeeID
+          ];
+          const directId = directIds.find((id) => /^[0-9a-f]{24}$/i.test(String(id || '').trim()));
+          if (directId) return String(directId).trim();
+
+          return null;
+        };
+
+        let employeeRecordId =
+          getEmployeeRecordId(approvingUser) ||
+          getEmployeeRecordId(resData?.data) ||
+          getEmployeeRecordId(resData);
+        if (!employeeRecordId) {
+          const employeeResponse = await api.get('/api/employee/list');
+          const employeeList = employeeResponse.data?.data ||
+            employeeResponse.data?.employees ||
+            employeeResponse.data?.employeesList ||
+            (Array.isArray(employeeResponse.data) ? employeeResponse.data : []);
+          const userEmail = String(approvingUser?.email || '').trim().toLowerCase();
+          const userCode = String(approvingUser?.employeeID || approvingUser?.employeeCode || '').trim().toLowerCase();
+          const matchingEmployee = (Array.isArray(employeeList) ? employeeList : []).find((employee) => {
+            if (!employee) return false;
+            const linkedUser = employee.user || employee.userId || employee.userID;
+            const linkedUserId = String(
+              typeof linkedUser === 'object'
+                ? linkedUser?._id || linkedUser?.id || ''
+                : linkedUser || ''
+            ).trim().toLowerCase();
+            const employeeEmail = String(employee.email || employee.user?.email || '').trim().toLowerCase();
+            const employeeCode = String(employee.employeeID || employee.employeeCode || '').trim().toLowerCase();
+            return (linkedUserId && linkedUserId === String(userId).trim().toLowerCase()) ||
+              (userEmail && employeeEmail === userEmail) ||
+              (userCode && employeeCode === userCode);
+          });
+          employeeRecordId = matchingEmployee?._id || matchingEmployee?.id || null;
+        }
+
+        if (!employeeRecordId) {
+          throw new Error('Could not find this employee record to promote them to Team Lead.');
+        }
+
         const token = getAuthToken();
         const response = await fetch(
-          `https://kt-backend-ttzj.onrender.com/api/employee/assign-tl/${encodeURIComponent(String(userId))}`,
+          `https://kt-backend-ttzj.onrender.com/api/employee/assign-tl/${encodeURIComponent(String(employeeRecordId))}`,
           {
             method: 'PUT',
             headers: {
@@ -1145,12 +1193,14 @@ const EmployeeRequests = () => {
             }
           }
         );
-        resData = await response.json().catch(() => ({}));
-        if (!response.ok || resData?.success === false) {
-          throw new Error(resData?.message || 'Failed to promote this employee to Team Lead.');
+        const promotionData = await response.json().catch(() => ({}));
+        if (!response.ok || promotionData?.success === false) {
+          throw new Error(promotionData?.message || 'Failed to promote this employee to Team Lead.');
         }
-        isSuccess = true;
-      } else {
+
+        return promotionData;
+      };
+
       // 1. Primary: PUT /api/users/approve using authenticated api instance
       try {
         const response = await api.put('/api/users/approve', payload);
@@ -1181,6 +1231,13 @@ const EmployeeRequests = () => {
         }
       }
 
+      if (!isSuccess || resData?.success === false) {
+        throw new Error(resData?.message || 'Approval request failed');
+      }
+
+      if (shouldPromoteToTeamLead) {
+        const promotionData = await assignAsTeamLead();
+        if (!resData) resData = promotionData;
       }
 
       // 2. Synchronize Team Lead and Team Linkage via backend API: POST /api/teamLead/create-team

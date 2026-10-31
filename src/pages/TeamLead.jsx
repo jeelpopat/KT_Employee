@@ -449,12 +449,15 @@ const AssignmentModal = ({
     }
 
     setSaving(true);
-    await onSave({
-      employeeIds: distinctIds,
-      leadId: lead._id
-    });
-    setSaving(false);
-    onClose();
+    try {
+      const saved = await onSave({
+        employeeIds: distinctIds,
+        leadId: lead._id
+      });
+      if (saved) onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getEmployeeAssignmentStatus = (emp) => {
@@ -1444,11 +1447,13 @@ const getDesignation = (lead) => {
   };
 
   const handleSaveAssignments = async (data) => {
+    let hasPersistedChanges = false;
+
     try {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       if (!token) {
         showToast("Authentication required. Please login again.", "error");
-        return;
+        return false;
       }
   
       const headers = {
@@ -1467,6 +1472,8 @@ const getDesignation = (lead) => {
 
       // Collect all associated IDs for the target lead
       const targetLeadObj = selectedLead || teamLeads.find(tl => String(tl._id) === targetLeadId);
+      const targetLeadName = getUserName(targetLeadObj) || targetLeadObj?.name || targetLeadObj?.fullName || "the selected Team Lead";
+      const targetLeadEmail = getUserEmail(targetLeadObj);
       const targetAssociatedIds = targetLeadObj ? [
         targetLeadObj._id,
         targetLeadObj.id,
@@ -1481,8 +1488,10 @@ const getDesignation = (lead) => {
 
       // Identify affected other leads whose employees were transferred to target lead
       const affectedOtherLeads = [];
+      const transferredEmployeeKeys = new Set();
+      const sourceLeadNames = new Set();
 
-      // 1. Update teamLeads state: assign cleanEmployeeIds to target, remove transferred from others
+      // Prepare the updated lead list, removing reassigned employees from their old teams.
       const nextTeamLeads = teamLeads.map((tl) => {
         const isTarget = isSameLead(tl, targetLeadObj) || targetAssociatedIds.includes(String(tl._id));
 
@@ -1497,11 +1506,15 @@ const getDesignation = (lead) => {
         const currentAssigned = tl.assignedEmployees || [];
         const remainingAssigned = currentAssigned.filter((empRef) => {
           const empKey = getCanonicalEmployeeKey(empRef, employees);
+          if (assignedCanonicalKeys.has(empKey)) {
+            transferredEmployeeKeys.add(empKey);
+          }
           return !assignedCanonicalKeys.has(empKey);
         });
 
         if (remainingAssigned.length !== currentAssigned.length) {
           const distinctRemaining = getDistinctAssignedEmployees(remainingAssigned, employees);
+          sourceLeadNames.add(getUserName(tl) || tl.name || tl.fullName || "another Team Lead");
           affectedOtherLeads.push({
             lead: tl,
             remainingEmpIds: distinctRemaining.map((e) => String(e._id))
@@ -1515,7 +1528,7 @@ const getDesignation = (lead) => {
         };
       });
 
-      // 2. Update assignedEmployees mapping
+      // Prepare the updated assignment lookup for the target lead and its aliases.
       const nextAssignedEmployees = { ...assignedEmployees };
 
       // Update non-target keys by removing reassigned employees
@@ -1535,79 +1548,84 @@ const getDesignation = (lead) => {
       });
       nextAssignedEmployees[targetLeadId] = cleanEmployeeIds;
 
-      // Update React state immediately
-      setTeamLeads(nextTeamLeads);
-      setAssignedEmployees(nextAssignedEmployees);
-
-      // 4. Save to backend for target lead
-      const payload = {
-        teamLead: data.leadId,
-        employees: cleanEmployeeIds
-      };
-
-      try {
-        await axios.post(
+      const saveTeamAssignments = async (leadId, employeeIds) => {
+        const response = await axios.post(
           `${BASE_URL}/teamLead/create-team`,
-          payload,
+          { teamLead: leadId, employees: employeeIds },
           { headers }
         );
-      } catch (backendErr) {
-        console.warn('Backend team assign endpoint note:', backendErr?.response?.data || backendErr.message);
-      }
+        hasPersistedChanges = true;
+        if (response.data?.success === false) {
+          throw new Error(response.data.message || 'Failed to save team assignments.');
+        }
+      };
 
-      // 5. Save updated assignments to backend for any other leads that lost employees
+      // Remove transferred employees from their previous leads before assigning the target lead.
       for (const affected of affectedOtherLeads) {
-        try {
-          const otherLeadId = affected.lead?.teamLeadId || affected.lead?._id;
-          if (otherLeadId) {
-            await axios.post(
-              `${BASE_URL}/teamLead/create-team`,
-              {
-                teamLead: otherLeadId,
-                employees: affected.remainingEmpIds
-              },
-              { headers }
-            );
-          }
-        } catch (otherErr) {
-          console.warn('Backend update note for reassigned lead:', otherErr?.message);
+        const otherLeadId = affected.lead?.teamLeadId || affected.lead?._id;
+        if (otherLeadId) {
+          await saveTeamAssignments(otherLeadId, affected.remainingEmpIds);
         }
       }
 
-      // 6. Asynchronously sync user document teamLead fields if possible
-      cleanEmployeeIds.forEach(async (empId) => {
-        try {
-          const matched = findEmployeeByIdOrUser(empId, employees);
-          const uId = matched?.userId || matched?.userID || matched?.user?._id || empId;
-          if (uId && String(uId).match(/^[0-9a-fA-F]{24}$/)) {
-            await axios.put(
-              `${BASE_URL}/users/approve`,
-              {
-                id: uId,
-                userId: uId,
-                _id: uId,
-                teamLead: targetLeadId,
-                teamLeadId: targetLeadId,
-                assignedTL: targetLeadId,
-                teamLeader: targetLeadId,
-                teamLeadName: targetLeadName,
-                teamLeadEmail: targetLeadEmail
-              },
-              { headers }
-            ).catch(() => {});
+      await saveTeamAssignments(data.leadId, cleanEmployeeIds);
+
+      // Keep employee records in sync with their newly assigned Team Lead.
+      await Promise.all(cleanEmployeeIds.map(async (empId) => {
+        const matched = findEmployeeByIdOrUser(empId, employees);
+        const uId = matched?.userId || matched?.userID || matched?.user?._id || empId;
+        if (uId && String(uId).match(/^[0-9a-fA-F]{24}$/)) {
+          const response = await axios.put(
+            `${BASE_URL}/users/approve`,
+            {
+              id: uId,
+              userId: uId,
+              _id: uId,
+              teamLead: targetLeadId,
+              teamLeadId: targetLeadId,
+              assignedTL: targetLeadId,
+              teamLeader: targetLeadId,
+              teamLeadName: targetLeadName,
+              teamLeadEmail: targetLeadEmail
+            },
+            { headers }
+          );
+          hasPersistedChanges = true;
+          if (response.data?.success === false) {
+            throw new Error(response.data.message || `Failed to update ${getEmployeeName(matched) || 'an employee'} assignment.`);
           }
-        } catch {}
-      });
+        }
+      }));
+
+      // Reflect assignments in the UI only after all required writes succeed.
+      setTeamLeads(nextTeamLeads);
+      setAssignedEmployees(nextAssignedEmployees);
 
       // Reload live data from backend to guarantee UI displays fresh API truth
       await fetchTeamLeads(true);
 
       window.dispatchEvent(new Event('kt_team_assignment_updated'));
 
-      showToast("Assignments saved successfully! Each employee is assigned to at most 1 Team Lead.", "success");
+      if (transferredEmployeeKeys.size === 1) {
+        const transferredEmployee = distinct.find((employee) =>
+          transferredEmployeeKeys.has(getCanonicalEmployeeKey(employee, employees))
+        );
+        const sourceLeadName = [...sourceLeadNames][0] || "the previous Team Lead";
+        const employeeName = getEmployeeName(transferredEmployee) || "Employee";
+        showToast(`${employeeName} reassigned from ${sourceLeadName} to ${targetLeadName} successfully.`, "success");
+      } else if (transferredEmployeeKeys.size > 1) {
+        showToast(`${transferredEmployeeKeys.size} employees reassigned to ${targetLeadName} successfully.`, "success");
+      } else {
+        showToast(`Employees assigned to ${targetLeadName} successfully.`, "success");
+      }
+      return true;
     } catch (error) {
       console.error('Error saving assignments:', error);
-      showToast(error?.response?.data?.message || 'Failed to save assignments. Please try again.', "error");
+      if (hasPersistedChanges) {
+        await fetchTeamLeads(true);
+      }
+      showToast(error?.response?.data?.message || error?.message || 'Failed to save assignments. Please try again.', "error");
+      return false;
     }
   };
 

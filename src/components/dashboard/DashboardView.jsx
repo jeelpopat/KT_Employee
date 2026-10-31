@@ -55,9 +55,8 @@ const parseBirthdayDate = (value) => {
   return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
-const getUpcomingBirthdaysFromUsers = (users) => {
+const getCurrentMonthBirthdaysFromUsers = (users) => {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   return filterOutUnknownUsers(filterOutFinanceUsers(users))
     .map((record) => {
@@ -74,7 +73,7 @@ const getUpcomingBirthdaysFromUsers = (users) => {
         [record.firstName, record.lastName].filter(Boolean).join(' ') ||
         [employee.firstName, employee.lastName].filter(Boolean).join(' ');
       const dateOfBirth =
-        record.dob || record.dateOfBirth || record.birthDate || record.birthday ||
+        record.dob || record.dateOfBirth || record.birthDate || record.birthday || record.birthdayDate ||
         employee.dob || employee.dateOfBirth || employee.birthDate || employee.birthday ||
         linkedUser.dob || linkedUser.dateOfBirth || linkedUser.birthDate || linkedUser.birthday;
       const birthday = parseBirthdayDate(dateOfBirth);
@@ -82,7 +81,6 @@ const getUpcomingBirthdaysFromUsers = (users) => {
       if (!name || !birthday || birthday.getMonth() !== now.getMonth()) return null;
 
       const birthdayDate = new Date(now.getFullYear(), birthday.getMonth(), birthday.getDate());
-      if (birthdayDate < today) return null;
 
       return {
         id: record._id || record.id || record.employeeId || record.email || name,
@@ -117,6 +115,42 @@ const isAttendanceApproved = (record) => {
   return record.isApproved === true ||
     record.isApprovedCheckIn === true ||
     Boolean(record.approvedCheckInTime || record.approvedBy || record.approverId);
+};
+
+const getAttendanceClassification = (...values) => {
+  const status = values
+    .map(value => String(value || '').toLowerCase().trim().replace(/[-_]/g, ' '))
+    .find(value =>
+      value === 'present' ||
+      value === 'late' ||
+      value === 'present (late)' ||
+      value === 'half day' ||
+      value === 'absent'
+    );
+
+  if (!status) return null;
+  if (status === 'half day') {
+    return {
+      label: 'Half Day',
+      badgeColorClass: 'text-indigo-700 bg-indigo-50 border-indigo-200'
+    };
+  }
+  if (status === 'absent') {
+    return {
+      label: 'Absent',
+      badgeColorClass: 'text-red-700 bg-red-50 border-red-200'
+    };
+  }
+  if (status === 'late' || status === 'present (late)') {
+    return {
+      label: 'Late',
+      badgeColorClass: 'text-amber-700 bg-amber-50 border-amber-200'
+    };
+  }
+  return {
+    label: 'Present',
+    badgeColorClass: 'text-green-700 bg-green-50 border-green-200'
+  };
 };
 
 // --- Geofencing Configuration (Office Location & 20 Meter Strict Radius) ---
@@ -198,6 +232,7 @@ export const DashboardView = () => {
   const [todayBreaks, setTodayBreaks] = useState([]);
 
   const [attendanceStatus, setAttendanceStatus] = useState('not_checked_in');
+  const [attendanceClassification, setAttendanceClassification] = useState(null);
   const [actionsAvailable, setActionsAvailable] = useState({
     canCheckIn: true,
     canStartBreak: false,
@@ -638,6 +673,11 @@ export const DashboardView = () => {
       setTodaySegments([]);
       setTodayBreaks([]);
       setDailyBreaksCount(0);
+      setAttendanceClassification(getAttendanceClassification(
+        ta?.attendanceStatus,
+        ta?.dayStatus,
+        ta?.status
+      ));
       setAttendanceStatus('not_checked_in');
       if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('not_checked_in');
       setActionsAvailable({
@@ -893,6 +933,11 @@ export const DashboardView = () => {
       isCompleted: hasCheckedOut
     });
     setAttendanceEvaluation(evalStatus);
+    setAttendanceClassification(getAttendanceClassification(
+      evalStatus.status,
+      ta?.attendanceStatus,
+      ta?.dayStatus
+    ));
 
     // Status banner management:
     // If rejected: display clear rejection message (never "wait for admin approval")
@@ -1380,7 +1425,7 @@ export const DashboardView = () => {
       try {
         const dashRes = await api.get('/api/employee-panel/dashboard');
         dData = dashRes.data?.data || dashRes.data || {};
-        setUpcomingBirthdays(dData.upcomingBirthdays || []);
+        setUpcomingBirthdays(getCurrentMonthBirthdaysFromUsers(dData.upcomingBirthdays || []));
         if (dData.stats?.leaveBalance !== undefined) {
           setLeaveBalance(`${dData.stats.leaveBalance} Days`);
         }
@@ -1400,7 +1445,7 @@ export const DashboardView = () => {
           uRes.data?.data ||
           (Array.isArray(uRes.data) ? uRes.data : []);
         if (Array.isArray(rawUsers)) {
-          setUpcomingBirthdays(getUpcomingBirthdaysFromUsers(rawUsers));
+          setUpcomingBirthdays(getCurrentMonthBirthdaysFromUsers(rawUsers));
           rawUsers.forEach(u => {
             const photo = cleanPhotoUrl(
               u.profilePhoto || u.profileImage || u.photoUrl || u.avatar || u.image || u.photo ||
@@ -2647,6 +2692,11 @@ export const DashboardView = () => {
                   <span className={`w-2 h-2 rounded-full ${statusConfig.dotColorClass}`}></span>
                   {statusConfig.statusText}
                 </span>
+                {attendanceClassification && !isRejectedAttendance && !isPendingAttendance && (
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${attendanceClassification.badgeColorClass}`}>
+                    {attendanceClassification.label}
+                  </span>
+                )}
               </div>
             </div>
 

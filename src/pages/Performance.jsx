@@ -129,17 +129,21 @@ const dedupePerformanceRecords = (records) => {
       employee?.name ||
       employee?.fullName ||
       "employee";
-    const key = JSON.stringify([
-      employeeIdentity,
-      record.createdAt || record.date || "",
-      record.performancePercentage ?? record.percentage ?? record.performance?.performancePercentage ?? "",
-      record.rating ?? "",
-      record.feedback ?? "",
-      record.remarks ?? record.remark ?? "",
-      record.evaluatorName || record.submittedBy?.name || record.submittedBy?.fullName || "",
-      record.evaluatorRole || record.submittedBy?.role || ""
-    ]).toLowerCase();
+    const recordId = record._id || record.id;
+    const key = recordId
+      ? String(recordId)
+      : JSON.stringify([
+        employeeIdentity,
+        record.createdAt || record.date || "",
+        record.performancePercentage ?? record.percentage ?? record.performance?.performancePercentage ?? "",
+        record.rating ?? "",
+        record.feedback ?? "",
+        record.remarks ?? record.remark ?? "",
+        record.evaluatorName || record.submittedBy?.name || record.submittedBy?.fullName || "",
+        record.evaluatorRole || record.submittedBy?.role || ""
+      ]).toLowerCase();
     if (!uniqueRecords.has(key)) uniqueRecords.set(key, record);
+    else uniqueRecords.set(key, { ...uniqueRecords.get(key), ...record });
   });
 
   return Array.from(uniqueRecords.values());
@@ -280,8 +284,12 @@ const updateInPersistentStore = (updatedRecord) => {
   try {
     const existing = getStoredPerformances();
     const id = String(updatedRecord._id);
-    const updated = existing.map((p) => (String(p._id) === id ? { ...p, ...updatedRecord } : p));
+    const hasExistingRecord = existing.some((p) => String(p._id || p.id) === id);
+    const updated = hasExistingRecord
+      ? existing.map((p) => (String(p._id || p.id) === id ? { ...p, ...updatedRecord } : p))
+      : [updatedRecord, ...existing];
     localStorage.setItem(PERF_STORE_KEY, JSON.stringify(updated));
+    localStorage.setItem(PERF_CACHE_KEY, JSON.stringify(updated));
     return updated;
   } catch {
     return [];
@@ -320,6 +328,7 @@ const Performance = () => {
     user?.email?.toLowerCase().trim() === "hetvi.kevalon@gmail.com" ||
     user?.name?.toLowerCase().includes("hetvi")
   );
+  const canViewEditActions = canViewPerformanceActions || isTL;
 
   // Team Lead view scope: 'team' (team members) vs 'my' (own performance)
   // Defaults to 'team' for Team Leaders so they immediately see their team's performance
@@ -800,13 +809,23 @@ const Performance = () => {
         if (isTL) fetchTeamLeadScope();
       }
     };
+    const handlePerformanceUpdated = () => fetchAllPerformances(true);
+    const handlePerformanceStorage = (event) => {
+      if (event.key === PERF_STORE_KEY || event.key === PERF_CACHE_KEY) {
+        fetchAllPerformances(true);
+      }
+    };
 
     window.addEventListener("focus", handleFocus);
+    window.addEventListener("kt_performance_updated", handlePerformanceUpdated);
+    window.addEventListener("storage", handlePerformanceStorage);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("kt_performance_updated", handlePerformanceUpdated);
+      window.removeEventListener("storage", handlePerformanceStorage);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [canCreatePerformance, isAdmin, isTL, fetchAllPerformances, fetchEmployees, fetchTeamLeadScope]);
@@ -1133,6 +1152,10 @@ const Performance = () => {
       [...perfIdentity.names].some((name) => memberNames.has(name));
   }, [teamEmployeesScope, isMyRecord, user]);
 
+  const canEditPerformanceRecord = useCallback((perf) => (
+    isAdmin || (isTL && isTeamMemberRecord(perf))
+  ), [isAdmin, isTL, isTeamMemberRecord]);
+
   // Role-isolated performances: Admin sees all; TL can toggle personal vs assigned team; Employee sees personal
   const myPerformances = useMemo(() => {
     const cleanList = performances.filter(
@@ -1364,7 +1387,10 @@ const Performance = () => {
   };
 
   const handleOpenEditModal = (perf) => {
-    if (!isAdmin) return;
+    if (!canEditPerformanceRecord(perf)) {
+      showNotification("You can only edit performance records for your assigned team members.", "error");
+      return;
+    }
     setEditingRecord(perf);
     const pct = getNumericPercentage(perf);
     const empName = getEmployeeDisplayName(perf);
@@ -1390,7 +1416,13 @@ const Performance = () => {
 
   const handleSubmitModal = async (e) => {
     if (e) e.preventDefault();
-    if (!canCreatePerformance || (isEditModalOpen && !isAdmin)) return;
+    const canSubmit = isEditModalOpen
+      ? Boolean(editingRecord && canEditPerformanceRecord(editingRecord))
+      : canCreatePerformance;
+    if (!canSubmit) {
+      showNotification("You do not have permission to update this performance record.", "error");
+      return;
+    }
 
     if (!isValidPerformanceMonth(modalForm.month)) {
       showNotification("Please select a valid performance month.", "error");
@@ -1475,14 +1507,22 @@ const Performance = () => {
           }
         );
 
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.message || "Failed to update performance record");
+        const responseData = await response.json().catch(() => ({}));
+        if (!response.ok || responseData?.success === false) {
+          throw new Error(responseData.message || "Failed to update performance record");
         }
 
+        const serverRecord = responseData?.data?.performance ||
+          responseData?.performance ||
+          responseData?.data ||
+          responseData?.record ||
+          responseData;
         const updatedData = {
           ...editingRecord,
           ...payload,
+          ...(serverRecord && typeof serverRecord === "object" ? serverRecord : {}),
+          ...payload,
+          _id: editingRecord._id || editingRecord.id,
           percentage: pct,
           remarks: remarksText,
           remark: remarksText,
@@ -1494,6 +1534,12 @@ const Performance = () => {
           monthName: monthName
         };
         updateInPersistentStore(updatedData);
+        setPerformances((current) => dedupePerformanceRecords(
+          current.map((record) => String(record._id || record.id) === String(updatedData._id)
+            ? { ...record, ...updatedData }
+            : record)
+        ));
+        window.dispatchEvent(new CustomEvent("kt_performance_updated", { detail: updatedData }));
 
         showNotification("Performance record updated successfully!", "success");
         setIsEditModalOpen(false);
@@ -1995,7 +2041,7 @@ const Performance = () => {
                   <th className="py-3 px-4 text-left font-semibold">
                     {canViewPerformanceActions ? "Date" : "Month"}
                   </th>
-                  {canViewPerformanceActions && (
+                  {canViewEditActions && (
                     <th className="py-3 px-4 text-center font-semibold">Action</th>
                   )}
                 </tr>
@@ -2102,28 +2148,28 @@ const Performance = () => {
                         {dateFormatted}
                       </td>
 
-                      {canViewPerformanceActions && (
+                      {canViewEditActions && (
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
                           <div className="flex items-center justify-center gap-2.5">
+                            {canEditPerformanceRecord(perf) && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(perf)}
+                                className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer p-1"
+                                title="Edit performance"
+                              >
+                                <Edit3 size={15} />
+                              </button>
+                            )}
                             {isAdmin && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditModal(perf)}
-                                  className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer p-1"
-                                  title="Edit performance"
-                                >
-                                  <Edit3 size={15} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeletePerformance(perf)}
-                                  className="text-slate-600 hover:text-rose-600 transition-colors cursor-pointer p-1"
-                                  title="Delete record"
-                                >
-                                  <Trash2 size={15} />
-                                </button>
-                              </>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePerformance(perf)}
+                                className="text-slate-600 hover:text-rose-600 transition-colors cursor-pointer p-1"
+                                title="Delete record"
+                              >
+                                <Trash2 size={15} />
+                              </button>
                             )}
                           </div>
                         </td>
@@ -2140,7 +2186,7 @@ const Performance = () => {
       {/* ==================================================== */}
       {/* 4. MODAL: ADD / EDIT PERFORMANCE EVALUATION */}
       {/* ==================================================== */}
-      {((canCreatePerformance && isAddModalOpen) || (isAdmin && isEditModalOpen)) && (
+      {((canCreatePerformance && isAddModalOpen) || (isEditModalOpen && canEditPerformanceRecord(editingRecord))) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-5 md:p-6 overflow-y-auto font-poppins animate-in fade-in"
           onClick={() => {
