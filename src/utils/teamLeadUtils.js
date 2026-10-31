@@ -254,11 +254,11 @@ export const isTeamOwnedByLead = (teamDoc, userIdent) => {
   }
 
   // 4. Check nested or string teamLead object (e.g. { teamLead: "6724..." } or { teamLead: { _id, email, ... } })
-  const rawTL = teamDoc.teamLead || teamDoc.lead;
+  const rawTL = teamDoc.teamLead || teamDoc.lead || teamDoc.leader || teamDoc.teamLeader || teamDoc.teamLeaderId;
   if (rawTL) {
     if (typeof rawTL === 'string' || typeof rawTL === 'number') {
       const s = String(rawTL).toLowerCase().trim();
-      if (ids.has(s) || emails.has(s)) return true;
+      if (ids.has(s) || emails.has(s) || (names && names.has(s))) return true;
     } else if (typeof rawTL === 'object') {
       if (rawTL._id && ids.has(String(rawTL._id).toLowerCase().trim())) return true;
       if (rawTL.id && ids.has(String(rawTL.id).toLowerCase().trim())) return true;
@@ -266,12 +266,12 @@ export const isTeamOwnedByLead = (teamDoc, userIdent) => {
       if (rawTL.employeeId && ids.has(String(rawTL.employeeId).toLowerCase().trim())) return true;
       if (rawTL.email && emails.has(String(rawTL.email).toLowerCase().trim())) return true;
       const rawName = String(rawTL.name || rawTL.fullName || '').toLowerCase().trim();
-      if (rawName && names.has(rawName)) return true;
+      if (rawName && names && names.has(rawName)) return true;
     }
   }
 
-  // 5. Check direct userId / employeeId / assignedTL on teamDoc
-  const directId = teamDoc.userId || teamDoc.employeeId || teamDoc.assignedTL;
+  // 5. Check direct userId / employeeId / assignedTL / createdBy on teamDoc
+  const directId = teamDoc.userId || teamDoc.employeeId || teamDoc.assignedTL || teamDoc.createdBy;
   if (directId && ids.has(String(directId).toLowerCase().trim())) {
     return true;
   }
@@ -298,10 +298,47 @@ export const extractAssignedTeamEmployees = (myTeams, usersMap = {}) => {
         // Enrich from usersMap if available
         const u = usersMap[s];
         if (u) {
-          if (u.email) memberEmails.add(String(u.email).toLowerCase().trim());
-          if (u.name) memberNames.add(String(u.name).toLowerCase().trim());
-          if (u.fullName) memberNames.add(String(u.fullName).toLowerCase().trim());
-          if (u.employeeId) memberIds.add(String(u.employeeId).toLowerCase().trim());
+          [
+            u._id,
+            u.id,
+            u.userId,
+            u.userID,
+            u.employeeId,
+            u.employeeID,
+            u.empId,
+            u.uniqueID,
+            u.uniqueId,
+            u.employeeCode,
+            u.user?._id,
+            u.user?.id,
+            u.user?.userId,
+            u.employee?._id,
+            u.employee?.id,
+            u.employee?.employeeId
+          ].filter(Boolean).forEach((id) => memberIds.add(String(id).toLowerCase().trim()));
+
+          [
+            u.email,
+            u.employeeEmail,
+            u.user?.email,
+            u.employee?.email
+          ].filter(Boolean).forEach((email) => {
+            memberEmails.add(String(email).toLowerCase().trim());
+          });
+
+          [
+            u.name,
+            u.fullName,
+            u.displayName,
+            `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+            u.user?.name,
+            u.user?.fullName,
+            u.employee?.name,
+            u.employee?.fullName
+          ].filter(Boolean).forEach((name) => {
+            memberNames.add(String(name).toLowerCase().trim());
+          });
+
           memberRecords.push(u);
         }
       }
@@ -309,19 +346,42 @@ export const extractAssignedTeamEmployees = (myTeams, usersMap = {}) => {
     }
 
     if (typeof item === 'object') {
-      if (item._id) memberIds.add(String(item._id).toLowerCase().trim());
-      if (item.id) memberIds.add(String(item.id).toLowerCase().trim());
-      if (item.employeeId) memberIds.add(String(item.employeeId).toLowerCase().trim());
-      if (item.empId) memberIds.add(String(item.empId).toLowerCase().trim());
-      if (item.userId) memberIds.add(String(item.userId).toLowerCase().trim());
+      [
+        item._id,
+        item.id,
+        item.employeeId,
+        item.employeeID,
+        item.empId,
+        item.userId,
+        item.userID,
+        item.uniqueID,
+        item.uniqueId,
+        item.employeeCode,
+        item.user?._id,
+        item.user?.id,
+        item.employee?._id,
+        item.employee?.id
+      ].filter(Boolean).forEach((id) => memberIds.add(String(id).toLowerCase().trim()));
 
-      if (item.email) memberEmails.add(String(item.email).toLowerCase().trim());
+      [
+        item.email,
+        item.employeeEmail,
+        item.user?.email,
+        item.employee?.email
+      ].filter(Boolean).forEach((email) => {
+        memberEmails.add(String(email).toLowerCase().trim());
+      });
 
       const rawName =
         item.name ||
         item.fullName ||
-        `${item.firstName || ''} ${item.lastName || ''}`.trim();
-      if (rawName) memberNames.add(rawName.toLowerCase().trim());
+        item.displayName ||
+        `${item.firstName || ''} ${item.lastName || ''}`.trim() ||
+        item.user?.name ||
+        item.user?.fullName ||
+        item.employee?.name ||
+        item.employee?.fullName;
+      if (rawName) memberNames.add(String(rawName).toLowerCase().trim());
 
       memberRecords.push(item);
 

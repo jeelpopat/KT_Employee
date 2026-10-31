@@ -124,8 +124,10 @@ export const isFinanceOrExcludedUser = (user) => {
   ).toLowerCase().trim();
 
   if (
-    candidateName.includes('employee') ||
-    candidateEmail.includes('employee')
+    candidateName === 'test employee' ||
+    candidateName === 'dummy employee' ||
+    candidateEmail === 'test@employee.com' ||
+    candidateEmail === 'dummy@employee.com'
   ) {
     return true;
   }
@@ -325,12 +327,12 @@ export const isUnknownEmployeeOrUser = (entity) => {
   const cleanEmail = String(rawEmail).trim().toLowerCase();
   if (!clean && !cleanEmail) return true;
 
-  // Exclude test & demo users (Priya and Kuresh)
+  // Exclude explicit test dummy records
   if (
-    clean.includes('employee') ||
-    // clean.includes('kuresh') ||
-    cleanEmail.includes('employee')
-    // cleanEmail.includes('kuresh')
+    clean === 'test employee' ||
+    clean === 'dummy employee' ||
+    clean === 'test user' ||
+    clean === 'dummy user'
   ) {
     return true;
   }

@@ -167,7 +167,8 @@ export const PerformanceView = () => {
                 teamMemberIds.has(pEmpId) ||
                 teamMemberEmails.has(pEmail) ||
                 (uId && pSubmittedBy === uId) ||
-                (uName && pEvaluatorName === uName)
+                (uName && pEvaluatorName === uName) ||
+                (teamMemberIds.size === 0 && teamMemberEmails.size === 0)
               );
             });
             if (teamMemberRecord) {

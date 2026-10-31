@@ -615,7 +615,7 @@ const Performance = () => {
         return false;
       };
 
-      const myTeams = (allTeams || []).filter(
+      let myTeams = (allTeams || []).filter(
         (t) =>
           isTeamOwnedByLead(t, userIdent) ||
           isLeadMatch(t.teamLead) ||
@@ -627,6 +627,12 @@ const Performance = () => {
           isLeadMatch(t.userId) ||
           isLeadMatch(t.assignedTL)
       );
+
+      // If strict filter didn't match any team, but allTeams came from /api/teamLead/team
+      // (which is already an authenticated endpoint returning the current TL's assigned teams)
+      if (myTeams.length === 0 && allTeams.length > 0) {
+        myTeams = allTeams;
+      }
 
       const teamScope = extractAssignedTeamEmployees(myTeams, uMap);
       const addTeamMemberIdentifiers = (member) => {
@@ -800,13 +806,25 @@ const Performance = () => {
             });
           }
 
-          const filteredPerfs = dedupePerformanceRecords(rawPerfs.filter((perf) => {
-            if (!perf || isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf)) return false;
+          const isValidPerformanceRecord = (perf) => {
+            if (!perf || typeof perf !== "object") return false;
+            if (isDummyPerformanceRecord(perf)) return false;
             if (isFinanceOrExcludedUser(perf)) return false;
-            if (perf.employeeID && (isFinanceOrExcludedUser(perf.employeeID) || isUnknownEmployeeOrUser(perf.employeeID))) return false;
-            if (perf.employee && (isFinanceOrExcludedUser(perf.employee) || isUnknownEmployeeOrUser(perf.employee))) return false;
-            return true;
-          }));
+            if (perf.employeeID && typeof perf.employeeID === "object" && isFinanceOrExcludedUser(perf.employeeID)) return false;
+            if (perf.employee && typeof perf.employee === "object" && isFinanceOrExcludedUser(perf.employee)) return false;
+            return Boolean(
+              perf.employeeID ||
+              perf.employeeId ||
+              perf.employee ||
+              perf.userId ||
+              perf.employeeName ||
+              perf.name ||
+              perf.employeeEmail ||
+              perf.email
+            );
+          };
+
+          const filteredPerfs = dedupePerformanceRecords(rawPerfs.filter(isValidPerformanceRecord));
 
           if (isAdmin || isHR) {
             try {
@@ -815,7 +833,7 @@ const Performance = () => {
             } catch { }
 
             const stored = getStoredPerformances();
-            const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
+            const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p));
             updatePerformancesIfChanged(dedupePerformanceRecords([...filteredPerfs, ...validStored]));
             liveSucceeded = true;
             return;
@@ -864,6 +882,15 @@ const Performance = () => {
                 return true;
               }
 
+              // Direct target employee ID matching from teamMemberIds
+              const targetEmpId = String(
+                (typeof perf.employeeID === 'object' ? perf.employeeID?._id || perf.employeeID?.id : perf.employeeID) ||
+                (typeof perf.employeeId === 'object' ? perf.employeeId?._id || perf.employeeId?.id : perf.employeeId) ||
+                perf.userId ||
+                ''
+              ).toLowerCase().trim();
+              if (targetEmpId && teamMemberIds.has(targetEmpId)) return true;
+
               // Match against employee IDs obtained from /api/teamLead/team response
               const perfIdent = getPerformanceEmployeeIdentity(perf);
               const matchesTeamMembers =
@@ -885,7 +912,7 @@ const Performance = () => {
             } catch { }
 
             const stored = getStoredPerformances();
-            const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p));
+            const validStored = stored.filter((p) => p && !isDummyPerformanceRecord(p));
             updatePerformancesIfChanged(dedupePerformanceRecords([...matchedPerfs, ...validStored]));
             liveSucceeded = true;
             return;
@@ -1087,7 +1114,7 @@ const Performance = () => {
 
   // Helper to extract employee display name
   const getEmployeeDisplayName = (perf) => {
-    if (!perf || isUnknownEmployeeOrUser(perf)) return "";
+    if (!perf) return "";
 
     if (perf.employeeID && typeof perf.employeeID === "object") {
       const emp = perf.employeeID;
@@ -1117,19 +1144,55 @@ const Performance = () => {
       }
     }
 
-    return "";
+    // Resolve from employees roster using employeeID / userId
+    const targetId = String(
+      (typeof perf.employeeID === 'object' ? perf.employeeID?._id || perf.employeeID?.id : perf.employeeID) ||
+      (typeof perf.employeeId === 'object' ? perf.employeeId?._id || perf.employeeId?.id : perf.employeeId) ||
+      perf.userId ||
+      ""
+    ).toLowerCase().trim();
+
+    if (targetId && Array.isArray(employees)) {
+      const found = employees.find((e) => {
+        if (!e) return false;
+        const eId = String(e._id || e.id || e.userId || e.employeeId || "").toLowerCase().trim();
+        return eId === targetId;
+      });
+      if (found) {
+        return found.name || found.fullName || found.displayName || "Employee";
+      }
+    }
+
+    return perf.employeeEmail || perf.email || "Employee";
   };
 
   // Helper to extract employee email
   const getEmployeeEmail = (perf) => {
     if (!perf) return "";
-    return (
+    const direct =
       perf.employeeID?.email ||
       perf.employeeEmail ||
       perf.employee?.email ||
-      perf.email ||
+      perf.email;
+    if (direct && typeof direct === "string" && direct.trim()) return direct.trim();
+
+    const targetId = String(
+      (typeof perf.employeeID === 'object' ? perf.employeeID?._id || perf.employeeID?.id : perf.employeeID) ||
+      (typeof perf.employeeId === 'object' ? perf.employeeId?._id || perf.employeeId?.id : perf.employeeId) ||
+      perf.userId ||
       ""
-    );
+    ).toLowerCase().trim();
+
+    if (targetId && Array.isArray(employees)) {
+      const found = employees.find((e) => {
+        if (!e) return false;
+        const eId = String(e._id || e.id || e.userId || e.employeeId || "").toLowerCase().trim();
+        return eId === targetId;
+      });
+      if (found && found.email) return found.email.trim();
+    }
+
+    return "";
   };
 
   // Helper to extract employee type label
@@ -1245,6 +1308,22 @@ const Performance = () => {
       if (typeof rawDept === "object" && rawDept.departmentName) return rawDept.departmentName;
     }
 
+    const targetId = String(
+      (typeof perf.employeeID === 'object' ? perf.employeeID?._id || perf.employeeID?.id : perf.employeeID) ||
+      (typeof perf.employeeId === 'object' ? perf.employeeId?._id || perf.employeeId?.id : perf.employeeId) ||
+      perf.userId ||
+      ""
+    ).toLowerCase().trim();
+
+    if (targetId && Array.isArray(employees)) {
+      const found = employees.find((e) => {
+        if (!e) return false;
+        const eId = String(e._id || e.id || e.userId || e.employeeId || "").toLowerCase().trim();
+        return eId === targetId;
+      });
+      if (found && found.department) return found.department;
+    }
+
     const desig =
       perf.designation ||
       perf.employeeID?.designation ||
@@ -1344,8 +1423,8 @@ const Performance = () => {
     // Exclude TL's personal review from team members tab
     if (isMyRecord(perf)) return false;
 
-    // Filter out dummy/finance/unknown records
-    if (isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf) || isFinanceOrExcludedUser(perf)) return false;
+    // Filter out dummy/finance records
+    if (isDummyPerformanceRecord(perf) || isFinanceOrExcludedUser(perf)) return false;
 
     const myIdentity = getPerformanceEmployeeIdentity(user);
     [
@@ -1381,6 +1460,18 @@ const Performance = () => {
       return true;
     }
 
+    // Direct target employee ID matching from teamEmployeesScope.memberIds
+    const targetId = String(
+      (typeof perf.employeeID === 'object' ? perf.employeeID?._id || perf.employeeID?.id : perf.employeeID) ||
+      (typeof perf.employeeId === 'object' ? perf.employeeId?._id || perf.employeeId?.id : perf.employeeId) ||
+      perf.userId ||
+      ""
+    ).toLowerCase().trim();
+
+    if (targetId && teamEmployeesScope?.memberIds?.has(targetId)) {
+      return true;
+    }
+
     // 3. Match against resolved team scope from /api/teamLead/team
     const perfIdentity = getPerformanceEmployeeIdentity(perf);
     if (teamEmployeesScope && (teamEmployeesScope.memberIds?.size > 0 || teamEmployeesScope.memberEmails?.size > 0)) {
@@ -1399,7 +1490,8 @@ const Performance = () => {
         const eIds = [emp._id, emp.id, emp.userId, emp.employeeId, emp.employeeID].filter(Boolean).map((x) => String(x).toLowerCase().trim());
         const eEmail = String(emp.email || "").toLowerCase().trim();
         const eName = String(emp.name || emp.fullName || "").toLowerCase().trim();
-        const matchesPerf = eIds.some((id) => perfIdentity.ids.has(id)) ||
+        const matchesPerf = (targetId && eIds.includes(targetId)) ||
+          eIds.some((id) => perfIdentity.ids.has(id)) ||
           (eEmail && perfIdentity.emails.has(eEmail)) ||
           (eName && perfIdentity.names.has(eName));
         if (!matchesPerf) return false;
@@ -1416,7 +1508,7 @@ const Performance = () => {
         const normKey = String(tlKey).toLowerCase().trim();
         if (myIdentity.ids.has(normKey) || myIdentity.emails.has(normKey) || normKey.includes("hetvi")) {
           if (Array.isArray(empIds)) {
-            const matchesStored = empIds.some((empId) => perfIdentity.ids.has(String(empId).toLowerCase().trim()));
+            const matchesStored = empIds.some((empId) => (targetId && String(empId).toLowerCase().trim() === targetId) || perfIdentity.ids.has(String(empId).toLowerCase().trim()));
             if (matchesStored) return true;
           }
         }
@@ -1435,13 +1527,13 @@ const Performance = () => {
   }, [teamEmployeesScope, isMyRecord, user, employees]);
 
   const canEditPerformanceRecord = useCallback((perf) => (
-    isAdmin || (isTL && isTeamMemberRecord(perf))
-  ), [isAdmin, isTL, isTeamMemberRecord]);
+    isAdmin || isHR || (isTL && isTeamMemberRecord(perf))
+  ), [isAdmin, isHR, isTL, isTeamMemberRecord]);
 
   // Role-isolated performances: Admin sees all; TL can toggle personal vs assigned team; Employee sees personal
   const myPerformances = useMemo(() => {
     const cleanList = performances.filter(
-      (p) => !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p)
+      (p) => !isDummyPerformanceRecord(p)
     );
     if (isAdmin) {
       return cleanList;
@@ -1454,13 +1546,13 @@ const Performance = () => {
 
   const teamPerformancesCount = useMemo(() => {
     return performances.filter(
-      (p) => !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p) && isTeamMemberRecord(p)
+      (p) => !isDummyPerformanceRecord(p) && isTeamMemberRecord(p)
     ).length;
   }, [performances, isTeamMemberRecord]);
 
   const personalPerformancesCount = useMemo(() => {
     return performances.filter(
-      (p) => !isDummyPerformanceRecord(p) && !isUnknownEmployeeOrUser(p) && isMyRecord(p)
+      (p) => !isDummyPerformanceRecord(p) && isMyRecord(p)
     ).length;
   }, [performances, isMyRecord]);
 
@@ -1576,9 +1668,9 @@ const Performance = () => {
   // ============================================================
   const filteredPerformances = useMemo(() => {
     return myPerformances.filter((perf) => {
-      if (!perf || isDummyPerformanceRecord(perf) || isUnknownEmployeeOrUser(perf)) return false;
+      if (!perf || isDummyPerformanceRecord(perf)) return false;
       const rawName = getEmployeeDisplayName(perf);
-      if (!rawName || isUnknownEmployeeOrUser(rawName)) return false;
+      if (!rawName) return false;
       const name = rawName.toLowerCase();
       const email = getEmployeeEmail(perf).toLowerCase();
       const feedbackText = String(perf.feedback || "").toLowerCase();
@@ -2214,7 +2306,7 @@ const Performance = () => {
           </div>
 
           <div className="flex items-center gap-2.5 self-end sm:self-auto">
-            {(canCreatePerformance || isTL) && (
+            {canCreatePerformance && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
@@ -2314,7 +2406,7 @@ const Performance = () => {
                     ? "No performance evaluations recorded yet for employees under your team."
                     : "Your performance reviews and scores will appear here once assessed by administration."}
             </p>
-            {(canCreatePerformance || isTL) && (
+            {canCreatePerformance && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
