@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
-import { Crown } from "lucide-react";
+import { AlertTriangle, ArrowRight, Crown, X } from "lucide-react";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../utils/roleFilters";
 import { showToast } from "../components/common/Toast";
 
@@ -266,6 +266,7 @@ const AssignmentModal = ({
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all"); // 'all' | 'available' | 'current' | 'other'
+  const [transferConfirmation, setTransferConfirmation] = useState(null);
 
   useEffect(() => {
     if (lead && isOpen) {
@@ -275,6 +276,19 @@ const AssignmentModal = ({
       setFilterType("all");
     }
   }, [lead, isOpen, employees]);
+
+  useEffect(() => {
+    if (!transferConfirmation) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setTransferConfirmation(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [transferConfirmation]);
 
   // Helper to check if a person matches the current Team Lead
   const isCurrentLead = (person) => {
@@ -421,22 +435,23 @@ const AssignmentModal = ({
     const leadInfo = getAssignedLeadInfo(matched || employeeId);
     if (leadInfo && !leadInfo.isCurrentLead) {
       const empName = getDisplayName(matched || employeeId);
-      const otherLeadName = leadInfo.leadName;
-      const currentLeadName = lead?.name || lead?.fullName || "this Team Lead";
-
-      const confirmTransfer = window.confirm(
-        `"${empName}" is currently assigned to Team Lead "${otherLeadName}".\n\n` +
-        `Rule: Every employee can have a maximum of 1 Team Lead (not more than 1 TL).\n\n` +
-        `Do you want to reassign "${empName}" to "${currentLeadName}"?\n` +
-        `(They will be moved to this Team Lead and removed from "${otherLeadName}")`
-      );
-
-      if (!confirmTransfer) {
-        return;
-      }
+      setTransferConfirmation({
+        employeeId: canonicalId,
+        employeeName: empName || "this employee",
+        previousLeadName: leadInfo.leadName,
+        nextLeadName: getUserName(lead) || lead?.name || lead?.fullName || "this Team Lead",
+      });
+      return;
     }
 
     setSelectedEmployees((prev) => [...prev, canonicalId]);
+  };
+
+  const confirmEmployeeTransfer = () => {
+    if (transferConfirmation) {
+      setSelectedEmployees((prev) => [...prev, transferConfirmation.employeeId]);
+    }
+    setTransferConfirmation(null);
   };
 
   const handleSave = async () => {
@@ -534,6 +549,7 @@ const AssignmentModal = ({
   const otherTLCount = validAvailableEmployees.filter((e) => getEmployeeAssignmentStatus(e).status === 'other').length;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
@@ -776,6 +792,85 @@ const AssignmentModal = ({
         </div>
       </div>
     </div>
+    {transferConfirmation && (
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+        onClick={() => setTransferConfirmation(null)}
+      >
+        <section
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="transfer-confirmation-title"
+          aria-describedby="transfer-confirmation-description"
+          className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-start gap-3 border-b border-amber-100 bg-amber-50/80 px-5 py-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 id="transfer-confirmation-title" className="text-base font-semibold text-slate-900">
+                Reassign team member?
+              </h2>
+              <p className="mt-1 text-sm leading-5 text-slate-600">
+                An employee can be assigned to only one Team Lead at a time.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTransferConfirmation(null)}
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              aria-label="Cancel reassignment"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="space-y-4 px-5 py-5">
+            <p id="transfer-confirmation-description" className="text-sm leading-6 text-slate-600">
+              <span className="font-semibold text-slate-900">{transferConfirmation.employeeName}</span>
+              {" is currently assigned to another team. Reassigning will remove them from that team."}
+            </p>
+
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Current Team Lead</p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-800">
+                  {transferConfirmation.previousLeadName}
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+              <div className="min-w-0 flex-1 text-right">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">New Team Lead</p>
+                <p className="mt-1 truncate text-sm font-semibold text-indigo-700">
+                  {transferConfirmation.nextLeadName}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setTransferConfirmation(null)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              Keep current team
+            </button>
+            <button
+              type="button"
+              onClick={confirmEmployeeTransfer}
+              className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            >
+              Confirm reassignment
+            </button>
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 };
 
@@ -1473,7 +1568,6 @@ const getDesignation = (lead) => {
       // Collect all associated IDs for the target lead
       const targetLeadObj = selectedLead || teamLeads.find(tl => String(tl._id) === targetLeadId);
       const targetLeadName = getUserName(targetLeadObj) || targetLeadObj?.name || targetLeadObj?.fullName || "the selected Team Lead";
-      const targetLeadEmail = getUserEmail(targetLeadObj);
       const targetAssociatedIds = targetLeadObj ? [
         targetLeadObj._id,
         targetLeadObj.id,
@@ -1569,33 +1663,6 @@ const getDesignation = (lead) => {
       }
 
       await saveTeamAssignments(data.leadId, cleanEmployeeIds);
-
-      // Keep employee records in sync with their newly assigned Team Lead.
-      await Promise.all(cleanEmployeeIds.map(async (empId) => {
-        const matched = findEmployeeByIdOrUser(empId, employees);
-        const uId = matched?.userId || matched?.userID || matched?.user?._id || empId;
-        if (uId && String(uId).match(/^[0-9a-fA-F]{24}$/)) {
-          const response = await axios.put(
-            `${BASE_URL}/users/approve`,
-            {
-              id: uId,
-              userId: uId,
-              _id: uId,
-              teamLead: targetLeadId,
-              teamLeadId: targetLeadId,
-              assignedTL: targetLeadId,
-              teamLeader: targetLeadId,
-              teamLeadName: targetLeadName,
-              teamLeadEmail: targetLeadEmail
-            },
-            { headers }
-          );
-          hasPersistedChanges = true;
-          if (response.data?.success === false) {
-            throw new Error(response.data.message || `Failed to update ${getEmployeeName(matched) || 'an employee'} assignment.`);
-          }
-        }
-      }));
 
       // Reflect assignments in the UI only after all required writes succeed.
       setTeamLeads(nextTeamLeads);
