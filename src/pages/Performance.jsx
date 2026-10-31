@@ -388,6 +388,7 @@ const Performance = () => {
     }
   }, [isTL]);
 
+
   const { confirm, confirmationDialog } = useConfirm();
   const headers = useMemo(() => {
     const token = localStorage.getItem("auth_token") || localStorage.getItem("token") || "";
@@ -859,7 +860,7 @@ const Performance = () => {
                 employee: perf.teamLead
               });
               if ([...teamLeadIdentity.ids].some((id) => myIdentity.ids.has(id)) ||
-                  [...teamLeadIdentity.emails].some((email) => myIdentity.emails.has(email))) {
+                [...teamLeadIdentity.emails].some((email) => myIdentity.emails.has(email))) {
                 return true;
               }
 
@@ -905,10 +906,10 @@ const Performance = () => {
         const myId = String(getRealAuthUserId(user) || user?._id || user?.id || user?.employeeId || "").trim();
         const fallbackEndpoints = myId
           ? [
-              `https://kt-backend-ttzj.onrender.com/api/performance/user/${myId}`,
-              `https://kt-backend-ttzj.onrender.com/api/performance/${myId}`,
-              "https://kt-backend-ttzj.onrender.com/api/performance/my"
-            ]
+            `https://kt-backend-ttzj.onrender.com/api/performance/user/${myId}`,
+            `https://kt-backend-ttzj.onrender.com/api/performance/${myId}`,
+            "https://kt-backend-ttzj.onrender.com/api/performance/my"
+          ]
           : [];
 
         for (const ep of fallbackEndpoints) {

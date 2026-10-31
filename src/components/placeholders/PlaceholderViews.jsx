@@ -42,6 +42,7 @@ const isRecordEqual = (a, b) => {
   );
 };
 
+
 // 2. PERFORMANCE VIEW - Live API integration using GET /api/performance/:id (My Performance Only)
 export const PerformanceView = () => {
   const { user } = useApp();
@@ -966,11 +967,10 @@ export const EmployeesView = () => {
             <button
               key={tag}
               onClick={() => setFilterRole(tag)}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                filterRole === tag
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${filterRole === tag
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               {label}
             </button>
@@ -1034,12 +1034,11 @@ export const EmployeesView = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${
-                            emp.role === 'TL' ? 'bg-amber-500' :
-                            emp.role === 'HR' ? 'bg-rose-500' :
-                            emp.role === 'ADMIN' ? 'bg-purple-600' :
-                            'bg-indigo-600'
-                          }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${emp.role === 'TL' ? 'bg-amber-500' :
+                              emp.role === 'HR' ? 'bg-rose-500' :
+                                emp.role === 'ADMIN' ? 'bg-purple-600' :
+                                  'bg-indigo-600'
+                            }`}>
                             {initials}
                           </div>
                           <div>
@@ -1049,13 +1048,12 @@ export const EmployeesView = () => {
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                          emp.role === 'TL' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
-                          emp.role === 'HR' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
-                          emp.role === 'ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-300' :
-                          emp.role === 'INT' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                          'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${emp.role === 'TL' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                            emp.role === 'HR' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                              emp.role === 'ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                                emp.role === 'INT' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                                  'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                          }`}>
                           {emp.roleFull}
                         </span>
                       </td>
@@ -1545,13 +1543,13 @@ export const TeamTaskManagementView = () => {
     if (e) e.stopPropagation();
     const newProgress = getProgressForStatus(newStatus);
     // Optimistic UI update
-    setTasks(prev => prev.map(t => t._id === task._id ? { 
-      ...t, 
+    setTasks(prev => prev.map(t => t._id === task._id ? {
+      ...t,
       status: newStatus,
-      progress: newProgress !== null ? newProgress : t.progress 
+      progress: newProgress !== null ? newProgress : t.progress
     } : t));
     try {
-      const payload = { 
+      const payload = {
         status: newStatus,
         ...(newProgress !== null ? { progress: newProgress } : {})
       };
@@ -2720,11 +2718,10 @@ export const TeamLeaveManagementView = () => {
                       </span>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                      (l.leaveType === 'half_day' || l.isHalfDay) 
-                        ? 'bg-amber-100 text-amber-700' 
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${(l.leaveType === 'half_day' || l.isHalfDay)
+                        ? 'bg-amber-100 text-amber-700'
                         : 'bg-indigo-100 text-indigo-700'
-                    }`}>
+                      }`}>
                       {(l.leaveType === 'half_day' || l.isHalfDay) ? 'Half Day Leave' : 'Full Day Leave'}
                     </span>
 

@@ -330,6 +330,7 @@ export const extractAssignedTeamEmployees = (myTeams, usersMap = {}) => {
     }
   };
 
+
   myTeams.forEach((team) => {
     const pool = [
       ...(Array.isArray(team.employees) ? team.employees : []),
@@ -609,7 +610,7 @@ export const fetchEmployeeTeamLead = async () => {
     for (const email of emails) {
       if (userTLMap[email] && userTLMap[email].name) return userTLMap[email];
     }
-  } catch {}
+  } catch { }
 
   // Fallback 2: Check backend GET /api/teamLead/team
   try {
@@ -637,7 +638,7 @@ export const fetchEmployeeTeamLead = async () => {
         if (lead) return { _id: lead, name: team.teamLeadName || 'Team Lead' };
       }
     }
-  } catch {}
+  } catch { }
 
   return null;
 };

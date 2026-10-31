@@ -17,6 +17,7 @@ const isRecordEqual = (a, b) => {
   );
 };
 
+
 /**
  * PerformanceView Component
  * Integrated with the new API workflow:
