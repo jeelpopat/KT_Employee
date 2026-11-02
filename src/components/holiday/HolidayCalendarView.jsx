@@ -158,10 +158,14 @@ export const HolidayCalendarView = () => {
   // 1. Previous month overflow days
   for (let i = startOffset - 1; i >= 0; i--) {
     const dayNumber = daysInPrevMonth - i;
+    const dateObj = new Date(currentYear, currentMonth - 1, dayNumber);
+    const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
+    const holiday = holidays.find((item) => item.date === dateStr);
     gridCells.push({
       day: dayNumber,
       isOverflow: true,
       overflowType: 'prev',
+      holidayName: holiday?.name || '',
       key: `prev-${dayNumber}`
     });
   }
@@ -213,10 +217,14 @@ export const HolidayCalendarView = () => {
   // 3. Next month overflow days (fill up to exact 42 cells = 6 rows)
   const remainingCells = 42 - gridCells.length;
   for (let nextDay = 1; nextDay <= remainingCells; nextDay++) {
+    const dateObj = new Date(currentYear, currentMonth + 1, nextDay);
+    const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(nextDay).padStart(2, '0')}`;
+    const holiday = holidays.find((item) => item.date === dateStr);
     gridCells.push({
       day: nextDay,
       isOverflow: true,
       overflowType: 'next',
+      holidayName: holiday?.name || '',
       key: `next-${nextDay}`
     });
   }
@@ -291,7 +299,7 @@ export const HolidayCalendarView = () => {
                     {cell.day}
                   </div>
                   <div className="text-[10px] text-slate-400 font-normal leading-tight">
-                    Other
+                    {cell.holidayName}
                   </div>
                 </div>
               );

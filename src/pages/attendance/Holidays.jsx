@@ -519,13 +519,10 @@ export default function Holidays() {
                 </div>
 
                 <div className="mt-0.5">
-                  {day.isCurrentMonth && day.hasHoliday && day.holidayTitle && (
+                  {day.hasHoliday && day.holidayTitle && (
                     <p className="text-[8px] sm:text-[9px] md:text-[10px] font-semibold text-slate-700 leading-tight truncate">
                       {day.holidayTitle}
                     </p>
-                  )}
-                  {!day.isCurrentMonth && (
-                    <p className="text-[7px] sm:text-[8px] font-semibold text-slate-400">Other</p>
                   )}
                 </div>
               </button>

@@ -254,6 +254,7 @@ export const DashboardView = () => {
 
   // --- Dynamic Quick Actions Height Tracking for Announcements ---
   const quickActionsRef = useRef(null);
+  const adjustmentHistoryCacheRef = useRef({ records: [], fetchedAt: 0 });
   const [quickActionsHeight, setQuickActionsHeight] = useState(null);
 
   useEffect(() => {
@@ -1397,6 +1398,102 @@ export const DashboardView = () => {
           .filter(record => Array.isArray(record?.sessions))
           .flatMap(record => record.sessions.map(normalizeBreakRecord).filter(b => b.startTime || b.endTime))
       ];
+
+      const getMatchingAdjustments = (adjustments) => adjustments
+        .filter((adjustment) => (
+          adjustment &&
+          isTodayDate(adjustment.date || adjustment.attendanceDate || adjustment.dateStr) &&
+          isCurrentUsersAttendance(adjustment)
+        ))
+        .sort((first, second) => {
+          const firstUpdatedAt = new Date(first.updatedAt || first.createdAt || 0).getTime();
+          const secondUpdatedAt = new Date(second.updatedAt || second.createdAt || 0).getTime();
+          return secondUpdatedAt - firstUpdatedAt;
+        });
+
+      const rawBreakDuration = todayDoc?.totalBreakTime ??
+        timelineItem?.totalBreakTime ??
+        adminRecord?.totalBreakTime ??
+        adminRecord?.breakDuration;
+      const reportedBreakMinutes =
+        Math.round(parseFloat(String(rawBreakDuration || 0).replace(/[^\d.-]/g, '')) || 0);
+      const getCompleteBreakMinutes = (records) => getUniqueBreaks(records).reduce((total, record) => {
+        const start = parseTimeToMinutes(record.startTime);
+        const end = parseTimeToMinutes(record.endTime);
+        if (start === null || end === null) return total;
+        return total + (end > start ? end - start : end + 1440 - start);
+      }, 0);
+      const getAdjustmentBreaks = (adjustment) => [
+        ...asBreakArray(adjustment.breaks),
+        getTopLevelBreak(adjustment),
+        ...(Array.isArray(adjustment.sessions)
+          ? adjustment.sessions.map(normalizeBreakRecord)
+          : [])
+      ].filter((record) => {
+        const { startTime, endTime } = normalizeBreakRecord(record);
+        return Boolean(startTime && endTime);
+      });
+      const hasMatchingAdjustmentBreaks = (adjustments) => adjustments.some((adjustment) => {
+        const adjustmentBreaks = getAdjustmentBreaks(adjustment);
+        return adjustmentBreaks.length > 0 &&
+          Math.abs(getCompleteBreakMinutes(adjustmentBreaks) - reportedBreakMinutes) <= 1;
+      });
+      const hasReportedBreakDuration = reportedBreakMinutes > 0;
+      const recordedBreakMinutes = getCompleteBreakMinutes(rawBreaks);
+      const breakDurationMatches = Math.abs(recordedBreakMinutes - reportedBreakMinutes) <= 1;
+
+      let matchingAdjustments = [];
+      try {
+        const localAdjustments = JSON.parse(localStorage.getItem('localAdjustments') || '[]');
+        if (Array.isArray(localAdjustments)) {
+          matchingAdjustments = getMatchingAdjustments(localAdjustments);
+        }
+      } catch (error) {
+        console.warn('Could not read locally saved attendance adjustments:', error);
+      }
+
+      if (
+        !hasMatchingAdjustmentBreaks(matchingAdjustments) &&
+        !breakDurationMatches &&
+        hasReportedBreakDuration
+      ) {
+        const cache = adjustmentHistoryCacheRef.current;
+        if (Date.now() - cache.fetchedAt < 30_000) {
+          matchingAdjustments = getMatchingAdjustments(cache.records);
+        } else {
+          try {
+            const adjustmentResponse = await api.get('/api/adjustment/history', { skipCache: true });
+            const adjustmentRecords = adjustmentResponse.data?.data ||
+              adjustmentResponse.data?.adjustments ||
+              [];
+            if (!Array.isArray(adjustmentRecords)) {
+              throw new TypeError('Attendance adjustment history response is not a list.');
+            }
+            adjustmentHistoryCacheRef.current = {
+              records: adjustmentRecords,
+              fetchedAt: Date.now()
+            };
+            matchingAdjustments = getMatchingAdjustments(adjustmentRecords);
+          } catch (error) {
+            adjustmentHistoryCacheRef.current = { records: [], fetchedAt: Date.now() };
+            console.warn('Could not load attendance adjustment history for timeline:', error);
+          }
+        }
+      }
+
+      const adjustmentWithBreaks = matchingAdjustments.find((adjustment) => {
+        const adjustmentBreaks = getAdjustmentBreaks(adjustment);
+        return adjustmentBreaks.length > 0 &&
+          Math.abs(getCompleteBreakMinutes(adjustmentBreaks) - reportedBreakMinutes) <= 1;
+      });
+
+      if (!breakDurationMatches && adjustmentWithBreaks) {
+        rawBreaks.splice(
+          0,
+          rawBreaks.length,
+          ...getAdjustmentBreaks(adjustmentWithBreaks)
+        );
+      }
 
       const mergedCheckIn = todayDoc?.approvedCheckInTime || todayDoc?.checkInTime || todayDoc?.checkInTimeDisplay || todayDoc?.approvedCheckInTimeDisplay || timelineItem?.approvedCheckInTime || timelineItem?.checkInTime || timelineItem?.checkInTimeDisplay || adminRecord?.approvedCheckInTime || adminRecord?.checkInTime || adminRecord?.punchIn || adminRecord?.checkIn || todayDoc?.inTime || timelineItem?.inTime;
 
@@ -2886,25 +2983,6 @@ export const DashboardView = () => {
               ))}
             </div>
 
-            {/* Status transition timestamps below the timeline */}
-            <div className="mt-3">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                {(nineHourTimeline.statusMarkers || []).map((marker) => {
-                  return (
-                    <div
-                      key={`time-${marker.id}`}
-                      className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 transition-colors pointer-events-auto group cursor-help"
-                      title={`${marker.label}: ${marker.timeStr}`}
-                    >
-                      <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${marker.dotClass}`} />
-                      <span className="whitespace-nowrap text-[10px] font-mono font-bold leading-none text-slate-700">
-                        {marker.timeStr}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         </div>
 

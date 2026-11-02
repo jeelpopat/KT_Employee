@@ -8,15 +8,38 @@ import api from '../../api/axios.js';
 import {
   computeNineHourTimeline,
   isTodayDate,
-  formatMinutesToTimeStr,
-  convertUTCMinutesToLocal,
   formatISOToLocalTime,
   normalizeAttendanceRecord,
   deriveAttendanceStatus
 } from '../../utils/timelineUtils.js';
 
+const getAttendanceTimelineRecords = (payload, depth = 0) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object' || depth > 3) return null;
+
+  for (const key of ['timeline', 'records', 'attendance', 'data', 'result', 'payload']) {
+    const records = getAttendanceTimelineRecords(payload[key], depth + 1);
+    if (records) return records;
+  }
+
+  return null;
+};
+
+const getAttendanceSummary = (payload, depth = 0) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload) || depth > 3) return {};
+  if (payload.summary && typeof payload.summary === 'object') return payload.summary;
+
+  for (const key of ['data', 'result', 'payload', 'response']) {
+    const summary = getAttendanceSummary(payload[key], depth + 1);
+    if (Object.keys(summary).length > 0) return summary;
+  }
+
+  return {};
+};
+
 export const AttendanceView = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceError, setAttendanceError] = useState('');
   const [summaryStats, setSummaryStats] = useState({
     totalWorkingHours: 0,
     presentDays: 0,
@@ -78,8 +101,18 @@ export const AttendanceView = () => {
       let data = [];
       let summary = {};
       if (tlResponse.status === 'fulfilled') {
-        data = tlResponse.value.data?.data || [];
-        summary = tlResponse.value.data?.summary || {};
+        const records = getAttendanceTimelineRecords(tlResponse.value.data);
+        if (records) {
+          data = records;
+          summary = getAttendanceSummary(tlResponse.value.data);
+          setAttendanceError('');
+        } else {
+          console.error('Attendance timeline response did not contain a records array.');
+          setAttendanceError('Could not read attendance history. Please try again.');
+        }
+      } else {
+        console.error('Failed to fetch attendance timeline:', tlResponse.reason);
+        setAttendanceError('Could not load attendance history. Please try again.');
       }
 
       let todayDoc = null;
@@ -178,7 +211,7 @@ export const AttendanceView = () => {
           status: isTodayRejected ? 'rejected' : (todayDoc?.status || 'present'),
           approvalStatus: isTodayRejected ? 'rejected' : todayDoc?.approvalStatus,
           isRejected: isTodayRejected,
-          rejectionReason: isTodayRejected ? (todayDoc?.rejectionReason || localRejectionReason) : undefined,
+          rejectionReason: isTodayRejected ? (todayDoc?.rejectionReason || 'Rejected by admin') : undefined,
           timelineSegments: isTodayRejected ? [] : (todayDoc?.timelineSegments || []),
           totalWorkTime: isTodayRejected ? 0 : (todayDoc?.totalWorkTime || 0),
           totalWorkTimeDisplay: isTodayRejected ? '0h' : (todayDoc?.totalWorkTimeDisplay || '0h'),
@@ -209,6 +242,7 @@ export const AttendanceView = () => {
 
     } catch (error) {
       console.error("Failed to fetch timeline attendance:", error);
+      setAttendanceError('Could not load attendance history. Please try again.');
       setAttendanceRecords([]);
     } finally {
       if (!isSilent) setIsLoading(false);
@@ -266,6 +300,22 @@ export const AttendanceView = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+
+      {attendanceError && (
+        <div role="alert" className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="shrink-0" />
+            <span>{attendanceError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchAttendance(false)}
+            className="shrink-0 font-semibold underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -574,31 +624,6 @@ export const AttendanceView = () => {
                     ))}
                   </div>
 
-                  {/* Status Transition Markers Below Timeline (Check In, Break In, Extra Break, Break Out, Check Out, 9h End) */}
-                  <div className="mt-2.5">
-                    {/* Positioned Marker Ticks & Timestamps Along Timeline */}
-                    <div className="relative w-full h-4">
-                      {(nineHourTimeline.statusMarkers || []).map((marker) => {
-                        let alignClass = '-translate-x-1/2';
-                        if (marker.percent <= 3) alignClass = 'translate-x-0';
-                        else if (marker.percent >= 97) alignClass = '-translate-x-full';
-
-                        return (
-                          <div
-                            key={`tick-${marker.id}`}
-                            style={{ left: `${marker.percent}%` }}
-                            className={`absolute top-0 flex flex-col items-center ${alignClass} transition-all pointer-events-auto group cursor-help`}
-                            title={`${marker.label}: ${marker.timeStr}`}
-                          >
-                            <div className={`w-0.5 h-1.5 rounded-full ${marker.dotClass} mb-0.5`} />
-                            <span className="text-[9px] font-mono font-bold text-slate-700 leading-none">
-                              {marker.timeStr}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
 
               </div>

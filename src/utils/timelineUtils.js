@@ -774,9 +774,24 @@ export const computeNineHourTimeline = ({
 
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const firstTimelineSegment = timelineSegments
+      .map((segment, index) => ({
+        index,
+        fromMinutes: convertUTCMinutesToLocal(segment.fromMinutes, startMinutes),
+        isBreak: segment.type === 'yellow' || (segment.label || '').toLowerCase().includes('break'),
+        isInactive:
+          segment.type === 'grey' ||
+          segment.type === 'gray' ||
+          (segment.label || '').toLowerCase().includes('late') ||
+          (segment.label || '').toLowerCase().includes('early')
+      }))
+      .sort((a, b) => a.fromMinutes - b.fromMinutes)[0];
+    const firstWorkSegmentIndex = firstTimelineSegment && !firstTimelineSegment.isBreak && !firstTimelineSegment.isInactive
+      ? firstTimelineSegment.index
+      : -1;
 
     timelineSegments.forEach((seg, idx) => {
-      const localFrom = convertUTCMinutesToLocal(seg.fromMinutes, startMinutes);
+      let localFrom = convertUTCMinutesToLocal(seg.fromMinutes, startMinutes);
       let localTo = convertUTCMinutesToLocal(seg.toMinutes, startMinutes);
 
       const isBreak = seg.type === 'yellow' || (seg.label || '').toLowerCase().includes('break');
@@ -785,6 +800,10 @@ export const computeNineHourTimeline = ({
         seg.type === 'gray' ||
         (seg.label || '').toLowerCase().includes('late') ||
         (seg.label || '').toLowerCase().includes('early');
+
+      if (idx === firstWorkSegmentIndex && localFrom > startMinutes) {
+        localFrom = startMinutes;
+      }
 
       // If user is actively working (not checked out, not on break), extend working time live to current minute
       if (!isBreak && !isInactiveOrLate && !isCheckedOut && !isOnBreak) {
