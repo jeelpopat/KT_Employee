@@ -56,7 +56,7 @@ export const InactivityAlertModal = () => {
             className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
             <Coffee size={14} />
-            <span>Start Break</span>
+            <span>I Am in Break</span>
           </button>
 
           <button
@@ -74,5 +74,4 @@ export const InactivityAlertModal = () => {
     </div>
   );
 };
-
 

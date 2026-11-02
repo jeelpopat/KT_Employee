@@ -57,6 +57,7 @@ const parseBirthdayDate = (value) => {
 
 const getCurrentMonthBirthdaysFromUsers = (users) => {
   const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   return filterOutUnknownUsers(filterOutFinanceUsers(users))
     .map((record) => {
@@ -81,6 +82,7 @@ const getCurrentMonthBirthdaysFromUsers = (users) => {
       if (!name || !birthday || birthday.getMonth() !== now.getMonth()) return null;
 
       const birthdayDate = new Date(now.getFullYear(), birthday.getMonth(), birthday.getDate());
+      if (birthdayDate < today) return null;
 
       return {
         id: record._id || record.id || record.employeeId || record.email || name,
@@ -492,6 +494,8 @@ export const DashboardView = () => {
     const localCheckedIn = localStorage.getItem('kt_checked_in_' + todayStr) === 'true' || localStorage.getItem('kt_checked_in_' + todayLocalStr) === 'true';
     const localCheckedOut = localStorage.getItem('kt_checked_out_' + todayStr) === 'true' || localStorage.getItem('kt_checked_out_' + todayLocalStr) === 'true';
     const localOnBreak = localStorage.getItem('kt_on_break_' + todayStr) === 'true' || localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true';
+    const localBreakStartedAt = localStorage.getItem('kt_active_break_started_at_' + todayStr) ||
+      localStorage.getItem('kt_active_break_started_at_' + todayLocalStr);
     const rawCheckIn = ta?.approvedCheckInTime || ta?.checkInTime || ta?.checkInTimeDisplay || ta?.approvedCheckInTimeDisplay || ta?.inTime || ta?.checkIn || ta?.punchIn;
     const rawCheckOut = ta?.checkOutTime || ta?.checkOutTimeDisplay || ta?.outTime || ta?.checkOut || ta?.punchOut;
     const statusLower = String(ta?.status || '').toLowerCase().trim();
@@ -624,6 +628,8 @@ export const DashboardView = () => {
       localStorage.removeItem('kt_attendance_pending_' + todayLocalStr);
       localStorage.removeItem('kt_on_break_' + todayStr);
       localStorage.removeItem('kt_on_break_' + todayLocalStr);
+      localStorage.removeItem('kt_active_break_started_at_' + todayStr);
+      localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
       localStorage.setItem('kt_attendance_rejected_' + todayStr, 'true');
       localStorage.setItem('kt_attendance_rejected_' + todayLocalStr, 'true');
       if (rejectionReasonText) {
@@ -656,6 +662,8 @@ export const DashboardView = () => {
       localStorage.removeItem('kt_check_in_time');
       localStorage.removeItem('kt_on_break_' + todayStr);
       localStorage.removeItem('kt_on_break_' + todayLocalStr);
+      localStorage.removeItem('kt_active_break_started_at_' + todayStr);
+      localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
       localStorage.removeItem('kt_checked_out_' + todayStr);
       localStorage.removeItem('kt_checked_out_' + todayLocalStr);
       localStorage.removeItem('kt_check_out_time_str');
@@ -747,11 +755,48 @@ export const DashboardView = () => {
       ? ta.sessions.map(normalizeBreakRecord).filter(b => b.startTime || b.endTime)
       : [];
     const singleBreak = getTopLevelBreak(ta);
-
-    const breaksList = getUniqueBreaks(alignBreakRecordsToShift([
+    const sourceBreaks = [
       ...rawBreaks,
       ...sessionBreaks,
       ...(singleBreak.startTime || singleBreak.endTime ? [singleBreak] : [])
+    ];
+    const backendHasActiveBreak = sourceBreaks.some((record) => {
+      const normalized = normalizeBreakRecord(record);
+      return normalized.startTime && !normalized.endTime;
+    });
+    const localBreakStartMinutes = parseTimeToMinutes(localBreakStartedAt);
+    const localBreakStartTimestamp = localBreakStartedAt ? new Date(localBreakStartedAt).getTime() : Number.NaN;
+    const backendEndedBreakAfterLocalStart = sourceBreaks.some((record) => {
+      const endTime = normalizeBreakRecord(record).endTime;
+      if (!endTime) return false;
+      const endTimestamp = new Date(endTime).getTime();
+      if (Number.isFinite(localBreakStartTimestamp) && Number.isFinite(endTimestamp)) {
+        return endTimestamp >= localBreakStartTimestamp;
+      }
+      const endMinutes = parseTimeToMinutes(endTime);
+      return localBreakStartMinutes === null || endMinutes >= localBreakStartMinutes;
+    });
+    const backendConfirmsBreakEnded = Boolean(
+      ta && (
+        backendEndedBreakAfterLocalStart ||
+        (!localOnBreak && (
+          ta?.breakTimer?.isOnBreak === false ||
+          ta?.isOnBreak === false ||
+          sourceBreaks.some((record) => normalizeBreakRecord(record).endTime)
+        ))
+      )
+    );
+    if (backendConfirmsBreakEnded) {
+      localStorage.removeItem('kt_active_break_started_at_' + todayStr);
+      localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
+    }
+    const localActiveBreak = localOnBreak && localBreakStartedAt && !backendConfirmsBreakEnded && !backendHasActiveBreak
+      ? [{ startTime: localBreakStartedAt, endTime: null }]
+      : [];
+
+    const breaksList = getUniqueBreaks(alignBreakRecordsToShift([
+      ...sourceBreaks,
+      ...localActiveBreak
     ], rawCheckIn));
 
     const yellowSegments = (segments || []).filter(s => s.type === 'yellow');
@@ -802,6 +847,8 @@ export const DashboardView = () => {
     } else {
       localStorage.removeItem('kt_on_break_' + todayStr);
       localStorage.removeItem('kt_on_break_' + todayLocalStr);
+      localStorage.removeItem('kt_active_break_started_at_' + todayStr);
+      localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
     }
 
     // Break records are authoritative; use timeline segments only when no records exist.
@@ -2339,6 +2386,8 @@ export const DashboardView = () => {
         } else if (actionType === 'break_start') {
           localStorage.setItem('kt_on_break_' + todayStr, 'true');
           localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
+          localStorage.setItem('kt_active_break_started_at_' + todayStr, activeBreakIsoStart || nowIso);
+          localStorage.setItem('kt_active_break_started_at_' + todayLocalStr, activeBreakIsoStart || nowIso);
           localStorage.setItem('kt_last_break_in_' + todayStr, nowLocal);
           const currentBreaks = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
           const newBreaksCount = currentBreaks + 1;
@@ -2353,6 +2402,8 @@ export const DashboardView = () => {
         } else if (actionType === 'break_end') {
           localStorage.removeItem('kt_on_break_' + todayStr);
           localStorage.removeItem('kt_on_break_' + todayLocalStr);
+          localStorage.removeItem('kt_active_break_started_at_' + todayStr);
+          localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
           localStorage.setItem('kt_last_break_out_' + todayStr, nowLocal);
           const updatedBreaks = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
           setAttendanceStatus('checked_in');

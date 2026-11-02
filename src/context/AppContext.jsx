@@ -3,11 +3,14 @@ import api, { clearApiCache } from '../api/axios.js';
 import { clearAuth, normalizeRole } from '../utils/auth.js';
 import { getProgressForStatus } from '../utils/taskUtils.js';
 import {
+  getGPSLocation,
+  breakIn,
   TARGET_LAT,
   TARGET_LNG,
   GEOFENCE_RADIUS_METERS,
   AUTO_CHECKOUT_RADIUS_METERS,
-  calculateDistanceInMeters
+  calculateDistanceInMeters,
+  getAttendanceErrorMessage
 } from '../services/attendanceService.js';
 import { showToast } from '../components/common/Toast.jsx';
 
@@ -788,24 +791,47 @@ export const AppProvider = ({ children }) => {
     setNotifications(prev => [newNotif, ...prev]);
   };
 
-  const handleInactivityStartBreak = () => {
-    setIsInactivityAlertOpen(false);
-    lastActivityTimestampRef.current = Date.now();
-    setInactivitySeconds(0);
+  const handleInactivityStartBreak = async () => {
+    if (attendanceStatus !== 'checked_in') {
+      setIsInactivityAlertOpen(false);
+      return;
+    }
 
-    setInactivityEvents(prev => prev.map((evt, idx) => idx === 0 ? {
-      ...evt,
-      responseStatus: 'Switched to Break'
-    } : evt));
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayLocalStr = new Date().toLocaleDateString('en-CA');
     try {
+      const location = await getGPSLocation();
+      await breakIn(location);
+
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const nowLocal = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const todayStr = now.toISOString().split('T')[0];
+      const todayLocalStr = now.toLocaleDateString('en-CA');
+      const currentBreakCount = Math.max(
+        Number.parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10) || 0,
+        Number.parseInt(localStorage.getItem('kt_break_count_' + todayLocalStr) || '0', 10) || 0
+      );
+
       localStorage.setItem('kt_on_break_' + todayStr, 'true');
       localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
-    } catch (e) { }
+      localStorage.setItem('kt_active_break_started_at_' + todayStr, nowIso);
+      localStorage.setItem('kt_active_break_started_at_' + todayLocalStr, nowIso);
+      localStorage.setItem('kt_last_break_in_' + todayStr, nowLocal);
+      localStorage.setItem('kt_break_count_' + todayStr, String(currentBreakCount + 1));
+      localStorage.setItem('kt_break_count_' + todayLocalStr, String(currentBreakCount + 1));
 
-    handleStartBreak();
+      setIsInactivityAlertOpen(false);
+      setInactivityEvents(prev => prev.map((evt, idx) => idx === 0 ? {
+        ...evt,
+        responseStatus: 'Switched to Break'
+      } : evt));
+      lastActivityTimestampRef.current = Date.now();
+      setInactivitySeconds(0);
+      handleStartBreak();
+      window.dispatchEvent(new Event('attendance_updated'));
+    } catch (error) {
+      console.error('Could not start break from inactivity alert:', error);
+      showToast(getAttendanceErrorMessage(error), 'error');
+    }
   };
 
   const handleSimulateInactivity = () => {
