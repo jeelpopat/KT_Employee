@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Users,
   Plus,
@@ -104,6 +104,8 @@ export default function Employees() {
   // =========================
   const [editMode, setEditMode] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const employeeRecordsRef = useRef([]);
 
   const [formData, setFormData] = useState(initialFormData);
 
@@ -197,7 +199,10 @@ export default function Employees() {
           const records = Array.isArray(employeeData)
             ? employeeData
             : employeeData.employees || employeeData.data || employeeData.employeesList || [];
-          if (Array.isArray(records)) employeeRecords = records;
+          if (Array.isArray(records)) {
+            employeeRecords = records;
+            employeeRecordsRef.current = records;
+          }
         } else {
           console.warn(`Could not load employee status records (HTTP ${employeeRes.status})`);
         }
@@ -238,18 +243,26 @@ export default function Employees() {
           return String(identity || "").trim().toLowerCase();
         };
         const userId = normalizeIdentity(record?._id || record?.id || record?.userID || record?.userId);
-        const employeeId = normalizeIdentity(record?.employeeID || record?.employeeId);
+        const employeeId = normalizeIdentity(record?.employeeID || record?.employeeId || record?.uniqueID || record?.employeeCode);
         const email = normalizeIdentity(record?.email || record?.employeeEmail);
         const employeeRecord = employeeRecords.find((employee) => {
           const employeeUserId = normalizeIdentity(employee?.userID || employee?.userId);
-          const employeeIdValue = normalizeIdentity(employee?.employeeID || employee?.employeeId);
+          const employeeIdValue = normalizeIdentity(employee?.employeeID || employee?.employeeId || employee?.employeeCode);
           const employeeEmail = normalizeIdentity(
             employee?.email || employee?.userID?.email || employee?.userId?.email
           );
+          const employeeDocId = normalizeIdentity(employee?._id || employee?.id);
+          const recordEmpRefId = normalizeIdentity(
+            typeof record?.employeeId === "object" ? record.employeeId?._id : record?.employeeId
+          );
+          const recordTlEmpId = normalizeIdentity(record?.teamLead?.employeeId);
+
           return (
             (userId && employeeUserId && userId === employeeUserId) ||
             (employeeId && employeeIdValue && employeeId === employeeIdValue) ||
-            (email && employeeEmail && email === employeeEmail)
+            (email && employeeEmail && email === employeeEmail) ||
+            (employeeDocId && recordEmpRefId && employeeDocId === recordEmpRefId) ||
+            (employeeDocId && recordTlEmpId && employeeDocId === recordTlEmpId)
           );
         });
         const role = resolveRoleName(record, roleNamesById);
@@ -264,9 +277,33 @@ export default function Employees() {
         const name = record?.name || record?.fullName ||
           `${record?.firstName || ""} ${record?.lastName || ""}`.trim();
 
+        const employeeRecordId =
+          employeeRecord?._id ||
+          employeeRecord?.id ||
+          (typeof record?.employeeId === "object" ? record.employeeId?._id || record.employeeId?.id : null) ||
+          (typeof record?.employeeID === "object" ? record.employeeID?._id || record.employeeID?.id : null) ||
+          (record?.employeeId && /^[0-9a-f]{24}$/i.test(String(record.employeeId)) ? String(record.employeeId) : null) ||
+          (record?.teamLead && typeof record.teamLead === "object" && record.teamLead.employeeId && /^[0-9a-f]{24}$/i.test(String(record.teamLead.employeeId)) ? String(record.teamLead.employeeId) : null) ||
+          null;
+
+        const resolvedEmployeeCode =
+          employeeRecord?.employeeID ||
+          employeeRecord?.employeeCode ||
+          employeeRecord?.employeeId ||
+          record?.employeeID ||
+          record?.employeeCode ||
+          record?.uniqueID ||
+          (typeof record?.employeeId === "string" ? record.employeeId : "");
+
         return {
           ...record,
-          _id: record?._id || record?.id || record?.employeeId?._id || record?.employeeID?._id,
+          _id: record?._id || record?.id || employeeRecord?._id || record?.employeeId?._id || record?.employeeID?._id,
+          userId: record?._id || record?.id,
+          employeeRecordId,
+          employeeRecord: employeeRecord || null,
+          employeeId: employeeRecordId || resolvedEmployeeCode || record?.employeeId || record?._id,
+          employeeID: resolvedEmployeeCode || record?.employeeID || "",
+          employeeCode: resolvedEmployeeCode,
           name,
           role: String(role),
           designation,
@@ -274,7 +311,58 @@ export default function Employees() {
           employeeStatus: getEmploymentStatus(employeeRecord, record),
         };
       });
-      setEmployees(filterOutUnknownUsers(normalizedUsers));
+
+      // Pass 2: Include employees from /api/employee/list that were not in /api/users/all
+      const matchedEmployeeDocIds = new Set(
+        normalizedUsers
+          .map((u) => u.employeeRecordId || u.employeeRecord?._id)
+          .filter(Boolean)
+          .map((id) => String(id).toLowerCase().trim())
+      );
+
+      const unmatchedEmployees = employeeRecords
+        .filter((empRec) => {
+          if (!empRec || !empRec._id) return false;
+          const recId = String(empRec._id).toLowerCase().trim();
+          if (matchedEmployeeDocIds.has(recId)) return false;
+          const recEmail = String(empRec.email || "").toLowerCase().trim();
+          if (recEmail && normalizedUsers.some((u) => String(u.email || "").toLowerCase().trim() === recEmail)) {
+            return false;
+          }
+          return true;
+        })
+        .map((empRec) => {
+          const role = resolveRoleName(empRec, roleNamesById);
+          const rawDesignation = empRec?.designation || empRec?.position || "";
+          const designation = typeof rawDesignation === "object"
+            ? rawDesignation.name || rawDesignation.designationName || rawDesignation.title || ""
+            : rawDesignation;
+          const rawDepartment = empRec?.department || empRec?.departmentName || empRec?.dept || "";
+          const department = typeof rawDepartment === "object"
+            ? rawDepartment.name || rawDepartment.departmentName || rawDepartment.title || ""
+            : rawDepartment;
+          const name = empRec?.name || empRec?.fullName ||
+            `${empRec?.firstName || ""} ${empRec?.lastName || ""}`.trim();
+          const code = empRec?.employeeID || empRec?.employeeCode || empRec?.employeeId || "";
+
+          return {
+            ...empRec,
+            _id: empRec._id,
+            userId: empRec.userID || empRec.userId || empRec._id,
+            employeeRecordId: empRec._id,
+            employeeRecord: empRec,
+            employeeId: empRec._id,
+            employeeID: code,
+            employeeCode: code,
+            name,
+            role: String(role),
+            designation,
+            department,
+            employeeStatus: getEmploymentStatus(empRec, empRec),
+          };
+        });
+
+      setEmployees(filterOutUnknownUsers([...normalizedUsers, ...unmatchedEmployees]));
     } catch (error) {
       console.error("Fetch employees error:", error);
     } finally {
@@ -289,13 +377,77 @@ export default function Employees() {
     setFormData(initialFormData);
     setEditMode(false);
     setSelectedEmployeeId(null);
+    setSelectedEmployee(null);
+  };
+
+  // Helper to resolve employee collection document ID
+  const resolveEmployeeRecordId = (employeeOrId) => {
+    if (!employeeOrId) return null;
+    const empObj = typeof employeeOrId === "object" && employeeOrId !== null ? employeeOrId : null;
+    if (!empObj) {
+      const idStr = String(employeeOrId).trim().toLowerCase();
+      const currentRecords = employeeRecordsRef.current || [];
+      const matchedRec = currentRecords.find((rec) => {
+        const recId = String(rec?._id || "").toLowerCase();
+        const recUserId = String(rec?.userID || rec?.userId || "").toLowerCase();
+        return recId === idStr || recUserId === idStr;
+      });
+      if (matchedRec?._id) return String(matchedRec._id);
+
+      if (/^[0-9a-f]{24}$/i.test(String(employeeOrId).trim())) {
+        return String(employeeOrId).trim();
+      }
+      return String(employeeOrId);
+    }
+
+    if (empObj.employeeRecordId && /^[0-9a-f]{24}$/i.test(String(empObj.employeeRecordId))) {
+      return String(empObj.employeeRecordId);
+    }
+    if (empObj.employeeRecord?._id && /^[0-9a-f]{24}$/i.test(String(empObj.employeeRecord._id))) {
+      return String(empObj.employeeRecord._id);
+    }
+
+    // Lookup in cached employee records
+    const currentRecords = employeeRecordsRef.current || [];
+    const matchedRec = currentRecords.find((rec) => {
+      const rUserId = String(rec?.userID || rec?.userId || "").toLowerCase().trim();
+      const targetUserId = String(empObj.userId || empObj._id || empObj.id || "").toLowerCase().trim();
+      const rEmail = String(rec?.email || "").toLowerCase().trim();
+      const targetEmail = String(empObj.email || "").toLowerCase().trim();
+      const rCode = String(rec?.employeeID || rec?.employeeId || rec?.employeeCode || "").toLowerCase().trim();
+      const targetCode = String(empObj.employeeCode || empObj.employeeID || empObj.employeeId || empObj.uniqueID || "").toLowerCase().trim();
+
+      return (
+        (targetUserId && rUserId && targetUserId === rUserId) ||
+        (targetEmail && rEmail && targetEmail === rEmail) ||
+        (targetCode && rCode && targetCode === rCode)
+      );
+    });
+    if (matchedRec?._id) {
+      return String(matchedRec._id);
+    }
+
+    const candidates = [
+      typeof empObj.employeeId === "object" ? empObj.employeeId?._id || empObj.employeeId?.id : empObj.employeeId,
+      typeof empObj.employeeID === "object" ? empObj.employeeID?._id || empObj.employeeID?.id : empObj.employeeID,
+      empObj.teamLead && typeof empObj.teamLead === "object" ? empObj.teamLead.employeeId : null,
+      empObj.uniqueID,
+    ];
+    const validCandidate = candidates.find(
+      (id) => id && /^[0-9a-f]{24}$/i.test(String(id).trim()) && String(id).trim() !== String(empObj._id || empObj.userId)
+    );
+    return validCandidate || candidates.find(Boolean) || empObj._id;
   };
 
   // =========================
   // TEAM LEAD TOGGLE
   // =========================
-  const toggleTL = async (employeeId, isTeamLead) => {
+  const toggleTL = async (employeeOrId, isTeamLead) => {
     try {
+      const empObj = typeof employeeOrId === "object" && employeeOrId !== null ? employeeOrId : null;
+      const employeeId = resolveEmployeeRecordId(employeeOrId);
+      const targetUserId = empObj ? (empObj.userId || empObj._id) : employeeId;
+
       const url = isTeamLead
         ? `https://kt-backend-ttzj.onrender.com/api/employee/remove-tl/${employeeId}`
         : `https://kt-backend-ttzj.onrender.com/api/employee/assign-tl/${employeeId}`;
@@ -318,7 +470,7 @@ export default function Employees() {
         showToast(data.message || "Team lead status updated successfully", "success");
         setEmployees((prev) =>
           prev.map((emp) =>
-            emp._id === employeeId
+            emp._id === targetUserId || emp.employeeRecordId === employeeId || emp._id === employeeId
               ? {
                 ...emp,
                 isTeamLead: !isTeamLead,
@@ -477,7 +629,11 @@ export default function Employees() {
   // =========================
   const handleEditEmployee = (employee) => {
     setEditMode(true);
-    setSelectedEmployeeId(employee._id);
+    setSelectedEmployee(employee);
+
+    // Resolve employee collection document ID (_id) for /api/employee/edit/:id
+    const empRecordId = resolveEmployeeRecordId(employee);
+    setSelectedEmployeeId(empRecordId);
 
     const displayName =
       employee.name ||
@@ -571,8 +727,21 @@ export default function Employees() {
       setIsSubmitting(true);
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
-      const res = await fetch(
-        `https://kt-backend-ttzj.onrender.com/api/employee/edit/${selectedEmployeeId}`,
+      let targetId = selectedEmployeeId;
+
+      // Ensure we send employee document ID instead of user ID
+      if (
+        selectedEmployee &&
+        (targetId === selectedEmployee.userId || targetId === selectedEmployee._id)
+      ) {
+        const resolved = resolveEmployeeRecordId(selectedEmployee);
+        if (resolved && resolved !== selectedEmployee.userId && resolved !== selectedEmployee._id) {
+          targetId = resolved;
+        }
+      }
+
+      let res = await fetch(
+        `https://kt-backend-ttzj.onrender.com/api/employee/edit/${targetId}`,
         {
           method: "PUT",
           headers: {
@@ -583,7 +752,51 @@ export default function Employees() {
         }
       );
 
-      const data = await res.json();
+      let data = await res.json().catch(() => ({}));
+
+      // Fallback: If employee was not found (e.g. ID mismatch), query /api/employee/list live to find the employee document _id and retry
+      if ((!res.ok || data?.success === false || data?.message === "Employee not found") && (formData.email || selectedEmployee?.email)) {
+        try {
+          const freshListRes = await fetch("https://kt-backend-ttzj.onrender.com/api/employee/list", {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          });
+          if (freshListRes.ok) {
+            const freshData = await freshListRes.json();
+            const freshList = Array.isArray(freshData)
+              ? freshData
+              : freshData.employees || freshData.data || [];
+            const targetEmail = String(formData.email || selectedEmployee?.email || "").trim().toLowerCase();
+            const targetUid = String(selectedEmployee?.userId || selectedEmployee?._id || "").trim().toLowerCase();
+            const matchedFresh = freshList.find((emp) => {
+              const eEmail = String(emp.email || emp.userID?.email || emp.userId?.email || "").trim().toLowerCase();
+              const eUid = String(emp.userID || emp.userId || "").trim().toLowerCase();
+              return (targetEmail && eEmail && targetEmail === eEmail) || (targetUid && eUid && targetUid === eUid);
+            });
+            if (matchedFresh?._id && String(matchedFresh._id) !== String(targetId)) {
+              const retryRes = await fetch(
+                `https://kt-backend-ttzj.onrender.com/api/employee/edit/${matchedFresh._id}`,
+                {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  },
+                  body: JSON.stringify(payload),
+                }
+              );
+              const retryData = await retryRes.json().catch(() => ({}));
+              if (retryRes.ok && retryData.success) {
+                res = retryRes;
+                data = retryData;
+              }
+            }
+          }
+        } catch (retryError) {
+          console.warn("Fallback employee edit lookup failed:", retryError?.message);
+        }
+      }
 
       if (data.success) {
         showToast("Employee Updated Successfully", "success");
@@ -607,7 +820,7 @@ export default function Employees() {
   // DELETE EMPLOYEE
   // DELETE /employee/remove/:id
   // =========================
-  const handleDeleteEmployee = async (employeeId, employeeName) => {
+  const handleDeleteEmployee = async (employeeOrId, employeeName) => {
     const confirmed = await confirm({
       title: "Delete employee?",
       message: `Are you sure you want to delete ${employeeName}? This action cannot be undone.`,
@@ -619,6 +832,9 @@ export default function Employees() {
     }
 
     try {
+      const empObj = typeof employeeOrId === "object" && employeeOrId !== null ? employeeOrId : null;
+      const employeeId = resolveEmployeeRecordId(employeeOrId);
+      const targetUserId = empObj ? (empObj.userId || empObj._id) : employeeId;
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
@@ -660,7 +876,12 @@ export default function Employees() {
         showToast(data.message || "Employee Deleted Successfully", "success");
 
         setEmployees((prev) =>
-          prev.filter((employee) => employee._id !== employeeId)
+          prev.filter(
+            (employee) =>
+              employee._id !== targetUserId &&
+              employee._id !== employeeId &&
+              employee.employeeRecordId !== employeeId
+          )
         );
       } else {
         showToast(data.message || "Failed to delete employee", "error");
@@ -1090,22 +1311,20 @@ export default function Employees() {
                         {/* STATUS (CLEAN UNBOXED WITH STATUS DOT) */}
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                              emp.employeeStatus === "Inactive"
-                                ? "text-rose-600"
-                                : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                            className={`inline-flex items-center gap-1.5 text-xs font-medium ${emp.employeeStatus === "Inactive"
+                              ? "text-rose-600"
+                              : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                 ? "text-amber-600"
                                 : "text-emerald-600"
-                            }`}
+                              }`}
                           >
                             <span
-                              className={`h-2 w-2 rounded-full ${
-                                emp.employeeStatus === "Inactive"
-                                  ? "bg-rose-500"
-                                  : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                              className={`h-2 w-2 rounded-full ${emp.employeeStatus === "Inactive"
+                                ? "bg-rose-500"
+                                : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                   ? "bg-amber-500"
                                   : "bg-emerald-500"
-                              }`}
+                                }`}
                             />
                             {emp.employeeStatus || "Active"}
                           </span>
@@ -1155,7 +1374,7 @@ export default function Employees() {
                                 <button
                                   onClick={() =>
                                     handleDeleteEmployee(
-                                      emp._id,
+                                      emp,
                                       `${emp.firstName || ""} ${emp.lastName || ""
                                         }`.trim()
                                     )
@@ -1171,7 +1390,7 @@ export default function Employees() {
                                 <button
                                   onClick={() =>
                                     toggleTL(
-                                      emp._id,
+                                      emp,
                                       isTeamLeadEmployee(emp)
                                     )
                                   }
@@ -1232,22 +1451,20 @@ export default function Employees() {
 
                       <div className="flex flex-col items-end gap-1 ml-2 flex-shrink-0">
                         <span
-                          className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                            emp.employeeStatus === "Inactive"
-                              ? "text-rose-600"
-                              : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                          className={`inline-flex items-center gap-1.5 text-xs font-medium ${emp.employeeStatus === "Inactive"
+                            ? "text-rose-600"
+                            : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                               ? "text-amber-600"
                               : "text-emerald-600"
-                          }`}
+                            }`}
                         >
                           <span
-                            className={`h-2 w-2 rounded-full ${
-                              emp.employeeStatus === "Inactive"
-                                ? "bg-rose-500"
-                                : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                            className={`h-2 w-2 rounded-full ${emp.employeeStatus === "Inactive"
+                              ? "bg-rose-500"
+                              : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                 ? "bg-amber-500"
                                 : "bg-emerald-500"
-                            }`}
+                              }`}
                           />
                           {emp.employeeStatus || "Active"}
                         </span>
@@ -1311,7 +1528,7 @@ export default function Employees() {
                           <button
                             onClick={() =>
                               handleDeleteEmployee(
-                                emp._id,
+                                emp,
                                 `${emp.firstName || ""} ${emp.lastName || ""
                                   }`.trim()
                               )
@@ -1325,7 +1542,7 @@ export default function Employees() {
                           <button
                             onClick={() =>
                               toggleTL(
-                                emp._id,
+                                emp,
                                 isTeamLeadEmployee(emp)
                               )
                             }
@@ -1382,22 +1599,20 @@ export default function Employees() {
 
                     <div className="flex flex-col items-end gap-0.5 ml-1 flex-shrink-0">
                       <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-medium ${
-                          emp.employeeStatus === "Inactive"
-                            ? "text-rose-600"
-                            : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                        className={`inline-flex items-center gap-1 text-[11px] font-medium ${emp.employeeStatus === "Inactive"
+                          ? "text-rose-600"
+                          : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                             ? "text-amber-600"
                             : "text-emerald-600"
-                        }`}
+                          }`}
                       >
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            emp.employeeStatus === "Inactive"
-                              ? "bg-rose-500"
-                              : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                          className={`h-1.5 w-1.5 rounded-full ${emp.employeeStatus === "Inactive"
+                            ? "bg-rose-500"
+                            : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                               ? "bg-amber-500"
                               : "bg-emerald-500"
-                          }`}
+                            }`}
                         />
                         {emp.employeeStatus || "Active"}
                       </span>
@@ -1463,7 +1678,7 @@ export default function Employees() {
                           <button
                             onClick={() =>
                               handleDeleteEmployee(
-                                emp._id,
+                                emp,
                                 `${emp.firstName || ""} ${emp.lastName || ""
                                   }`.trim()
                               )
@@ -1477,7 +1692,7 @@ export default function Employees() {
                           <button
                             onClick={() =>
                               toggleTL(
-                                emp._id,
+                                emp,
                                 isTeamLeadEmployee(emp)
                               )
                             }
@@ -1852,8 +2067,8 @@ export default function Employees() {
                         ? "Updating Employee..."
                         : "Adding Employee..."
                       : editMode
-                      ? "Update Employee"
-                      : "Add Employee"}
+                        ? "Update Employee"
+                        : "Add Employee"}
                   </span>
                 </button>
               </div>

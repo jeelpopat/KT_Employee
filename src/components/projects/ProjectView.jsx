@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Briefcase, Calendar, Users, CheckCircle2, Clock, 
   Search, Filter, Loader2, RefreshCw, FolderKanban,
@@ -151,6 +151,7 @@ export const ProjectView = () => {
   const [editingProject, setEditingProject] = useState(null);
   const [deletingProject, setDeletingProject] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const lastProjectClickTimeRef = useRef(0);
   const [companyStaff, setCompanyStaff] = useState([]);
   const [formError, setFormError] = useState('');
 
@@ -214,6 +215,12 @@ export const ProjectView = () => {
   const handleSaveProject = async (e) => {
     e.preventDefault();
     if (isEmployee) return;
+
+    const now = Date.now();
+    if (now - lastProjectClickTimeRef.current < 300) return;
+    lastProjectClickTimeRef.current = now;
+    if (isSubmitting) return;
+
     if (!formData.projectName.trim() || !formData.clientName.trim()) {
       setFormError('Project Name and Client Name are required.');
       return;
@@ -588,7 +595,8 @@ export const ProjectView = () => {
           {!isEmployee && (
             <button
               onClick={openCreateModal}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              disabled={isSubmitting}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={14} />
               <span>Create Project</span>

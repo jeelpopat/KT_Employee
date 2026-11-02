@@ -230,3 +230,30 @@
   scrollbar-width: thin;
   scrollbar-color: #068dcb80 #f8fafc;
 }
+
+/* Custom Dark Modal Scrollbar */
+.dark-modal-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dark-modal-scrollbar::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 9999px;
+  margin: 4px 0;
+}
+
+.dark-modal-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.dark-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+.dark-modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0f172a;
+}

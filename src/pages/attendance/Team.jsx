@@ -450,6 +450,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   employees: [],
 });
 
+  const [isProjectSubmitting, setIsProjectSubmitting] = useState(false);
+  const lastProjectClickTimeRef = useRef(0);
+
   const [projectForm, setProjectForm] = useState({
     projectName: "",
     projectDescription: "",
@@ -1712,6 +1715,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   };
 
   const closeProjectModal = () => {
+    if (isProjectSubmitting) return;
     setShowProjectModal(false);
     setSelectedProject(null);
     setProjectForm({ ...defaultProjectForm });
@@ -1720,7 +1724,52 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   const handleAddProject = async (e) => {
     e.preventDefault();
 
+    const now = Date.now();
+    if (now - lastProjectClickTimeRef.current < 300) {
+      return;
+    }
+    lastProjectClickTimeRef.current = now;
+
+    if (isProjectSubmitting) {
+      return;
+    }
+
+    if (!projectForm.projectName.trim()) {
+      showToast("Please enter project name.", "error");
+      return;
+    }
+
+    if (!projectForm.clientName.trim()) {
+      showToast("Please enter client name.", "error");
+      return;
+    }
+
+    if (!projectForm.assignedTL) {
+      showToast("Please select a team lead.", "error");
+      return;
+    }
+
+    if (
+      (projectForm.startDate && !isValidProjectDate(projectForm.startDate)) ||
+      (projectForm.endDate && !isValidProjectDate(projectForm.endDate))
+    ) {
+      showToast("Enter valid project dates using a four-digit year.", "error");
+      return;
+    }
+
+    if (projectForm.endDate && projectForm.endDate < todayDate) {
+      showToast("End date must be today or later.", "error");
+      return;
+    }
+
+    if (projectForm.startDate && projectForm.endDate && projectForm.endDate < projectForm.startDate) {
+      showToast("End date cannot be earlier than the start date.", "error");
+      return;
+    }
+
     try {
+      setIsProjectSubmitting(true);
+
       const payload = {
         projectName: projectForm.projectName.trim(),
         projectDescription: projectForm.projectDescription?.trim() || "",
@@ -1734,39 +1783,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         employees: Array.isArray(projectForm.assignedEmployees) ? projectForm.assignedEmployees : [],
         teamLeadUser: projectForm.assignedTL || null,
       };
-
-      if (!projectForm.projectName.trim()) {
-        showToast("Please enter project name.", "error");
-        return;
-      }
-
-      if (!projectForm.clientName.trim()) {
-        showToast("Please enter client name.", "error");
-        return;
-      }
-
-      if (!projectForm.assignedTL) {
-        showToast("Please select a team lead.", "error");
-        return;
-      }
-
-      if (
-        (projectForm.startDate && !isValidProjectDate(projectForm.startDate)) ||
-        (projectForm.endDate && !isValidProjectDate(projectForm.endDate))
-      ) {
-        showToast("Enter valid project dates using a four-digit year.", "error");
-        return;
-      }
-
-      if (projectForm.endDate && projectForm.endDate < todayDate) {
-        showToast("End date must be today or later.", "error");
-        return;
-      }
-
-      if (projectForm.startDate && projectForm.endDate && projectForm.endDate < projectForm.startDate) {
-        showToast("End date cannot be earlier than the start date.", "error");
-        return;
-      }
 
       if (selectedProject?._id) {
         const id = selectedProject._id;
@@ -1800,6 +1816,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         "Unable to save project.";
 
       showToast(`Project ${selectedProject ? "update" : "creation"} failed: ${message}`, "error");
+    } finally {
+      setIsProjectSubmitting(false);
     }
   };
 
@@ -2062,6 +2080,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
           {activeMainTab === 'projects' ? (
             <button
+              type="button"
               onClick={() => {
                 setSelectedProject(null);
                 setProjectForm({
@@ -2674,7 +2693,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       setProjectForm(defaultProjectForm);
                       setShowProjectModal(true);
                     }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all text-xs font-semibold inline-flex items-center gap-1.5 mx-auto"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all text-xs font-semibold inline-flex items-center gap-1.5 mx-auto cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     Create Project
@@ -2965,8 +2984,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
               <button
                 type="button"
                 onClick={closeProjectModal}
+                disabled={isProjectSubmitting}
                 aria-label="Close project form"
-                className="text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg p-2 transition-colors"
+                className="text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg p-2 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3284,8 +3304,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
               <div className="flex shrink-0 flex-col-reverse sm:flex-row gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:px-7">
                 <button
                   type="button"
+                  disabled={isProjectSubmitting}
                   onClick={closeProjectModal}
-                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer"
+                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
@@ -3293,12 +3314,14 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 {selectedProject && (
                   <button
                     type="button"
+                    disabled={isProjectSubmitting}
                     onClick={() => {
+                      if (isProjectSubmitting) return;
                       const idToDelete = selectedProject._id;
                       closeProjectModal();
                       handleDeleteProject(idToDelete);
                     }}
-                    className="w-full sm:w-auto px-4 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    className="w-full sm:w-auto px-4 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Trash2 className="w-4 h-4 text-rose-600" />
                     Delete Project
@@ -3307,10 +3330,18 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
                 <button
                   type="submit"
-                  className="w-full sm:flex-1 btn-brand-primary text-white py-3 rounded-lg font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer"
+                  disabled={isProjectSubmitting}
+                  className="w-full sm:flex-1 btn-brand-primary text-white py-3 rounded-lg font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                 >
-                  {selectedProject ? "Update Project" : "Create Project"}
+                  {isProjectSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      <span>{selectedProject ? "Updating Project..." : "Creating Project..."}</span>
+                    </>
+                  ) : (
+                    <span>{selectedProject ? "Update Project" : "Create Project"}</span>
+                  )}
                 </button>
               </div>
             </form>

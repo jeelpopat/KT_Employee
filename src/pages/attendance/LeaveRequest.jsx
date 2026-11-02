@@ -153,12 +153,16 @@ const getCanonicalLeaveType = (type, leave) => {
     .replace(/[_\s]+/g, "-");
   const isHalfDay = isHalfDayLeave(rawLeave, leave, totalDays, halfDayType);
 
-  if (!isHalfDay) return type || "Leave";
-
-  if (halfDayType === "first-half" || halfDayType === "second-half") {
-    return `Half Day (${halfDayType.replace("-", " ")})`;
+  if (isHalfDay || String(type || "").toLowerCase().includes("half")) {
+    return "Half Day";
   }
-  return "Half Day";
+
+  const normalized = normalizeLeaveType(type);
+  if (normalized === "full day" || normalized === "fullday") {
+    return "Full Day";
+  }
+
+  return type || "Leave";
 };
 
 const formatDuration = (leave) => {
@@ -179,6 +183,50 @@ const formatDuration = (leave) => {
   }
 
   return `${totalDays} ${totalDays === 1 ? "Day" : "Days"}`;
+};
+
+const renderDuration = (leave) => {
+  if (leave?.dateIssue) {
+    return (
+      <span className="font-semibold text-rose-600 text-xs font-poppins">
+        Invalid date range
+      </span>
+    );
+  }
+
+  const rawLeave = leave?.rawLeave || leave || {};
+  const totalDays = Number(rawLeave?.totalDays ?? leave?.totalDays ?? 0);
+  const halfType = String(rawLeave?.halfDayType || leave?.halfDayType || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+  const isHalf = isHalfDayLeave(rawLeave, leave, totalDays, halfType);
+
+  if (isHalf) {
+    const shiftLabel =
+      halfType === "first-half"
+        ? "(First Half)"
+        : halfType === "second-half"
+        ? "(Second Half)"
+        : "(Half Day)";
+
+    return (
+      <div className="leading-tight">
+        <span className="block font-bold text-slate-900 text-xs sm:text-[13px] font-poppins whitespace-nowrap">
+          0.5 Day
+        </span>
+        <span className="block text-[11px] text-slate-500 font-medium font-poppins whitespace-nowrap">
+          {shiftLabel}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <span className="block font-bold text-slate-900 text-xs sm:text-[13px] font-poppins whitespace-nowrap">
+      {totalDays} {totalDays === 1 ? "Day" : "Days"}
+    </span>
+  );
 };
 
 const isHalfDayLeave = (rawLeave, leave, totalDays, halfDayType) =>
@@ -1791,18 +1839,18 @@ export default function LeaveRequest() {
                   DESKTOP TABLE (Clean White Row Background, Navy Headers)
               ================================================== */}
             <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/80">
-              <table className="w-full table-fixed text-xs font-poppins">
+              <table className="w-full min-w-[1150px] table-fixed text-xs font-poppins">
                 <colgroup>
                   <col className="w-[4%]" />
-                  <col className="w-[16%]" />
+                  <col className="w-[15%]" />
                   <col className="w-[11%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[9%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[13%]" />
                   <col className="w-[8%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[11%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[12%]" />
                 </colgroup>
 
                 <thead style={{ backgroundColor: "#0346651A" }}>
@@ -1871,14 +1919,14 @@ export default function LeaveRequest() {
                       </td>
 
                       <td className="px-3 py-3">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-medium font-poppins shadow-2xs whitespace-nowrap">
+                        <span className="inline-flex max-w-full items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-medium font-poppins shadow-2xs whitespace-nowrap">
                           {getLeaveTypeIcon(request.leaveType)}
-                          <span>{getCanonicalLeaveType(formatLeaveType(request.leaveType), request)}</span>
+                          <span className="truncate">{getCanonicalLeaveType(formatLeaveType(request.leaveType), request)}</span>
                         </span>
                       </td>
 
-                      <td className="px-3 py-3 font-bold text-slate-900 text-xs sm:text-[13px] font-poppins whitespace-nowrap">
-                        {formatDuration(request)}
+                      <td className="px-3 py-3">
+                        {renderDuration(request)}
                       </td>
 
                       <td className="px-3 py-3 text-[11px] font-poppins leading-tight">

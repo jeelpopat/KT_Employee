@@ -1184,21 +1184,22 @@ export const AdminScreenshotPortal = () => {
             </div>
 
             {/* Right Meta Sidebar */}
-            <div className="w-full lg:w-84 bg-slate-900 p-5 text-white border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col justify-between space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">Screenshot Metadata</h3>
-                  <button 
-                    onClick={() => {
-                      setLightboxRecord(null);
-                      setIsPlayingTimeline(false);
-                    }}
-                    className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
+            <div className="w-full lg:w-88 xl:w-96 bg-slate-900 text-white border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col min-h-0 flex-1 lg:flex-none max-h-[92vh] overflow-hidden">
+              <div className="p-4 sm:p-5 pb-3 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900 z-10">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">Screenshot Metadata</h3>
+                <button 
+                  onClick={() => {
+                    setLightboxRecord(null);
+                    setIsPlayingTimeline(false);
+                  }}
+                  className="p-1 rounded text-slate-400 hover:text-white cursor-pointer transition-colors"
+                  title="Close Modal"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 pt-3 space-y-4 dark-modal-scrollbar modal-scrollbar">
                 <div className="space-y-2.5 text-xs">
                   {/* Session Status & Mongoose Schema Telemetry */}
                   <div className="p-3 bg-slate-800/90 rounded-xl border border-slate-700/80 space-y-2">
@@ -1376,41 +1377,41 @@ export const AdminScreenshotPortal = () => {
                     </button>
                   </div>
                 </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                    <a
+                      href={lightboxRecord.fullUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <ExternalLink size={14} />
+                      <span>Open Full High-Res Asset</span>
+                    </a>
+                    <a
+                      href="https://console.cloudinary.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full py-2 bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Database size={14} />
+                      <span>Open in console.cloudinary.com</span>
+                    </a>
+                    <button
+                      onClick={() => {
+                        setLightboxRecord(null);
+                        setIsPlayingTimeline(false);
+                      }}
+                      className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2 pt-2">
-                <a
-                  href={lightboxRecord.fullUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <ExternalLink size={14} />
-                  <span>Open Full High-Res Asset</span>
-                </a>
-                <a
-                  href="https://console.cloudinary.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-2 bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Database size={14} />
-                  <span>Open in console.cloudinary.com</span>
-                </a>
-                <button
-                  onClick={() => {
-                    setLightboxRecord(null);
-                    setIsPlayingTimeline(false);
-                  }}
-                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
             </div>
-
           </div>
-        </div>
       )}
 
       {/* Settings Modal (Configures POST /api/employee-panel/monitoring/settings) */}
