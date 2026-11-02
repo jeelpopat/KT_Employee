@@ -204,24 +204,24 @@ export const resolveRoleName = (record, roleNamesById = new Map()) => {
   const names = candidates.map((candidate) => {
     const value = candidate && typeof candidate === 'object'
       ? candidate.roleName ||
-        candidate.name ||
-        candidate.title ||
-        candidate.key ||
-        candidate.label ||
-        candidate.displayName ||
-        candidate.role_name ||
-        candidate.roleId ||
-        candidate.userRole ||
-        candidate.user_role ||
-        candidate.employeeRole ||
-        candidate.employee_role ||
-        candidate.roleType ||
-        candidate.role_type ||
-        candidate.roleID ||
-        candidate.role_id ||
-        candidate._id ||
-        candidate.id ||
-        ''
+      candidate.name ||
+      candidate.title ||
+      candidate.key ||
+      candidate.label ||
+      candidate.displayName ||
+      candidate.role_name ||
+      candidate.roleId ||
+      candidate.userRole ||
+      candidate.user_role ||
+      candidate.employeeRole ||
+      candidate.employee_role ||
+      candidate.roleType ||
+      candidate.role_type ||
+      candidate.roleID ||
+      candidate.role_id ||
+      candidate._id ||
+      candidate.id ||
+      ''
       : candidate;
     const text = String(value || '').trim();
     return roleNamesById.get(text.toLowerCase()) ||
@@ -367,3 +367,158 @@ export const filterOutUnknownUsers = (list) => {
   if (!Array.isArray(list)) return [];
   return list.filter((item) => !isUnknownEmployeeOrUser(item));
 };
+
+/**
+ * Checks if a user, employee, or record has an HR role, designation, department, or email.
+ */
+export const isHrRoleOrUser = (entity) => {
+  if (!entity) return false;
+
+  const records = [];
+  const pending = [entity];
+  while (pending.length > 0) {
+    const cur = pending.shift();
+    if (!cur || typeof cur !== 'object' || records.includes(cur)) continue;
+    records.push(cur);
+    ['user', 'userId', 'userID', 'employee', 'employeeId', 'employeeID', 'profile', 'assignedEmployee'].forEach((f) => {
+      if (cur[f] && typeof cur[f] === 'object') pending.push(cur[f]);
+    });
+  }
+
+  const roleFields = [
+    'role', 'userRole', 'user_role', 'roleName', 'role_name', 'employeeRole', 'employee_role',
+    'roleType', 'role_type'
+  ];
+  const desigFields = [
+    'designation', 'designationName', 'designation_name', 'jobTitle', 'position', 'title'
+  ];
+  const deptFields = [
+    'department', 'departmentName', 'department_name', 'dept'
+  ];
+  const emailFields = [
+    'email', 'userEmail', 'employeeEmail'
+  ];
+
+  const getStringValues = (fields) => {
+    return records.flatMap((rec) => fields.map((f) => {
+      const val = rec[f];
+      if (!val) return '';
+      if (typeof val === 'object') {
+        return String(val.name || val.roleName || val.designationName || val.departmentName || val.title || '').trim().toLowerCase();
+      }
+      return String(val).trim().toLowerCase();
+    })).filter(Boolean);
+  };
+
+  const roles = getStringValues(roleFields);
+  const designations = getStringValues(desigFields);
+  const departments = getStringValues(deptFields);
+  const emails = getStringValues(emailFields);
+
+  // Check roles
+  for (const r of roles) {
+    if (r === 'hr' || r === 'hr manager' || r === 'hr executive' || r === 'human resources' || r === 'hr_admin' || r === 'hradmin') return true;
+    if (r.startsWith('hr ') || r.endsWith(' hr')) return true;
+    if (r.split(/[\s/_-]+/).includes('hr')) return true;
+    if (r.includes('human resources')) return true;
+  }
+
+  // Check designations
+  for (const d of designations) {
+    if (d === 'hr' || d.split(/[\s/_-]+/).includes('hr') || d.includes('human resources')) return true;
+  }
+
+  // Check departments
+  for (const dept of departments) {
+    if (dept === 'hr' || dept.split(/[\s/_-]+/).includes('hr') || dept.includes('human resources')) return true;
+  }
+
+  // Check emails
+  for (const email of emails) {
+    if (email.startsWith('hr@') || email.includes('hr@kevalon') || email.includes('hr.manager@') || email.includes('hrmanager@')) return true;
+  }
+
+  return false;
+};
+
+/**
+ * Filters an array of records to remove any HR users or employees.
+ */
+export const filterOutHrUsers = (list) => {
+  if (!Array.isArray(list)) return [];
+  return list.filter((item) => !isHrRoleOrUser(item));
+};
+
+/**
+ * Checks whether an entity has the 'employee' role and is eligible to be assigned as a team member under a Team Lead.
+ * Excludes: HR, Admin, Team Lead, and Finance.
+ */
+export const isStrictEmployeeRole = (entity) => {
+  if (!entity) return false;
+  if (isUnknownEmployeeOrUser(entity)) return false;
+  if (isFinanceOrExcludedUser(entity)) return false;
+  if (isHrRoleOrUser(entity)) return false;
+
+  // Check if Team Lead
+  if (isTeamLeadRole(entity)) return false;
+
+  const records = [];
+  const pending = [entity];
+  while (pending.length > 0) {
+    const cur = pending.shift();
+    if (!cur || typeof cur !== 'object' || records.includes(cur)) continue;
+    records.push(cur);
+    ['user', 'userId', 'userID', 'employee', 'employeeId', 'employeeID', 'profile', 'assignedEmployee'].forEach((f) => {
+      if (cur[f] && typeof cur[f] === 'object') pending.push(cur[f]);
+    });
+  }
+
+  for (const rec of records) {
+    if (rec.isTeamLead === true || rec.isTeamLeader === true) return false;
+  }
+
+  const roleFields = [
+    'role', 'userRole', 'user_role', 'roleName', 'role_name', 'employeeRole', 'employee_role',
+    'roleType', 'role_type'
+  ];
+  const desigFields = [
+    'designation', 'designationName', 'designation_name', 'jobTitle', 'position', 'title'
+  ];
+
+  const getStringValues = (fields) => {
+    return records.flatMap((rec) => fields.map((f) => {
+      const val = rec[f];
+      if (!val) return '';
+      if (typeof val === 'object') {
+        return String(val.name || val.roleName || val.designationName || val.departmentName || val.title || '').trim().toLowerCase();
+      }
+      return String(val).trim().toLowerCase();
+    })).filter(Boolean);
+  };
+
+  const roles = getStringValues(roleFields);
+  const designations = getStringValues(desigFields);
+
+  // Check roles: must not be admin, tl, lead
+  for (const r of roles) {
+    if (r === 'admin' || r.includes('admin')) return false;
+    if (r === 'team lead' || r === 'team_leader' || r === 'team leader' || r === 'tl' || r === 'teamlead' || r.includes('lead')) return false;
+  }
+
+  // Check designations: must not be admin, lead
+  for (const d of designations) {
+    if (d === 'admin' || d.includes('admin') || d.includes('team lead') || d.includes('team leader') || d === 'tl') return false;
+  }
+
+  // Now verify that the role is 'employee', 'staff', 'user', or an unassigned/ObjectId role from employee record
+  const hasEmployeeRole = roles.some((r) => r === 'employee' || r === 'staff' || r === 'user');
+  if (hasEmployeeRole) return true;
+
+  const allRolesAreGenericOrEmpty = roles.length === 0 || roles.every((r) => /^[0-9a-f]{24}$/i.test(r));
+  if (allRolesAreGenericOrEmpty) {
+    return true;
+  }
+
+  return false;
+};
+

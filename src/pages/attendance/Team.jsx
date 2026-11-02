@@ -34,7 +34,9 @@ import {
   isFinanceOrExcludedUser,
   filterOutFinanceUsers,
   filterOutUnknownUsers,
-  isUnknownEmployeeOrUser
+  isUnknownEmployeeOrUser,
+  isHrRoleOrUser,
+  isStrictEmployeeRole
 } from "../../utils/roleFilters";
 import { useApp, deriveUserRole } from "../../context/AppContext";
 import { 
@@ -867,7 +869,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       }
 
       const isTeamLeadUser = (u) => {
-        if (!u || isFinanceOrExcludedUser(u)) return false;
+        if (!u || isFinanceOrExcludedUser(u) || isHrRoleOrUser(u)) return false;
         const role = String(u.role || '').toLowerCase().trim();
         const desig = String(u.designation?.designationName || u.designation?.name || u.designation || '').toLowerCase().trim();
         return (
@@ -917,7 +919,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           });
 
           const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || [])
-            .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e));
+            .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e) && !isHrRoleOrUser(e));
 
           optionsMap.set(dedupeKey, {
             _id: String(u._id || idKey),
@@ -933,8 +935,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       // 2. Include any extra confirmed TLs from teamLeadsData without duplication
       teamLeadsData.forEach((lead) => {
         const teamLeadRecord = lead?.teamLead || lead?.lead || lead?.user || lead?.employee || null;
-        if (lead && (isFinanceOrExcludedUser(lead) || isUnknownEmployeeOrUser(lead))) return;
-        if (teamLeadRecord && (isFinanceOrExcludedUser(teamLeadRecord) || isUnknownEmployeeOrUser(teamLeadRecord))) return;
+        if (lead && (isFinanceOrExcludedUser(lead) || isUnknownEmployeeOrUser(lead) || isHrRoleOrUser(lead))) return;
+        if (teamLeadRecord && (isFinanceOrExcludedUser(teamLeadRecord) || isUnknownEmployeeOrUser(teamLeadRecord) || isHrRoleOrUser(teamLeadRecord))) return;
 
         const leadId =
           teamLeadRecord?.userId ||
@@ -961,7 +963,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         }
 
         const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || [])
-          .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e));
+          .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e) && !isHrRoleOrUser(e));
 
         optionsMap.set(dedupeKey, {
           _id: String(leadId),
@@ -3198,6 +3200,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   const seenEmpNames = new Set();
 
                   employees.forEach((emp) => {
+                    if (isFinanceOrExcludedUser(emp) || isHrRoleOrUser(emp) || !isStrictEmployeeRole(emp)) return;
                     const id = normalizeId(emp);
                     if (!id) return;
                     const name = getEmployeeName(emp) || "Employee";
@@ -3215,6 +3218,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   });
 
                   users.forEach((user) => {
+                    if (isFinanceOrExcludedUser(user) || isHrRoleOrUser(user) || !isStrictEmployeeRole(user)) return;
                     const role = String(user.role || user.userRole || "").trim().toLowerCase();
                     if (role === "employee" || role === "staff") {
                       const id = normalizeId(user);

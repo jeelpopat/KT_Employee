@@ -183,8 +183,8 @@ const calculateApprovedLeaveDaysForMonth = (targetUser, month, year, leavesList)
     // Check user matching
     const leaveEmp = (typeof leave.employeeId === 'object' && leave.employeeId !== null) ? leave.employeeId :
       (typeof leave.employee === 'object' && leave.employee !== null) ? leave.employee :
-      (typeof leave.user === 'object' && leave.user !== null) ? leave.user :
-      (typeof leave.userId === 'object' && leave.userId !== null) ? leave.userId : null;
+        (typeof leave.user === 'object' && leave.user !== null) ? leave.user :
+          (typeof leave.userId === 'object' && leave.userId !== null) ? leave.userId : null;
 
     const leaveIds = [
       typeof leave.employeeId === 'string' ? leave.employeeId : null,
@@ -311,8 +311,8 @@ const fetchBackendUserLeaves = async (userId, targetUser) => {
 
         const leaveEmp = (typeof leave.employeeId === 'object' && leave.employeeId !== null) ? leave.employeeId :
           (typeof leave.employee === 'object' && leave.employee !== null) ? leave.employee :
-          (typeof leave.user === 'object' && leave.user !== null) ? leave.user :
-          (typeof leave.userId === 'object' && leave.userId !== null) ? leave.userId : null;
+            (typeof leave.user === 'object' && leave.user !== null) ? leave.user :
+              (typeof leave.userId === 'object' && leave.userId !== null) ? leave.userId : null;
 
         const leaveIds = [
           typeof leave.employeeId === 'string' ? leave.employeeId : null,
@@ -466,6 +466,8 @@ export const SalaryView = () => {
   const [structureForm, setStructureForm] = useState(initialStructureForm);
 
   // Auto-calculated fields for Salary Structure modal
+  // Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
+  // net salary = Base Gross - Fixed Monthly Deduction - TDS
   const structureCalculations = useMemo(() => {
     const basic = Number(structureForm.basicSalary) || 0;
     const hra = Number(structureForm.hra) || 0;
@@ -474,11 +476,13 @@ export const SalaryView = () => {
     const fixedDeduction = Number(structureForm.fixedDeduction) || 0;
     const tdsPercentage = Number(structureForm.tdsPercentage) || 0;
 
-    const grossSalary = basic + hra + allowance + fixedBonus;
-    const tdsAmount = (grossSalary * tdsPercentage) / 100;
-    const totalDeductions = fixedDeduction + tdsAmount;
-    const netSalary = Math.max(0, grossSalary - totalDeductions);
-    const annualCtc = grossSalary * 12;
+    // Formula: Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
+    const baseGross = Math.round((basic + hra + allowance + fixedBonus) * 100) / 100;
+    const grossSalary = baseGross;
+    const tdsAmount = Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
+    const totalDeductions = Math.round((fixedDeduction + tdsAmount) * 100) / 100;
+    const netSalary = Math.max(0, Math.round((baseGross - totalDeductions) * 100) / 100);
+    const annualCtc = Math.round(grossSalary * 12 * 100) / 100;
 
     return {
       basic,
@@ -487,6 +491,7 @@ export const SalaryView = () => {
       fixedBonus,
       fixedDeduction,
       tdsPercentage,
+      baseGross,
       grossSalary,
       tdsAmount,
       totalDeductions,
@@ -586,6 +591,8 @@ export const SalaryView = () => {
   }, [processForm.userId, allSalaries]);
 
   // Real-time calculation for Process Payroll modal
+  // Formula 1: Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
+  // Formula 2: net salary = Base Gross + Extra Bonus - Extra Deduction - Fixed Monthly Deduction - TDS - LOP
   const processCalculations = useMemo(() => {
     const totalDays = Number(processForm.totalDays) || getDaysInMonth(processForm.month, processForm.year);
     const daysPayable = processForm.daysPayable !== '' && processForm.daysPayable !== undefined
@@ -602,10 +609,12 @@ export const SalaryView = () => {
         basicSalary: 0,
         hra: 0,
         allowance: 0,
+        specialAllowance: 0,
         fixedBonus: 0,
         fixedDeduction: 0,
         extraBonus: 0,
         extraDeduction: 0,
+        baseGross: 0,
         grossSalary: 0,
         tdsPercentage: 0,
         tdsAmount: 0,
@@ -623,7 +632,7 @@ export const SalaryView = () => {
 
     const basic = Number(selectedUserActiveStructure.basicSalary) || 0;
     const hra = Number(selectedUserActiveStructure.hra) || 0;
-    const allowance = Number(selectedUserActiveStructure.allowance) || 0;
+    const allowance = Number(selectedUserActiveStructure.specialAllowance || selectedUserActiveStructure.allowance) || 0;
     const fixedBonus = Number(selectedUserActiveStructure.fixedBonus) || 0;
     const fixedDeduction = Number(selectedUserActiveStructure.fixedDeduction) || 0;
     const tdsPercentage = Number(selectedUserActiveStructure.tdsPercentage) || 0;
@@ -631,23 +640,40 @@ export const SalaryView = () => {
     const extraBonus = Number(processForm.extraBonus) || 0;
     const extraDeduction = Number(processForm.extraDeduction) || 0;
 
-    const grossSalary = basic + hra + allowance + fixedBonus + extraBonus;
-    const tdsAmount = (grossSalary * tdsPercentage) / 100;
-    const perDaySalary = totalDays > 0 ? Math.round((grossSalary / totalDays) * 100) / 100 : 0;
+    // Formula 1: Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
+    const baseGross = Math.round((basic + hra + allowance + fixedBonus) * 100) / 100;
+
+    // Per day salary for LOP calculation based on Base Gross
+    const perDaySalary = totalDays > 0 ? Math.round((baseGross / totalDays) * 100) / 100 : 0;
+    // LOP = lopDays * perDaySalary
     const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
 
-    const totalDeduction = Math.round((fixedDeduction + extraDeduction + tdsAmount + lopDeduction) * 100) / 100;
-    const netSalary = Math.max(0, Math.round((grossSalary - totalDeduction) * 100) / 100);
+    // TDS = (Base Gross * tdsPercentage) / 100
+    const tdsAmount = Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
+
+    // Formula 2: net salary = Base Gross + Extra Bonus - Extra Deduction - Fixed Monthly Deduction - TDS - LOP
+    const netSalary = Math.max(
+      0,
+      Math.round((baseGross + extraBonus - extraDeduction - fixedDeduction - tdsAmount - lopDeduction) * 100) / 100
+    );
+
+    // Total deductions = Extra Deduction + Fixed Monthly Deduction + TDS + LOP
+    const totalDeduction = Math.round((extraDeduction + fixedDeduction + tdsAmount + lopDeduction) * 100) / 100;
+
+    // Total gross earnings including extra bonus
+    const grossSalary = Math.round((baseGross + extraBonus) * 100) / 100;
 
     return {
       hasStructure: true,
       basicSalary: basic,
       hra,
       allowance,
+      specialAllowance: allowance,
       fixedBonus,
       fixedDeduction,
       extraBonus,
       extraDeduction,
+      baseGross,
       grossSalary,
       tdsPercentage,
       tdsAmount,
@@ -763,11 +789,6 @@ export const SalaryView = () => {
         savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
       } catch { }
 
-      let savedLeaveOverrides = {};
-      try {
-        savedLeaveOverrides = JSON.parse(localStorage.getItem('payroll_leave_overrides') || '{}');
-      } catch { }
-
       const staffMap = new Map();
       (staffList || companyStaff || []).forEach((u) => {
         if (u?._id) staffMap.set(String(u._id), u);
@@ -821,56 +842,27 @@ export const SalaryView = () => {
         const rawStatus = String(savedOverrides[pId] || item.status || item.paymentStatus || item.salaryStatus || 'processed').toLowerCase().trim();
         const currentStatus = rawStatus === 'paid' ? 'paid' : 'processed';
 
-        // Check for persisted leave overrides by payroll ID or by user_month_year key
-        const userPeriodKey = `${uId}_${item.month}_${item.year}`;
-        const leaveOverride = savedLeaveOverrides[pId] || savedLeaveOverrides[userPeriodKey] || null;
-
-        const effectiveTotalDays = leaveOverride?.totalDays != null
-          ? Number(leaveOverride.totalDays)
-          : (item.totalDays != null ? Number(item.totalDays) : getDaysInMonth(item.month, item.year));
-
-        const effectiveLeaveDays = leaveOverride?.leaveDays != null
-          ? Number(leaveOverride.leaveDays)
-          : (item.leaveDays != null ? Number(item.leaveDays) : 0);
-
-        const effectiveLopDays = leaveOverride?.lopDays != null
-          ? Number(leaveOverride.lopDays)
-          : (item.lopDays != null ? Number(item.lopDays) : 0);
-
-        const effectiveDaysPayable = leaveOverride?.daysPayable != null
-          ? Number(leaveOverride.daysPayable)
-          : (item.daysPayable != null ? Number(item.daysPayable) : effectiveTotalDays);
-
-        // Explicit formula: presentDays = daysPayable - leaveDays - lopDays
-        const calculatedPresDays = Math.max(0, effectiveDaysPayable - effectiveLeaveDays - effectiveLopDays);
-        const effectivePresentDays = leaveOverride?.presentDays != null
-          ? Number(leaveOverride.presentDays)
-          : (item.presentDays != null ? Number(item.presentDays) : calculatedPresDays);
-
-        const effectiveLopDeduction = leaveOverride?.lopDeduction != null
-          ? Number(leaveOverride.lopDeduction)
-          : (item.lopDeduction != null ? Number(item.lopDeduction) : 0);
-
-        const effectiveNetSalary = leaveOverride?.netSalary != null
-          ? Number(leaveOverride.netSalary)
-          : item.netSalary;
-
-        const effectiveTotalDeduction = leaveOverride?.totalDeduction != null
-          ? Number(leaveOverride.totalDeduction)
-          : item.totalDeduction;
+        // Use direct API data from GET /api/payroll without frontend calculation overrides
+        const totalDaysVal = item.totalDays != null ? Number(item.totalDays) : (Number(item.workingDays) || getDaysInMonth(item.month, item.year));
+        const leaveDaysVal = item.leaveDays != null ? Number(item.leaveDays) : 0;
+        const lopDaysVal = item.lopDays != null ? Number(item.lopDays) : 0;
+        const daysPayableVal = item.daysPayable != null ? Number(item.daysPayable) : totalDaysVal;
+        const presentDaysVal = item.presentDays != null ? Number(item.presentDays) : Math.max(0, daysPayableVal - leaveDaysVal - lopDaysVal);
+        const lopDeductionVal = item.lopDeduction != null ? Number(item.lopDeduction) : 0;
 
         return {
           ...item,
           status: currentStatus,
-          totalDays: effectiveTotalDays,
-          workingDays: effectiveTotalDays,
-          daysPayable: effectiveDaysPayable,
-          leaveDays: effectiveLeaveDays,
-          lopDays: effectiveLopDays,
-          presentDays: effectivePresentDays,
-          lopDeduction: effectiveLopDeduction,
-          netSalary: effectiveNetSalary,
-          totalDeduction: effectiveTotalDeduction,
+          totalDays: totalDaysVal,
+          workingDays: totalDaysVal,
+          daysPayable: daysPayableVal,
+          leaveDays: leaveDaysVal,
+          lopDays: lopDaysVal,
+          presentDays: presentDaysVal,
+          lopDeduction: lopDeductionVal,
+          netSalary: item.netSalary != null ? item.netSalary : 0,
+          totalDeduction: item.totalDeduction != null ? item.totalDeduction : 0,
+          grossSalary: item.grossSalary != null ? item.grossSalary : 0,
           employeeIdentifier: employeeIdentifier ? String(employeeIdentifier) : '',
           userObj: {
             ...(matchedUser || {}),
@@ -1178,7 +1170,8 @@ export const SalaryView = () => {
       dearnessAllowance: Number(selectedUserActiveStructure.dearnessAllowance) || 0,
       otherAllowances: Number(selectedUserActiveStructure.otherAllowances) || 0,
       fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
-      grossSalary: Number(selectedUserActiveStructure.grossSalary) || processCalculations.grossSalary,
+      baseGross: processCalculations.baseGross,
+      grossSalary: processCalculations.grossSalary,
       basicForPf: Number(selectedUserActiveStructure.basicForPf) || 0,
       fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
       extraDeduction: extraDeductionValue,
@@ -1253,6 +1246,7 @@ export const SalaryView = () => {
       otherAllowances: Number(selectedUserActiveStructure.otherAllowances) || 0,
       fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
       extraBonus: extraBonusValue,
+      baseGross: processCalculations.baseGross,
       grossSalary: targetGrossSalary,
       basicForPf: Number(selectedUserActiveStructure.basicForPf) || 0,
       pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
@@ -1264,6 +1258,7 @@ export const SalaryView = () => {
       fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
       extraDeduction: extraDeductionValue,
       otherDeductions: Number(selectedUserActiveStructure.otherDeductions) || 0,
+      lopDeduction: targetLopDeduction,
       totalDeduction: targetTotalDeduction,
       netSalary: targetNetSalary,
       employerContributions: structureSnapshot.employerContributions,
@@ -1330,27 +1325,9 @@ export const SalaryView = () => {
         if (createdId) savedOverrides[String(createdId)] = selectedStatus;
         savedOverrides[`${processForm.userId}_${parsedMonth}_${parsedYear}`] = selectedStatus;
         localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
-
-        const savedLeaveOverrides = JSON.parse(localStorage.getItem('payroll_leave_overrides') || '{}');
-        const leaveDataToSave = {
-          leaveDays: targetLeaveDays,
-          lopDays: targetLopDays,
-          daysPayable: targetDaysPayable,
-          presentDays: targetPresentDays,
-          totalDays: targetTotalDays,
-          workingDays: targetTotalDays,
-          perDaySalary: targetPerDaySalary,
-          lopDeduction: targetLopDeduction,
-          grossSalary: targetGrossSalary,
-          totalDeduction: targetTotalDeduction,
-          netSalary: targetNetSalary,
-          status: selectedStatus === 'paid' ? 'Paid' : 'Processed'
-        };
-        if (createdId) savedLeaveOverrides[String(createdId)] = leaveDataToSave;
-        savedLeaveOverrides[`${processForm.userId}_${parsedMonth}_${parsedYear}`] = leaveDataToSave;
-        localStorage.setItem('payroll_leave_overrides', JSON.stringify(savedLeaveOverrides));
       } catch { }
 
+      /*
       // 4. Automatically generate official payslip immediately with full attendance details (POST: api/payroll/payslip/generate)
       const targetPayrollId = createdId || processForm.userId;
       if (targetPayrollId) {
@@ -1398,6 +1375,7 @@ export const SalaryView = () => {
           console.warn('Auto payslip generation note:', errGen);
         }
       }
+      */
 
       setNotification({
         type: 'success',
@@ -1598,15 +1576,21 @@ export const SalaryView = () => {
 
   const updatePayrollCalculations = useMemo(() => {
     if (!selectedPayrollToUpdate) {
-      return { grossSalary: 0, totalDeduction: 0, netSalary: 0, totalDays: 30, daysPayable: 30, leaveDays: 0, lopDays: 0, presentDays: 30, perDaySalary: 0, lopDeduction: 0 };
+      return { baseGross: 0, grossSalary: 0, totalDeduction: 0, netSalary: 0, totalDays: 30, daysPayable: 30, leaveDays: 0, lopDays: 0, presentDays: 30, perDaySalary: 0, lopDeduction: 0, fixedDeduction: 0, tdsAmount: 0 };
     }
 
-    const prevExtraBonus = Number(selectedPayrollToUpdate.extraBonus) || 0;
-    const prevExtraDeduction = Number(selectedPayrollToUpdate.extraDeduction) || 0;
-    const prevLopDeduction = Number(selectedPayrollToUpdate.lopDeduction) || 0;
+    const basic = Number(selectedPayrollToUpdate.basicSalary) || 0;
+    const hra = Number(selectedPayrollToUpdate.hra) || 0;
+    const allowance = Number(selectedPayrollToUpdate.specialAllowance || selectedPayrollToUpdate.allowance) || 0;
+    const fixedBonus = Number(selectedPayrollToUpdate.fixedBonus) || 0;
+    const fixedDeduction = Number(selectedPayrollToUpdate.fixedDeduction) || 0;
+    const tdsPercentage = Number(selectedPayrollToUpdate.tdsPercentage) || 0;
 
-    const baseGross = (Number(selectedPayrollToUpdate.grossSalary) || 0) - prevExtraBonus;
-    const baseDeductions = (Number(selectedPayrollToUpdate.totalDeduction) || 0) - prevExtraDeduction - prevLopDeduction;
+    const prevExtraBonus = Number(selectedPayrollToUpdate.extraBonus) || 0;
+    const computedBaseGross = (basic || hra || allowance || fixedBonus)
+      ? (basic + hra + allowance + fixedBonus)
+      : Math.max(0, (Number(selectedPayrollToUpdate.grossSalary) || 0) - prevExtraBonus);
+    const baseGross = Math.round(computedBaseGross * 100) / 100;
 
     const newExtraBonus = Number(updatePayrollForm.extraBonus) || 0;
     const newExtraDeduction = Number(updatePayrollForm.extraDeduction) || 0;
@@ -1617,17 +1601,36 @@ export const SalaryView = () => {
       : totalDays;
     const leaveDays = Number(updatePayrollForm.leaveDays) || 0;
     const lopDays = Number(updatePayrollForm.lopDays) || 0;
-    // Formula: presentDays = daysPayable - leaveDays - lopDays
     const presentDays = Math.max(0, daysPayable - leaveDays - lopDays);
 
-    const grossSalary = Math.max(0, baseGross + newExtraBonus);
-    const perDaySalary = totalDays > 0 ? Math.round((grossSalary / totalDays) * 100) / 100 : 0;
+    const perDaySalary = totalDays > 0 ? Math.round((baseGross / totalDays) * 100) / 100 : 0;
     const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
+    const tdsAmount = Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
 
-    const totalDeduction = Math.max(0, Math.round((baseDeductions + newExtraDeduction + lopDeduction) * 100) / 100);
-    const netSalary = Math.max(0, Math.round((grossSalary - totalDeduction) * 100) / 100);
+    // Formula: net salary = Base Gross + Extra Bonus - Extra Deduction - Fixed Monthly Deduction - TDS - LOP
+    const netSalary = Math.max(
+      0,
+      Math.round((baseGross + newExtraBonus - newExtraDeduction - fixedDeduction - tdsAmount - lopDeduction) * 100) / 100
+    );
 
-    return { grossSalary, totalDeduction, netSalary, totalDays, daysPayable, leaveDays, lopDays, presentDays, perDaySalary, lopDeduction };
+    const totalDeduction = Math.round((newExtraDeduction + fixedDeduction + tdsAmount + lopDeduction) * 100) / 100;
+    const grossSalary = Math.round((baseGross + newExtraBonus) * 100) / 100;
+
+    return {
+      baseGross,
+      grossSalary,
+      fixedDeduction,
+      tdsAmount,
+      totalDeduction,
+      netSalary,
+      totalDays,
+      daysPayable,
+      leaveDays,
+      lopDays,
+      presentDays,
+      perDaySalary,
+      lopDeduction
+    };
   }, [selectedPayrollToUpdate, updatePayrollForm]);
 
   const handleSubmitUpdatePayroll = async (e) => {
@@ -1702,27 +1705,7 @@ export const SalaryView = () => {
       const targetId = String(selectedPayrollToUpdate._id || empId);
       try {
         const savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
-        savedOverrides[targetId] = payload.status;
         localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
-
-        const savedLeaveOverrides = JSON.parse(localStorage.getItem('payroll_leave_overrides') || '{}');
-        const leaveDataToSave = {
-          leaveDays: updatePayrollCalculations.leaveDays,
-          lopDays: updatePayrollCalculations.lopDays,
-          daysPayable: updatePayrollCalculations.daysPayable,
-          presentDays: updatePayrollCalculations.presentDays,
-          totalDays: updatePayrollCalculations.totalDays,
-          workingDays: updatePayrollCalculations.totalDays,
-          perDaySalary: updatePayrollCalculations.perDaySalary,
-          lopDeduction: updatePayrollCalculations.lopDeduction,
-          grossSalary: updatePayrollCalculations.grossSalary,
-          totalDeduction: updatePayrollCalculations.totalDeduction,
-          netSalary: updatePayrollCalculations.netSalary,
-          status: payload.status === 'paid' ? 'Paid' : 'Processed'
-        };
-        savedLeaveOverrides[targetId] = leaveDataToSave;
-        savedLeaveOverrides[`${empId}_${payload.month}_${payload.year}`] = leaveDataToSave;
-        localStorage.setItem('payroll_leave_overrides', JSON.stringify(savedLeaveOverrides));
       } catch { }
 
       // Update state live across tables
@@ -2559,11 +2542,6 @@ export const SalaryView = () => {
                                 <span className="text-[11px] text-slate-400 truncate block">
                                   {u.email || 'No email'}
                                 </span>
-                                {payroll.employeeIdentifier && (
-                                  <span className="text-[10px] text-slate-400 truncate block">
-                                    Employee ID: {payroll.employeeIdentifier}
-                                  </span>
-                                )}
                               </div>
                             </div>
                           </td>
@@ -2591,26 +2569,28 @@ export const SalaryView = () => {
                           </td>
 
                           <td className="py-3.5 px-4 font-mono text-slate-600">
-                            {formatINR(gross - extraB)}
+                            {formatINR(Number(payroll.basicSalary) || Number(payroll.baseGross) || 0)}
                           </td>
 
                           <td className="py-3.5 px-2 font-semibold text-xs">
                             <div className="text-emerald-600 font-semibold">
-                              +{formatINR(fixedB + extraB)}
+                              +{(Number(payroll.fixedBonus) || 0) + (Number(payroll.extraBonus) || 0) > 0
+                                ? formatINR((Number(payroll.fixedBonus) || 0) + (Number(payroll.extraBonus) || 0))
+                                : '—'}
                             </div>
                           </td>
 
                           <td className="py-3.5 px-4 font-mono font-semibold text-slate-900">
-                            {formatINR(gross)}
+                            {formatINR(payroll.grossSalary)}
                           </td>
 
                           <td className="py-3.5 px-4 font-mono text-rose-600">
-                            <div>-{formatINR(totDed)}</div>
+                            <div>-{formatINR(payroll.totalDeduction)}</div>
                           </td>
 
                           <td className="py-3.5 px-4 font-mono">
                             <span className="font-bold text-sm text-emerald-600 px-2 py-0.5 rounded">
-                              {formatINR(net)}
+                              {formatINR(payroll.netSalary)}
                             </span>
                           </td>
 
@@ -2624,9 +2604,8 @@ export const SalaryView = () => {
                                     value={isPaid ? 'paid' : 'processed'}
                                     disabled={isPaid || updatingStatusId === payroll._id}
                                     onChange={(e) => handleChangeSalaryStatus(payroll, e.target.value)}
-                                    className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition appearance-none capitalize shadow-2xs ${getStatusBadgeClass(payroll.status)} ${
-                                      isPaid ? 'cursor-not-allowed pr-2.5 opacity-90' : 'cursor-pointer pr-6 hover:shadow-xs'
-                                    }`}
+                                    className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition appearance-none capitalize shadow-2xs ${getStatusBadgeClass(payroll.status)} ${isPaid ? 'cursor-not-allowed pr-2.5 opacity-90' : 'cursor-pointer pr-6 hover:shadow-xs'
+                                      }`}
                                     title={isPaid ? "Status is Paid and cannot be changed back to Processed" : "Click to mark as Paid"}
                                   >
                                     {!isPaid && <option value="processed">Processed</option>}
@@ -2644,22 +2623,6 @@ export const SalaryView = () => {
                             })()}
                           </td>
 
-                          {/* Payslip Download Column */}
-                          {/* <td className="py-3.5 px-4"> */}
-                          {/* <button
-                            onClick={() => handleDownloadPayslipForPayroll(payroll)}
-                            disabled={downloadingSlipId === payroll._id}
-                            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
-                            title="Download Official Payslip"
-                          >
-                            {downloadingSlipId === payroll._id ? (
-                              <RefreshCw size={12} className="animate-spin" />
-                            ) : (
-                              <Download size={12} />
-                            )}
-                          </button> */}
-                          {/* </td> */}
-
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
@@ -2669,11 +2632,11 @@ export const SalaryView = () => {
                                   className="px-2.5 py-1.5 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
                                   title="Update Monthly Payroll"
                                 >
-                                  {/* <CreditCard size={12} /> */}
                                   <Edit3 size={14} />
-                                  {/* <span>Update / Pay</span> */}
                                 </button>
                               )}
+                              {/* Payslip buttons commented out as requested */}
+                              {/*
                               <button
                                 onClick={() => handleViewPayslipForPayroll(payroll)}
                                 className="px-2.5 py-1.5 hover:bg-purple-100 text-purple-700 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
@@ -2684,11 +2647,10 @@ export const SalaryView = () => {
                               <button
                                 onClick={() => handleDownloadPayslipForPayroll(payroll)}
                                 disabled={downloadingSlipId === payroll._id || String(payroll.status || '').toLowerCase() !== 'paid'}
-                                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
-                                  String(payroll.status || '').toLowerCase() === 'paid'
-                                    ? 'hover:bg-indigo-100 text-indigo-700 cursor-pointer'
-                                    : 'opacity-40 cursor-not-allowed text-slate-400 bg-slate-50'
-                                }`}
+                                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${String(payroll.status || '').toLowerCase() === 'paid'
+                                  ? 'hover:bg-indigo-100 text-indigo-700 cursor-pointer'
+                                  : 'opacity-40 cursor-not-allowed text-slate-400 bg-slate-50'
+                                  }`}
                                 title={
                                   String(payroll.status || '').toLowerCase() === 'paid'
                                     ? "Download Official Payslip"
@@ -2701,7 +2663,7 @@ export const SalaryView = () => {
                                   <Download size={14} />
                                 )}
                               </button>
-
+                              */}
                             </div>
                           </td>
                         </tr>
@@ -2986,7 +2948,7 @@ export const SalaryView = () => {
                       <th className="py-3 px-4">Deductions & TDS</th>
                       <th className="py-3 px-4">Net Disbursed</th>
                       <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Payslip</th>
+                      {isAdmin && <th className="py-3 px-4 text-right">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -2996,7 +2958,7 @@ export const SalaryView = () => {
                           {formatMonthYear(rec.month, rec.year)}
                         </td>
                         <td className="py-3 px-4 font-mono">
-                          {formatINR((Number(rec.grossSalary) || 0) - (Number(rec.extraBonus) || 0))}
+                          {formatINR(Number(rec.basicSalary) || Number(rec.baseGross) || 0)}
                         </td>
                         <td className="py-3 px-4 font-mono text-emerald-600">
                           +{(Number(rec.fixedBonus) || 0) + (Number(rec.extraBonus) || 0) > 0
@@ -3011,31 +2973,29 @@ export const SalaryView = () => {
                             {String(rec.status || 'processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed'}
                           </span>
                         </td>
+                        {isAdmin && (
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => openUpdatePayrollModal(rec)}
+                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition cursor-pointer border border-emerald-200"
+                              title="Update Monthly Payroll / Mark as Paid"
+                            >
+                              <CreditCard size={12} />
+                              <span>Update / Pay</span>
+                            </button>
+                          </td>
+                        )}
+                        {/* Payslip buttons commented out as requested */}
+                        {/*
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            {isAdmin && (
-                              <button
-                                onClick={() => openUpdatePayrollModal(rec)}
-                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer border border-emerald-200"
-                                title="Update Monthly Payroll / Mark as Paid"
-                              >
-                                <CreditCard size={12} />
-                                <span>Update / Pay</span>
-                              </button>
-                            )}
                             <button
                               onClick={() => handleDownloadPayslipForPayroll(rec)}
                               disabled={downloadingSlipId === rec._id || String(rec.status || '').toLowerCase() !== 'paid'}
-                              className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
-                                String(rec.status || '').toLowerCase() === 'paid'
-                                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs'
-                                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                              }`}
-                              title={
-                                String(rec.status || '').toLowerCase() === 'paid'
-                                  ? "Download Official Payslip"
-                                  : "PDF download is only available when status is Paid"
-                              }
+                              className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${String(rec.status || '').toLowerCase() === 'paid'
+                                ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs'
+                                : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                                }`}
                             >
                               {downloadingSlipId === rec._id ? (
                                 <RefreshCw size={12} className="animate-spin" />
@@ -3047,13 +3007,13 @@ export const SalaryView = () => {
                             <button
                               onClick={() => handleViewPayslipForPayroll(rec)}
                               className="px-2 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
-                              title="View Official Payslip"
                             >
                               <Eye size={12} />
                               <span>View</span>
                             </button>
                           </div>
                         </td>
+                        */}
                       </tr>
                     ))}
                   </tbody>
@@ -3247,19 +3207,11 @@ export const SalaryView = () => {
                   </div>
 
                   {/* Present Days Calculation Indicator */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-indigo-50/80 rounded-lg border border-indigo-200/80 text-xs">
-                    <div className="flex items-center gap-1.5 text-indigo-900 font-medium">
-                      <Calculator size={14} className="text-indigo-600 shrink-0" />
-                      <span>
-                        Formula: <code className="font-mono font-bold text-indigo-700 bg-white/90 px-1.5 py-0.5 rounded text-[11px]">presentDays = daysPayable - leaveDays - lopDays</code>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-600 text-[11px]">Calculated Present Days:</span>
-                      <span className="font-mono font-black text-sm text-indigo-700 bg-white px-2.5 py-0.5 rounded-md border border-indigo-300 shadow-2xs">
-                        {updatePayrollCalculations.presentDays} Days
-                      </span>
-                    </div>
+                  <div className="flex items-center justify-between p-2 bg-indigo-50/80 rounded-lg border border-indigo-200/80 text-xs">
+                    <span className="text-indigo-900 font-medium">Calculated Present Days:</span>
+                    <span className="font-mono font-black text-sm text-indigo-700 bg-white px-2.5 py-0.5 rounded-md border border-indigo-300 shadow-2xs">
+                      {updatePayrollCalculations.presentDays} Days
+                    </span>
                   </div>
                 </div>
 
@@ -3302,11 +3254,10 @@ export const SalaryView = () => {
                       value={String(updatePayrollForm.status || 'Processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed'}
                       disabled={String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid'}
                       onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, status: e.target.value })}
-                      className={`w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-semibold ${
-                        String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid'
-                          ? 'opacity-80 cursor-not-allowed bg-slate-100'
-                          : 'cursor-pointer'
-                      }`}
+                      className={`w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-semibold ${String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid'
+                        ? 'opacity-80 cursor-not-allowed bg-slate-100'
+                        : 'cursor-pointer'
+                        }`}
                       title={String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid' ? "Paid status is final and cannot be reverted to Processed" : "Select disbursement status"}
                     >
                       {String(selectedPayrollToUpdate.status || '').toLowerCase() !== 'paid' && (
@@ -3629,49 +3580,27 @@ export const SalaryView = () => {
                     />
                   </div>
                 </div>
-
-                {/* Present Days Calculation Indicator */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-indigo-50/80 rounded-lg border border-indigo-200/80 text-xs">
-                  <div className="flex items-center gap-1.5 text-indigo-900 font-medium">
-                    <Calculator size={14} className="text-indigo-600 shrink-0" />
-                    <span>
-                      Formula: <code className="font-mono font-bold text-indigo-700 bg-white/90 px-1.5 py-0.5 rounded text-[11px]">presentDays = daysPayable - leaveDays - lopDays</code>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-600 text-[11px]">Calculated Present Days:</span>
-                    <span className="font-mono font-black text-sm text-indigo-700 bg-white px-2.5 py-0.5 rounded-md border border-indigo-300 shadow-2xs">
-                      {processCalculations.presentDays} Days
-                    </span>
-                  </div>
-                </div>
               </div>
 
               {selectedUserActiveStructure ? (
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 text-xs">
-                  <div className="flex justify-between font-semibold text-slate-700 pb-1 border-b border-slate-200">
-                    <span>Active Salary Contract ID</span>
-                    <span className="font-mono text-[11px] text-indigo-600">
-                      {String(selectedUserActiveStructure._id).slice(-8)}
+                <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50/60 rounded-xl border border-slate-200">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Basic Pay</span>
+                    <span className="font-mono font-bold text-slate-900 text-xs">
+                      {formatINR(selectedUserActiveStructure.basicSalary)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
-                    <div>
-                      <span className="text-slate-400 block">Basic Pay</span>
-                      <span className="font-mono font-medium">{formatINR(selectedUserActiveStructure.basicSalary)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block">HRA & Allowance</span>
-                      <span className="font-mono font-medium">
-                        {formatINR((Number(selectedUserActiveStructure.hra) || 0) + (Number(selectedUserActiveStructure.allowance) || 0))}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block">Fixed Bonus</span>
-                      <span className="font-mono font-medium text-emerald-600">
-                        +{formatINR(selectedUserActiveStructure.fixedBonus)}
-                      </span>
-                    </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">HRA & Allowance</span>
+                    <span className="font-mono font-bold text-slate-900 text-xs">
+                      {formatINR((Number(selectedUserActiveStructure.hra) || 0) + (Number(selectedUserActiveStructure.specialAllowance || selectedUserActiveStructure.allowance) || 0))}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Fixed Bonus</span>
+                    <span className="font-mono font-bold text-emerald-600 text-xs">
+                      +{formatINR(selectedUserActiveStructure.fixedBonus)}
+                    </span>
                   </div>
                 </div>
               ) : processForm.userId ? (
@@ -3725,13 +3654,15 @@ export const SalaryView = () => {
                 </select>
               </div>
 
-              {/* Auto generate payslip note */}
+              {/* Auto generate payslip note 
               <div className="flex items-center gap-2 pt-1 text-xs text-emerald-600 font-medium">
                 <CheckCircle2 size={15} />
                 <span>Status is changeable anytime from payrolls table • Official payslip automatically generated</span>
-              </div>
+              </div> */}
 
-              {selectedUserActiveStructure && (
+              {/* Summary Payout Preview commented out as requested */}
+              {/*
+              selectedUserActiveStructure && (
                 <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/70 space-y-2 text-xs">
                   <div className="flex justify-between font-bold text-slate-800 border-b border-emerald-200/50 pb-1.5">
                     <span>Summary Payout Preview</span>
@@ -3740,22 +3671,21 @@ export const SalaryView = () => {
                     </span>
                   </div>
 
-                  {/* Attendance & Days Metric Preview */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-b border-emerald-200/40 pb-2 text-[11px]">
                     <div>
                       <span className="text-[10px] text-slate-500 block uppercase">Total Days</span>
                       <span className="font-mono font-bold text-slate-800">{processCalculations.totalDays}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-amber-700 block uppercase font-semibold">Approved Leaves</span>
+                      <span className="text-[10px] text-amber-700 block uppercase">Approved Leaves</span>
                       <span className="font-mono font-bold text-amber-800">{processCalculations.leaveDays} days</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-emerald-700 block uppercase font-semibold">Payable Days</span>
+                      <span className="text-[10px] text-emerald-700 block uppercase">Payable Days</span>
                       <span className="font-mono font-bold text-emerald-800">{processCalculations.daysPayable} days</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-indigo-700 block uppercase font-semibold">Present Days</span>
+                      <span className="text-[10px] text-indigo-700 block uppercase">Present Days</span>
                       <span className="font-mono font-black text-indigo-800">{processCalculations.presentDays} days</span>
                     </div>
                   </div>
@@ -3789,7 +3719,8 @@ export const SalaryView = () => {
                     </div>
                   </div>
                 </div>
-              )}
+              )
+              */}
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
@@ -4014,8 +3945,12 @@ export const SalaryView = () => {
       )}
 
       {/* ==================================================== */}
-      {/* 6. MODAL: OFFICIAL PAYSLIP STATEMENT (PRINT & VIEW) */}
       {/* ==================================================== */}
+      {/* 6. MODAL: OFFICIAL PAYSLIP STATEMENT (PRINT & VIEW) - COMMENTED OUT */}
+      {/* ==================================================== */}
+      {/*
+// 
+      // 
       {viewingPayslipModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
@@ -4025,7 +3960,7 @@ export const SalaryView = () => {
             className="bg-white border border-slate-200 rounded-xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
+            // 
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg">
@@ -4048,9 +3983,9 @@ export const SalaryView = () => {
               </button>
             </div>
 
-            {/* Printable Content Body */}
+            // 
             <div id="printable-payslip-content" className="p-6 overflow-y-auto space-y-5 text-xs bg-white">
-              {/* Company & Employee Identity Banner */}
+              // 
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest block">
@@ -4081,7 +4016,7 @@ export const SalaryView = () => {
                 </div>
               </div>
 
-              {/* Monthly Attendance & Working Days Card */}
+              // 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Month Days</span>
@@ -4101,15 +4036,15 @@ export const SalaryView = () => {
                     {viewingPayslipModal.presentDays != null
                       ? viewingPayslipModal.presentDays
                       : (viewingPayslipModal.daysPayable != null
-                          ? Math.max(0, Number(viewingPayslipModal.daysPayable) - (Number(viewingPayslipModal.leaveDays) || 0) - (Number(viewingPayslipModal.lopDays) || 0))
-                          : '—')} Days
+                        ? Math.max(0, Number(viewingPayslipModal.daysPayable) - (Number(viewingPayslipModal.leaveDays) || 0) - (Number(viewingPayslipModal.lopDays) || 0))
+                        : '—')} Days
                   </span>
                 </div>
               </div>
 
-              {/* Earnings & Deductions Tables */}
+              // 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Earnings Table */}
+                // 
                 <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/60 space-y-2.5">
                   <span className="text-[10px] uppercase font-bold text-emerald-700 block pb-1 border-b border-slate-200/60">
                     Earnings Breakdown (Credits)
@@ -4148,7 +4083,7 @@ export const SalaryView = () => {
                   </div>
                 </div>
 
-                {/* Deductions Table */}
+                // 
                 <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/60 space-y-2.5">
                   <span className="text-[10px] uppercase font-bold text-rose-700 block pb-1 border-b border-slate-200/60">
                     Deductions Breakdown (Debits)
@@ -4183,7 +4118,7 @@ export const SalaryView = () => {
                 </div>
               </div>
 
-              {/* Net Salary Highlight Box */}
+              // 
               <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-emerald-800 uppercase font-bold block">
@@ -4197,17 +4132,16 @@ export const SalaryView = () => {
               </div>
             </div>
 
-            {/* Modal Footer */}
+            // 
             <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleOpenPrintHtml(viewingPayslipModal)}
                   disabled={String(viewingPayslipModal.status || '').toLowerCase() !== 'paid'}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
-                    String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
-                      ? 'bg-slate-200 hover:bg-slate-300 text-slate-800 cursor-pointer'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
+                    ? 'bg-slate-200 hover:bg-slate-300 text-slate-800 cursor-pointer'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
                   title={
                     String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
                       ? "Print Statement"
@@ -4220,11 +4154,10 @@ export const SalaryView = () => {
                 <button
                   onClick={() => handleDownloadPayslipForPayroll(viewingPayslipModal)}
                   disabled={downloadingSlipId === (viewingPayslipModal._id || viewingPayslipModal.id) || String(viewingPayslipModal.status || '').toLowerCase() !== 'paid'}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${
-                    String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
-                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
+                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
                   title={
                     String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
                       ? "Download Official PDF Payslip"
@@ -4260,7 +4193,9 @@ export const SalaryView = () => {
         </div>
       )}
 
-      {/* ==================================================== */}
+      //
+      */}
+
       {/* 7. MODAL: VIEW BASE SALARY STRUCTURE BREAKDOWN */}
       {/* ==================================================== */}
       {viewingDetailSalary && (

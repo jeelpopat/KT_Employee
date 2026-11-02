@@ -1,4 +1,5 @@
 import api from '../api/axios.js';
+export { isHrRoleOrUser, isStrictEmployeeRole, filterOutHrUsers } from './roleFilters.js';
 
 const TEAM_API_URL = 'https://kt-backend-ttzj.onrender.com/api/teamLead/team';
 

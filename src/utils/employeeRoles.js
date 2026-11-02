@@ -1,7 +1,7 @@
 /**
  * Standard Employee Departments and Roles Specification:
  * • Sales: Business Development Executive (BDE), Account Executive
- * • Developer: Software, Frontend, Backend, Full Stack, Mobile, QA, AI/ML, Data Analyst
+ * • Developer: Software, Frontend, Backend, Full Stack, MERN Stack Developer, Mobile, QA, AI/ML, Data Analyst
  * • Design: UI/UX, Graphic
  */
 
@@ -15,6 +15,7 @@ export const EMPLOYEE_DEPARTMENTS_ROLES = {
     "Frontend",
     "Backend",
     "Full Stack",
+    "MERN Stack Developer",
     "Mobile",
     "QA",
     "AI/ML",
@@ -44,6 +45,7 @@ export const getDepartmentForRole = (roleOrDesignation = '') => {
         return dept;
       }
       if (rLower.includes('bde') && str.includes('bde')) return 'Sales';
+      if (rLower.includes('mern') && str.includes('mern')) return 'Developer';
       if (rLower.includes('qa') && (str.includes('qa') || str.includes('testing') || str.includes('tester'))) return 'Developer';
       if (rLower.includes('ui/ux') && (str.includes('ui') || str.includes('ux'))) return 'Design';
     }
@@ -80,6 +82,7 @@ export const matchesEmployeeDepartment = (emp, targetDepartment) => {
     const rLower = r.toLowerCase();
     if (empDesig.includes(rLower)) return true;
     if (rLower.includes('bde') && empDesig.includes('bde')) return true;
+    if (rLower.includes('mern') && empDesig.includes('mern')) return true;
     if (rLower.includes('qa') && (empDesig.includes('qa') || empDesig.includes('test'))) return true;
     if (rLower.includes('ui/ux') && (empDesig.includes('ui') || empDesig.includes('ux'))) return true;
     return false;
@@ -108,6 +111,7 @@ export const matchesEmployeeRole = (emp, targetRole) => {
   if (targetLower.includes('frontend') && empDesig.includes('frontend')) return true;
   if (targetLower.includes('backend') && empDesig.includes('backend')) return true;
   if (targetLower.includes('full stack') && (empDesig.includes('full stack') || empDesig.includes('fullstack'))) return true;
+  if (targetLower.includes('mern') && empDesig.includes('mern')) return true;
   if (targetLower.includes('mobile') && (empDesig.includes('mobile') || empDesig.includes('android') || empDesig.includes('ios') || empDesig.includes('flutter'))) return true;
   if (targetLower.includes('qa') && (empDesig.includes('qa') || empDesig.includes('tester') || empDesig.includes('testing') || empDesig.includes('quality'))) return true;
   if (targetLower.includes('ai/ml') && (empDesig.includes('ai') || empDesig.includes('ml') || empDesig.includes('machine learning'))) return true;

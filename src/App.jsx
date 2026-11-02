@@ -174,7 +174,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'team-members': return (userRole === 'admin' || userRole === 'hr') ? <AdminMembersView /> : <TeamMembersView />;
       case 'employees': return (userRole === 'admin' || userRole === 'hr') ? <AdminEmployeesView /> : <EmployeesView />;
       case 'learning-hub': return <LearningHubView />;
-      case 'documents': return <DocumentsView />;
+      case 'documents': return (userRole === 'admin') ? <AdminDashboardView /> : <DocumentsView />;
       case 'daily-follow-up': return <DailyFollowUpView />;
       case 'team-tasks': return <AdminTeamTasksView />;
       case 'team-leaves': return (userRole === 'admin' || userRole === 'hr') ? <AdminLeaveRequestsView /> : <TeamLeaveManagementView />;

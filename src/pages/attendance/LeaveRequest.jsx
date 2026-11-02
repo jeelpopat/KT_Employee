@@ -1839,50 +1839,50 @@ export default function LeaveRequest() {
                   DESKTOP TABLE (Clean White Row Background, Navy Headers)
               ================================================== */}
             <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/80">
-              <table className="w-full min-w-[1150px] table-fixed text-xs font-poppins">
+              <table className="w-full min-w-[1280px] table-fixed text-xs font-poppins">
                 <colgroup>
                   <col className="w-[4%]" />
-                  <col className="w-[15%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[9%]" />
                   <col className="w-[11%]" />
-                  <col className="w-[11%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[12%]" />
                   <col className="w-[13%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[6%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[12%]" />
                 </colgroup>
 
                 <thead style={{ backgroundColor: "#0346651A" }}>
                   <tr className="border-b border-slate-200/80">
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[45px]">
                       No.
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[160px]">
                       Employee
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[120px]">
                       Leave
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[100px]">
                       Duration
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[130px]">
                       Dates
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[100px]">
                       Team Lead
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[100px]">
                       HR
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[100px]">
                       Admin
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[140px]">
                       Workflow
                     </th>
-                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[150px]">
                       Approve / Reject Reason
                     </th>
                   </tr>
@@ -1937,7 +1937,7 @@ export default function LeaveRequest() {
                         )}
                       </td>
 
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {normalizeRole(currentRole) === "teamlead" && canTakeAction(request) ? (
                           <ApprovalActions leave={request} />
                         ) : (
@@ -1949,7 +1949,7 @@ export default function LeaveRequest() {
                         )}
                       </td>
 
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {normalizeRole(currentRole) === "hr" && canTakeAction(request) ? (
                           <ApprovalActions leave={request} />
                         ) : (
@@ -1961,7 +1961,7 @@ export default function LeaveRequest() {
                         )}
                       </td>
 
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {normalizeRole(request.role) === "hr" ? (
                           normalizeRole(currentRole) === "admin" && canTakeAction(request) ? (
                             <ApprovalActions leave={request} />
@@ -1973,7 +1973,7 @@ export default function LeaveRequest() {
                         )}
                       </td>
 
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <span className="text-xs font-medium text-slate-700 font-poppins whitespace-nowrap">
                           {getWorkflowText(request)}
                         </span>

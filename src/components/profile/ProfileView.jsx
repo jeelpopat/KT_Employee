@@ -50,8 +50,22 @@ const isPassportSizePhoto = (file) => new Promise((resolve, reject) => {
   image.src = imageUrl;
 });
 
+const isDocPdf = (doc) => {
+  if (!doc) return false;
+  const fType = String(doc.fileType || '').toLowerCase();
+  const fName = String(doc.fileName || '').toLowerCase();
+  const fUrl = String(doc.fileUrl || '').toLowerCase();
+  return (
+    fType.includes('pdf') ||
+    fName.endsWith('.pdf') ||
+    fUrl.includes('.pdf') ||
+    fUrl.startsWith('data:application/pdf')
+  );
+};
+
 export const ProfileView = () => {
   const { user: contextUser, updateUserProfile, userRole, roleDetails } = useApp();
+  const isAdmin = userRole === 'admin';
   
   const [profileData, setProfileData] = useState(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -59,6 +73,12 @@ export const ProfileView = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'documents' | 'security'
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'documents') {
+      setActiveTab('details');
+    }
+  }, [isAdmin, activeTab]);
 
   // Form States - Personal & Contact
   const [name, setName] = useState(() => resolveEmployeeName(contextUser) || '');
@@ -100,6 +120,33 @@ export const ProfileView = () => {
   const [isSavingDocNumber, setIsSavingDocNumber] = useState(false);
   const [editingDocId, setEditingDocId] = useState(null);
   const [tempDocNumber, setTempDocNumber] = useState('');
+
+  // Automatically clear document feedback banner after 3.5 seconds
+  useEffect(() => {
+    if (!docFeedback.text) return;
+    const timer = setTimeout(() => {
+      setDocFeedback({ type: '', text: '' });
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [docFeedback.text]);
+
+  // Automatically clear photo feedback banner after 3.5 seconds
+  useEffect(() => {
+    if (!photoFeedback.text) return;
+    const timer = setTimeout(() => {
+      setPhotoFeedback({ type: '', text: '' });
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [photoFeedback.text]);
+
+  // Automatically clear password feedback banner after 3.5 seconds
+  useEffect(() => {
+    if (!passwordMsg.text) return;
+    const timer = setTimeout(() => {
+      setPasswordMsg({ type: '', text: '' });
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [passwordMsg.text]);
 
   // Document Viewer Lightbox Modal State
   const [docViewerModal, setDocViewerModal] = useState({
@@ -285,11 +332,11 @@ export const ProfileView = () => {
             subtitle: 'Government issued 12-digit Unique Identification (UIDAI)',
             category: 'Identity Proof',
             docNumber: aadharNum || 'Not Provided',
-            status: aadharNum ? 'uploaded' : 'pending',
+            status: 'pending',
             fileUrl: '',
-            fileName: aadharNum ? 'Aadhar_Card.pdf' : '',
+            fileName: '',
             fileType: 'application/pdf',
-            uploadedAt: aadharNum ? 'Recorded' : 'Pending',
+            uploadedAt: 'Pending',
             isCore: true
           },
           {
@@ -299,11 +346,11 @@ export const ProfileView = () => {
             subtitle: 'Permanent Account Number issued by Income Tax Department',
             category: 'Tax ID & Proof',
             docNumber: panNum || 'Not Provided',
-            status: panNum ? 'uploaded' : 'pending',
+            status: 'pending',
             fileUrl: '',
-            fileName: panNum ? 'PAN_Card.jpg' : '',
+            fileName: '',
             fileType: 'image/jpeg',
-            uploadedAt: panNum ? 'Recorded' : 'Pending',
+            uploadedAt: 'Pending',
             isCore: true
           },
           {
@@ -682,12 +729,24 @@ export const ProfileView = () => {
 
   // --- Document Actions: View, Update, Add, Delete ---
   const handleOpenDocViewer = (doc) => {
-    setDocViewerModal({
-      isOpen: true,
-      doc,
-      zoomLevel: 100,
-      rotation: 0
-    });
+    if (doc?.fileUrl) {
+      const newTab = window.open(doc.fileUrl, '_blank', 'noopener,noreferrer');
+      if (!newTab) {
+        const a = document.createElement('a');
+        a.href = doc.fileUrl;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      return;
+    }
+    setDocFeedback({ type: 'error', text: 'No document file attached yet.' });
+    setTimeout(() => setDocFeedback({ type: '', text: '' }), 3500);
+    if (doc?.id) {
+      handleTriggerDocUpload(doc.id);
+    }
   };
 
   const handleCloseDocViewer = () => {
@@ -823,6 +882,7 @@ export const ProfileView = () => {
     } catch (err) {
       console.error("Error uploading document:", err);
       setDocFeedback({ type: 'error', text: 'Failed to upload document.' });
+      setTimeout(() => setDocFeedback({ type: '', text: '' }), 3500);
     } finally {
       setUploadingDocId(null);
       setTargetActionDocId(null);
@@ -1413,16 +1473,18 @@ export const ProfileView = () => {
               <span>{isRefreshing ? 'Fetching...' : 'Sync Live Details'}</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('documents')}
-              className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
-            >
-              <FileCheck size={16} />
-              <span>My Documents</span>
-              <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
-                {documents.length}
-              </span>
-            </button>
+            {!isAdmin && (
+              <button
+                onClick={() => setActiveTab('documents')}
+                className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+              >
+                <FileCheck size={16} />
+                <span>My Documents</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                  {documents.length}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1442,25 +1504,27 @@ export const ProfileView = () => {
           <span>Personal Details</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('documents')}
-          className={`profile-tab flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-            activeTab === 'documents'
-              ? 'border-[#0088cc] text-[#004b73]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <FileBadge size={15} />
-          <span>Documents & Identity</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-            activeTab === 'documents'
-              ? 'bg-[#004b73] text-white'
-              : 'bg-slate-100 text-slate-600'
-          }`}>
-            {documents.length}
-          </span>
-        </button>
+        {!isAdmin && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('documents')}
+            className={`profile-tab flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+              activeTab === 'documents'
+                ? 'border-[#0088cc] text-[#004b73]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FileBadge size={15} />
+            <span>Documents & Identity</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+              activeTab === 'documents'
+                ? 'bg-[#004b73] text-white'
+                : 'bg-slate-100 text-slate-600'
+            }`}>
+              {documents.length}
+            </span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -1509,91 +1573,93 @@ export const ProfileView = () => {
             </div>
 
             {/* Documents Quick Widget */}
-            <div className="profile-documents-widget bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                <h3 className="profile-section-title profile-proof-title text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                  <FileCheck size={16} className="text-indigo-500" /> Identity Proofs
-                </h3>
-                <span className="profile-proof-count text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
-                  {[aadharDoc, panDoc, passportPhotoDoc].filter(doc => doc?.status === 'uploaded').length}/3 Done
-                </span>
+            {!isAdmin && (
+              <div className="profile-documents-widget bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                  <h3 className="profile-section-title profile-proof-title text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                    <FileCheck size={16} className="text-indigo-500" /> Identity Proofs
+                  </h3>
+                  <span className="profile-proof-count text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
+                    {[aadharDoc, panDoc, passportPhotoDoc].filter(doc => Boolean(doc?.fileUrl)).length}/3 Done
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Aadhar summary */}
+                  <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-1.5 rounded bg-indigo-50 text-indigo-600 shrink-0">
+                        <img src={aadharProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
+                      </div>
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-slate-900 truncate">Aadhar Card</p>
+                        <p className="text-[11px] font-mono text-slate-500 truncate">{aadharDoc?.docNumber || 'Not set'}</p>
+                      </div>
+                    </div>
+                    {aadharDoc?.fileUrl && (
+                      <button
+                        onClick={() => handleOpenDocViewer(aadharDoc)}
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                        title="View Aadhar Card"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* PAN summary */}
+                  <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-1.5 rounded bg-amber-100 text-amber-600 shrink-0">
+                        <img src={panProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
+                      </div>
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-slate-900 truncate">PAN Card</p>
+                        <p className="text-[11px] font-mono text-slate-500 truncate">{panDoc?.docNumber || 'Not set'}</p>
+                      </div>
+                    </div>
+                    {panDoc?.fileUrl && (
+                      <button
+                        onClick={() => handleOpenDocViewer(panDoc)}
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                        title="View PAN Card"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Passport Photo summary */}
+                  <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-1.5 rounded bg-purple-100 text-purple-600 shrink-0">
+                        <img src={passportProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
+                      </div>
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-slate-900 truncate">Passport Photo</p>
+                        <p className="text-[11px] text-slate-500 truncate">Official Photo</p>
+                      </div>
+                    </div>
+                    {passportPhotoDoc?.fileUrl && (
+                      <button
+                        onClick={() => handleOpenDocViewer(passportPhotoDoc)}
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                        title="View Passport Photo"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setActiveTab('documents')}
+                    className="profile-manage-documents w-full mt-2 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg border border-dashed border-indigo-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    Manage All Documents <ArrowRight size={12} />
+                  </button>
+                </div>
               </div>
-
-              <div className="space-y-3">
-                {/* Aadhar summary */}
-                <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="p-1.5 rounded bg-indigo-50 text-indigo-600 shrink-0">
-                      <img src={aadharProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
-                    </div>
-                    <div className="truncate">
-                      <p className="text-xs font-bold text-slate-900 truncate">Aadhar Card</p>
-                      <p className="text-[11px] font-mono text-slate-500 truncate">{aadharDoc?.docNumber || 'Not set'}</p>
-                    </div>
-                  </div>
-                  {aadharDoc?.fileUrl && (
-                    <button
-                      onClick={() => handleOpenDocViewer(aadharDoc)}
-                      className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
-                      title="View Aadhar Card"
-                    >
-                      <Eye size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {/* PAN summary */}
-                <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="p-1.5 rounded bg-amber-100 text-amber-600 shrink-0">
-                      <img src={panProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
-                    </div>
-                    <div className="truncate">
-                      <p className="text-xs font-bold text-slate-900 truncate">PAN Card</p>
-                      <p className="text-[11px] font-mono text-slate-500 truncate">{panDoc?.docNumber || 'Not set'}</p>
-                    </div>
-                  </div>
-                  {panDoc?.fileUrl && (
-                    <button
-                      onClick={() => handleOpenDocViewer(panDoc)}
-                      className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
-                      title="View PAN Card"
-                    >
-                      <Eye size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Passport Photo summary */}
-                <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="p-1.5 rounded bg-purple-100 text-purple-600 shrink-0">
-                      <img src={passportProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
-                    </div>
-                    <div className="truncate">
-                      <p className="text-xs font-bold text-slate-900 truncate">Passport Photo</p>
-                      <p className="text-[11px] text-slate-500 truncate">Official Photo</p>
-                    </div>
-                  </div>
-                  {passportPhotoDoc?.fileUrl && (
-                    <button
-                      onClick={() => handleOpenDocViewer(passportPhotoDoc)}
-                      className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
-                      title="View Passport Photo"
-                    >
-                      <Eye size={14} />
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setActiveTab('documents')}
-                  className="profile-manage-documents w-full mt-2 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg border border-dashed border-indigo-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  Manage All Documents <ArrowRight size={12} />
-                </button>
-              </div>
-            </div>
+            )}
 
             {/* Emergency Contact */}
             {emergencyContact.name && (
@@ -1763,7 +1829,7 @@ export const ProfileView = () => {
       {/* ========================================================================= */}
       {/* TAB 2: DOCUMENTS & IDENTITY PROOFS (AADHAR, PAN, PASSPORT PHOTO, ADD) */}
       {/* ========================================================================= */}
-      {activeTab === 'documents' && (
+      {!isAdmin && activeTab === 'documents' && (
         <div className="space-y-6">
           
           {/* Header Banner for Documents */}
@@ -1806,13 +1872,24 @@ export const ProfileView = () => {
 
           {/* Feedback banner */}
           {docFeedback.text && (
-            <div className={`p-4 rounded-xl text-sm font-medium border flex items-center gap-3 transition-all ${
+            <div className={`p-4 rounded-xl text-sm font-medium border flex items-center justify-between gap-3 transition-all ${
               docFeedback.type === 'error'
                 ? 'bg-red-50 text-red-700 border-red-200'
                 : 'bg-green-50 text-green-700 border-green-200'
             }`}>
-              {docFeedback.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
-              <span>{docFeedback.text}</span>
+              <div className="flex items-center gap-3">
+                {docFeedback.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+                <span>{docFeedback.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDocFeedback({ type: '', text: '' })}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors cursor-pointer shrink-0"
+                title="Dismiss message"
+                aria-label="Dismiss message"
+              >
+                <X size={16} />
+              </button>
             </div>
           )}
 
@@ -1843,14 +1920,11 @@ export const ProfileView = () => {
                         </div>
                       </div>
 
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
-                        aadharDoc.status === 'uploaded' 
-                          ? 'bg-green-50 text-green-700 border border-green-200' 
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {aadharDoc.status === 'uploaded' ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
-                        {aadharDoc.status === 'uploaded' ? 'Uploaded' : 'Pending'}
-                      </span>
+                      {Boolean(aadharDoc.fileUrl) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-green-50 text-green-700 border border-green-200">
+                          <CheckCircle2 size={11} /> Uploaded
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs text-slate-500 mb-4 line-clamp-2">
@@ -1917,14 +1991,16 @@ export const ProfileView = () => {
                   </div>
 
                   {/* Action Buttons: View & Update/Upload */}
-                  <div className="grid grid-cols-2 gap-2 pt-4 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDocViewer(aadharDoc)}
-                      className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                    >
-                      <Eye size={14} /> View
-                    </button>
+                  <div className={`grid ${aadharDoc.fileUrl ? 'grid-cols-2' : 'grid-cols-1'} gap-2 pt-4 border-t border-slate-100`}>
+                    {aadharDoc.fileUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDocViewer(aadharDoc)}
+                        className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <Eye size={14} /> View
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -1937,7 +2013,7 @@ export const ProfileView = () => {
                       ) : (
                         <Upload size={14} />
                       )}
-                      {uploadingDocId === aadharDoc.id ? 'Uploading...' : 'Update'}
+                      {uploadingDocId === aadharDoc.id ? 'Uploading...' : (aadharDoc.fileUrl ? 'Update' : 'Upload')}
                     </button>
                   </div>
                 </div>
@@ -1959,14 +2035,11 @@ export const ProfileView = () => {
                         </div>
                       </div>
 
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
-                        panDoc.status === 'uploaded' 
-                          ? 'bg-green-50 text-green-700 border border-green-200' 
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {panDoc.status === 'uploaded' ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
-                        {panDoc.status === 'uploaded' ? 'Uploaded' : 'Pending'}
-                      </span>
+                      {Boolean(panDoc.fileUrl) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-green-50 text-green-700 border border-green-200">
+                          <CheckCircle2 size={11} /> Uploaded
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs text-slate-500 mb-4 line-clamp-2">
@@ -2033,14 +2106,16 @@ export const ProfileView = () => {
                   </div>
 
                   {/* Action Buttons: View & Update/Upload */}
-                  <div className="grid grid-cols-2 gap-2 pt-4 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDocViewer(panDoc)}
-                      className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Eye size={14} /> View
-                    </button>
+                  <div className={`grid ${panDoc.fileUrl ? 'grid-cols-2' : 'grid-cols-1'} gap-2 pt-4 border-t border-slate-100`}>
+                    {panDoc.fileUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDocViewer(panDoc)}
+                        className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Eye size={14} /> View
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -2053,7 +2128,7 @@ export const ProfileView = () => {
                       ) : (
                         <Upload size={14} />
                       )}
-                      {uploadingDocId === panDoc.id ? 'Uploading...' : 'Update'}
+                      {uploadingDocId === panDoc.id ? 'Uploading...' : (panDoc.fileUrl ? 'Update' : 'Upload')}
                     </button>
                   </div>
                 </div>
@@ -2075,14 +2150,11 @@ export const ProfileView = () => {
                         </div>
                       </div>
 
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
-                        passportPhotoDoc.status === 'uploaded' 
-                          ? 'bg-green-50 text-green-700 border border-green-200' 
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {passportPhotoDoc.status === 'uploaded' ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
-                        {passportPhotoDoc.status === 'uploaded' ? 'Uploaded' : 'Pending'}
-                      </span>
+                      {Boolean(passportPhotoDoc.fileUrl) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-green-50 text-green-700 border border-green-200">
+                          <CheckCircle2 size={11} /> Uploaded
+                        </span>
+                      )}
                     </div>
 
                     {/* Passport Photo Preview Box */}
@@ -2114,7 +2186,7 @@ export const ProfileView = () => {
                       <div className="flex items-center justify-between">
                         <span>Attached File:</span>
                         <span className="font-medium text-slate-700 truncate max-w-[140px] text-right">
-                          {passportPhotoDoc.fileName || 'Passport_Photo.jpg'}
+                          {passportPhotoDoc.fileName || (passportPhotoDoc.fileUrl ? 'Passport_Photo.jpg' : 'None')}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -2137,14 +2209,16 @@ export const ProfileView = () => {
                   </div>
 
                   {/* Action Buttons: View & Update/Upload */}
-                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDocViewer(passportPhotoDoc)}
-                      className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Eye size={14} /> View
-                    </button>
+                  <div className={`grid ${passportPhotoDoc.fileUrl ? 'grid-cols-3' : 'grid-cols-1'} gap-2 pt-4 border-t border-slate-100`}>
+                    {passportPhotoDoc.fileUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDocViewer(passportPhotoDoc)}
+                        className="profile-document-view w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Eye size={14} /> View
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -2157,24 +2231,26 @@ export const ProfileView = () => {
                       ) : (
                         <Upload size={14} />
                       )}
-                      {uploadingDocId === passportPhotoDoc.id ? 'Uploading...' : 'Update'}
+                      {uploadingDocId === passportPhotoDoc.id ? 'Uploading...' : (passportPhotoDoc.fileUrl ? 'Update' : 'Upload')}
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={handleDeletePassportPhoto}
-                      disabled={!passportPhotoDoc.fileUrl || isDeletingPassportPhoto || uploadingDocId === passportPhotoDoc.id}
-                      className="profile-document-delete w-full py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Delete passport size photo"
-                      aria-label="Delete passport size photo"
-                    >
-                      {isDeletingPassportPhoto ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={14} />
-                      )}
-                      Delete
-                    </button>
+                    {passportPhotoDoc.fileUrl && (
+                      <button
+                        type="button"
+                        onClick={handleDeletePassportPhoto}
+                        disabled={isDeletingPassportPhoto || uploadingDocId === passportPhotoDoc.id}
+                        className="profile-document-delete w-full py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Delete passport size photo"
+                        aria-label="Delete passport size photo"
+                      >
+                        {isDeletingPassportPhoto ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={14} />
+                        )}
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -2256,14 +2332,16 @@ export const ProfileView = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDocViewer(doc)}
-                        className="py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-xs"
-                      >
-                        <Eye size={13} /> View
-                      </button>
+                    <div className={`grid ${doc.fileUrl ? 'grid-cols-2' : 'grid-cols-1'} gap-2 pt-3 border-t border-slate-100`}>
+                      {doc.fileUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDocViewer(doc)}
+                          className="py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-xs"
+                        >
+                          <Eye size={13} /> View
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -2272,7 +2350,7 @@ export const ProfileView = () => {
                         className="py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-60 shadow-xs"
                       >
                         {uploadingDocId === doc.id ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                        Update
+                        {doc.fileUrl ? 'Update' : 'Upload'}
                       </button>
                     </div>
                   </div>
@@ -2407,7 +2485,7 @@ export const ProfileView = () => {
           onClick={handleCloseDocViewer}
         >
           <div 
-            className="bg-white border border-slate-200 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white border border-slate-200 rounded-xl w-full max-w-5xl h-[88vh] max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -2464,7 +2542,7 @@ export const ProfileView = () => {
             </div>
 
             {/* Viewer Zoom & Rotation Toolbar (For Image Preview) */}
-            {(!docViewerModal.doc.fileType?.includes('pdf') && !docViewerModal.doc.fileName?.endsWith('.pdf')) && (
+            {!isDocPdf(docViewerModal.doc) && docViewerModal.doc.fileUrl && (
               <div className="px-6 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 shrink-0">
                 <span className="font-medium">Image View Controls:</span>
                 <div className="flex items-center gap-2">
@@ -2506,7 +2584,7 @@ export const ProfileView = () => {
             )}
 
             {/* Modal Body: Document Preview Content */}
-            <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-slate-900/5 min-h-[360px]">
+            <div className={`flex-1 overflow-auto flex items-center justify-center bg-slate-900/5 ${isDocPdf(docViewerModal.doc) ? 'p-2 sm:p-3' : 'p-6'} min-h-[360px]`}>
               {!docViewerModal.doc.fileUrl ? (
                 <div className="text-center p-8">
                   <FileText size={48} className="mx-auto text-slate-400 mb-3 opacity-50" />
@@ -2517,42 +2595,23 @@ export const ProfileView = () => {
                     onClick={() => {
                       handleTriggerDocUpload(docViewerModal.doc.id);
                     }}
-                    className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5"
+                    className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Upload size={14} /> Upload Now
                   </button>
                 </div>
-              ) : (docViewerModal.doc.fileType?.includes('pdf') || docViewerModal.doc.fileName?.endsWith('.pdf')) ? (
-                /* PDF Document Preview Card */
-                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center max-w-md bg-white rounded-xl border border-slate-200 shadow-md">
-                  <div className="p-4 rounded-2xl bg-red-50 text-red-600 mb-4">
-                    <FileText size={48} />
-                  </div>
-                  <h4 className="text-base font-bold text-slate-900">{docViewerModal.doc.title}</h4>
-                  <p className="text-xs font-mono text-slate-500 mt-1">{docViewerModal.doc.fileName}</p>
-                  <p className="text-xs text-slate-400 mt-2">PDF Document Ready to View & Print</p>
-                  
-                  <div className="flex items-center gap-3 mt-6">
-                    <a
-                      href={docViewerModal.doc.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs transition-colors"
-                    >
-                      <ExternalLink size={14} /> Open Full PDF
-                    </a>
-                    <a
-                      href={docViewerModal.doc.fileUrl}
-                      download={docViewerModal.doc.fileName}
-                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold flex items-center gap-2 transition-colors"
-                    >
-                      <Download size={14} /> Download
-                    </a>
-                  </div>
+              ) : isDocPdf(docViewerModal.doc) ? (
+                /* Direct PDF Preview inside Viewer */
+                <div className="w-full h-full flex flex-col flex-1 min-h-[480px]">
+                  <iframe
+                    src={docViewerModal.doc.fileUrl}
+                    title={docViewerModal.doc.title || "PDF Document"}
+                    className="w-full h-full min-h-[480px] flex-1 rounded-lg border border-slate-200 bg-white shadow-inner"
+                  />
                 </div>
               ) : (
-                /* Image Preview with Interactive Scale & Rotation */
-                <div className="overflow-auto max-h-[60vh] flex items-center justify-center w-full">
+                /* Direct Image Preview with Interactive Scale & Rotation */
+                <div className="overflow-auto max-h-[70vh] flex items-center justify-center w-full">
                   <img
                     src={docViewerModal.doc.fileUrl}
                     alt={docViewerModal.doc.title}
@@ -2560,7 +2619,7 @@ export const ProfileView = () => {
                       transform: `scale(${docViewerModal.zoomLevel / 100}) rotate(${docViewerModal.rotation}deg)`,
                       transition: 'transform 0.15s ease-out'
                     }}
-                    className="max-h-[55vh] max-w-full object-contain rounded-lg shadow-lg border border-slate-200"
+                    className="max-h-[65vh] max-w-full object-contain rounded-lg shadow-lg border border-slate-200"
                   />
                 </div>
               )}

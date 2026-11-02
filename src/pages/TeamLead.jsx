@@ -1,7 +1,12 @@
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { AlertTriangle, ArrowRight, Crown, X } from "lucide-react";
-import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../utils/roleFilters";
+import {
+  isFinanceOrExcludedUser,
+  isUnknownEmployeeOrUser,
+  isHrRoleOrUser,
+  isStrictEmployeeRole
+} from "../utils/roleFilters";
 import { showToast } from "../components/common/Toast";
 
 const BASE_URL = "https://kt-backend-ttzj.onrender.com/api";
@@ -270,7 +275,8 @@ const AssignmentModal = ({
 
   useEffect(() => {
     if (lead && isOpen) {
-      const distinct = getDistinctAssignedEmployees(lead.assignedEmployees || [], employees);
+      const distinct = getDistinctAssignedEmployees(lead.assignedEmployees || [], employees)
+        .filter((emp) => isStrictEmployeeRole(emp));
       setSelectedEmployees(distinct.map(getEmployeeReferenceId).filter(Boolean));
       setSearchQuery("");
       setFilterType("all");
@@ -400,15 +406,11 @@ const AssignmentModal = ({
     return null;
   };
 
-  // Available Employees: Purely employees (NOT team lead, NOT admin, NOT finance, NOT current lead) - Deduplicated
+  // Available Employees: Purely users with employee role (NOT HR, NOT team lead, NOT admin, NOT finance, NOT current lead) - Deduplicated
   const availableEmployees = getDistinctAssignedEmployees(
     (employees || []).filter((emp) => {
       if (isCurrentLead(emp)) return false;
-      if (isFinanceOrExcludedUser(emp)) return false;
-      const role = (emp.role || emp.designation || '').toLowerCase().trim();
-      const isTeamLead = role.includes('lead') || emp.isTeamLead === true;
-      const isAdmin = role.includes('admin');
-      return !isTeamLead && !isAdmin;
+      return isStrictEmployeeRole(emp);
     }),
     employees
   );
@@ -421,6 +423,7 @@ const AssignmentModal = ({
   const handleEmployeeToggle = (employeeId) => {
     const empKey = getCanonicalEmployeeKey(employeeId, employees);
     const matched = findEmployeeByIdOrUser(employeeId, employees);
+    if (matched && !isStrictEmployeeRole(matched)) return;
     const canonicalId = matched ? String(matched._id) : String(employeeId);
 
     const isCurrentlyChecked = selectedEmployees.some((id) => getCanonicalEmployeeKey(id, employees) === empKey);
@@ -455,7 +458,8 @@ const AssignmentModal = ({
   };
 
   const handleSave = async () => {
-    const distinct = getDistinctAssignedEmployees(selectedEmployees, employees);
+    const distinct = getDistinctAssignedEmployees(selectedEmployees, employees)
+      .filter((emp) => isStrictEmployeeRole(emp));
     const distinctIds = distinct.map((emp) => String(emp._id));
 
     if (distinctIds.length === 0) {
@@ -499,7 +503,7 @@ const AssignmentModal = ({
 
   const validAvailableEmployees = useMemo(() => {
     return (availableEmployees || []).filter((emp) => {
-      if (!emp) return false;
+      if (!emp || !isStrictEmployeeRole(emp)) return false;
       const name = getDisplayName(emp);
       return Boolean(name && isValidName(name));
     });
@@ -1177,7 +1181,7 @@ const getDesignation = (lead) => {
 
       const isTeamLeadUser = (u) => {
         if (!u) return false;
-        if (isFinanceOrExcludedUser(u)) return false;
+        if (isFinanceOrExcludedUser(u) || isHrRoleOrUser(u)) return false;
         const role = String(u.role || '').toLowerCase().trim();
         const desig = String(u.designation?.designationName || u.designation?.name || u.designation || '').toLowerCase().trim();
         return (
@@ -1264,7 +1268,7 @@ const getDesignation = (lead) => {
       // Extract all employees from database marked as team lead (e.g. Yash Vaghasiya)
       const employeeTeamLeads = (fetchedEmployees || []).filter((emp) => {
         if (!emp) return false;
-        if (isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
+        if (isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp) || isHrRoleOrUser(emp)) return false;
         const role = String(emp.role || emp.designation || '').toLowerCase().trim();
         return emp.isTeamLead === true || role === 'team lead' || role === 'team_leader' || role === 'tl' || role.includes('lead');
       });
@@ -1333,6 +1337,7 @@ const getDesignation = (lead) => {
         if (!apiLead) return;
         if (isFinanceOrExcludedUser(apiLead) || (apiLead.teamLead && isFinanceOrExcludedUser(apiLead.teamLead))) return;
         if (isUnknownEmployeeOrUser(apiLead) || (apiLead.teamLead && isUnknownEmployeeOrUser(apiLead.teamLead))) return;
+        if (isHrRoleOrUser(apiLead) || (apiLead.teamLead && isHrRoleOrUser(apiLead.teamLead))) return;
 
         const leadId = 
           (typeof apiLead?.teamLead === 'string' ? apiLead.teamLead : null) ||
@@ -1416,9 +1421,9 @@ const getDesignation = (lead) => {
         const mergedLiveEmployees = [...apiEmployees, ...directlyAssignedEmployees];
         const distinctAssigned = getDistinctAssignedEmployees(mergedLiveEmployees, fetchedEmployees);
 
-        // Strictly filter out any employee without a valid resolved name (NO "Unnamed" or unknown)
+        // Strictly filter out any employee without a valid resolved name (NO "Unnamed" or unknown) and ONLY employee role
         const validNamedEmployees = distinctAssigned.filter((emp) => {
-          if (!emp) return false;
+          if (!emp || !isStrictEmployeeRole(emp)) return false;
           const name = getEmployeeName(emp);
           const email = emp.email || emp.user?.email || '';
           if (!isValidName(name) && (!email || !email.includes('@'))) return false;
@@ -1493,7 +1498,7 @@ const getDesignation = (lead) => {
       }
 
       const validEmployees = allEmployees.filter((emp) => {
-        if (!emp || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return false;
+        if (!emp || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp) || isHrRoleOrUser(emp)) return false;
         const name = getEmployeeName(emp);
         if (!name || isInvalidName(name)) return false;
         return true;
@@ -1525,6 +1530,7 @@ const getDesignation = (lead) => {
     const rawAssigned = assignedEmployees[lead._id] || lead.assignedEmployees || [];
     const distinctAssigned = getDistinctAssignedEmployees(rawAssigned, employees);
     const validAssigned = distinctAssigned.filter((emp) => {
+      if (!isStrictEmployeeRole(emp)) return false;
       const name = getEmployeeName(emp);
       return Boolean(name && isValidName(name));
     });
@@ -1819,7 +1825,7 @@ const getDesignation = (lead) => {
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL EMPLOYEES</p>
           </div>
           <p className="text-2xl sm:text-3xl font-bold text-slate-900">
-            {employees.filter((employee) => employee.role?.toLowerCase().trim() === "employee").length}
+            {employees.filter((employee) => isStrictEmployeeRole(employee)).length}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between">
@@ -1828,7 +1834,7 @@ const getDesignation = (lead) => {
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">TOTAL MEMBERS</p>
           </div>
           <p className="text-2xl sm:text-3xl font-bold text-slate-900">
-            {teamLeads.length + employees.filter((employee) => employee.role?.toLowerCase().trim() === "employee").length}
+            {teamLeads.length + employees.filter((employee) => isStrictEmployeeRole(employee)).length}
           </p>
         </div>
       </div>
@@ -1854,6 +1860,7 @@ const getDesignation = (lead) => {
             const rawAssigned = assignedEmployees[lead._id] || lead.assignedEmployees || [];
             const assignedList = getDistinctAssignedEmployees(rawAssigned, employees);
             const validAssignedList = assignedList.filter((emp) => {
+              if (!isStrictEmployeeRole(emp)) return false;
               const disp = getEmployeeDisplayName(emp);
               return Boolean(disp && isValidName(disp));
             });
