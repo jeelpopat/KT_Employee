@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Calendar } from 'lucide-react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
+import { invalidateCache } from '../../api/axios.js';
+import { expandHolidayDates } from '../../utils/holidayUtils.js';
 
 const API_BASE = 'https://kt-backend-ttzj.onrender.com/api/holiday';
 
@@ -58,7 +60,8 @@ const getAuthHeaders = () => {
 export default function Holidays() {
   const { confirm, confirmationDialog } = useConfirm();
   const [holidays, setHolidays] = useState([]);
-  const [date, setDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [title, setTitle] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -68,7 +71,6 @@ export default function Holidays() {
   const [view, setView] = useState('calendar');
   const [showModal, setShowModal] = useState(false);
   const titleInputRef = useRef(null);
-  const dateInputRef = useRef(null);
 
   const fetchHolidays = async () => {
     setLoading(true);
@@ -100,24 +102,11 @@ export default function Holidays() {
 
   const resetForm = (shouldClose = true) => {
     setEditingId(null);
-    setDate('');
+    setStartDate('');
+    setEndDate('');
     setTitle('');
     setError('');
     if (shouldClose) setShowModal(false);
-  };
-
-  const handleOpenDatePicker = () => {
-    try {
-      if (dateInputRef.current) {
-        if (typeof dateInputRef.current.showPicker === 'function') {
-          dateInputRef.current.showPicker();
-        } else {
-          dateInputRef.current.focus();
-        }
-      }
-    } catch {
-      dateInputRef.current?.focus();
-    }
   };
 
   useEffect(() => {
@@ -139,7 +128,9 @@ export default function Holidays() {
   const openAddHolidayModal = (selectedDate = '') => {
     resetForm(false);
     if (selectedDate) {
-      setDate(toStandardDateString(selectedDate));
+      const selectedDateValue = toStandardDateString(selectedDate);
+      setStartDate(selectedDateValue);
+      setEndDate(selectedDateValue);
     }
     setShowModal(true);
     setTimeout(() => {
@@ -150,55 +141,81 @@ export default function Holidays() {
   const handleSubmit = async (e) => { 
     e.preventDefault();
     const trimmedTitle = title.trim();
-    if (!date || !trimmedTitle) {
-      setError('Please fill in both date and title!');
+    if (!startDate || !endDate || !trimmedTitle) {
+      setError('Please fill in the date range and holiday title.');
+      return;
+    }
+    if (startDate > endDate) {
+      setError('End date cannot be earlier than start date.');
       return;
     }
 
+    const rangeDates = expandHolidayDates([{ startDate, endDate }]);
+    const conflictingHoliday = holidays.find((holiday) =>
+      rangeDates.includes(holiday.date) &&
+      holiday.id !== editingId &&
+      holiday.title.toLowerCase() !== trimmedTitle.toLowerCase()
+    );
+    if (conflictingHoliday) {
+      setError(`${conflictingHoliday.date} already has the holiday "${conflictingHoliday.title}".`);
+      return;
+    }
+
+    const datesToSave = editingId
+      ? [startDate]
+      : rangeDates.filter((rangeDate) => !holidays.some((holiday) =>
+        holiday.date === rangeDate &&
+        holiday.title.toLowerCase() === trimmedTitle.toLowerCase()
+      ));
+
     setIsSubmitting(true);
     setError('');
-
-    const payload = {
-      holidayName: trimmedTitle,
-      holidayDate: date,
-    };
+    let savedCount = 0;
 
     try {
-      const url = editingId ? `${API_BASE}/update/${editingId}` : `${API_BASE}/create`;
-      const method = editingId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(responseData.message || 'Unable to save holiday');
-      }
-
-      const savedHoliday = normalizeHoliday(
-        responseData.data || responseData.holiday || responseData || {
-          _id: editingId,
-          holidayDate: date,
+      for (const rangeDate of datesToSave) {
+        const payload = {
           holidayName: trimmedTitle,
+          holidayDate: rangeDate,
+        };
+        const url = editingId ? `${API_BASE}/update/${editingId}` : `${API_BASE}/create`;
+        const method = editingId ? 'PUT' : 'POST';
+        const response = await fetch(url, {
+          method,
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        const responseData = await response.json();
+        if (!response.ok) {
+          throw new Error(responseData.message || `Unable to save holiday for ${rangeDate}.`);
         }
-      );
+        invalidateCache(/holiday/);
 
-      setHolidays((prevHolidays) => {
+        const savedHoliday = normalizeHoliday(
+          responseData.data || responseData.holiday || responseData || {
+            _id: editingId || `${rangeDate}-${trimmedTitle}`,
+            holidayDate: rangeDate,
+            holidayName: trimmedTitle,
+          }
+        );
         if (editingId) {
-          return prevHolidays.map((holiday) =>
+          setHolidays((previous) => previous.map((holiday) =>
             holiday.id === editingId ? savedHoliday : holiday
-          );
+          ));
+        } else {
+          setHolidays((previous) => [...previous, savedHoliday]);
         }
-        return [...prevHolidays, savedHoliday];
-      });
-
+        savedCount += 1;
+      }
       resetForm();
     } catch (submitError) {
       console.error('Holiday save failed', submitError);
-      setError('Unable to save holiday. Please try again.');
+      if (savedCount > 0) {
+        await fetchHolidays();
+        setError(`Saved ${savedCount} holiday date(s), but the rest could not be saved. ${submitError.message}`);
+      } else {
+        setError(submitError.message || 'Unable to save holiday. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -206,7 +223,8 @@ export default function Holidays() {
 
   const handleEdit = (holiday) => {
     setEditingId(holiday.id);
-    setDate(toStandardDateString(holiday.date));
+    setStartDate(toStandardDateString(holiday.date));
+    setEndDate(toStandardDateString(holiday.date));
     setTitle(holiday.title);
     setError('');
     setShowModal(true);
@@ -236,6 +254,7 @@ export default function Holidays() {
         throw new Error(data.message || 'Unable to delete holiday');
       }
 
+      invalidateCache(/holiday/);
       setHolidays((prevHolidays) => prevHolidays.filter((holiday) => holiday.id !== id));
       if (editingId === id) resetForm();
     } catch (deleteError) {
@@ -755,34 +774,50 @@ export default function Holidays() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs sm:text-sm font-semibold text-slate-700">
-                        Select Date <span className="text-rose-500">*</span>
-                      </label>
-                      {date && (
-                        <span className="text-2xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-                          {parseHolidayDate(date)?.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        ref={dateInputRef}
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="w-full border border-slate-300 pl-3.5 pr-10 py-2.5 text-sm rounded-xl bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer shadow-2xs [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                        required
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs sm:text-sm font-semibold text-slate-700">
+                          {editingId ? 'Select Date' : 'Start Date'} <span className="text-rose-500">*</span>
+                        </label>
+                        {startDate && (
+                          <span className="text-2xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                            {parseHolidayDate(startDate)?.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => {
+                            const nextStartDate = e.target.value;
+                            setStartDate(nextStartDate);
+                            if (!endDate || endDate < nextStartDate) setEndDate(nextStartDate);
+                          }}
+                          className="w-full border border-slate-300 pl-3.5 pr-3 py-2.5 text-sm rounded-xl bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer shadow-2xs"
+                          required
+                        />
                       </div>
                     </div>
-                    <p className="mt-1 text-2xs text-slate-400">
-                      Click anywhere on the box to select date
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs sm:text-sm font-semibold text-slate-700">
+                          End Date <span className="text-rose-500">*</span>
+                        </label>
+                      </div>
+                      <input
+                        type="date"
+                        value={endDate}
+                        min={startDate || undefined}
+                        disabled={Boolean(editingId)}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full border border-slate-300 px-3.5 py-2.5 text-sm rounded-xl bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer shadow-2xs disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                        required
+                      />
+                    </div>
+                    <p className="sm:col-span-2 -mt-2 text-2xs text-slate-400">
+                      The holiday title will be applied to every date from start to end, inclusive.
                     </p>
                   </div>
 
@@ -824,7 +859,7 @@ export default function Holidays() {
                       {isSubmitting && (
                         <Loader2 className="w-4 h-4 animate-spin text-white" />
                       )}
-                      <span>{isSubmitting ? 'Saving...' : editingId ? 'Update Holiday' : 'Add Holiday'}</span>
+                      <span>{isSubmitting ? 'Saving...' : editingId ? 'Update Holiday' : 'Apply Holiday Range'}</span>
                     </button>
                   </div>
                 </form>

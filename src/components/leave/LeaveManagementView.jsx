@@ -6,6 +6,8 @@ import {
 import api from '../../api/axios.js'; 
 import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
 import { isEmployeeRole, fetchEmployeeTeamLead } from '../../utils/teamLeadUtils.js';
+import { expandHolidayDates } from '../../utils/holidayUtils.js';
+import { LeaveDatePicker } from '../common/LeaveDatePicker.jsx';
 
 export const LeaveManagementView = () => {
   const { user, userRole } = useApp();
@@ -19,6 +21,8 @@ export const LeaveManagementView = () => {
     totalLeaves: 12, usedLeaves: 0, remainingLeaves: 12, pendingRequests: 0 
   });
   const [holidaysList, setHolidaysList] = useState([]);
+  const [holidaysLoaded, setHolidaysLoaded] = useState(false);
+  const [holidayLoadError, setHolidayLoadError] = useState('');
   
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -341,17 +345,18 @@ export const LeaveManagementView = () => {
 
       setLeaveRequests(myLeavesOnly);
 
-      // 2. Fetch Holidays List to calculate working days
-      const year = new Date().getFullYear();
+      // 2. Fetch holidays for every year that could be selected in a leave range.
       try {
-        const holidayRes = await api.get(`/api/holiday/all?year=${year}`);
+        const holidayRes = await api.get('/api/holiday/all');
         const hList = holidayRes.data?.holidays || holidayRes.data?.data || holidayRes.data;
-        if (Array.isArray(hList)) {
-          const dates = hList.map(h => (h.holidayDate || h.date || '').split('T')[0]).filter(Boolean);
-          setHolidaysList(dates);
-        }
+        if (!Array.isArray(hList)) throw new Error('Holiday response has an invalid format.');
+        setHolidaysList([...new Set(expandHolidayDates(hList))]);
+        setHolidaysLoaded(true);
+        setHolidayLoadError('');
       } catch (holErr) {
         console.warn('Holiday fetch notice:', holErr.message);
+        setHolidaysLoaded(false);
+        setHolidayLoadError('Unable to verify company holidays. Refresh the page before applying for leave.');
       }
 
       // 3. Fetch employee's assigned Team Lead
@@ -500,6 +505,19 @@ export const LeaveManagementView = () => {
 
     if (!isHalfDayActive && finalEndDate < startDate) {
       setFormError('End date cannot be earlier than start date.');
+      return;
+    }
+
+    if (!holidaysLoaded) {
+      setFormError(holidayLoadError || 'Company holiday dates are still loading. Please try again.');
+      return;
+    }
+
+    const holidayInRange = holidaysList.find((holidayDate) =>
+      holidayDate >= startDate && holidayDate <= finalEndDate
+    );
+    if (holidayInRange) {
+      setFormError(`${holidayInRange} is a company holiday. Select a leave range that does not include it.`);
       return;
     }
 
@@ -1094,20 +1112,12 @@ export const LeaveManagementView = () => {
                       {isHalfDay || leaveType === 'half_day' ? 'Leave Date' : 'Start Date'}
                       <span className="text-red-500 ml-0.5">*</span>
                     </label>
-                    <input 
-                      type="date" 
-                      min={minAllowedDate}
-                      max="9999-12-31"
+                    <LeaveDatePicker
                       value={startDate}
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (val && !isValidLeaveDate(val)) {
-                          const message = 'Please enter a valid date using a 4-digit year.';
-                          e.target.setCustomValidity(message);
-                          setFormError(message);
-                          return;
-                        }
-                        e.target.setCustomValidity('');
+                      minDate={minAllowedDate}
+                      disabledDates={holidaysList}
+                      disabled={!holidaysLoaded}
+                      onChange={val => {
                         if (val && val < minAllowedDate) {
                           setFormError(`Policy Notice: Leave must be applied at least 2 days in advance (from ${minAllowedDate} onwards).`);
                         } else {
@@ -1123,11 +1133,11 @@ export const LeaveManagementView = () => {
                           }
                         }
                       }}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-                      required
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Allowed from: <span className="font-semibold text-slate-700">{minAllowedDate}</span> onwards
+                      {holidaysLoaded
+                        ? <>Allowed from: <span className="font-semibold text-slate-700">{minAllowedDate}</span> onwards. Company holidays are unavailable.</>
+                        : holidayLoadError || 'Loading company holiday dates...'}
                     </p>
                   </div>
                   <div>
@@ -1138,20 +1148,13 @@ export const LeaveManagementView = () => {
                         <span className="text-xs font-normal text-slate-500 ml-1.5">(Auto-synced with Leave Date)</span>
                       )}
                     </label>
-                    <input 
-                      type="date" 
-                      min={startDate || minAllowedDate}
-                      max="9999-12-31"
+                    <LeaveDatePicker
                       value={(isHalfDay || leaveType === 'half_day') ? startDate : endDate}
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (val && !isValidLeaveDate(val)) {
-                          const message = 'Please enter a valid date using a 4-digit year.';
-                          e.target.setCustomValidity(message);
-                          setFormError(message);
-                          return;
-                        }
-                        e.target.setCustomValidity('');
+                      minDate={startDate || minAllowedDate}
+                      rangeStart={startDate}
+                      disabledDates={holidaysList}
+                      disabled={!holidaysLoaded || isHalfDay || leaveType === 'half_day' || !startDate}
+                      onChange={val => {
                         if (val && val < minAllowedDate) {
                           setFormError(`Policy Notice: Leave must be applied at least 2 days in advance (from ${minAllowedDate} onwards).`);
                         } else if (startDate && val < startDate) {
@@ -1161,9 +1164,7 @@ export const LeaveManagementView = () => {
                         }
                         setEndDate(val);
                       }}
-                      disabled={isHalfDay || leaveType === 'half_day' || !startDate}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                      required={!(isHalfDay || leaveType === 'half_day')}
+                      placeholder="Select date"
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
                       {isHalfDay || leaveType === 'half_day'
@@ -1175,7 +1176,7 @@ export const LeaveManagementView = () => {
                   </div>
                 </div>
                 <p className="text-[11px] text-amber-600 font-medium">
-                  Notice: Leaves must be applied at least 2 days in advance (selectable from {minAllowedDate}).
+                  Notice: Leaves must be applied at least 2 days in advance. Company holidays cannot be included in the requested date range.
                 </p>
               </div>
               
