@@ -2462,19 +2462,15 @@ export default function Adjustments() {
 
                 <div className="flex w-full gap-2 sm:w-auto">
 
-                  <button
-                    type="button"
-                    onClick={
-                      addSession
-                    }
-                    className="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 sm:py-1 transition-colors sm:flex-none"
-                    disabled={
-                      sessionCount >=
-                      2
-                    }
-                  >
-                    + Add Session
-                  </button>
+                  {sessionCount < 2 && (
+                    <button
+                      type="button"
+                      onClick={addSession}
+                      className="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 sm:py-1 transition-colors sm:flex-none"
+                    >
+                      + Add Session
+                    </button>
+                  )}
 
                   <button
                     type="button"
