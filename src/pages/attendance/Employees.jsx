@@ -72,6 +72,9 @@ const isTeamLeadEmployee = (employee) =>
 const canDeleteOrAssignTeamLead = (employee) =>
   !["HR", "Admin"].includes(getEmployeeRoleLabel(employee));
 
+const canAssignTeamLead = (employee) =>
+  !["HR", "Admin", "CA", "Accountant"].includes(getEmployeeRoleLabel(employee));
+
 const isHrOrAdminRole = (role) => {
   const normalizedRole = String(role || "").trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
   return normalizedRole === "hr" || normalizedRole.startsWith("hr ") ||
@@ -1387,31 +1390,33 @@ export default function Employees() {
                                 </button>
 
                                 {/* TEAM LEAD */}
-                                <button
-                                  onClick={() =>
-                                    toggleTL(
-                                      emp,
-                                      isTeamLeadEmployee(emp)
-                                    )
-                                  }
-                                  title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                                    ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                                    : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                                    }`}
-                                >
-                                  {isTeamLeadEmployee(emp) ? (
-                                    <>
-                                      <UserMinus className="h-3.5 w-3.5 text-rose-500" />
-                                      Remove TL
-                                    </>
-                                  ) : (
-                                    <>
-                                      <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
-                                      Assign TL
-                                    </>
-                                  )}
-                                </button>
+                                {canAssignTeamLead(emp) && (
+                                  <button
+                                    onClick={() =>
+                                      toggleTL(
+                                        emp,
+                                        isTeamLeadEmployee(emp)
+                                      )
+                                    }
+                                    title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
+                                      ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+                                      : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
+                                      }`}
+                                  >
+                                    {isTeamLeadEmployee(emp) ? (
+                                      <>
+                                        <UserMinus className="h-3.5 w-3.5 text-rose-500" />
+                                        Remove TL
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
+                                        Assign TL
+                                      </>
+                                    )}
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -1539,31 +1544,33 @@ export default function Employees() {
                             Delete
                           </button>
 
-                          <button
-                            onClick={() =>
-                              toggleTL(
-                                emp,
-                                isTeamLeadEmployee(emp)
-                              )
-                            }
-                            title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                            className={`inline-flex min-w-[104px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                              ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                              : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                              }`}
-                          >
-                            {isTeamLeadEmployee(emp) ? (
-                              <>
-                                <UserMinus className="h-3.5 w-3.5 text-rose-500" />
-                                Remove TL
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
-                                Assign TL
-                              </>
-                            )}
-                          </button>
+                          {canAssignTeamLead(emp) && (
+                            <button
+                              onClick={() =>
+                                toggleTL(
+                                  emp,
+                                  isTeamLeadEmployee(emp)
+                                )
+                              }
+                              title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
+                              className={`inline-flex min-w-[104px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
+                                ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+                                : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
+                                }`}
+                            >
+                              {isTeamLeadEmployee(emp) ? (
+                                <>
+                                  <UserMinus className="h-3.5 w-3.5 text-rose-500" />
+                                  Remove TL
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
+                                  Assign TL
+                                </>
+                              )}
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -1689,31 +1696,33 @@ export default function Employees() {
                             Delete
                           </button>
 
-                          <button
-                            onClick={() =>
-                              toggleTL(
-                                emp,
-                                isTeamLeadEmployee(emp)
-                              )
-                            }
-                            title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                            className={`inline-flex min-w-[86px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                              ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                              : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                              }`}
-                          >
-                            {isTeamLeadEmployee(emp) ? (
-                              <>
-                                <UserMinus className="h-3 w-3 text-rose-500" />
-                                Remove TL
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="h-3 w-3 text-emerald-500" />
-                                Assign TL
-                              </>
-                            )}
-                          </button>
+                          {canAssignTeamLead(emp) && (
+                            <button
+                              onClick={() =>
+                                toggleTL(
+                                  emp,
+                                  isTeamLeadEmployee(emp)
+                                )
+                              }
+                              title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
+                              className={`inline-flex min-w-[86px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
+                                ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+                                : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
+                                }`}
+                            >
+                              {isTeamLeadEmployee(emp) ? (
+                                <>
+                                  <UserMinus className="h-3 w-3 text-rose-500" />
+                                  Remove TL
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="h-3 w-3 text-emerald-500" />
+                                  Assign TL
+                                </>
+                              )}
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
