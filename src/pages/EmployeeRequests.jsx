@@ -133,6 +133,31 @@ const isUserApproved = (user) =>
   user?.approved === true ||
   String(user?.status || '').trim().toLowerCase() === 'approved';
 
+const isReadOnlyRequestRole = (user) => {
+  if (isTeamLeadUser(user)) return false;
+
+  const roleValues = [
+    user?.role,
+    user?.userRole,
+    user?.roleName,
+    user?.employeeRole,
+    user?.roleType,
+  ];
+
+  const normalizeRole = (value) => {
+    const roleName = typeof value === 'string'
+      ? value
+      : value?.roleName || value?.name || value?.title || value?.designationName || '';
+    return String(roleName).toLowerCase().replace(/[_-]+/g, ' ').trim();
+  };
+  const isRestrictedRole = (role) =>
+    /\b(ca|chartered accountant|accountant|admin|administrator|hr|human resources)\b/.test(role);
+  const availableRoles = roleValues.map(normalizeRole).filter(Boolean);
+
+  if (availableRoles.length > 0) return availableRoles.some(isRestrictedRole);
+  return isRestrictedRole(normalizeRole(user?.designation));
+};
+
 const EmployeeRequests = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2251,7 +2276,8 @@ const EmployeeRequests = () => {
                 ) : null}
 
                 {/* Expandable Details */}
-                <div className="mt-2 sm:mt-3">
+                {!isReadOnlyRequestRole(user) && (
+                  <div className="mt-2 sm:mt-3">
                   <button
                     type="button"
                     onClick={() => toggleExpand(userId)}
@@ -2348,62 +2374,65 @@ const EmployeeRequests = () => {
                       </div>
                     </div>
                   )}
-                </div>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
-                <div className="mt-3 sm:mt-4 flex flex-col xs:flex-row gap-1.5 sm:gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleApproveClick(user);
-                    }}
-                    className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isApproved
-                      ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98] border border-blue-200/80'
-                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
-                      }`}
-                  >
-                    {isApproved ? (
-                      <span className="flex items-center justify-center gap-1.5">
-                        <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
-                        Change TL / Edit
-                      </span>
-                    ) : (
-                      <span className="flex items-center justify-center gap-1.5">
-                        <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        Approve...
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAction(user, isApproved ? 'revoke' : 'reject');
-                    }}
-                    disabled={isProcessingReject}
-                    className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isProcessingReject
-                      ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                      : isApproved
-                        ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-[1.02] active:scale-[0.98]'
-                        : 'bg-rose-100 text-rose-700 hover:bg-rose-200 hover:scale-[1.02] active:scale-[0.98]'
-                      }`}
-                  >
-                    {isProcessingReject ? (
-                      <span className="flex items-center justify-center gap-1.5">
-                        <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                        Processing...
-                      </span>
-                    ) : isApproved ? (
-                      <span className="flex items-center justify-center gap-1.5">
-                        <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-                        Revoke
-                      </span>
-                    ) : (
-                      'Reject'
-                    )}
-                  </button>
-                </div>
+                {!isReadOnlyRequestRole(user) && (
+                  <div className="mt-3 sm:mt-4 flex flex-col xs:flex-row gap-1.5 sm:gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApproveClick(user);
+                      }}
+                      className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isApproved
+                        ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98] border border-blue-200/80'
+                        : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
+                        }`}
+                    >
+                      {isApproved ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+                          Change TL / Edit
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          Approve...
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction(user, isApproved ? 'revoke' : 'reject');
+                      }}
+                      disabled={isProcessingReject}
+                      className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isProcessingReject
+                        ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                        : isApproved
+                          ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-[1.02] active:scale-[0.98]'
+                          : 'bg-rose-100 text-rose-700 hover:bg-rose-200 hover:scale-[1.02] active:scale-[0.98]'
+                        }`}
+                    >
+                      {isProcessingReject ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                          Processing...
+                        </span>
+                      ) : isApproved ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
+                          Revoke
+                        </span>
+                      ) : (
+                        'Reject'
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -3124,7 +3153,7 @@ const EmployeeRequests = () => {
                   </p>
                 </div>
 
-                {selectedUser?.isApproved ? (
+                {!isReadOnlyRequestRole(selectedUser) && (selectedUser?.isApproved ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -3150,7 +3179,7 @@ const EmployeeRequests = () => {
                     <ShieldCheck size={16} />
                     <span>Approve Employee Request</span>
                   </button>
-                )}
+                ))}
               </div>
             </div>
           </div>
