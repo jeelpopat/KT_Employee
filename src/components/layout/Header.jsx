@@ -55,7 +55,7 @@ export const Header = ({ onSignOut }) => {
   // --- Admin Notifications Feed States ---
   const [adminNotifications, setAdminNotifications] = useState([]);
   const [adminUnreadCount, setAdminUnreadCount] = useState(0);
-  const [adminTab, setAdminTab] = useState('unread'); // 'unread' | 'all' | 'read' | 'requests' | 'announcements'
+  const [adminTab, setAdminTab] = useState('unread'); // 'unread' | 'all' | 'read'
   const previousAdminUnreadRef = useRef(0);
 
   // --- Global Announcement Management States (Admin) ---
@@ -486,22 +486,10 @@ export const Header = ({ onSignOut }) => {
   // Admin filter lists
   const unreadAdminList = adminNotifications.filter((n) => !n.isRead);
   const readAdminList = adminNotifications.filter((n) => n.isRead);
-  const adminRequestsCount = adminNotifications.filter(
-    (n) => n.category === 'request' || n.type === 'LEAVE_REQUEST' || n.type === 'CHECKIN_REQUEST' || n.type === 'ADJUSTMENT_REQUEST'
-  ).length;
-  const adminAnnouncementsCount = adminNotifications.filter(
-    (n) => n.category === 'announcement' || n.type === 'ANNOUNCEMENT' || n.type === 'HOLIDAY'
-  ).length;
 
   const filteredAdminNotifications = adminNotifications.filter((n) => {
     if (adminTab === 'unread') return !n.isRead;
     if (adminTab === 'read') return n.isRead;
-    if (adminTab === 'requests') {
-      return n.category === 'request' || n.type === 'LEAVE_REQUEST' || n.type === 'CHECKIN_REQUEST' || n.type === 'ADJUSTMENT_REQUEST';
-    }
-    if (adminTab === 'announcements') {
-      return n.category === 'announcement' || n.type === 'ANNOUNCEMENT' || n.type === 'HOLIDAY';
-    }
     return true;
   });
 
@@ -829,26 +817,6 @@ export const Header = ({ onSignOut }) => {
                           }`}
                       >
                         Read ({readAdminList.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAdminTab('requests')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${adminTab === 'requests'
-                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                          : 'border-transparent text-slate-500 hover:text-slate-700'
-                          }`}
-                      >
-                        Requests ({adminRequestsCount})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAdminTab('announcements')}
-                        className={`px-2.5 py-1.5 rounded-t-md font-medium border-b-2 transition-all shrink-0 cursor-pointer ${adminTab === 'announcements'
-                          ? 'border-indigo-600 text-indigo-600 bg-indigo-50/40'
-                          : 'border-transparent text-slate-500 hover:text-slate-700'
-                          }`}
-                      >
-                        Announcements ({adminAnnouncementsCount})
                       </button>
                     </div>
 
