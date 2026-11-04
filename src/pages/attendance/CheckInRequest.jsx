@@ -287,7 +287,7 @@ const formatCheckInTime = (value) => {
 // EXTRACT EMPLOYEE INITIALS (e.g. "Pandya Hetvi" -> "HP")
 // ============================================================
 const getEmployeeInitials = (req) => {
-  if (!req) return "HP";
+  if (!req) return "EM";
   const raw = req.raw || req;
   const firstName =
     raw.firstName ||
@@ -310,14 +310,11 @@ const getEmployeeInitials = (req) => {
   }
 
   const name = (req.name || "").replace(/\([^)]*\)/g, "").trim();
-  if (!name) return "HP";
+  if (!name) return "EM";
 
   const parts = name.split(/\s+/).filter(Boolean);
   if (parts.length === 1) {
     return parts[0].slice(0, 2).toUpperCase();
-  }
-  if (parts[0].toLowerCase() === "pandya" && parts[1].toLowerCase() === "hetvi") {
-    return "HP";
   }
   return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
 };

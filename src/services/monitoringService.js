@@ -288,41 +288,6 @@ export const deriveSessionStatus = (attendanceStatus, isAutoCheckedOut = false) 
 
 // Helper to derive employee position (e.g. TL, EMP, HR, ADMIN)
 export const deriveEmployeePosition = (raw = {}, emp = {}) => {
-  const nameStr = (
-    raw?.employeeName ||
-    raw?.name ||
-    raw?.fullName ||
-    emp?.name ||
-    emp?.fullName ||
-    ''
-  ).toString().toLowerCase().trim();
-
-  const emailStr = (
-    raw?.email ||
-    raw?.userEmail ||
-    emp?.email ||
-    ''
-  ).toString().toLowerCase().trim();
-
-  const idStr = (
-    raw?.userId ||
-    raw?.employeeId ||
-    raw?._id ||
-    emp?._id ||
-    emp?.id ||
-    emp?.employeeId ||
-    ''
-  ).toString().toLowerCase().trim();
-
-  // Known company Team Leaders: Pandya Hetvi, etc.
-  if (
-    nameStr.includes('hetvi') ||
-    emailStr.includes('hetvi') ||
-    idStr.includes('6ab3894c4b9bcbcfe8afc6c')
-  ) {
-    return { short: 'TL', label: 'Team Leader', code: 'team_leader' };
-  }
-
   const roleStr = (
     raw?.position ||
     raw?.positionShort ||
@@ -347,13 +312,15 @@ export const deriveEmployeePosition = (raw = {}, emp = {}) => {
     raw?.isTeamLead === true ||
     emp?.isTeamLeader === true ||
     emp?.isTeamLead === true ||
+    raw?.profile?.isTeamLeader === true ||
+    raw?.profile?.isTeamLead === true ||
     raw?.position === 'TL' ||
     raw?.positionShort === 'TL' ||
     emp?.position === 'TL' ||
     emp?.positionShort === 'TL' ||
     roleStr.includes('lead') ||
     roleStr.includes('leader') ||
-    roleStr.includes('tl') ||
+    roleStr === 'tl' ||
     roleStr.includes('team lead') ||
     roleStr.includes('team_leader');
 

@@ -132,7 +132,6 @@ export const deriveUserRole = (u) => {
   ).toString().toLowerCase().trim();
 
   const emailStr = (u.email || u.user?.email || u.employee?.email || '').toLowerCase().trim();
-  const nameStr = (u.name || u.fullName || u.employee?.name || u.employee?.fullName || '').toLowerCase().trim();
 
   // 1. Check for Team Leader first (so TL is never misclassified)
   // 1. Check for HR (role "hr" or HR indicators checked first)
@@ -171,8 +170,8 @@ export const deriveUserRole = (u) => {
     u.isTeamLead === true ||
     u.employee?.isTeamLeader === true ||
     u.employee?.isTeamLead === true ||
-    emailStr === 'hetvi.kevalon@gmail.com' ||
-    nameStr.includes('hetvi')
+    u.profile?.isTeamLeader === true ||
+    u.profile?.isTeamLead === true
   ) {
     return 'team_leader';
   }
@@ -924,14 +923,7 @@ export const AppProvider = ({ children }) => {
     const devInfo = getDeviceInfoString();
 
     // Determine Employee Position: TL, EMP, HR, ADMIN
-    const isTLUser =
-      userRole === 'team_leader' ||
-      user?.isTeamLeader === true ||
-      user?.name?.toLowerCase().includes('hetvi') ||
-      empName?.toLowerCase().includes('hetvi') ||
-      user?.email?.toLowerCase().includes('hetvi') ||
-      String(effectiveUserId).toLowerCase().includes('6ab3894c4b9bcbcfe8afc6c') ||
-      String(empId).toLowerCase().includes('6ab3894c4b9bcbcfe8afc6c');
+    const isTLUser = userRole === 'team_leader' || deriveUserRole(mergedUser) === 'team_leader';
 
     const positionInfo = isTLUser
       ? { short: 'TL', label: 'Team Leader' }
@@ -1670,30 +1662,13 @@ export const AppProvider = ({ children }) => {
         ''
       ).toLowerCase().trim();
 
-      const candidateName = String(
-        candidate?.name ||
-        candidate?.fullName ||
-        candidate?.employee?.name ||
-        candidate?.employee?.fullName ||
-        candidate?.user?.name ||
-        tokenPayload?.name ||
-        ''
-      ).toLowerCase().trim();
-
-      const empIdStr = String(
-        candidate?.employeeId ||
-        candidate?.employeeID ||
-        candidate?.employee?.employeeID ||
-        candidate?.employee?.employeeId ||
-        prof.uniqueID ||
-        ''
-      ).toUpperCase().trim();
-
       const isTLFlag = (
         candidate?.isTeamLeader === true ||
         candidate?.isTeamLead === true ||
         candidate?.employee?.isTeamLeader === true ||
         candidate?.employee?.isTeamLead === true ||
+        candidate?.profile?.isTeamLeader === true ||
+        candidate?.profile?.isTeamLead === true ||
         tokenPayload?.isTeamLeader === true ||
         tokenPayload?.isTeamLead === true
       );
@@ -1741,9 +1716,8 @@ export const AppProvider = ({ children }) => {
         designationStr.includes('team leader') ||
         designationStr.includes('teamlead') ||
         isTLFlag ||
-        empIdStr === 'EMP1002' ||
-        candidateEmail === 'hetvi.kevalon@gmail.com' ||
-        candidateName.includes('hetvi')
+        prof.isTeamLeader === true ||
+        prof.isTeamLead === true
       ) {
         determinedRole = 'team_leader';
         if (!resolvedRoleName || resolvedRoleName.toLowerCase() === 'employee') {

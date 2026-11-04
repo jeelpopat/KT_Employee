@@ -334,37 +334,7 @@ export const AdminScreenshotPortal = () => {
     const empInfo = getRecordEmployeeInfo(rec);
     const nameStr = (empInfo.name || rec.employeeName || '').toLowerCase();
 
-    const emailStr = String(
-      rec.email ||
-      rec.userEmail ||
-      rec.employee?.email ||
-      rec.employeeId?.email ||
-      user?.email ||
-      ''
-    ).toLowerCase();
-
-    const idStr = String(
-      rec.userId ||
-      rec.employeeId ||
-      empInfo.id ||
-      rec._id ||
-      rec.id ||
-      rec.employee?._id ||
-      rec.employee?.id ||
-      rec.employeeId?._id ||
-      ''
-    ).toLowerCase();
-
-    // 1. Hetvi or other known TLs are strictly Team Leader (TL)
-    if (
-      nameStr.includes('hetvi') ||
-      emailStr.includes('hetvi') ||
-      idStr.includes('6ab3894c4b9bcbcfe8afc6c')
-    ) {
-      return { short: 'TL', label: 'Team Leader', code: 'team_leader' };
-    }
-
-    // 2. If this screenshot belongs to active logged in user
+    // 1. If this screenshot belongs to active logged in user
     if (user && (
       rec.employeeId === user.employeeId ||
       rec.employeeId === user.id ||
@@ -380,7 +350,7 @@ export const AdminScreenshotPortal = () => {
       if (userRole === 'hr') return { short: 'HR', label: 'HR Manager', code: 'hr' };
     }
 
-    // 3. Team leader flags and role strings
+    // 2. Team leader flags and role strings
     const isTL =
       rec.isTeamLeader === true ||
       rec.isTeamLead === true ||
@@ -397,7 +367,7 @@ export const AdminScreenshotPortal = () => {
       return { short: 'TL', label: 'Team Leader', code: 'team_leader' };
     }
 
-    // 4. If explicit non-EMP position was specified in the record
+    // 3. If explicit non-EMP position was specified in the record
     if (rec.positionShort && rec.positionShort !== 'EMP' && rec.positionLabel) {
       return { short: rec.positionShort, label: rec.positionLabel };
     }

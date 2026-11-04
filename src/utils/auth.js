@@ -204,7 +204,6 @@ export const deriveUserRoleFromData = (u, raw, authToken, fallbackStoredRole) =>
   ).toLowerCase().trim();
 
   if (email === "harsh@kevalontechnology.in") return "admin";
-  if (email === "hetvi.kevalon@gmail.com") return "team_leader";
 
   // Check token claims if available
   if (authToken) {
@@ -261,7 +260,13 @@ export const deriveUserRoleFromData = (u, raw, authToken, fallbackStoredRole) =>
     roleVal.includes("team leader") ||
     desig.includes("team lead") ||
     desig.includes("team leader") ||
-    desig.includes("teamlead")
+    desig.includes("teamlead") ||
+    candidate.isTeamLeader === true ||
+    candidate.isTeamLead === true ||
+    emp.isTeamLeader === true ||
+    emp.isTeamLead === true ||
+    prof.isTeamLeader === true ||
+    prof.isTeamLead === true
   ) {
     return "team_leader";
   }

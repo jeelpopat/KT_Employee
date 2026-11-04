@@ -372,9 +372,7 @@ const Performance = () => {
     normalizedRole.includes("team lead") ||
     normalizedRole.includes("team leader") ||
     user?.isTeamLeader === true ||
-    user?.isTeamLead === true ||
-    user?.email?.toLowerCase().trim() === "hetvi.kevalon@gmail.com" ||
-    user?.name?.toLowerCase().includes("hetvi")
+    user?.isTeamLead === true
   );
   const canViewEditActions = canViewPerformanceActions || isTL;
 
@@ -572,7 +570,7 @@ const Performance = () => {
 
       const userIdent = getLoggedInUserIdentifiers(user);
       const myId = String(getRealAuthUserId(user) || user?._id || user?.id || "").toLowerCase().trim();
-      const myEmail = String(user?.email || "hetvi.kevalon@gmail.com").toLowerCase().trim();
+      const myEmail = String(user?.email || "").toLowerCase().trim();
 
       // Lead matching helper
       const isLeadMatch = (leadObj) => {
@@ -584,7 +582,6 @@ const Performance = () => {
           if (userIdent.ids?.has(s)) return true;
           if (userIdent.emails?.has(s)) return true;
           if (userIdent.names?.has(s)) return true;
-          if (s.includes("hetvi") && (myEmail.includes("hetvi") || myId.includes("hetvi") || [...userIdent.names].some((n) => n.includes("hetvi")))) return true;
           const resolved = uMap[s];
           if (resolved && resolved !== leadObj) return isLeadMatch(resolved);
           return false;
@@ -607,9 +604,6 @@ const Performance = () => {
           ].filter(Boolean).map((x) => String(x).toLowerCase().trim());
           if (lNames.some((nm) => userIdent.names?.has(nm))) return true;
 
-          if (lEmails.some((em) => em.includes("hetvi")) || lNames.some((nm) => nm.includes("hetvi"))) {
-            if (myEmail.includes("hetvi") || [...userIdent.names].some((n) => n.includes("hetvi"))) return true;
-          }
           return false;
         }
         return false;
@@ -1506,7 +1500,7 @@ const Performance = () => {
       const storedAssignments = JSON.parse(localStorage.getItem("teamLeadAssignedEmployees") || "{}");
       for (const [tlKey, empIds] of Object.entries(storedAssignments)) {
         const normKey = String(tlKey).toLowerCase().trim();
-        if (myIdentity.ids.has(normKey) || myIdentity.emails.has(normKey) || normKey.includes("hetvi")) {
+        if (myIdentity.ids.has(normKey) || myIdentity.emails.has(normKey) || myIdentity.names.has(normKey)) {
           if (Array.isArray(empIds)) {
             const matchesStored = empIds.some((empId) => (targetId && String(empId).toLowerCase().trim() === targetId) || perfIdentity.ids.has(String(empId).toLowerCase().trim()));
             if (matchesStored) return true;
