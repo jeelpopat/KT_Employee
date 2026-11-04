@@ -7,6 +7,7 @@ import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
 import { ToastContainer, showToast } from './components/common/Toast.jsx';
+import { LoadingScreen } from './components/common/Loader.jsx';
 import { stopScreenCapture } from './services/monitoringService.js';
 
 // Lazy-load layout and views so unauthenticated users download ONLY the Login screen
@@ -225,13 +226,9 @@ const MainLayout = ({ handleSignOut }) => {
         <div className="lg:pl-60 flex flex-col min-h-screen pt-16 bg-[#F4F4F4]">
           <main className="flex-1 p-3 pt-4 sm:p-5 sm:pt-6 lg:p-6 lg:pt-6 bg-[#F4F4F4]">
             <div className="page-content w-full">
-              <Suspense fallback={
-                <div className="flex items-center justify-center min-h-[350px]">
-                  <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              }>
-                {renderActiveTab()}
-              </Suspense>
+              <Suspense fallback={<LoadingScreen message="Loading section..." />}>
+                    {renderActiveTab()}
+                  </Suspense>
             </div>
           </main>
         </div>
@@ -435,12 +432,7 @@ export default function App() {
   };
 
   if (isCheckingAuth) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 font-sans">
-        <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-        <p className="text-xs font-semibold text-slate-500 tracking-tight">Verifying session...</p>
-      </div>
-    );
+    return <LoadingScreen message="Verifying session..." fullScreen className="bg-slate-50 font-sans" />;
   }
 
   return (
@@ -449,11 +441,7 @@ export default function App() {
       {isAuthenticated ? (
         <MainLayout handleSignOut={handleSignOut} />
       ) : authView === 'reset_password' ? (
-        <Suspense fallback={
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        }>
+        <Suspense fallback={<LoadingScreen message="Loading password reset..." fullScreen />}>
           <ResetPasswordView onBackToLogin={() => setAuthView('login')} />
         </Suspense>
       ) : authView === 'forgot_password' ? (

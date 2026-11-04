@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { LoadingScreen } from "../../components/common/Loader.jsx";
 import { useLocation } from "react-router-dom";
 import Toast, { showToast } from "../../components/common/Toast";
 import {
@@ -2282,11 +2283,10 @@ export default function Adjustments() {
       ====================================================== */}
 
       {loading && (
-        <div className="flex flex-col justify-center items-center py-16 sm:py-24">
-          <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
-          <p className="text-sm font-semibold text-slate-800">Loading attendance adjustment console...</p>
-          <p className="text-xs text-slate-500 mt-1">Fetching employee lists and adjustment history</p>
-        </div>
+        <LoadingScreen
+          message="Loading attendance adjustment console..."
+          description="Fetching employee lists and adjustment history"
+        />
       )}
  
       <div

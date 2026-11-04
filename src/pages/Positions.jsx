@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { LoadingScreen } from "../components/common/Loader.jsx";
 import { 
   Pencil, Trash2, X, Plus, Briefcase, MapPin, Clock, Users, Tag, List, 
   Search, Filter, ChevronDown, Eye, Sparkles, Building2, Calendar, 
@@ -328,9 +329,7 @@ export default function Positions() {
       {/* Main Content */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
           {loading ? (
-            <div className="flex justify-center items-center py-16 sm:py-20">
-              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
-            </div>
+            <LoadingScreen message="Loading positions..." />
           ) : filteredPositions.length === 0 ? (
             <div className="text-center py-20">
               <div className="flex justify-center mb-6">

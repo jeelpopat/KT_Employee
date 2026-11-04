@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { LoadingScreen } from "../../components/common/Loader.jsx";
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
@@ -2266,11 +2267,10 @@ export default function AttendanceLogs() {
 
         {/* LOADING & TABLE */}
         {loading ? (
-          <div className="p-16 text-center font-poppins">
-            <RefreshCw size={28} className="animate-spin text-[#0088cc] mx-auto mb-3" />
-            <p className="text-xs font-semibold text-slate-500">Loading attendance records...</p>
-            <p className="text-[11px] text-slate-400 mt-1">Fetching latest team logs for {formatIndianDate(selectedDate)}</p>
-          </div>
+          <LoadingScreen
+            message="Loading attendance records..."
+            description={`Fetching latest team logs for ${formatIndianDate(selectedDate)}`}
+          />
         ) : filteredAndSortedLogs.length === 0 ? (
           <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50 font-poppins">
             <Clock size={36} className="text-slate-300 mx-auto mb-3" />

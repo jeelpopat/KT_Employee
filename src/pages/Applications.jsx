@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { LoadingScreen } from "../components/common/Loader.jsx";
 import { Briefcase } from "lucide-react";
 import Toast from "../components/common/Toast";
 
@@ -257,9 +258,7 @@ export default function Applications() {
       {/* Main Content */}
       <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
         {loading ? (
-          <div className="flex justify-center items-center py-16 sm:py-20">
-            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-[#0088cc]" />
-          </div>
+          <LoadingScreen message="Loading applications..." />
         ) : applications.length === 0 ? (
           <div className="text-center py-12 sm:py-16">
             <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import { 
   PhoneCall, Clock, Calendar, User, Briefcase, AlertCircle, 
   CheckCircle2, Search, ChevronDown, ChevronUp, RefreshCw, 
@@ -449,11 +450,7 @@ export const DailyFollowUpView = () => {
 
       {/* 3. Loading & Error States */}
       {isLoading ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-xs">
-          <RefreshCw size={28} className="animate-spin text-indigo-600 mx-auto mb-3" />
-          <p className="text-sm font-bold text-slate-800">Loading Team Daily Reports...</p>
-          <p className="text-xs text-slate-500 mt-1">Connecting to /api/dailyUpdate/list?teamLeadId={tlUserId || 'TL_ID'}</p>
-        </div>
+        <LoadingScreen message="Loading Team Daily Reports..." />
       ) : fetchError && groupedByPerson.length === 0 ? (
         <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center space-y-2">
           <AlertCircle size={28} className="text-rose-600 mx-auto" />

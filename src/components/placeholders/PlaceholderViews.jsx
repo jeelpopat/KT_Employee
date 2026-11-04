@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import {
   Wallet, TrendingUp, Briefcase, Users, BookOpen, GraduationCap,
   FileBadge, PhoneCall, ListTodo, CalendarX, ClipboardCheck,
@@ -314,10 +315,7 @@ export const PerformanceView = () => {
       </div>
 
       {initialLoading && !hasLoadedRef.current && !performanceData ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white border border-slate-200/80 rounded-xl">
-          <Loader2 size={32} className="animate-spin text-indigo-500" />
-          <p className="text-xs text-slate-500 font-medium">Loading your performance metrics...</p>
-        </div>
+        <LoadingScreen message="Loading your performance metrics..." />
       ) : !performanceData ? (
         <div className="flex flex-col items-center justify-center p-16 bg-white border border-slate-200/80 rounded-xl text-center space-y-3">
           <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
@@ -636,10 +634,7 @@ export const TeamMembersView = () => {
       )}
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-16 space-y-3">
-          <Loader2 size={32} className="animate-spin text-indigo-500" />
-          <p className="text-sm text-slate-500">Loading your project teammates...</p>
-        </div>
+        <LoadingScreen message="Loading your project teammates..." />
       ) : filteredMembers.length === 0 ? (
         <div className="bg-white border border-slate-200/80 rounded-xl p-10 text-center shadow-xs">
           <Users size={36} className="mx-auto text-slate-400 mb-2 opacity-60" />
@@ -998,9 +993,7 @@ export const EmployeesView = () => {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 size={32} className="animate-spin text-indigo-500" />
-          </div>
+          <LoadingScreen message="Loading team members..." />
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <Users size={36} className="mx-auto text-slate-400 mb-2 opacity-60" />
@@ -1788,10 +1781,7 @@ export const TeamTaskManagementView = () => {
 
       {/* Main Content Area */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white border border-slate-200/80 rounded-xl">
-          <Loader2 size={32} className="animate-spin text-indigo-500" />
-          <p className="text-xs text-slate-500 font-medium">Loading live team tasks...</p>
-        </div>
+        <LoadingScreen message="Loading live team tasks..." />
       ) : filteredTasks.length === 0 ? (
         <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center space-y-3">
           <div className="p-3 bg-slate-100 text-slate-400 rounded-full w-fit mx-auto">
@@ -2682,10 +2672,7 @@ export const TeamLeaveManagementView = () => {
 
       {/* Applications List */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white border border-slate-200 rounded-lg">
-          <Loader2 size={32} className="animate-spin text-rose-500" />
-          <p className="text-xs text-slate-500 font-medium">Loading team leave requests...</p>
-        </div>
+        <LoadingScreen message="Loading team leave requests..." />
       ) : filteredLeaves.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-lg p-12 text-center space-y-2">
           <CheckCircle2 size={36} className="text-emerald-500 mx-auto" />

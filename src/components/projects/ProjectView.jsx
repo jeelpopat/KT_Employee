@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import {
   Briefcase, Calendar, Users, CheckCircle2, Clock, 
   Search, Filter, Loader2, RefreshCw, FolderKanban,
@@ -708,10 +709,7 @@ export const ProjectView = () => {
 
       {/* Projects Grid */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-16 space-y-3">
-          <Loader2 size={32} className="animate-spin text-indigo-600" />
-          <p className="text-sm text-slate-500">Loading live projects and assigned team members...</p>
-        </div>
+        <LoadingScreen message="Loading live projects and assigned team members..." />
       ) : filteredProjects.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-lg p-12 text-center shadow-xs">
           <FolderKanban size={40} className="mx-auto text-slate-400 mb-3 opacity-60" />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import {
   List, Kanban, Search, Clock, Paperclip, MessageSquare,
   CheckSquare, TrendingUp, FileCheck, AlertCircle, Loader2,
@@ -466,10 +467,7 @@ export const TaskManagementView = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3">
-          <Loader2 className="animate-spin text-indigo-600" size={32} />
-          <p className="text-sm text-slate-500">Loading live tasks...</p>
-        </div>
+        <LoadingScreen message="Loading live tasks..." />
       ) : (
         <>
           {viewMode === 'kanban' ? (

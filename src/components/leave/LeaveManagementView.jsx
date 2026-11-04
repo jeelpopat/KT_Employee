@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import { 
   Plus, CheckCircle2, Clock, XCircle, 
   Paperclip, Search, Info, Calendar, FileText, Loader2, RefreshCw, AlertCircle, AlertTriangle, UserX, UserCheck
@@ -803,10 +804,7 @@ export const LeaveManagementView = () => {
 
         <div className="overflow-x-auto">
           {isLoading ? (
-             <div className="flex flex-col items-center justify-center p-12 space-y-3">
-               <Loader2 size={24} className="animate-spin text-indigo-500" />
-               <span className="text-sm text-slate-500 font-medium">Loading history...</span>
-             </div>
+            <LoadingScreen message="Loading history..." />
           ) : (
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wider border-b border-slate-200">

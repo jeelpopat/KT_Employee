@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { LoadingScreen } from "../components/common/Loader.jsx";
 import { 
   Users, Mail, FolderOpen, Search, Filter, TrendingUp, Clock, ChevronDown, 
   X, Calendar, User, Briefcase, Tag, AlertCircle, CheckCircle, MessageCircle,
@@ -360,9 +361,7 @@ export default function PortfolioLeads() {
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center py-16 sm:py-20">
-              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
-            </div>
+            <LoadingScreen message="Loading portfolio leads..." />
           ) : filteredLeads.length === 0 ? (
             <div className="text-center py-16 sm:py-20">
               <div className="flex justify-center mb-4">

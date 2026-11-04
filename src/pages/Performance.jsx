@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { LoadingScreen } from "../components/common/Loader.jsx";
 import { useConfirm } from "../components/common/ConfirmDialog";
 import {
   BarChart3,
@@ -2381,10 +2382,7 @@ const Performance = () => {
 
         {/* Table Container */}
         {initialLoading && performances.length === 0 ? (
-          <div className="p-16 text-center font-poppins">
-            <RefreshCw size={28} className="animate-spin text-[#0088cc] mx-auto mb-3" />
-            <p className="text-xs font-semibold text-slate-500">Loading performance data...</p>
-          </div>
+          <LoadingScreen message="Loading performance data..." />
         ) : filteredPerformances.length === 0 ? (
           <div className="p-16 text-center font-poppins">
             <Award size={36} className="text-slate-300 mx-auto mb-3" />

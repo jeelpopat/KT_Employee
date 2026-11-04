@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { LoadingScreen } from "../../components/common/Loader.jsx";
 import {
   Users,
   Plus,
@@ -1219,11 +1220,10 @@ export default function Employees() {
 
         {/* ================= LOADING ================= */}
         {loading ? (
-          <div className="flex flex-col justify-center items-center py-16 sm:py-24">
-            <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
-            <p className="text-sm font-semibold text-slate-800">Loading employee directory...</p>
-            <p className="text-xs text-slate-500 mt-1">Fetching team records and credentials</p>
-          </div>
+          <LoadingScreen
+            message="Loading employee directory..."
+            description="Fetching team records and credentials"
+          />
 
         ) : filteredEmployees.length === 0 ? (
 

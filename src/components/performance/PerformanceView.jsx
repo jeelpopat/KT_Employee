@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import { TrendingUp, RefreshCw, Loader2, Award } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
@@ -285,10 +286,7 @@ export const PerformanceView = () => {
       </div>
 
       {initialLoading && !hasLoadedRef.current && !performanceData ? (
-        <div className="flex flex-col items-center justify-center p-16 space-y-3 bg-white border border-slate-200/80 rounded-xl">
-          <Loader2 size={32} className="animate-spin text-indigo-500" />
-          <p className="text-xs text-slate-500 font-medium">Loading your performance metrics...</p>
-        </div>
+        <LoadingScreen message="Loading your performance metrics..." />
       ) : !performanceData ? (
         <div className="flex flex-col items-center justify-center p-16 bg-white border border-slate-200/80 rounded-xl text-center space-y-3">
           <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">

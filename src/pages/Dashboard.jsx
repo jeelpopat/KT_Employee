@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { LoadingScreen } from "../components/common/Loader.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -754,9 +755,7 @@ export default function Dashboard() {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-4.5 font-poppins">
       {loading && (
-        <div className="flex justify-center items-center py-12 sm:py-16">
-          <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-[#005a7d]" />
-        </div>
+        <LoadingScreen message="Loading dashboard..." />
       )}
       {!loading && (
         <>

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { LoadingScreen } from '../components/common/Loader.jsx';
 import {
   Users,
   CheckCircle,
@@ -2104,9 +2105,7 @@ const EmployeeRequests = () => {
 
       {/* Loading State */}
       {loading && (
-        <div className="flex justify-center items-center py-16 sm:py-20">
-          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
-        </div>
+        <LoadingScreen message="Loading employee requests..." />
       )}
 
       {/* Error State */}

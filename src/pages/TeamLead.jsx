@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { LoadingScreen } from "../components/common/Loader.jsx";
 import axios from "axios";
 import { AlertTriangle, ArrowRight, Crown, X } from "lucide-react";
 import {
@@ -1748,11 +1749,7 @@ const getDesignation = (lead) => {
   const isAdmin = userRole === 'admin';
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh] py-16 sm:py-20">
-        <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600" />
-      </div>
-    );
+    return <LoadingScreen message="Loading team lead data..." />;
   }
  
   if (error) {

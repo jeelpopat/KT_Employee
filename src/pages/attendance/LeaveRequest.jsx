@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LoadingScreen } from "../../components/common/Loader.jsx";
 import {
   Calendar,
   CalendarDays,
@@ -1624,11 +1625,10 @@ export default function LeaveRequest() {
   // ==========================================================
 
   const Loader = () => (
-    <div className="flex flex-col justify-center items-center py-16 sm:py-24">
-      <Loader2 className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-3" />
-      <p className="text-sm font-semibold text-slate-800">Loading leave requests...</p>
-      <p className="text-xs text-slate-500 mt-1">Fetching latest employee leave applications</p>
-    </div>
+    <LoadingScreen
+      message="Loading leave requests..."
+      description="Fetching latest employee leave applications"
+    />
   );
 
   // ==========================================================

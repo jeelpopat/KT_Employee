@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import { 
   Shield, Save, CheckCircle2, User, 
   Mail, Phone, Briefcase, Calendar, 
@@ -1271,12 +1272,7 @@ export const ProfileView = () => {
   };
 
   if (isLoadingData) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <Loader2 size={32} className="animate-spin text-indigo-600" />
-        <p className="text-sm text-slate-500 font-medium">Loading your profile & documents...</p>
-      </div>
-    );
+    return <LoadingScreen message="Loading your profile & documents..." />;
   }
 
   const fullName = name || resolveEmployeeName(profileData) || resolveEmployeeName(contextUser) || (contextUser?.email ? contextUser.email.split('@')[0] : '') || '';

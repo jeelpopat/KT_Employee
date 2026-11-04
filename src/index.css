@@ -167,6 +167,19 @@
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+@keyframes loading-progress {
+  0% {
+    transform: translateX(-140%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+.loading-progress-bar {
+  animation: loading-progress 1.8s ease-in-out infinite;
+}
+
 @media (max-width: 768px) {
   body {
     font-size: 0.8125rem;

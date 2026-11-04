@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import { LoadingScreen } from "../../components/common/Loader.jsx";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import { 
@@ -2205,10 +2206,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
         {/* Project List */}
         {loading ? (
-          <div className="flex flex-col justify-center items-center py-20 bg-white rounded-2xl border border-slate-200/80">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3" />
-            <p className="text-sm font-medium text-slate-500">Loading projects and tasks...</p>
-          </div>
+          <LoadingScreen message="Loading projects and tasks..." />
         ) : (
           <div className="space-y-4">
             {filteredProjects.length > 0 ? (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import { 
   ShieldCheck, Search, Clock, User, Play, Pause, HardDrive, Sliders,
   CheckCircle2, AlertTriangle, PlayCircle, StopCircle, RefreshCw, Settings,
@@ -977,10 +978,7 @@ export const AdminScreenshotPortal = () => {
         </div>
 
         {isLoading ? (
-          <div className="p-16 flex flex-col items-center justify-center space-y-3">
-            <RefreshCw size={24} className="animate-spin text-indigo-600" />
-            <span className="text-xs text-slate-500 font-medium">Loading screenshot archives...</span>
-          </div>
+          <LoadingScreen message="Loading screenshot archives..." />
         ) : filteredScreenshots.length === 0 ? (
           <div className="p-16 text-center space-y-2">
             <Camera size={36} className="mx-auto text-slate-400" />

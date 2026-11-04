@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, ArrowUpDown, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
-import { TableSkeleton } from './Loader';
+import { LoadingScreen } from './Loader.jsx';
 import EmptyState from './EmptyState';
 
 export const Table = ({
@@ -122,7 +122,7 @@ export const Table = ({
               {isLoading ? (
                 <tr>
                   <td colSpan={columns.length} className="p-0">
-                    <TableSkeleton rows={pageSize} cols={columns.length} />
+                    <LoadingScreen message="Loading records..." />
                   </td>
                 </tr>
               ) : paginatedData.length > 0 ? (

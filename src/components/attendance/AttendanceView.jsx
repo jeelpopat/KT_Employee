@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LoadingScreen } from '../common/Loader.jsx';
 import {
   Clock, Calendar, Search, RotateCcw,
   CheckCircle2, AlertTriangle, PlayCircle, StopCircle, Coffee, Loader2, MapPin
@@ -415,9 +416,8 @@ export const AttendanceView = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {isLoading ? (
-          <div className="xl:col-span-2 flex flex-col items-center justify-center p-16 space-y-4">
-            <Loader2 size={32} className="animate-spin text-indigo-500" />
-            <span className="text-sm font-medium text-slate-500">Loading attendance history...</span>
+          <div className="xl:col-span-2">
+            <LoadingScreen message="Loading attendance history..." />
           </div>
         ) : filteredRecords.length === 0 ? (
           <div className="xl:col-span-2 flex flex-col items-center justify-center p-16 space-y-4 bg-white border border-slate-200/80 rounded-xl shadow-xs">
