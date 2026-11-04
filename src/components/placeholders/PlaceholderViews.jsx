@@ -2228,6 +2228,25 @@ export const TeamTaskManagementView = () => {
 };
 
 // 11. TEAM LEAVE MANAGEMENT (Team Leader #4) - Live API integration with strict assigned-team scoping
+const extractLeaveList = (responseData) => {
+  const candidates = [
+    responseData,
+    responseData?.data,
+    responseData?.leaves,
+    responseData?.history,
+    responseData?.requests,
+    responseData?.result,
+    responseData?.data?.leaves,
+    responseData?.data?.history,
+    responseData?.data?.requests,
+    responseData?.data?.result,
+  ];
+
+  return candidates.find((candidate) => Array.isArray(candidate) && candidate.length > 0) ||
+    candidates.find(Array.isArray) ||
+    [];
+};
+
 export const TeamLeaveManagementView = () => {
   const { user } = useApp();
   const [leaves, setLeaves] = useState([]);
@@ -2338,9 +2357,12 @@ export const TeamLeaveManagementView = () => {
         const rawUsers = uRes.value.data?.users || uRes.value.data?.data || (Array.isArray(uRes.value.data) ? uRes.value.data : []);
         if (Array.isArray(rawUsers)) {
           rawUsers.forEach(u => {
-            if (u._id) uMap[String(u._id)] = u;
-            if (u.id) uMap[String(u.id)] = u;
-            if (u.employeeId) uMap[String(u.employeeId)] = u;
+            [
+              u._id, u.id, u.userId, u.userID, u.employeeId, u.employeeID,
+              u.empId, u.uniqueID, u.uniqueId, u.employeeCode,
+            ].filter(Boolean).forEach(id => {
+              uMap[String(id).toLowerCase().trim()] = u;
+            });
             if (u.email) uMap[u.email.toLowerCase().trim()] = u;
           });
           setUsersMap(uMap);
@@ -2360,13 +2382,11 @@ export const TeamLeaveManagementView = () => {
       let allLeavesList = [];
       try {
         const res = await api.get('/api/leave/all');
-        const raw = res.data?.data || res.data?.leaves || res.data?.history || (Array.isArray(res.data) ? res.data : []);
-        if (Array.isArray(raw) && raw.length > 0) allLeavesList = raw;
+        allLeavesList = extractLeaveList(res.data);
       } catch (err1) {
         try {
           const res2 = await api.get('/api/employee-panel/leaves/history');
-          const raw2 = res2.data?.data || res2.data?.leaves || res2.data?.history || (Array.isArray(res2.data) ? res2.data : []);
-          if (Array.isArray(raw2) && raw2.length > 0) allLeavesList = raw2;
+          allLeavesList = extractLeaveList(res2.data);
         } catch (err2) {
           console.warn('Could not load leaves:', err2);
         }

@@ -424,72 +424,95 @@ export const isLeaveOfAssignedTeam = (leave, teamScope, usersMap = {}) => {
     return false;
   }
 
-  const rawEmp =
-    leave.employeeId && typeof leave.employeeId === 'object'
-      ? leave.employeeId
-      : leave.employee || leave.user || leave.userId || {};
+  const leaveIds = new Set();
+  const leaveEmails = new Set();
+  const leaveNames = new Set();
+  const identityKeys = [
+    '_id', 'id', 'userId', 'userID', 'employeeId', 'employeeID',
+    'empId', 'uniqueID', 'uniqueId', 'employeeCode',
+  ];
+  const entityKeys = [
+    'employee', 'user', 'userId', 'employeeId', 'applicant', 'applicantId',
+    'appliedBy', 'createdBy', 'profile',
+  ];
+  const ignoredNames = new Set([
+    'employee', 'unknown', 'unknown employee', 'user', 'team member',
+  ]);
+  const addEntity = (entity, depth = 0) => {
+    if (!entity) return;
+    if (typeof entity !== 'object') {
+      leaveIds.add(String(entity).toLowerCase().trim());
+      return;
+    }
 
-  const leaveIds = [
-    typeof leave.employeeId === 'string' ? leave.employeeId : null,
-    typeof leave.employee === 'string' ? leave.employee : null,
-    typeof leave.user === 'string' ? leave.user : null,
-    typeof leave.applicantId === 'string' ? leave.applicantId : null,
-    typeof leave.applicantID === 'string' ? leave.applicantID : null,
-    typeof leave.userId === 'string' ? leave.userId : null,
-    typeof leave.appliedBy === 'string' ? leave.appliedBy : null,
-    rawEmp?._id ? String(rawEmp._id) : null,
-    rawEmp?.id ? String(rawEmp.id) : null,
-    rawEmp?.employeeId ? String(rawEmp.employeeId) : null,
-    rawEmp?.empId ? String(rawEmp.empId) : null,
-    leave.id ? String(leave.id) : null,
-  ]
-    .filter(Boolean)
-    .map((s) => String(s).toLowerCase().trim());
+    identityKeys.forEach((key) => {
+      if (entity[key] && typeof entity[key] !== 'object') {
+        leaveIds.add(String(entity[key]).toLowerCase().trim());
+      }
+    });
+    [entity.email, entity.employeeEmail].filter(Boolean).forEach((email) => {
+      leaveEmails.add(String(email).toLowerCase().trim());
+    });
+
+    const fullName = entity.name || entity.fullName || entity.displayName ||
+      (entity.firstName ? `${entity.firstName} ${entity.lastName || ''}`.trim() : '');
+    if (fullName) {
+      const name = String(fullName).toLowerCase().trim();
+      if (!ignoredNames.has(name)) leaveNames.add(name);
+    }
+
+    if (depth < 2) {
+      entityKeys.forEach((key) => {
+        if (entity[key] && entity[key] !== entity) addEntity(entity[key], depth + 1);
+      });
+    }
+  };
+
+  [
+    leave.employeeId,
+    leave.employeeID,
+    leave.userID,
+    leave.empId,
+    leave.uniqueID,
+    leave.uniqueId,
+    leave.employeeCode,
+    leave.employee,
+    leave.user,
+    leave.userId,
+    leave.applicant,
+    leave.applicantId,
+    leave.applicantID,
+    leave.appliedBy,
+    leave.createdBy,
+  ].forEach((entity) => addEntity(entity));
+  [leave.email, leave.applicantEmail, leave.employeeEmail].filter(Boolean).forEach((email) => {
+    leaveEmails.add(String(email).toLowerCase().trim());
+  });
+  [leave.name, leave.employeeName, leave.applicantName].filter(Boolean).forEach((name) => {
+    const normalizedName = String(name).toLowerCase().trim();
+    if (!ignoredNames.has(normalizedName)) leaveNames.add(normalizedName);
+  });
 
   for (const id of leaveIds) {
     if (memberIds.has(id)) return true;
-    const u = usersMap[id];
-    if (u) {
-      if (u._id && memberIds.has(String(u._id).toLowerCase().trim())) return true;
-      if (u.id && memberIds.has(String(u.id).toLowerCase().trim())) return true;
-      if (u.employeeId && memberIds.has(String(u.employeeId).toLowerCase().trim())) return true;
-      if (u.email && memberEmails.has(String(u.email).toLowerCase().trim())) return true;
+    const user = usersMap[id];
+    if (user) {
+      const userIds = identityKeys
+        .map((key) => user[key])
+        .filter((value) => value && typeof value !== 'object')
+        .map((value) => String(value).toLowerCase().trim());
+      if (userIds.some((userId) => memberIds.has(userId))) return true;
+
+      const userEmails = [user.email, user.employeeEmail, user.user?.email, user.employee?.email]
+        .filter(Boolean)
+        .map((email) => String(email).toLowerCase().trim());
+      if (userEmails.some((email) => memberEmails.has(email))) return true;
     }
   }
-
-  const leaveEmails = [
-    leave.email,
-    leave.applicantEmail,
-    leave.employeeEmail,
-    rawEmp?.email,
-  ]
-    .filter(Boolean)
-    .map((s) => String(s).toLowerCase().trim());
 
   for (const email of leaveEmails) {
     if (memberEmails.has(email)) return true;
   }
-
-  const leaveNames = [
-    leave.name,
-    leave.employeeName,
-    leave.applicantName,
-    rawEmp?.name,
-    rawEmp?.fullName,
-    rawEmp?.firstName ? `${rawEmp.firstName} ${rawEmp.lastName || ''}`.trim() : null,
-  ]
-    .filter(Boolean)
-    .map((s) => String(s).toLowerCase().trim())
-    .filter(
-      (n) =>
-        ![
-          'employee',
-          'unknown',
-          'unknown employee',
-          'user',
-          'team member',
-        ].includes(n)
-    );
 
   for (const name of leaveNames) {
     if (memberNames.has(name)) return true;
@@ -703,4 +726,3 @@ export const fetchEmployeeTeamLead = async () => {
 
   return null;
 };
-

@@ -466,9 +466,12 @@ export default function LeaveRequest() {
         const rawUsers = uRes.value?.users || uRes.value?.data || (Array.isArray(uRes.value) ? uRes.value : []);
         if (Array.isArray(rawUsers)) {
           rawUsers.forEach(u => {
-            if (u._id) uMap[String(u._id)] = u;
-            if (u.id) uMap[String(u.id)] = u;
-            if (u.employeeId) uMap[String(u.employeeId)] = u;
+            [
+              u._id, u.id, u.userId, u.userID, u.employeeId, u.employeeID,
+              u.empId, u.uniqueID, u.uniqueId, u.employeeCode,
+            ].filter(Boolean).forEach(id => {
+              uMap[String(id).toLowerCase().trim()] = u;
+            });
             if (u.email) uMap[u.email.toLowerCase().trim()] = u;
           });
           setUsersMap(uMap);
