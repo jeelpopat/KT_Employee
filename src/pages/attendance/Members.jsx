@@ -169,18 +169,28 @@ const isAttendanceMatch = (member, record) => {
   return false;
 };
 
-const PROJECT_API_BASE = 'https://kt-backend-ttzj.onrender.com/api/projectManage';
+const API_BASE = 'https://kt-backend-ttzj.onrender.com/api';
+const PROJECT_API_BASE = `${API_BASE}/projectManage`;
 
-const normalizeArrayPayload = (payload) => {
+const normalizeArrayPayload = (payload, depth = 0) => {
   if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== 'object') return [];
-  if (Array.isArray(payload.data)) return payload.data;
-  if (Array.isArray(payload.projects)) return payload.projects;
-  if (Array.isArray(payload.tasks)) return payload.tasks;
-  if (Array.isArray(payload.items)) return payload.items;
-  if (Array.isArray(payload.dailyUpdates)) return payload.dailyUpdates;
-  if (Array.isArray(payload.updates)) return payload.updates;
-  return [];
+  if (!payload || typeof payload !== 'object' || depth > 4) return [];
+
+  let emptyArray = null;
+  for (const key of ['data', 'projects', 'tasks', 'items', 'dailyUpdates', 'dailyReports', 'updates', 'reports']) {
+    if (Array.isArray(payload[key])) {
+      if (payload[key].length > 0) return payload[key];
+      emptyArray = payload[key];
+      continue;
+    }
+    if (payload[key] && typeof payload[key] === 'object') {
+      const nested = normalizeArrayPayload(payload[key], depth + 1);
+      if (nested.length > 0) return nested;
+    }
+  }
+
+  if (emptyArray) return emptyArray;
+  return payload._id || payload.id || payload.todaysWork ? [payload] : [];
 };
 
 const getMemberIdentityValues = (member = {}) => {
@@ -189,6 +199,8 @@ const getMemberIdentityValues = (member = {}) => {
     member?._id,
     member?.employeeId,
     member?.userId,
+    member?.employeeID,
+    member?.userID,
     member?.email,
   ].filter(Boolean);
 
@@ -213,11 +225,25 @@ const hasMemberMatch = (value, member) => {
       value?.userId,
       value?.employeeId,
       value?.userID,
+      value?.employeeID,
+      value?.email,
     ]
       .filter(Boolean)
       .map((id) => String(id).trim().toLowerCase());
 
-    return objectIds.some((id) => memberIds.includes(id));
+    if (objectIds.some((id) => memberIds.includes(id))) return true;
+
+    return [
+      value?.user,
+      value?.employee,
+      value?.assignedTo,
+      value?.assignee,
+      value?.userId,
+      value?.employeeId,
+      value?.userID,
+      value?.employeeID,
+    ]
+      .some((nested) => nested && hasMemberMatch(nested, member));
   }
 
   const valueId = String(value).trim().toLowerCase();
@@ -257,13 +283,21 @@ const taskMatchesMember = (task, member) => {
 
   const fields = [
     task?.assignedTo,
+    task?.assignedToUser,
+    task?.assignedUserId,
     task?.assignedEmployee,
+    task?.assignedEmployees,
+    task?.assignedEmployeeId,
+    task?.assignedEmployeeID,
     task?.assignedTeamLeadUser,
     task?.assignedTeamLeadEmployee,
     task?.employee,
+    task?.employeeId,
+    task?.employeeID,
     task?.user,
     task?.assignedUser,
-    task?.assignee
+    task?.assignee,
+    task?.assigneeId,
   ];
 
   return fields.some((field) => hasMemberMatch(field, member));
@@ -780,7 +814,7 @@ const fetchAllMembers = async () => {
     }
 
     const fetchAttendanceStatuses = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
       if (!token) return;
 
       try {
@@ -897,7 +931,11 @@ const fetchAllMembers = async () => {
     setMemberInsightsLoading(true);
     setMemberInsights({ projects: [], tasks: [], dailyUpdates: [] });
 
-    const memberIdentifier = member?.id || member?.employeeId || member?.email || member?.name || '';
+    const memberIdentifiers = [...new Set(
+      [member?.id, member?.userId, member?.employeeId]
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+    )];
     const token = localStorage.getItem('token');
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -914,13 +952,45 @@ const fetchAllMembers = async () => {
           .filter((project) => projectMatchesMember(project, member));
       });
 
-      const tasksPromise = memberIdentifier
-        ? fetch(`${PROJECT_API_BASE}/task/employee/${encodeURIComponent(memberIdentifier)}`, { headers }).then(async (response) => {
-            if (!response.ok) return [];
-            const payload = await response.json();
-            return normalizeArrayPayload(payload).filter((task) => taskMatchesMember(task, member));
-          })
-        : Promise.resolve([]);
+      const tasksPromise = (async () => {
+        const fetchTasks = async (url) => {
+          const response = await fetch(url, { headers });
+          if (!response.ok) {
+            console.warn(`Failed to fetch member tasks from ${url}:`, response.status);
+            return [];
+          }
+          return normalizeArrayPayload(await response.json());
+        };
+
+        for (const identifier of memberIdentifiers) {
+          for (const baseUrl of [`${API_BASE}/task`, `${PROJECT_API_BASE}/task`]) {
+            try {
+              const tasks = await fetchTasks(
+                `${baseUrl}/employee/${encodeURIComponent(identifier)}`
+              );
+              const matchingTasks = tasks.filter((task) => taskMatchesMember(task, member));
+              if (matchingTasks.length > 0) return matchingTasks;
+            } catch (error) {
+              console.warn('Member-specific task lookup failed:', error);
+            }
+          }
+        }
+
+        for (const endpoint of [
+          `${API_BASE}/task/all`,
+          `${PROJECT_API_BASE}/task/all`,
+        ]) {
+          try {
+            const tasks = (await fetchTasks(endpoint))
+              .filter((task) => taskMatchesMember(task, member));
+            if (tasks.length > 0) return tasks;
+          } catch (error) {
+            console.warn(`Task list fallback failed for ${endpoint}:`, error);
+          }
+        }
+
+        return [];
+      })();
 
       const [projects, tasks] = await Promise.all([projectsPromise, tasksPromise]);
 
@@ -946,32 +1016,61 @@ const fetchAllMembers = async () => {
         if (res.ok) {
           const payload = await res.json();
           const allReports = normalizeArrayPayload(payload);
-          const memberIdStr = String(member?._id || member?.id || member?.userId || member?.employeeId || '').toLowerCase();
-          const memberEmailStr = String(member?.email || '').toLowerCase();
           const taskIds = new Set(tasks.map(t => String(t?._id || t?.id || t?.taskId || '')));
+
+          const getReportTaskReferences = (report) => [
+            ...(Array.isArray(report?.taskReferences) ? report.taskReferences : []),
+            ...(Array.isArray(report?.tasks) ? report.tasks : []),
+            report?.taskId,
+            report?.task,
+          ].filter(Boolean);
 
           dailyUpdates = allReports.filter(report => {
             if (!report) return false;
-            // Match by task references
-            if (Array.isArray(report.taskReferences) && report.taskReferences.length > 0) {
-              const matchesTask = report.taskReferences.some(ref => {
-                const refId = String(typeof ref === 'object' ? (ref._id || ref.id || ref.taskId || '') : ref);
-                return refId && taskIds.has(refId);
-              });
-              if (matchesTask) return true;
-            }
-            // Match by employee/user
-            const empObj = report.employeeId || report.userId || report.user;
-            const empId = String(typeof empObj === 'object' ? (empObj?._id || empObj?.id || '') : (empObj || '')).toLowerCase();
-            const empEmail = String(typeof empObj === 'object' ? (empObj?.email || '') : (report.employeeEmail || report.email || '')).toLowerCase();
-            if (memberIdStr && empId && empId === memberIdStr) return true;
-            if (memberEmailStr && empEmail && empEmail === memberEmailStr) return true;
-            return false;
+            const matchesTask = getReportTaskReferences(report).some((ref) => {
+              const refId = String(
+                typeof ref === 'object' ? (ref._id || ref.id || ref.taskId || '') : ref
+              );
+              return refId && taskIds.has(refId);
+            });
+            const matchesMember = [
+              report.employeeId,
+              report.employeeID,
+              report.employee,
+              report.userId,
+              report.user,
+              report.createdBy,
+              report.submittedBy,
+              report.employeeEmail || report.email,
+            ].some((value) => hasMemberMatch(value, member));
+            const reportName = String(report.employeeName || report.userName || '').trim().toLowerCase();
+            const memberName = String(member?.name || '').trim().toLowerCase();
+            return matchesTask || matchesMember || (reportName && memberName && reportName === memberName);
           }).map(report => ({
             ...report,
-            updateText: report.todaysWork || report.workUpdate || report.updateText || report.description || 'Daily Update',
-            taskTitle: (Array.isArray(report.taskReferences) && report.taskReferences[0]?.taskTitle) || 'Project Task'
+            updateText: report.todaysWork || report.workUpdate || report.updateText || report.description || report.message || 'Daily Update',
+            taskTitle:
+              report.taskTitle ||
+              report.taskName ||
+              report.taskReferences?.[0]?.taskTitle ||
+              report.tasks?.[0]?.taskTitle ||
+              tasks.find((task) => {
+                const taskId = String(task?._id || task?.id || task?.taskId || '');
+                return getReportTaskReferences(report).some((ref) =>
+                  String(typeof ref === 'object' ? (ref?._id || ref?.id || ref?.taskId || '') : ref) === taskId
+                );
+              })?.taskTitle ||
+              tasks.find((task) => {
+                const taskId = String(task?._id || task?.id || task?.taskId || '');
+                return getReportTaskReferences(report).some((ref) =>
+                  String(typeof ref === 'object' ? (ref?._id || ref?.id || ref?.taskId || '') : ref) === taskId
+                );
+              })?.title ||
+              report.projectName ||
+              'Project Task'
           }));
+        } else {
+          console.warn('Failed to fetch member daily reports:', res.status);
         }
       } catch (err) {
         console.error('❌ Error fetching daily updates list:', err);
@@ -1536,7 +1635,7 @@ const fetchAllMembers = async () => {
                       {memberInsights.dailyUpdates.map((update, idx) => (
                         <li key={update?._id || update?.id || idx} className="text-[11px] text-slate-700">
                           <div className="font-medium truncate">{update?.taskTitle || 'Task update'}</div>
-                          <div className="text-[10px] text-slate-500">{update?.message || update?.description || 'No details provided'}</div>
+                          <div className="text-[10px] text-slate-500">{update?.updateText || update?.todaysWork || update?.workUpdate || update?.description || update?.message || 'No details provided'}</div>
                         </li>
                       ))}
                     </ul>
