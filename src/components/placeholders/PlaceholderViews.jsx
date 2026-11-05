@@ -421,27 +421,45 @@ export const TeamMembersView = () => {
       const userEmail = (user?.email || user?.user?.email || '').toLowerCase().trim();
       const userId = String(user?._id || user?.id || user?.employee?._id || user?.employeeId || '');
 
-      // 1. Fetch live projects and tasks
-      const [projRes, taskRes] = await Promise.allSettled([
+      // Fetch project data and the Team Lead assignment directory.
+      const [projRes, taskRes, teamsRes, usersRes, employeesRes] = await Promise.allSettled([
         api.get('/api/projectManage/project/all'),
-        api.get('/api/task/all')
+        api.get('/api/task/all'),
+        api.get('/api/teamLead/team'),
+        api.get('/api/users/all'),
+        api.get('/api/employee/list')
       ]);
 
-      const projects = projRes.status === 'fulfilled' && Array.isArray(projRes.value.data?.data)
-        ? projRes.value.data.data
+      const unwrapList = (payload, keys, depth = 0) => {
+        if (Array.isArray(payload)) return payload;
+        if (!payload || typeof payload !== 'object' || depth > 3) return [];
+        for (const key of keys) {
+          if (Array.isArray(payload[key])) return payload[key];
+          if (payload[key] && typeof payload[key] === 'object') {
+            const nested = unwrapList(payload[key], keys, depth + 1);
+            if (nested.length > 0) return nested;
+          }
+        }
+        return [];
+      };
+
+      const projects = projRes.status === 'fulfilled'
+        ? unwrapList(projRes.value.data, ['data', 'projects', 'items'])
+        : [];
+      const tasks = taskRes.status === 'fulfilled'
+        ? unwrapList(taskRes.value.data, ['data', 'tasks', 'items'])
+        : [];
+      const teams = teamsRes.status === 'fulfilled'
+        ? unwrapList(teamsRes.value.data, ['teams', 'teamLeads', 'teamLead', 'data', 'items'])
+        : [];
+      const users = usersRes.status === 'fulfilled'
+        ? unwrapList(usersRes.value.data, ['users', 'data', 'items'])
+        : [];
+      const employees = employeesRes.status === 'fulfilled'
+        ? unwrapList(employeesRes.value.data, ['employees', 'employeesList', 'data', 'items'])
         : [];
 
-      const tasks = taskRes.status === 'fulfilled' && Array.isArray(taskRes.value.data?.data)
-        ? taskRes.value.data.data
-        : [];
-
-      if (projects.length === 0) {
-        setMembers([]);
-        setUserProjects([]);
-        return;
-      }
-
-      // 2. Determine which projects the current user belongs to
+      // Keep project-based membership while also including direct Team Lead assignments.
       const memberMap = new Map();
       const myProjectsList = [];
 
@@ -546,6 +564,106 @@ export const TeamMembersView = () => {
           }
         })
       );
+
+      const userIdentifiers = getLoggedInUserIdentifiers(user);
+      const myTeams = teams.filter((team) => isTeamOwnedByLead(team, userIdentifiers));
+      const directoryById = new Map();
+      const indexDirectoryRecord = (record) => {
+        if (!record || typeof record !== 'object') return;
+        [
+          record._id,
+          record.id,
+          record.userId,
+          record.userID,
+          record.employeeId,
+          record.employeeID,
+          record.empId,
+          record.uniqueID,
+          record.uniqueId,
+          record.employeeCode,
+          record.user?._id,
+          record.user?.id,
+          record.userID?._id,
+          record.userID?.id,
+          record.userId?._id,
+          record.userId?.id,
+          record.employee?._id,
+          record.employee?.id,
+          record.employeeID?._id,
+          record.employeeID?.id,
+          record.employeeId?._id,
+          record.employeeId?.id,
+          record.employee?.employeeId,
+          record.employee?.employeeID,
+        ].filter(Boolean).forEach((id) => directoryById.set(String(id).toLowerCase().trim(), record));
+        [record.email, record.user?.email, record.employee?.email]
+          .filter(Boolean)
+          .forEach((email) => directoryById.set(String(email).toLowerCase().trim(), record));
+      };
+      [...users, ...employees].forEach(indexDirectoryRecord);
+
+      const teamScope = extractAssignedTeamEmployees(myTeams, Object.fromEntries(directoryById));
+      const addTeamMember = (rawMember, isLead, teamName) => {
+        if (!rawMember) return;
+        const memberId = typeof rawMember === 'object'
+          ? rawMember._id || rawMember.id || rawMember.userId || rawMember.employeeId || rawMember.employeeID
+          : rawMember;
+        const resolvedMember = typeof rawMember === 'object'
+          ? rawMember
+          : directoryById.get(String(rawMember).toLowerCase().trim());
+        const record = resolvedMember || (memberId ? { _id: memberId } : null);
+        if (!record) return;
+
+        const email = String(record.email || record.user?.email || record.employee?.email || '').trim();
+        const id = String(record._id || record.id || record.userId || record.employeeId || record.employeeID || memberId || '').trim();
+        const key = (email || id).toLowerCase();
+        if (!key) return;
+        const name = record.fullName || record.name || record.user?.name || record.employee?.name ||
+          [record.firstName, record.lastName].filter(Boolean).join(' ') ||
+          record.employee?.employeeName ||
+          email.split('@')[0] ||
+          'Team Member';
+        const isMe = (email && email.toLowerCase() === userEmail) || (id && userIdentifiers.ids.has(id.toLowerCase()));
+        const existing = memberMap.get(key);
+        if (existing) {
+          if (teamName && !existing.projects.includes(teamName)) existing.projects.push(teamName);
+          if (isLead) {
+            existing.isLead = true;
+            existing.role = 'Team Leader';
+          }
+          return;
+        }
+
+        memberMap.set(key, {
+          id: id || key,
+          name,
+          email,
+          employeeID: record.employeeID || record.employeeId || record.uniqueID || record.employeeCode || '',
+          role: isLead ? 'Team Leader' : 'Employee',
+          status: 'Online',
+          isLead,
+          isMe,
+          projects: teamName ? [teamName] : [],
+        });
+      };
+
+      myTeams.forEach((team) => {
+        const teamName = team.teamName || team.name || team.projectName || team.project?.projectName || 'Team';
+        const lead = team.teamLeadUser || team.teamLeadEmployee || team.teamLead || team.lead || team.teamLeader;
+        addTeamMember(lead, true, teamName);
+        teamScope.memberRecords.forEach((record) => addTeamMember(record, false, teamName));
+        const rawMembers = [
+          ...(Array.isArray(team.employees) ? team.employees : []),
+          ...(Array.isArray(team.assignedEmployees) ? team.assignedEmployees : []),
+          ...(Array.isArray(team.assignedMembers) ? team.assignedMembers : []),
+          ...(Array.isArray(team.teamMembers) ? team.teamMembers : []),
+          ...(Array.isArray(team.members) ? team.members : []),
+          ...(Array.isArray(team.teamEmployees) ? team.teamEmployees : []),
+          ...(Array.isArray(team.employeeIds) ? team.employeeIds : []),
+        ];
+        rawMembers.forEach((record) => addTeamMember(record, false, teamName));
+        if (!myProjectsList.includes(teamName)) myProjectsList.push(teamName);
+      });
 
       setUserProjects(myProjectsList);
       setMembers(Array.from(memberMap.values()));
