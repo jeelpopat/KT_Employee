@@ -14,8 +14,10 @@ import {
   Trash2,
   Crown,
   UserMinus,
+  UserPlus,
   X,
   User,
+  ShieldCheck,
   GraduationCap,
   Loader2,
   RefreshCw,
@@ -89,7 +91,7 @@ export default function Employees() {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRole, setFilterRole] = useState("all");
   const [filterDepartment, setFilterDepartment] = useState("all");
@@ -972,7 +974,7 @@ export default function Employees() {
   });
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-5 font-poppins text-slate-800">
       {confirmationDialog}
       {toast.message && (
         <Toast
@@ -982,162 +984,777 @@ export default function Employees() {
         />
       )}
 
-      {/* ================= HEADER ================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-            <Users size={18} />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Employees
-            </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-              View and manage company employees, roles, and profiles
-            </p>
-          </div>
+      {/* ====================================================
+          PAGE HEADER (Matches Leave Requests Geometry)
+      ==================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 font-poppins">
+        <div>
+          <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
+            Employees
+          </h1>
+          <p className="text-xs sm:text-[13px] text-slate-500 font-normal font-poppins mt-0.5">
+            View and manage company employees, roles, and profiles
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-
-          {/* TOTAL */}
-          <div className="px-3 sm:px-4 py-2 bg-white shadow-xs border border-slate-200/80 rounded-lg flex items-center gap-1.5 sm:gap-2">
-            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
-
-            <span className="text-xs sm:text-sm text-gray-600">
-              Total:
-            </span>
-
-            <span className="font-semibold text-gray-900 text-xs sm:text-sm">
+        <div className="flex items-center gap-2 sm:gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Total Count Badge */}
+          <div className="h-9 bg-white border border-slate-300 rounded-md px-3 sm:px-3.5 shadow-2xs text-xs font-medium flex items-center select-none font-poppins text-slate-600 gap-1.5">
+            <Users size={14} className="text-slate-600 shrink-0" />
+            <span>Total:</span>
+            <span className="font-bold text-slate-900">
               {filteredEmployees.length !== employees.length
                 ? `${filteredEmployees.length} / ${employees.length}`
                 : employees.length}
             </span>
           </div>
 
-          {/* REFRESH */}
+          {/* Refresh Button */}
           <button
             type="button"
             onClick={() => fetchEmployees(false)}
             disabled={loading}
-            title="Refresh employee directory"
-            className="h-10 px-3.5 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 rounded-lg shadow-xs flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
+            title="Refresh directory"
+            aria-label="Refresh directory"
+            className="h-9 w-9 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer font-poppins"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-[#0088cc]" : "text-slate-500"}`} />
-            <span className="hidden xs:inline">{loading ? "Refreshing..." : "Refresh"}</span>
+            <RefreshCw size={13} className={`text-slate-600 ${loading ? "animate-spin text-[#0088cc]" : ""}`} />
           </button>
 
-          {/* ADD */}
+          {/* Add Employee Button */}
           <button
+            type="button"
             onClick={() => {
               resetForm();
               setShowModal(true);
             }}
-            className="h-10 px-4 btn-brand-primary text-white transition-all flex items-center gap-2 shadow-xs text-xs sm:text-sm font-medium rounded-lg cursor-pointer"
-            style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+            className="h-9 px-3.5 text-white text-xs font-medium rounded-md shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all hover:opacity-95 font-poppins"
+            style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
           >
-            <Plus className="h-4 w-4" />
-            Add Employee
+            <Plus size={14} />
+            <span>Add Employee</span>
           </button>
         </div>
       </div>
 
-      {/* ================= MAIN CONTENT ================= */}
-      <div className="bg-white shadow-xs border border-slate-200/80 rounded-xl overflow-hidden">
+      {/* ====================================================
+            MAIN DATA CONTAINER (Clean White Background #FFFFFF)
+      ==================================================== */}
+      <div className="bg-white border border-slate-200/80 rounded-xl sm:rounded-2xl p-4 sm:p-5 lg:p-6 shadow-2xs space-y-4 font-poppins">
 
-        {/* SEARCH */}
-        <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
-          <div className="flex flex-col gap-3 sm:gap-4">
+        {/* ==================================================
+              SEARCH & FILTERS TOOLBAR
+          ================================================== */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 font-poppins">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by employee name, email or department..."
+              className="w-full h-10 pl-10 pr-9 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition bg-white font-poppins"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            aria-expanded={showFilters}
+            onClick={() => setShowFilters((prev) => !prev)}
+            className="h-10 inline-flex items-center justify-center gap-2 px-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs sm:text-sm font-medium font-poppins shadow-2xs transition cursor-pointer"
+          >
+            <Filter className="w-3.5 h-3.5 text-slate-500" />
+            <span>Filters</span>
+            {(filterDepartment !== "all" || filterEmployeeRole !== "all" || filterRole !== "all" || filterStatus !== "all") && (
+              <span className="w-2 h-2 rounded-full bg-[#034665]" />
+            )}
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-slate-500 transition-transform ${showFilters ? "rotate-180" : ""}`}
+            />
+          </button>
+        </div>
 
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
+        {/* Filters Row: Four dropdown/select filter fields placed side-by-side */}
+        {showFilters && (
+          <div className="pt-3 border-t border-slate-100 space-y-3 font-poppins">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* 1. Department */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5 font-poppins">
+                  Department
+                </label>
+                <select
+                  value={filterDepartment}
+                  onChange={(e) => {
+                    const nextDept = e.target.value;
+                    setFilterDepartment(nextDept);
+                    if (nextDept !== "all" && filterEmployeeRole !== "all") {
+                      const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[nextDept] || [];
+                      if (!rolesInDept.includes(filterEmployeeRole)) {
+                        setFilterEmployeeRole("all");
+                      }
+                    }
+                  }}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition font-poppins"
+                >
+                  <option value="all">All Department</option>
+                  {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                <input
-                  type="text"
-                  placeholder="Search by name, email, or designation..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                />
+              {/* 2. Employee Role */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5 font-poppins">
+                  Employee Role
+                </label>
+                <select
+                  value={filterEmployeeRole}
+                  onChange={(e) => {
+                    const nextRole = e.target.value;
+                    setFilterEmployeeRole(nextRole);
+                    if (nextRole !== "all" && filterDepartment === "all") {
+                      const deducedDept = getDepartmentForRole(nextRole);
+                      if (deducedDept) setFilterDepartment(deducedDept);
+                    }
+                  }}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition font-poppins"
+                >
+                  <option value="all">All Roles</option>
+                  {filterDepartment !== "all" && EMPLOYEE_DEPARTMENTS_ROLES[filterDepartment] ? (
+                    EMPLOYEE_DEPARTMENTS_ROLES[filterDepartment].map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))
+                  ) : (
+                    Object.entries(EMPLOYEE_DEPARTMENTS_ROLES).map(([dept, roles]) => (
+                      <optgroup key={dept} label={dept}>
+                        {roles.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              {/* 3. System Role */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5 font-poppins">
+                  System Role
+                </label>
+                <select
+                  value={filterRole}
+                  onChange={(e) => setFilterRole(e.target.value)}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition font-poppins"
+                >
+                  <option value="all">All Roles</option>
+                  <option value="employee">Employee</option>
+                  <option value="admin">Admin</option>
+                  <option value="team lead">Team Lead</option>
+                  <option value="hr">HR</option>
+                  <option value="accountant">Accountant</option>
+                  <option value="ca">CA</option>
+                </select>
+              </div>
+
+              {/* 4. Status */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5 font-poppins">
+                  Status
+                </label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition font-poppins"
+                >
+                  <option value="all">All Status</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Clear all filters shortcut if any filter is active */}
+            {(filterDepartment !== "all" || filterEmployeeRole !== "all" || filterRole !== "all" || filterStatus !== "all" || searchTerm) && (
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterDepartment("all");
+                    setFilterEmployeeRole("all");
+                    setFilterRole("all");
+                    setFilterStatus("all");
+                    setSearchTerm("");
+                  }}
+                  className="text-xs text-[#068DCB] hover:text-[#034665] font-medium transition-colors cursor-pointer font-poppins"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================================================
+              LOADING & EMPTY STATES
+          ================================================== */}
+        {loading ? (
+          <LoadingScreen
+            message="Loading employee directory..."
+            description="Fetching team records and credentials"
+          />
+        ) : filteredEmployees.length === 0 ? (
+          <div className="py-16 text-center font-poppins">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-slate-100 mb-4 text-[#034665]">
+              <Users className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 font-poppins">
+              {searchTerm || filterStatus !== "all" || filterDepartment !== "all" || filterRole !== "all" || filterEmployeeRole !== "all"
+                ? "No Results Found"
+                : "No Employees Found"}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 font-poppins">
+              {searchTerm || filterStatus !== "all" || filterDepartment !== "all" || filterRole !== "all" || filterEmployeeRole !== "all"
+                ? "Try adjusting your search keywords or filter options."
+                : "Add your first employee to get started."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* ==================================================
+                  DESKTOP TABLE (Clean White Row Background, Navy Headers)
+              ================================================== */}
+            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/80">
+              <table className="w-full text-xs font-poppins">
+                <thead style={{ backgroundColor: "#0346651A" }}>
+                  <tr className="border-b border-slate-200/80">
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins w-14">
+                      NO
+                    </th>
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[200px]">
+                      EMPLOYEE
+                    </th>
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[150px]">
+                      DESIGNATION
+                    </th>
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[110px]">
+                      STATUS
+                    </th>
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[120px]">
+                      ROLE
+                    </th>
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[170px]">
+                      ACTION
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {filteredEmployees.map((emp, index) => {
+                    const displayName = emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "Employee";
+                    const initial = displayName.charAt(0).toUpperCase();
+
+                    return (
+                      <tr
+                        key={emp._id}
+                        className="hover:bg-slate-50/70 transition-colors"
+                      >
+                        {/* NO */}
+                        <td className="px-3 py-3 text-slate-500 font-medium font-poppins text-xs w-14">
+                          {index + 1}
+                        </td>
+
+                        {/* EMPLOYEE */}
+                        <td className="px-3 py-3">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 font-poppins shadow-2xs"
+                              style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
+                            >
+                              {initial}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 text-xs sm:text-[13px] font-poppins truncate">
+                                {displayName}
+                              </p>
+                              {emp.email && (
+                                <a
+                                  href={`mailto:${emp.email}`}
+                                  className="text-[11px] text-slate-400 hover:text-[#068DCB] hover:underline font-normal font-poppins truncate block"
+                                  title={`Click to send mail to ${emp.email}`}
+                                >
+                                  {emp.email}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* DESIGNATION */}
+                        <td className="px-3 py-3 text-slate-700 font-medium font-poppins text-xs">
+                          {emp.designation || "N/A"}
+                        </td>
+
+                        {/* STATUS */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-poppins select-none whitespace-nowrap border ${
+                              emp.employeeStatus === "Inactive"
+                                ? "bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]"
+                                : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                                  ? "bg-[#FFFBEB] text-[#D97706] border-[#FDE68A]"
+                                  : "bg-[#ECFDF5] text-[#059669] border-[#A7F3D0]"
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                emp.employeeStatus === "Inactive"
+                                  ? "bg-rose-500"
+                                  : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                                    ? "bg-amber-500"
+                                    : "bg-emerald-500"
+                              }`}
+                            />
+                            {emp.employeeStatus || "Active"}
+                          </span>
+                        </td>
+
+                        {/* ROLE */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          {(() => {
+                            const roleLabel = getEmployeeRoleLabel(emp);
+                            const isLeadership = ["Team Lead", "HR", "Admin"].includes(roleLabel);
+                            const colorClass = isLeadership ? "text-[#034665]" : "text-[#475569]";
+
+                            return (
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${colorClass} font-poppins`}>
+                                {roleLabel === "Team Lead" ? (
+                                  <Crown className="w-3.5 h-3.5 text-[#034665]" />
+                                ) : roleLabel === "HR" ? (
+                                  <UserCheck className="w-3.5 h-3.5 text-[#034665]" />
+                                ) : roleLabel === "Admin" ? (
+                                  <ShieldCheck className="w-3.5 h-3.5 text-[#034665]" />
+                                ) : (
+                                  <User className="w-3.5 h-3.5 text-[#475569]" />
+                                )}
+                                <span>{roleLabel}</span>
+                              </span>
+                            );
+                          })()}
+                        </td>
+
+                        {/* ACTION */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 font-poppins">
+                            {/* EDIT */}
+                            <button
+                              type="button"
+                              onClick={() => handleEditEmployee(emp)}
+                              title="Edit Employee"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#068DCB] hover:text-[#034665] hover:bg-sky-50 rounded-md transition-colors cursor-pointer font-poppins"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+
+                            {canDeleteOrAssignTeamLead(emp) && (
+                              <>
+                                {/* DELETE */}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteEmployee(
+                                      emp,
+                                      displayName
+                                    )
+                                  }
+                                  title="Delete Employee"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-colors cursor-pointer font-poppins"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Delete</span>
+                                </button>
+
+                                {/* ASSIGN / REMOVE TL */}
+                                {canAssignTeamLead(emp) && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      toggleTL(emp, isTeamLeadEmployee(emp))
+                                    }
+                                    title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer font-poppins ${
+                                      isTeamLeadEmployee(emp)
+                                        ? "text-rose-600 hover:text-rose-800 hover:bg-rose-50"
+                                        : "text-[#068DCB] hover:text-[#034665] hover:bg-sky-50"
+                                    }`}
+                                  >
+                                    {isTeamLeadEmployee(emp) ? (
+                                      <>
+                                        <UserMinus className="w-3.5 h-3.5 text-rose-500" />
+                                        <span>Remove TL</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserPlus className="w-3.5 h-3.5 text-[#068DCB]" />
+                                        <span>Assign TL</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ==================================================
+                  MOBILE & TABLET CARDS (< 1024px)
+              ================================================== */}
+            <div className="lg:hidden space-y-3 font-poppins">
+              {filteredEmployees.map((emp) => {
+                const displayName = emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "Employee";
+                const initial = displayName.charAt(0).toUpperCase();
+
+                return (
+                  <div
+                    key={emp._id}
+                    className="bg-white border border-slate-200/80 rounded-xl p-4 hover:border-[#034665]/30 hover:shadow-xs transition font-poppins space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 font-poppins shadow-2xs"
+                          style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
+                        >
+                          {initial}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 text-sm font-poppins truncate">
+                            {displayName}
+                          </p>
+                          <p className="text-[11px] text-slate-400 font-normal font-poppins truncate">
+                            {emp.designation || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-poppins select-none whitespace-nowrap border shrink-0 ${
+                          emp.employeeStatus === "Inactive"
+                            ? "bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]"
+                            : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                              ? "bg-[#FFFBEB] text-[#D97706] border-[#FDE68A]"
+                              : "bg-[#ECFDF5] text-[#059669] border-[#A7F3D0]"
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            emp.employeeStatus === "Inactive"
+                              ? "bg-rose-500"
+                              : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
+                                ? "bg-amber-500"
+                                : "bg-emerald-500"
+                          }`}
+                        />
+                        {emp.employeeStatus || "Active"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 text-xs font-poppins">
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-poppins">
+                          Email
+                        </p>
+                        <a
+                          href={`mailto:${emp.email}`}
+                          className="text-xs text-[#068DCB] hover:underline font-poppins truncate block mt-0.5"
+                        >
+                          {emp.email || "N/A"}
+                        </a>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-poppins">
+                          Department
+                        </p>
+                        <p className="text-slate-700 text-xs mt-0.5 font-poppins truncate">
+                          {emp.department?.departmentName || emp.departmentName || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 font-poppins flex-wrap">
+                      <span className="text-xs font-medium text-slate-600 font-poppins">
+                        Role:{" "}
+                        {(() => {
+                          const roleLabel = getEmployeeRoleLabel(emp);
+                          const isLeadership = ["Team Lead", "HR", "Admin"].includes(roleLabel);
+                          const colorClass = isLeadership ? "text-[#034665]" : "text-[#475569]";
+                          return (
+                            <strong className={`inline-flex items-center gap-1 font-semibold ${colorClass}`}>
+                              {roleLabel === "Team Lead" ? (
+                                <Crown className="w-3 h-3 text-[#034665]" />
+                              ) : roleLabel === "HR" ? (
+                                <UserCheck className="w-3 h-3 text-[#034665]" />
+                              ) : roleLabel === "Admin" ? (
+                                <ShieldCheck className="w-3 h-3 text-[#034665]" />
+                              ) : (
+                                <User className="w-3 h-3 text-[#475569]" />
+                              )}
+                              <span>{roleLabel}</span>
+                            </strong>
+                          );
+                        })()}
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleEditEmployee(emp)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#068DCB] hover:text-[#034665] hover:bg-sky-50 rounded-md transition-colors cursor-pointer font-poppins"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+
+                        {canDeleteOrAssignTeamLead(emp) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteEmployee(emp, displayName)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-colors cursor-pointer font-poppins"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+
+                            {canAssignTeamLead(emp) && (
+                              <button
+                                type="button"
+                                onClick={() => toggleTL(emp, isTeamLeadEmployee(emp))}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer font-poppins ${
+                                  isTeamLeadEmployee(emp)
+                                    ? "text-rose-600 hover:text-rose-800 hover:bg-rose-50"
+                                    : "text-[#068DCB] hover:text-[#034665] hover:bg-sky-50"
+                                }`}
+                              >
+                                {isTeamLeadEmployee(emp) ? (
+                                  <>
+                                    <UserMinus className="w-3.5 h-3.5 text-rose-500" />
+                                    <span>Remove TL</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserPlus className="w-3.5 h-3.5 text-[#068DCB]" />
+                                    <span>Assign TL</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* =====================================================
+          ADD / EDIT EMPLOYEE MODAL (Matches Frame 107.png)
+      ====================================================== */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 sm:p-6 backdrop-blur-xs font-poppins"
+          role="presentation"
+          onClick={() => {
+            setShowModal(false);
+            resetForm();
+          }}
+        >
+          <div
+            className="relative w-full max-w-[560px] max-h-[92vh] overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col font-poppins border border-slate-100"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="employee-form-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* MODAL HEADER */}
+            <div className="px-6 sm:px-8 pt-6 sm:pt-7 pb-2 flex-shrink-0 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="employee-form-title" className="text-xl sm:text-2xl font-bold text-slate-900 font-poppins tracking-tight">
+                  {editMode ? "Edit Employee" : "Add Employee"}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-400 font-normal font-poppins mt-1">
+                  {editMode
+                    ? "Update employee information"
+                    : "Add a new employee to the system"}
+                </p>
               </div>
 
               <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap relative"
+                type="button"
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                }}
+                className="text-[#235d78] hover:text-slate-900 transition-colors p-1 rounded-md cursor-pointer -mr-1"
+                aria-label="Close modal"
               >
-                <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-
-                <span className="hidden xs:inline">
-                  Filters
-                </span>
-
-                {(filterDepartment !== "all" || filterEmployeeRole !== "all" || filterRole !== "all" || filterStatus !== "all") && (
-                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                )}
-
-                <ChevronDown
-                  className={`h-3 w-3 transition-transform ${showFilters ? "rotate-180" : ""
-                    }`}
-                />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* FILTER OPTIONS */}
-            {showFilters && (
-              <div className="pt-2 sm:pt-3 border-t border-gray-100 space-y-2.5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                  {/* Department Filter */}
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
-                      Department
-                    </label>
+            {/* FORM */}
+            <form
+              onSubmit={
+                editMode
+                  ? handleUpdateEmployee
+                  : handleAddEmployee
+              }
+              className="flex-1 overflow-y-auto px-6 sm:px-8 pb-6 sm:pb-7 pt-2 space-y-4 font-poppins"
+            >
+              {/* ROW 1: FULL NAME */}
+              <div>
+                <label htmlFor="employee-full-name" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                  Full Name
+                </label>
+                <input
+                  id="employee-full-name"
+                  name="fullName"
+                  placeholder="Name"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  required
+                  className="w-full h-11 px-3.5 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins"
+                />
+              </div>
 
+              {/* ROW 2: EMAIL & MOBILE NUMBER */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="employee-email" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                    Email
+                  </label>
+                  <input
+                    id="employee-email"
+                    name="email"
+                    type="email"
+                    placeholder="Name@gmail.com"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    className="w-full h-11 px-3.5 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="employee-mobile" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                    Mobile Number
+                  </label>
+                  <input
+                    id="employee-mobile"
+                    name="mobile"
+                    placeholder="00000 00000"
+                    value={formData.mobile}
+                    onChange={handleChange}
+                    required
+                    className="w-full h-11 px-3.5 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins"
+                  />
+                </div>
+              </div>
+
+              {/* ROW 3: DEPARTMENT & ROLE / DESIGNATION */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="employee-department" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                    Department
+                  </label>
+                  <div className="relative">
                     <select
-                      value={filterDepartment}
+                      id="employee-department"
+                      name="department"
+                      value={formData.department}
                       onChange={(e) => {
-                        const nextDept = e.target.value;
-                        setFilterDepartment(nextDept);
-                        if (nextDept !== "all" && filterEmployeeRole !== "all") {
-                          const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[nextDept] || [];
-                          if (!rolesInDept.includes(filterEmployeeRole)) {
-                            setFilterEmployeeRole("all");
-                          }
-                        }
+                        const newDept = e.target.value;
+                        setFormData((prev) => {
+                          const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[newDept] || [];
+                          const isCurrentRoleInDept = rolesInDept.some(
+                            (r) => r.toLowerCase() === (prev.designation || "").toLowerCase()
+                          );
+                          return {
+                            ...prev,
+                            department: newDept,
+                            designation: isCurrentRoleInDept ? prev.designation : "",
+                          };
+                        });
                       }}
-                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
+                      required
+                      className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins appearance-none cursor-pointer"
                     >
-                      <option value="all">All Departments</option>
+                      <option value="">Department</option>
                       {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
                         <option key={dept} value={dept}>
                           {dept}
                         </option>
                       ))}
+                      {formData.department && !ALL_EMPLOYEE_DEPARTMENTS.includes(formData.department) && (
+                        <option value={formData.department}>{formData.department}</option>
+                      )}
                     </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787878] pointer-events-none" />
                   </div>
+                </div>
 
-                  {/* Employee Role Filter */}
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
-                      Employee Role
-                    </label>
-
+                <div>
+                  <label htmlFor="employee-designation" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                    Role / designation
+                  </label>
+                  <div className="relative">
                     <select
-                      value={filterEmployeeRole}
+                      id="employee-designation"
+                      name="designation"
+                      value={formData.designation}
                       onChange={(e) => {
-                        const nextRole = e.target.value;
-                        setFilterEmployeeRole(nextRole);
-                        if (nextRole !== "all" && filterDepartment === "all") {
-                          const deducedDept = getDepartmentForRole(nextRole);
-                          if (deducedDept) setFilterDepartment(deducedDept);
-                        }
+                        const newRole = e.target.value;
+                        const deducedDept = getDepartmentForRole(newRole);
+                        setFormData((prev) => ({
+                          ...prev,
+                          designation: newRole,
+                          department: prev.department || deducedDept,
+                        }));
                       }}
-                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
+                      required
+                      className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins appearance-none cursor-pointer"
                     >
-                      <option value="all">All Roles</option>
-                      {filterDepartment !== "all" && EMPLOYEE_DEPARTMENTS_ROLES[filterDepartment] ? (
-                        EMPLOYEE_DEPARTMENTS_ROLES[filterDepartment].map((role) => (
+                      <option value="">Department</option>
+                      {formData.department && EMPLOYEE_DEPARTMENTS_ROLES[formData.department] ? (
+                        EMPLOYEE_DEPARTMENTS_ROLES[formData.department].map((role) => (
                           <option key={role} value={role}>
                             {role}
                           </option>
@@ -1153,909 +1770,142 @@ export default function Employees() {
                           </optgroup>
                         ))
                       )}
-                    </select>
-                  </div>
-
-                  {/* System Role Filter */}
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
-                      System Role
-                    </label>
-
-                    <select
-                      value={filterRole}
-                      onChange={(e) => setFilterRole(e.target.value)}
-                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
-                    >
-                      <option value="all">All Roles</option>
-                      <option value="employee">Employee</option>
-                      <option value="admin">Admin</option>
-                      <option value="team lead">Team Lead</option>
-                      <option value="hr">HR</option>
-                      <option value="accountant">Accountant</option>
-                      <option value="ca">CA</option>
-                    </select>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-600 mb-1">
-                      Status
-                    </label>
-
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Clear all filters shortcut if any filter is active */}
-                {(filterDepartment !== "all" || filterEmployeeRole !== "all" || filterRole !== "all" || filterStatus !== "all" || searchTerm) && (
-                  <div className="flex justify-end pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFilterDepartment("all");
-                        setFilterEmployeeRole("all");
-                        setFilterRole("all");
-                        setFilterStatus("all");
-                        setSearchTerm("");
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                    >
-                      Clear all filters
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ================= LOADING ================= */}
-        {loading ? (
-          <LoadingScreen
-            message="Loading employee directory..."
-            description="Fetching team records and credentials"
-          />
-
-        ) : filteredEmployees.length === 0 ? (
-
-          /* ================= EMPTY ================= */
-          <div className="text-center py-12 sm:py-16">
-            <div className="flex justify-center mb-3 sm:mb-4">
-              <div className="bg-blue-50 p-3 sm:p-4 border border-blue-200">
-                <Users className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
-              </div>
-            </div>
-
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-              {searchTerm || filterStatus !== "all"
-                ? "No Results Found"
-                : "No Employees Found"}
-            </h3>
-
-            <p className="mt-1 text-xs sm:text-sm text-gray-500 px-4">
-              {searchTerm || filterStatus !== "all"
-                ? "Try adjusting your search or filter terms"
-                : "Add your first employee to get started."}
-            </p>
-          </div>
-
-        ) : (
-
-          /* ================= EMPLOYEE LIST ================= */
-          <div className="p-3 sm:p-4 lg:p-6">
-
-            {/* ================= DESKTOP TABLE ================= */}
-            <div className="hidden lg:block overflow-hidden border border-slate-200/80 rounded-lg">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200/80 bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      <th className="pl-6 pr-3 py-3.5 text-left w-12">#</th>
-                      <th className="px-4 py-3.5 text-left">Employee</th>
-                      <th className="px-4 py-3.5 text-left">Designation</th>
-                      <th className="px-4 py-3.5 text-left">Status</th>
-                      <th className="px-4 py-3.5 text-left">Role</th>
-                      <th className="px-4 py-3.5 text-left">Action</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredEmployees.map((emp, index) => (
-                      <tr
-                        key={emp._id}
-                        className="hover:bg-slate-50/60 transition-colors"
-                      >
-                        {/* # COLUMN WITH EXACT SAME LEFT PADDING (pl-6) */}
-                        <td className="pl-6 pr-3 py-3.5 text-left text-sm font-medium text-slate-500 whitespace-nowrap w-12">
-                          {index + 1}
-                        </td>
-
-                        {/* EMPLOYEE (NAME + CLICKABLE EMAIL RIGHT BELOW) */}
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-xs font-bold text-white shadow-xs shrink-0">
-                              {(emp.name || emp.firstName || "E")?.charAt(0)?.toUpperCase()}
-                            </div>
-
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-semibold text-slate-900 text-sm truncate">
-                                {emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim()}
-                              </span>
-                              {emp.email && (
-                                <a
-                                  href={`mailto:${emp.email}`}
-                                  className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline truncate transition-colors cursor-pointer mt-0.5 inline-block"
-                                  title={`Click to send mail to ${emp.email}`}
-                                >
-                                  {emp.email}
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* DESIGNATION */}
-                        <td className="px-4 py-3">
-                          <span className="flex items-center gap-1.5 text-slate-700">
-                            {/* <Briefcase className="h-3.5 w-3.5 text-slate-400" /> */}
-                            {emp.designation || "N/A"}
-                          </span>
-                        </td>
-
-                        {/* STATUS (CLEAN UNBOXED WITH STATUS DOT) */}
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-medium ${emp.employeeStatus === "Inactive"
-                              ? "text-rose-600"
-                              : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
-                                ? "text-amber-600"
-                                : "text-emerald-600"
-                              }`}
-                          >
-                            <span
-                              className={`h-2 w-2 rounded-full ${emp.employeeStatus === "Inactive"
-                                ? "bg-rose-500"
-                                : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
-                                  ? "bg-amber-500"
-                                  : "bg-emerald-500"
-                                }`}
-                            />
-                            {emp.employeeStatus || "Active"}
-                          </span>
-                        </td>
-
-                        {/* ROLE (CLEAN UNBOXED WITH ICON) */}
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                            {getEmployeeRoleLabel(emp) === "HR" ? (
-                              <>
-                                <UserCheck className="h-3.5 w-3.5 text-purple-600" />
-                                <span className="text-purple-700 font-semibold">HR</span>
-                              </>
-                            ) : getEmployeeRoleLabel(emp) === "Team Lead" ? (
-                              <>
-                                <Crown className="h-3.5 w-3.5 text-amber-500" />
-                                <span className="text-amber-700 font-semibold">Team Lead</span>
-                              </>
-                            ) : (
-                              <>
-                                <User className="h-3.5 w-3.5 text-slate-400" />
-                                <span>{getEmployeeRoleLabel(emp)}</span>
-                              </>
-                            )}
-                          </span>
-                        </td>
-
-                        {/* ACTIONS (CLEAN UNBOXED BUTTONS, NO HEAVY BOXES) */}
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-
-                            {/* EDIT */}
-                            <button
-                              onClick={() =>
-                                handleEditEmployee(emp)
-                              }
-                              title="Edit Employee"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors cursor-pointer"
-                            >
-                              <Edit className="h-3.5 w-3.5 text-indigo-500" />
-                              Edit
-                            </button>
-
-                            {canDeleteOrAssignTeamLead(emp) && (
-                              <>
-                                {/* DELETE */}
-                                <button
-                                  onClick={() =>
-                                    handleDeleteEmployee(
-                                      emp,
-                                      `${emp.firstName || ""} ${emp.lastName || ""
-                                        }`.trim()
-                                    )
-                                  }
-                                  title="Delete Employee"
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                                  Delete
-                                </button>
-
-                                {/* TEAM LEAD */}
-                                {canAssignTeamLead(emp) && (
-                                  <button
-                                    onClick={() =>
-                                      toggleTL(
-                                        emp,
-                                        isTeamLeadEmployee(emp)
-                                      )
-                                    }
-                                    title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                                      ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                                      : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                                      }`}
-                                  >
-                                    {isTeamLeadEmployee(emp) ? (
-                                      <>
-                                        <UserMinus className="h-3.5 w-3.5 text-rose-500" />
-                                        Remove TL
-                                      </>
-                                    ) : (
-                                      <>
-                                        <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
-                                        Assign TL
-                                      </>
-                                    )}
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* ================= TABLET ================= */}
-            <div className="hidden sm:block lg:hidden">
-              <div className="space-y-3">
-                {filteredEmployees.map((emp) => (
-                  <div
-                    key={emp._id}
-                    className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-xs hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-bold text-white shadow-xs flex-shrink-0">
-                          {emp.firstName?.charAt(0)}
-                          {emp.lastName?.charAt(0)}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-gray-900 truncate">
-                            {emp.firstName} {emp.lastName}
-                          </h3>
-
-                          <p className="text-sm text-gray-500 truncate">
-                            {emp.designation || "N/A"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-1 ml-2 flex-shrink-0">
-                        <span
-                          className={`inline-flex items-center gap-1.5 text-xs font-medium ${emp.employeeStatus === "Inactive"
-                            ? "text-rose-600"
-                            : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
-                              ? "text-amber-600"
-                              : "text-emerald-600"
-                            }`}
-                        >
-                          <span
-                            className={`h-2 w-2 rounded-full ${emp.employeeStatus === "Inactive"
-                              ? "bg-rose-500"
-                              : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
-                                ? "bg-amber-500"
-                                : "bg-emerald-500"
-                              }`}
-                          />
-                          {emp.employeeStatus || "Active"}
-                        </span>
-
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
-                          {getEmployeeRoleLabel(emp) === "HR" ? (
-                            <>
-                              <UserCheck className="h-3 w-3 text-purple-600" />
-                              <span className="text-purple-700 font-semibold">HR</span>
-                            </>
-                          ) : getEmployeeRoleLabel(emp) === "Team Lead" ? (
-                            <>
-                              <Crown className="h-3 w-3 text-amber-500" />
-                              <span className="text-amber-700 font-semibold">Team Lead</span>
-                            </>
-                          ) : (
-                            getEmployeeRoleLabel(emp)
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                      <div className="flex items-center gap-1.5 text-gray-600 min-w-0">
-                        <Mail className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-
-                        <a
-                          href={`mailto:${emp.email}`}
-                          className="truncate text-indigo-600 hover:underline"
-                        >
-                          {emp.email}
-                        </a>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-gray-600 min-w-0">
-                        <Building className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-
-                        <span className="truncate">
-                          {emp.department?.departmentName ||
-                            emp.departmentName ||
-                            "N/A"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* TABLET ACTIONS */}
-                    <div className="mt-3 pt-3 border-t border-gray-100 flex flex-nowrap gap-2 overflow-x-auto">
-
-                      <button
-                        onClick={() =>
-                          handleEditEmployee(emp)
-                        }
-                        className="inline-flex min-w-[76px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
-                      >
-                        <Edit className="h-3.5 w-3.5 text-indigo-500" />
-                        Edit
-                      </button>
-
-                      {canDeleteOrAssignTeamLead(emp) && (
-                        <>
-                          <button
-                            onClick={() =>
-                              handleDeleteEmployee(
-                                emp,
-                                `${emp.firstName || ""} ${emp.lastName || ""
-                                  }`.trim()
-                              )
-                            }
-                            className="inline-flex min-w-[76px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                            Delete
-                          </button>
-
-                          {canAssignTeamLead(emp) && (
-                            <button
-                              onClick={() =>
-                                toggleTL(
-                                  emp,
-                                  isTeamLeadEmployee(emp)
-                                )
-                              }
-                              title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                              className={`inline-flex min-w-[104px] flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                                ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                                : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                                }`}
-                            >
-                              {isTeamLeadEmployee(emp) ? (
-                                <>
-                                  <UserMinus className="h-3.5 w-3.5 text-rose-500" />
-                                  Remove TL
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck className="h-3.5 w-3.5 text-emerald-500" />
-                                  Assign TL
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </>
+                      {formData.designation && !ALL_EMPLOYEE_ROLES.includes(formData.designation) && (
+                        <option value={formData.designation}>{formData.designation}</option>
                       )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ================= MOBILE ================= */}
-            <div className="sm:hidden space-y-3">
-              {filteredEmployees.map((emp) => (
-                <div
-                  key={emp._id}
-                  className="border border-slate-200/80 rounded-xl p-3 bg-white shadow-xs hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-xs font-bold text-white shadow-xs flex-shrink-0">
-                        {emp.firstName?.charAt(0)}
-                        {emp.lastName?.charAt(0)}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-gray-900 text-sm truncate">
-                          {emp.firstName} {emp.lastName}
-                        </h3>
-
-                        <p className="text-xs text-gray-500 truncate">
-                          {emp.designation || "N/A"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-0.5 ml-1 flex-shrink-0">
-                      <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-medium ${emp.employeeStatus === "Inactive"
-                          ? "text-rose-600"
-                          : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
-                            ? "text-amber-600"
-                            : "text-emerald-600"
-                          }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${emp.employeeStatus === "Inactive"
-                            ? "bg-rose-500"
-                            : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
-                              ? "bg-amber-500"
-                              : "bg-emerald-500"
-                            }`}
-                        />
-                        {emp.employeeStatus || "Active"}
-                      </span>
-
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-500">
-                        {getEmployeeRoleLabel(emp) === "HR" ? (
-                          <>
-                            <UserCheck className="h-2.5 w-2.5 text-purple-600" />
-                            <span className="text-purple-700 font-semibold">HR</span>
-                          </>
-                        ) : getEmployeeRoleLabel(emp) === "Team Lead" ? (
-                          <>
-                            <Crown className="h-2.5 w-2.5 text-amber-500" />
-                            <span className="text-amber-700 font-semibold">TL</span>
-                          </>
-                        ) : (
-                          getEmployeeRoleLabel(emp)
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-2.5 pt-2.5 border-t border-gray-100">
-
-                    <div className="flex items-center justify-between text-xs">
-                      <a
-                        href={`mailto:${emp.email}`}
-                        className="flex items-center gap-1 text-indigo-600 hover:underline truncate max-w-[55%]"
-                      >
-                        <Mail className="h-3 w-3 flex-shrink-0" />
-
-                        <span className="truncate">
-                          {emp.email}
-                        </span>
-                      </a>
-
-                      <span className="flex items-center gap-1 text-gray-500 text-[10px]">
-                        <Building className="h-3 w-3 text-gray-400" />
-
-                        <span className="truncate max-w-[60px]">
-                          {emp.department?.departmentName ||
-                            emp.departmentName ||
-                            "N/A"}
-                        </span>
-                      </span>
-                    </div>
-
-                    {/* MOBILE ACTIONS */}
-                    <div className="mt-2 flex flex-nowrap gap-1 overflow-x-auto">
-
-                      <button
-                        onClick={() =>
-                          handleEditEmployee(emp)
-                        }
-                        className="inline-flex min-w-[64px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
-                      >
-                        <Edit className="h-3 w-3 text-indigo-500" />
-                        Edit
-                      </button>
-
-                      {canDeleteOrAssignTeamLead(emp) && (
-                        <>
-                          <button
-                            onClick={() =>
-                              handleDeleteEmployee(
-                                emp,
-                                `${emp.firstName || ""} ${emp.lastName || ""
-                                  }`.trim()
-                              )
-                            }
-                            className="inline-flex min-w-[64px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="h-3 w-3 text-rose-500" />
-                            Delete
-                          </button>
-
-                          {canAssignTeamLead(emp) && (
-                            <button
-                              onClick={() =>
-                                toggleTL(
-                                  emp,
-                                  isTeamLeadEmployee(emp)
-                                )
-                              }
-                              title={isTeamLeadEmployee(emp) ? "Remove as Team Lead" : "Assign as Team Lead"}
-                              className={`inline-flex min-w-[86px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap rounded-lg transition-colors cursor-pointer ${isTeamLeadEmployee(emp)
-                                ? "text-slate-600 hover:text-rose-600 hover:bg-rose-50"
-                                : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                                }`}
-                            >
-                              {isTeamLeadEmployee(emp) ? (
-                                <>
-                                  <UserMinus className="h-3 w-3 text-rose-500" />
-                                  Remove TL
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck className="h-3 w-3 text-emerald-500" />
-                                  Assign TL
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787878] pointer-events-none" />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* =====================================================
-          ADD / EDIT EMPLOYEE MODAL
-      ====================================================== */}
-      {showModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 sm:p-6 backdrop-blur-sm"
-          role="presentation"
-          onClick={() => {
-            setShowModal(false);
-            resetForm();
-          }}
-        >
-          <div
-            className="relative w-full max-w-xl max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col animate-fade-in border border-gray-100"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="employee-form-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-
-            {/* MODAL HEADER */}
-            <div className="bg-white border-b border-gray-100 px-6 py-4 flex-shrink-0">
-              <div className="flex items-start justify-between gap-4">
-
-                <div>
-                  <h2 id="employee-form-title" className="text-xl font-bold text-gray-900">
-                    {editMode ? "Edit Employee" : "Add Employee"}
-                  </h2>
-
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    {editMode
-                      ? "Update employee information"
-                      : "Add a new employee to the system"}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors rounded-lg"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* FORM */}
-            <form
-              onSubmit={
-                editMode
-                  ? handleUpdateEmployee
-                  : handleAddEmployee
-              }
-              className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
-            >
-
-              {/* FULL NAME (1 per row) */}
-              <div>
-                <label htmlFor="employee-full-name" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Full Name *
-                </label>
-
-                <input
-                  id="employee-full-name"
-                  name="fullName"
-                  placeholder="e.g. Keyur Nai"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
-                />
               </div>
 
-              {/* ROW 1: EMAIL & MOBILE NUMBER (2 per row) */}
+              {/* ROW 4: ROLE & GENDER */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="employee-email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Email *
+                  <label htmlFor="employee-system-role" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                    Role
                   </label>
-
-                  <input
-                    id="employee-email"
-                    name="email"
-                    type="email"
-                    placeholder="e.g. itsmetilaksoni@gmail.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="employee-mobile" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Mobile Number *
-                  </label>
-
-                  <input
-                    id="employee-mobile"
-                    name="mobile"
-                    placeholder="e.g. 7896321550"
-                    value={formData.mobile}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
-                  />
-                </div>
-              </div>
-
-              {/* ROW 2: DEPARTMENT & ROLE / DESIGNATION (2 per row) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="employee-department" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Department *
-                  </label>
-
-                  <select
-                    id="employee-department"
-                    name="department"
-                    value={formData.department}
-                    onChange={(e) => {
-                      const newDept = e.target.value;
-                      setFormData((prev) => {
-                        const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[newDept] || [];
-                        const isCurrentRoleInDept = rolesInDept.some(
-                          (r) => r.toLowerCase() === (prev.designation || "").toLowerCase()
-                        );
-                        return {
-                          ...prev,
-                          department: newDept,
-                          designation: isCurrentRoleInDept ? prev.designation : "",
-                        };
-                      });
-                    }}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg bg-white"
-                  >
-                    <option value="">Select Department</option>
-                    {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
-                      <option key={dept} value={dept}>
-                        {dept}
-                      </option>
-                    ))}
-                    {formData.department && !ALL_EMPLOYEE_DEPARTMENTS.includes(formData.department) && (
-                      <option value={formData.department}>{formData.department}</option>
-                    )}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="employee-designation" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Role / Designation *
-                  </label>
-
-                  <select
-                    id="employee-designation"
-                    name="designation"
-                    value={formData.designation}
-                    onChange={(e) => {
-                      const newRole = e.target.value;
-                      const deducedDept = getDepartmentForRole(newRole);
-                      setFormData((prev) => ({
-                        ...prev,
-                        designation: newRole,
-                        department: prev.department || deducedDept,
-                      }));
-                    }}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg bg-white"
-                  >
-                    <option value="">Select Role</option>
-                    {formData.department && EMPLOYEE_DEPARTMENTS_ROLES[formData.department] ? (
-                      EMPLOYEE_DEPARTMENTS_ROLES[formData.department].map((role) => (
-                        <option key={role} value={role}>
-                          {role}
-                        </option>
-                      ))
-                    ) : (
-                      Object.entries(EMPLOYEE_DEPARTMENTS_ROLES).map(([dept, roles]) => (
-                        <optgroup key={dept} label={dept}>
-                          {roles.map((role) => (
-                            <option key={role} value={role}>
-                              {role}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))
-                    )}
-                    {formData.designation && !ALL_EMPLOYEE_ROLES.includes(formData.designation) && (
-                      <option value={formData.designation}>{formData.designation}</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              {/* ROW 3: ROLE & GENDER (2 per row) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {(!editMode || !isHrOrAdminRole(formData.role)) && (
-                  <div>
-                    <label htmlFor="employee-system-role" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Role *
-                    </label>
-
+                  <div className="relative">
                     <select
                       id="employee-system-role"
                       name="role"
                       value={formData.role || "employee"}
                       onChange={handleChange}
+                      disabled={editMode && isHrOrAdminRole(formData.role)}
                       required
-                      className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg bg-white"
+                      className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins appearance-none cursor-pointer disabled:bg-slate-100 disabled:cursor-not-allowed"
                     >
                       <option value="employee">Employee</option>
                       <option value="team lead">Team Lead</option>
                       <option value="hr">HR</option>
                     </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787878] pointer-events-none" />
                   </div>
-                )}
+                </div>
 
                 <div>
-                  <label htmlFor="employee-gender" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Gender *
+                  <label htmlFor="employee-gender" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                    Gender
                   </label>
-
-                  <select
-                    id="employee-gender"
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
-                  >
-                    <option value="">Select gender</option>
-                    {["Male", "Female", "Other"].map((gender) => (
-                      <option key={gender} value={gender}>
-                        {gender}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      id="employee-gender"
+                      name="gender"
+                      value={formData.gender || "Male"}
+                      onChange={handleChange}
+                      required
+                      className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins appearance-none cursor-pointer"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787878] pointer-events-none" />
+                  </div>
                 </div>
               </div>
 
-              {/* ROW 4: DATE OF BIRTH & BLOOD GROUP (2 per row) */}
+              {/* ROW 5: DATE OF BIRTH & BLOOD GROUP */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="employee-dob" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Date of Birth *
+                  <label htmlFor="employee-dob" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                    Date of Birth
                   </label>
-
-                  <input
-                    id="employee-dob"
-                    type="date"
-                    name="dob"
-                    value={formData.dob}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
-                  />
+                  <div className="relative">
+                    <input
+                      id="employee-dob"
+                      type="date"
+                      name="dob"
+                      value={formData.dob}
+                      onChange={handleChange}
+                      required
+                      placeholder="dd-mm-yyyy"
+                      className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins cursor-pointer"
+                    />
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787878] pointer-events-none" />
+                  </div>
                 </div>
 
                 <div>
-                  <label htmlFor="employee-blood-group" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Blood Group *
+                  <label htmlFor="employee-blood-group" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                    Blood Group
                   </label>
-
-                  <select
-                    id="employee-blood-group"
-                    name="bloodGroup"
-                    value={formData.bloodGroup}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
-                  >
-                    <option value="">Select blood group</option>
-                    {[
-                      "A+",
-                      "A-",
-                      "B+",
-                      "B-",
-                      "AB+",
-                      "AB-",
-                      "O+",
-                      "O-",
-                    ].map((bloodGroup) => (
-                      <option key={bloodGroup} value={bloodGroup}>
-                        {bloodGroup}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      id="employee-blood-group"
+                      name="bloodGroup"
+                      value={formData.bloodGroup}
+                      onChange={handleChange}
+                      required
+                      className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins appearance-none cursor-pointer"
+                    >
+                      <option value="">Select blood group</option>
+                      {[
+                        "A+",
+                        "A-",
+                        "B+",
+                        "B-",
+                        "AB+",
+                        "AB-",
+                        "O+",
+                        "O-",
+                      ].map((bloodGroup) => (
+                        <option key={bloodGroup} value={bloodGroup}>
+                          {bloodGroup}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787878] pointer-events-none" />
+                  </div>
                 </div>
               </div>
 
-              {/* ADDRESS (1 per row) */}
+              {/* ROW 6: ADDRESS */}
               <div>
-                <label htmlFor="employee-address" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Address *
+                <label htmlFor="employee-address" className="block text-sm font-medium text-slate-900 mb-1.5 font-poppins">
+                  Address
                 </label>
-
                 <input
                   id="employee-address"
                   type="text"
                   name="address"
-                  placeholder="e.g. 123 Main St, City, State"
+                  placeholder="Address"
                   value={formData.address}
                   onChange={handleChange}
                   required
-                  className="w-full px-3.5 py-2.5 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins"
                 />
               </div>
 
-              {/* BUTTONS */}
-              <div className="flex gap-3 pt-4 border-t border-gray-100 sticky bottom-0 bg-white pb-1">
-
+              {/* ROW 7: BUTTONS */}
+              <div className="grid grid-cols-2 gap-3.5 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setShowModal(false);
                     resetForm();
                   }}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors rounded-lg"
+                  className="h-11 px-4 text-sm font-medium text-[#13516f] bg-white border border-[#c0d0d8] hover:bg-slate-50 transition-colors rounded-lg flex items-center justify-center font-poppins cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2063,11 +1913,8 @@ export default function Employees() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className={`flex-1 px-4 py-2.5 text-sm font-medium text-white transition-colors rounded-lg shadow-xs flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${editMode
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "btn-brand-primary"
-                    }`}
-                  style={!editMode ? { background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' } : undefined}
+                  className="h-11 px-4 text-sm font-medium text-white transition-all rounded-lg shadow-xs flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed font-poppins cursor-pointer hover:opacity-95"
+                  style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>
