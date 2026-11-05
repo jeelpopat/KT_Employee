@@ -33,10 +33,6 @@ import {
 import { getEmploymentStatus, isFinanceOrExcludedUser, isTeamLeadRole, isUnknownEmployeeOrUser } from '../../utils/roleFilters';
 import { getTaskProgress } from '../../utils/taskUtils';
 import {
-  EMPLOYEE_DEPARTMENTS_ROLES,
-  ALL_EMPLOYEE_DEPARTMENTS,
-  ALL_EMPLOYEE_ROLES,
-  getDepartmentForRole,
   matchesEmployeeDepartment,
   matchesEmployeeRole
 } from '../../utils/employeeRoles';
@@ -309,6 +305,7 @@ export default function Members() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
@@ -1091,8 +1088,34 @@ const fetchAllMembers = async () => {
     }
   };
 
+  const getMemberDepartment = (member) => String(
+    member?.department?.departmentName ||
+    member?.departmentName ||
+    member?.department ||
+    ''
+  ).trim();
+  const getMemberDesignation = (member) => String(
+    member?.designation?.name ||
+    member?.designation?.designationName ||
+    member?.designation ||
+    member?.position ||
+    ''
+  ).trim();
+  const departments = [...new Map(
+    members
+      .map(getMemberDepartment)
+      .filter(Boolean)
+      .map((department) => [department.toLowerCase(), department])
+  ).values()].sort((a, b) => a.localeCompare(b));
+  const employeeRoles = [...new Map(
+    members
+      .filter((member) => selectedDepartment === 'all' || matchesEmployeeDepartment(member, selectedDepartment))
+      .map(getMemberDesignation)
+      .filter(Boolean)
+      .map((designation) => [designation.toLowerCase(), designation])
+  ).values()].sort((a, b) => a.localeCompare(b));
   const roles = ['all', ...new Set(members.map(m => m.roleType).filter(Boolean))];
-  const statuses = ['all', ...new Set(members.map(m => String(m.status || '').toLowerCase()))];
+  const statuses = ['all', ...new Set(members.map(m => String(m.status || '').toLowerCase()).filter(Boolean))];
 
   const getRoleLabel = (role) => {
     const labels = {
@@ -1185,29 +1208,19 @@ const fetchAllMembers = async () => {
 
       {/* Filters Section */}
       <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-4 shadow-xs space-y-2.5">
-        <div className="flex flex-col lg:flex-row gap-2.5">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search members by name, email, designation..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white transition-all placeholder:text-slate-400"
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {/* Department Filter */}
-            <div className="relative">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Department Filter */}
+          <div className="relative min-w-[150px] flex-1">
               <select
                 value={selectedDepartment}
                 onChange={(e) => {
                   const nextDept = e.target.value;
                   setSelectedDepartment(nextDept);
                   if (nextDept !== 'all' && selectedEmployeeRole !== 'all') {
-                    const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[nextDept] || [];
-                    if (!rolesInDept.includes(selectedEmployeeRole)) {
+                    const rolesInDept = members
+                      .filter((member) => matchesEmployeeDepartment(member, nextDept))
+                      .map(getMemberDesignation);
+                    if (!rolesInDept.some((role) => role.toLowerCase() === selectedEmployeeRole.toLowerCase())) {
                       setSelectedEmployeeRole('all');
                     }
                   }
@@ -1215,53 +1228,67 @@ const fetchAllMembers = async () => {
                 className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 <option value="all">All Departments</option>
-                {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
+                {departments.map((dept) => (
                   <option key={dept} value={dept}>
                     {dept}
                   </option>
                 ))}
               </select>
               <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            </div>
+          </div>
 
-            {/* Employee Role Filter */}
-            <div className="relative">
+          <button
+            type="button"
+            aria-label={isSearchOpen ? 'Close member search' : 'Open member search'}
+            title={isSearchOpen ? 'Close search' : 'Search members'}
+            onClick={() => {
+              if (isSearchOpen) {
+                setIsSearchOpen(false);
+                setSearchTerm('');
+              } else {
+                setIsSearchOpen(true);
+              }
+            }}
+            className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-[#0088cc] focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20"
+          >
+            {isSearchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+          </button>
+
+          {isSearchOpen && (
+            <div className="relative min-w-[200px] flex-[1.5]">
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search members by name, email, designation..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-10 px-3.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white transition-all placeholder:text-slate-400"
+              />
+            </div>
+          )}
+
+          {/* Employee Role Filter */}
+          <div className="relative min-w-[150px] flex-1">
               <select
                 value={selectedEmployeeRole}
                 onChange={(e) => {
                   const nextRole = e.target.value;
                   setSelectedEmployeeRole(nextRole);
-                  if (nextRole !== 'all' && selectedDepartment === 'all') {
-                    const deducedDept = getDepartmentForRole(nextRole);
-                    if (deducedDept) setSelectedDepartment(deducedDept);
-                  }
                 }}
                 className="w-full h-10 pl-3.5 pr-8 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] bg-white appearance-none cursor-pointer font-medium text-slate-700"
               >
                 <option value="all">All Roles</option>
-                {selectedDepartment !== 'all' && EMPLOYEE_DEPARTMENTS_ROLES[selectedDepartment] ? (
-                  EMPLOYEE_DEPARTMENTS_ROLES[selectedDepartment].map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))
-                ) : (
-                  Object.entries(EMPLOYEE_DEPARTMENTS_ROLES).map(([dept, roles]) => (
-                    <optgroup key={dept} label={dept}>
-                      {roles.map((role) => (
-                        <option key={role} value={role}>
-                          {role}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))
-                )}
+                {employeeRoles.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
               </select>
               <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            </div>
+          </div>
 
-            {/* System Role Filter */}
-            <div className="relative">
+          {/* System Role Filter */}
+          <div className="relative min-w-[140px] flex-1">
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
@@ -1274,10 +1301,10 @@ const fetchAllMembers = async () => {
                 ))}
               </select>
               <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            </div>
+          </div>
 
-            {/* Status Filter */}
-            <div className="relative">
+          {/* Status Filter */}
+          <div className="relative min-w-[130px] flex-1">
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
@@ -1290,7 +1317,6 @@ const fetchAllMembers = async () => {
                 ))}
               </select>
               <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            </div>
           </div>
         </div>
 
@@ -1305,6 +1331,7 @@ const fetchAllMembers = async () => {
                 setSelectedRole('all');
                 setSelectedStatus('all');
                 setSearchTerm('');
+                setIsSearchOpen(false);
               }}
               className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
             >
