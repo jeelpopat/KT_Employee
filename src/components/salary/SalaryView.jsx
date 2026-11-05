@@ -595,13 +595,11 @@ export const SalaryView = () => {
   // Formula 2: net salary = Base Gross + Extra Bonus - Extra Deduction - Fixed Monthly Deduction - TDS - LOP
   const processCalculations = useMemo(() => {
     const totalDays = Number(processForm.totalDays) || getDaysInMonth(processForm.month, processForm.year);
-    const daysPayable = processForm.daysPayable !== '' && processForm.daysPayable !== undefined
-      ? Number(processForm.daysPayable)
-      : totalDays;
-    const leaveDays = Number(processForm.leaveDays) || 0;
     const lopDays = Number(processForm.lopDays) || 0;
-    // Explicit user specification: presentDays = daysPayable - leaveDays - lopDays
-    const presentDays = Math.max(0, daysPayable - leaveDays - lopDays);
+    const leaveDays = Number(processForm.leaveDays) || 0;
+    // Total Payable Days = Total Month Days - LOP Days (fixed calculation)
+    const daysPayable = Math.max(0, totalDays - lopDays);
+    const presentDays = Math.max(0, daysPayable - leaveDays);
 
     if (!selectedUserActiveStructure) {
       return {
@@ -1596,12 +1594,11 @@ export const SalaryView = () => {
     const newExtraDeduction = Number(updatePayrollForm.extraDeduction) || 0;
 
     const totalDays = Number(updatePayrollForm.totalDays) || getDaysInMonth(selectedPayrollToUpdate.month, selectedPayrollToUpdate.year);
-    const daysPayable = updatePayrollForm.daysPayable !== '' && updatePayrollForm.daysPayable !== undefined
-      ? Number(updatePayrollForm.daysPayable)
-      : totalDays;
-    const leaveDays = Number(updatePayrollForm.leaveDays) || 0;
     const lopDays = Number(updatePayrollForm.lopDays) || 0;
-    const presentDays = Math.max(0, daysPayable - leaveDays - lopDays);
+    const leaveDays = Number(updatePayrollForm.leaveDays) || 0;
+    // Total Payable Days = Total Month Days - LOP Days (fixed calculation)
+    const daysPayable = Math.max(0, totalDays - lopDays);
+    const presentDays = Math.max(0, daysPayable - leaveDays);
 
     const perDaySalary = totalDays > 0 ? Math.round((baseGross / totalDays) * 100) / 100 : 0;
     const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
@@ -3153,7 +3150,14 @@ export const SalaryView = () => {
                         min="1"
                         max="31"
                         value={updatePayrollForm.totalDays ?? 30}
-                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, totalDays: Number(e.target.value) || 0 })}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setUpdatePayrollForm({
+                            ...updatePayrollForm,
+                            totalDays: val,
+                            daysPayable: Math.max(0, val - (Number(updatePayrollForm.lopDays) || 0))
+                          });
+                        }}
                         className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:border-indigo-500"
                       />
                     </div>
@@ -3164,12 +3168,11 @@ export const SalaryView = () => {
                       </label>
                       <input
                         type="number"
-                        min="0"
-                        step="0.5"
+                        readOnly
                         value={updatePayrollForm.leaveDays ?? 0}
-                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, leaveDays: Number(e.target.value) || 0 })}
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-amber-300 rounded-lg text-amber-700 font-mono font-bold focus:outline-none focus:border-amber-500"
+                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-amber-300 rounded-lg text-amber-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                         placeholder="0"
+                        title="Approved Leaves is fixed"
                       />
                     </div>
 
@@ -3182,7 +3185,14 @@ export const SalaryView = () => {
                         min="0"
                         step="0.5"
                         value={updatePayrollForm.lopDays ?? 0}
-                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, lopDays: Number(e.target.value) || 0 })}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setUpdatePayrollForm({
+                            ...updatePayrollForm,
+                            lopDays: val,
+                            daysPayable: Math.max(0, (Number(updatePayrollForm.totalDays) || 0) - val)
+                          });
+                        }}
                         className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
                         placeholder="0"
                       />
@@ -3194,14 +3204,11 @@ export const SalaryView = () => {
                       </label>
                       <input
                         type="number"
-                        min="0"
-                        max="31"
-                        step="0.5"
-                        required
-                        value={updatePayrollForm.daysPayable ?? 30}
-                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, daysPayable: Number(e.target.value) || 0 })}
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold focus:outline-none focus:border-emerald-500"
-                        placeholder="e.g. 30"
+                        readOnly
+                        value={updatePayrollCalculations.daysPayable}
+                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
+                        placeholder="30"
+                        title="Total Payable Days = Total Month Days - LOP Days (Fixed)"
                       />
                     </div>
                   </div>
@@ -3528,7 +3535,14 @@ export const SalaryView = () => {
                       min="1"
                       max="31"
                       value={processForm.totalDays}
-                      onChange={(e) => setProcessForm({ ...processForm, totalDays: Number(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setProcessForm({
+                          ...processForm,
+                          totalDays: val,
+                          daysPayable: Math.max(0, val - (Number(processForm.lopDays) || 0))
+                        });
+                      }}
                       className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:border-indigo-500"
                     />
                   </div>
@@ -3539,12 +3553,11 @@ export const SalaryView = () => {
                     </label>
                     <input
                       type="number"
-                      min="0"
-                      step="0.5"
-                      value={processForm.leaveDays}
-                      onChange={(e) => setProcessForm({ ...processForm, leaveDays: Number(e.target.value) || 0 })}
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-amber-300 rounded-lg text-amber-700 font-mono font-bold focus:outline-none focus:border-amber-500"
+                      readOnly
+                      value={processForm.leaveDays ?? 0}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-amber-300 rounded-lg text-amber-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                       placeholder="0"
+                      title="Approved Leaves is fixed (synced from Leave API)"
                     />
                   </div>
 
@@ -3557,7 +3570,14 @@ export const SalaryView = () => {
                       min="0"
                       step="0.5"
                       value={processForm.lopDays}
-                      onChange={(e) => setProcessForm({ ...processForm, lopDays: Number(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setProcessForm({
+                          ...processForm,
+                          lopDays: val,
+                          daysPayable: Math.max(0, (Number(processForm.totalDays) || 0) - val)
+                        });
+                      }}
                       className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
                       placeholder="0"
                     />
@@ -3569,14 +3589,11 @@ export const SalaryView = () => {
                     </label>
                     <input
                       type="number"
-                      min="0"
-                      max="31"
-                      step="0.5"
-                      required
-                      value={processForm.daysPayable}
-                      onChange={(e) => setProcessForm({ ...processForm, daysPayable: Number(e.target.value) || 0 })}
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold focus:outline-none focus:border-emerald-500"
-                      placeholder="e.g. 30"
+                      readOnly
+                      value={processCalculations.daysPayable}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
+                      placeholder="30"
+                      title="Total Payable Days = Total Month Days - LOP Days (Fixed)"
                     />
                   </div>
                 </div>
@@ -4230,92 +4247,222 @@ export const SalaryView = () => {
             </div>
 
             <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Record Status</span>
-                  <span className="font-semibold text-slate-800">
-                    {viewingDetailSalary.isActive !== false ? 'Active Structure' : 'Archived Record'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Last Updated</span>
-                  <span className="font-mono text-slate-700">
-                    {formatDate(viewingDetailSalary.updatedAt || viewingDetailSalary.createdAt)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Annual CTC</span>
-                  <span className="font-mono font-bold text-indigo-600">
-                    {formatINR((Number(viewingDetailSalary.grossSalary) || 0) * 12)}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const getVal = (key) => {
+                  if (viewingDetailSalary[key] !== undefined && viewingDetailSalary[key] !== null) {
+                    return viewingDetailSalary[key];
+                  }
+                  if (viewingDetailSalary.salaryStructureSnapshot?.[key] !== undefined && viewingDetailSalary.salaryStructureSnapshot?.[key] !== null) {
+                    return viewingDetailSalary.salaryStructureSnapshot[key];
+                  }
+                  return null;
+                };
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[10px] uppercase font-bold text-emerald-600 block pb-1 border-b border-slate-200">
-                    Earnings (Credits)
-                  </span>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Basic Salary:</span>
-                    <span className="font-mono font-semibold">{formatINR(viewingDetailSalary.basicSalary)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">HRA:</span>
-                    <span className="font-mono font-semibold">{formatINR(viewingDetailSalary.hra)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Allowance:</span>
-                    <span className="font-mono font-semibold">{formatINR(viewingDetailSalary.allowance)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Bonus:</span>
-                    <span className="font-mono font-semibold text-emerald-600">
-                      +{formatINR(viewingDetailSalary.fixedBonus)}
-                    </span>
-                  </div>
-                  <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
-                    <span>Gross Salary:</span>
-                    <span className="font-mono">{formatINR(viewingDetailSalary.grossSalary)}</span>
-                  </div>
-                </div>
+                const hasSalaryValue = (val) => {
+                  if (val === null || val === undefined) return false;
+                  if (typeof val === 'string') {
+                    const trimmed = val.trim();
+                    if (trimmed === '' || trimmed === '0' || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'undefined') {
+                      return false;
+                    }
+                    const num = Number(trimmed);
+                    if (!isNaN(num) && num === 0) return false;
+                    return true;
+                  }
+                  if (typeof val === 'number') {
+                    return !isNaN(val) && val !== 0;
+                  }
+                  return Boolean(val);
+                };
 
-                <div className="space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[10px] uppercase font-bold text-rose-600 block pb-1 border-b border-slate-200">
-                    Deductions (Debits)
-                  </span>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Fixed Deduction:</span>
-                    <span className="font-mono font-semibold text-rose-600">
-                      -{formatINR(viewingDetailSalary.fixedDeduction)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">TDS ({viewingDetailSalary.tdsPercentage || 0}%):</span>
-                    <span className="font-mono font-semibold text-rose-600">
-                      -{formatINR(((Number(viewingDetailSalary.grossSalary) || 0) * (Number(viewingDetailSalary.tdsPercentage) || 0)) / 100)}
-                    </span>
-                  </div>
-                  <div className="pt-8 border-t border-slate-200 flex justify-between font-bold text-rose-600">
-                    <span>Total Deductions:</span>
-                    <span className="font-mono">
-                      -{formatINR((Number(viewingDetailSalary.fixedDeduction) || 0) + (((Number(viewingDetailSalary.grossSalary) || 0) * (Number(viewingDetailSalary.tdsPercentage) || 0)) / 100))}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                // 1. EARNINGS (CREDITS)
+                const basicSalary = getVal('basicSalary');
+                const hra = getVal('hra');
+                const conveyanceAllowance = getVal('conveyanceAllowance');
+                const medicalAllowance = getVal('medicalAllowance');
+                const specialAllowance = getVal('specialAllowance');
+                const allowance = getVal('allowance');
+                const dearnessAllowance = getVal('dearnessAllowance');
+                const otherAllowances = getVal('otherAllowances');
+                const fixedBonus = getVal('fixedBonus');
 
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-emerald-800 uppercase font-bold block">
-                    Net Take-Home Salary
-                  </span>
-                  <span className="text-xs text-slate-500">Baseline monthly credited amount</span>
-                </div>
-                <span className="font-mono font-black text-xl text-emerald-600">
-                  {formatINR(viewingDetailSalary.netSalary)}
-                </span>
-              </div>
+                const earningsItems = [
+                  { key: 'basicSalary', label: 'Basic Salary:', val: basicSalary, isBonus: false },
+                  { key: 'hra', label: 'HRA:', val: hra, isBonus: false },
+                  { key: 'conveyanceAllowance', label: 'Conveyance Allowance:', val: conveyanceAllowance, isBonus: false },
+                  { key: 'medicalAllowance', label: 'Medical Allowance:', val: medicalAllowance, isBonus: false },
+                  { key: 'specialAllowance', label: 'Special Allowance:', val: specialAllowance, isBonus: false },
+                  { key: 'allowance', label: 'Allowance:', val: allowance, isBonus: false },
+                  { key: 'dearnessAllowance', label: 'Dearness Allowance (DA):', val: dearnessAllowance, isBonus: false },
+                  { key: 'otherAllowances', label: 'Other Allowances:', val: otherAllowances, isBonus: false },
+                  { key: 'fixedBonus', label: 'Bonus:', val: fixedBonus, isBonus: true },
+                ].filter((item) => hasSalaryValue(item.val));
+
+                // Gross Salary
+                const rawGross = getVal('grossSalary');
+                const calculatedGross = [
+                  basicSalary, hra, conveyanceAllowance, medicalAllowance,
+                  specialAllowance, allowance, dearnessAllowance, otherAllowances, fixedBonus
+                ].reduce((sum, v) => sum + (hasSalaryValue(v) ? Number(v) : 0), 0);
+                const finalGross = hasSalaryValue(rawGross) ? Number(rawGross) : (calculatedGross > 0 ? calculatedGross : null);
+
+                // 2. DEDUCTIONS (DEBITS)
+                const basicForPf = getVal('basicForPf');
+                const pfDeduction = getVal('pfDeduction');
+                const esicDeduction = getVal('esicDeduction');
+                const professionalTax = getVal('professionalTax');
+                const rawTds = getVal('tds');
+                const tdsPercentage = getVal('tdsPercentage');
+                const fixedDeduction = getVal('fixedDeduction');
+                const otherDeductions = getVal('otherDeductions');
+
+                const calculatedTds = (hasSalaryValue(tdsPercentage) && hasSalaryValue(finalGross))
+                  ? (Number(finalGross) * Number(tdsPercentage)) / 100
+                  : null;
+                const finalTds = hasSalaryValue(rawTds) ? Number(rawTds) : (hasSalaryValue(calculatedTds) ? calculatedTds : null);
+
+                const deductionsItems = [
+                  { key: 'basicForPf', label: 'Basic for PF:', val: basicForPf, isBase: true },
+                  { key: 'fixedDeduction', label: 'Fixed Deduction:', val: fixedDeduction },
+                  ...(hasSalaryValue(finalTds) ? [{
+                    key: 'tds',
+                    label: hasSalaryValue(tdsPercentage) ? `TDS (${tdsPercentage}%):` : 'TDS / Income Tax:',
+                    val: finalTds
+                  }] : (hasSalaryValue(tdsPercentage) ? [{
+                    key: 'tdsPercentage',
+                    label: 'TDS Rate:',
+                    val: `${tdsPercentage}%`,
+                    isRate: true
+                  }] : [])),
+                  { key: 'pfDeduction', label: 'PF Deduction:', val: pfDeduction },
+                  { key: 'esicDeduction', label: 'ESIC Deduction:', val: esicDeduction },
+                  { key: 'professionalTax', label: 'Professional Tax:', val: professionalTax },
+                  { key: 'otherDeductions', label: 'Other Deductions:', val: otherDeductions },
+                ].filter((item) => item.isRate || hasSalaryValue(item.val));
+
+                // Total Deductions
+                const rawTotalDeduction = getVal('totalDeduction') != null ? getVal('totalDeduction') : getVal('totalDeductions');
+                const calculatedTotalDeduction = [
+                  fixedDeduction, finalTds, pfDeduction, esicDeduction, professionalTax, otherDeductions
+                ].reduce((sum, v) => sum + (hasSalaryValue(v) ? Number(v) : 0), 0);
+                const finalTotalDeductions = hasSalaryValue(rawTotalDeduction)
+                  ? Number(rawTotalDeduction)
+                  : (calculatedTotalDeduction > 0 ? calculatedTotalDeduction : null);
+
+                // 3. NET SALARY
+                const rawNetSalary = getVal('netSalary');
+                const calculatedNet = (finalGross != null ? finalGross : 0) - (finalTotalDeductions != null ? finalTotalDeductions : 0);
+                const finalNetSalary = hasSalaryValue(rawNetSalary) ? Number(rawNetSalary) : (calculatedNet > 0 ? calculatedNet : null);
+
+                // 4. YEARS OF SERVICE
+                const yearsOfService = getVal('yearsOfService');
+
+                return (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Record Status</span>
+                        <span className="font-semibold text-slate-800">
+                          {viewingDetailSalary.isActive !== false ? 'Active Structure' : 'Archived Record'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold block">Last Updated</span>
+                        <span className="font-mono text-slate-700">
+                          {formatDate(viewingDetailSalary.updatedAt || viewingDetailSalary.createdAt)}
+                        </span>
+                      </div>
+                      {hasSalaryValue(yearsOfService) && (
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold block">Years of Service</span>
+                          <span className="font-mono font-semibold text-slate-800">
+                            {yearsOfService} {Number(yearsOfService) === 1 ? 'Year' : 'Years'}
+                          </span>
+                        </div>
+                      )}
+                      {hasSalaryValue(finalGross) && (
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold block">Annual CTC</span>
+                          <span className="font-mono font-bold text-indigo-600">
+                            {formatINR(Number(finalGross) * 12)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Earnings */}
+                      <div className="flex flex-col justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 min-h-[140px]">
+                        <div className="space-y-2">
+                          <span className="text-[10px] uppercase font-bold text-emerald-600 block pb-1 border-b border-slate-200">
+                            Earnings (Credits)
+                          </span>
+                          {earningsItems.length > 0 ? (
+                            earningsItems.map((item) => (
+                              <div key={item.key} className="flex justify-between items-center py-0.5">
+                                <span className="text-slate-500">{item.label}</span>
+                                <span className={`font-mono font-semibold ${item.isBonus ? 'text-emerald-600' : 'text-slate-800'}`}>
+                                  {item.isBonus ? `+${formatINR(item.val)}` : formatINR(item.val)}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-slate-400 italic text-[11px] py-1">No additional earnings configured</p>
+                          )}
+                        </div>
+                        {hasSalaryValue(finalGross) && (
+                          <div className="pt-2 mt-3 border-t border-slate-200 flex justify-between font-bold text-slate-900">
+                            <span>Gross Salary:</span>
+                            <span className="font-mono">{formatINR(finalGross)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Deductions */}
+                      <div className="flex flex-col justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 min-h-[140px]">
+                        <div className="space-y-2">
+                          <span className="text-[10px] uppercase font-bold text-rose-600 block pb-1 border-b border-slate-200">
+                            Deductions (Debits)
+                          </span>
+                          {deductionsItems.length > 0 ? (
+                            deductionsItems.map((item) => (
+                              <div key={item.key} className="flex justify-between items-center py-0.5">
+                                <span className="text-slate-500">{item.label}</span>
+                                <span className={`font-mono font-semibold ${item.isBase ? 'text-slate-700' : 'text-rose-600'}`}>
+                                  {item.isRate ? item.val : item.isBase ? formatINR(item.val) : `-${formatINR(item.val)}`}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-slate-400 italic text-[11px] py-1">No deductions applicable</p>
+                          )}
+                        </div>
+                        {hasSalaryValue(finalTotalDeductions) && (
+                          <div className="pt-2 mt-3 border-t border-slate-200 flex justify-between font-bold text-rose-600">
+                            <span>Total Deductions:</span>
+                            <span className="font-mono">-{formatINR(finalTotalDeductions)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Net Take-Home Salary */}
+                    {hasSalaryValue(finalNetSalary) && (
+                      <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-emerald-800 uppercase font-bold block">
+                            Net Take-Home Salary
+                          </span>
+                          <span className="text-xs text-slate-500">Baseline monthly credited amount</span>
+                        </div>
+                        <span className="font-mono font-black text-xl text-emerald-600">
+                          {formatINR(finalNetSalary)}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">

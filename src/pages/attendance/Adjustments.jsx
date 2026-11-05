@@ -2206,18 +2206,10 @@ export default function Adjustments() {
           MAIN GRID
       ====================================================== */}
       {loading && (
-<<<<<<< Updated upstream
         <LoadingScreen
           message="Loading attendance adjustment console..."
           description="Fetching employee lists and adjustment history"
         />
-=======
-        <div className="flex flex-col justify-center items-center py-16 sm:py-24 font-poppins">
-          <Loader2 className="animate-spin h-9 w-9 text-[#068DCB] mb-3" />
-          <p className="text-sm font-semibold text-slate-800">Loading attendance adjustment console...</p>
-          <p className="text-xs text-slate-500 mt-1">Fetching employee lists and adjustment history</p>
-        </div>
->>>>>>> Stashed changes
       )}
 
       <div
