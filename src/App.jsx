@@ -217,7 +217,7 @@ const MainLayout = ({ handleSignOut }) => {
   return (
     <div className="min-h-screen bg-[#F4F4F4] text-slate-900 font-sans" style={{ backgroundColor: '#F4F4F4' }}>
       <div inert={requiresEmployeeScreenCapture}>
-        <Suspense fallback={<div className="h-16 border-b border-[#083b4e]" style={{ background: 'linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)' }} />}>
+        <Suspense fallback={<div className="h-16 border-b border-[#083b4e]" style={{ background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }} />}>
           <Header onSignOut={handleLayoutSignOut} />
         </Suspense>
         <Suspense fallback={null}>

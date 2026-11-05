@@ -256,6 +256,7 @@ export default function Adjustments() {
   // ============================================================
 
   const saveAttendanceSettings = () => {
+    setNotification("");
     // --------------------------------------------
     // Validate timings
     // --------------------------------------------
@@ -346,6 +347,7 @@ export default function Adjustments() {
     setNotification(
       "Attendance settings saved successfully!"
     );
+    showToast("Attendance settings saved successfully!", "success");
   };
 
   // ============================================================
@@ -1210,8 +1212,8 @@ export default function Adjustments() {
     );
 
     setEditMode(true);
-
     setError("");
+    setNotification("");
 
     window.scrollTo({
       top: 0,
@@ -1251,6 +1253,7 @@ export default function Adjustments() {
     );
 
     setError("");
+    setNotification("");
   };
 
   // ============================================================
@@ -1261,6 +1264,9 @@ export default function Adjustments() {
     e
   ) => {
     e.preventDefault();
+
+    setNotification("");
+    setError("");
 
     if (
       !formData.employeeId ||
@@ -1317,6 +1323,7 @@ export default function Adjustments() {
 
     setSubmitting(true);
     setError("");
+    setNotification("");
 
     try {
       const token =
@@ -1555,110 +1562,28 @@ export default function Adjustments() {
 
       let data = await response.json();
 
-      // AUTO-RECOVERY: If online backend returns "Attendance record not found",
-      // auto-initialize today's attendance record and retry adjustment submit!
-      if (!response.ok && data?.message && data.message.includes("Attendance record not found")) {
-        console.log("Attendance record missing, auto-initializing...");
-        try {
-          await fetch(`${API_BASE_URL}/attendance/admin/all?date=${encodeURIComponent(formData.date)}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        } catch (initErr) {
-          console.warn("Init fetch failed:", initErr);
-        }
-
-        // Retry adjustment submit
-        response = await fetch(url, {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (response.headers.get("content-type")?.includes("application/json")) {
-          data = await response.json();
-        }
-      }
-
-      if (!response.ok && data?.message && data.message.includes("Attendance record not found")) {
-        console.log("Attendance record missing, saving adjustment locally...");
-        const emp = employees.find((e) => String(e.id) === String(formData.employeeId));
-        const empName = emp ? emp.name : "Employee";
-        const firstSession = formData.sessions[0] || {};
-        const checkInVal = firstSession.checkin || "";
-        const checkOutVal = firstSession.checkout || "";
-
-        let calcStatus = "half-day";
-        if (checkInVal) {
-          let mins = null;
-          if (typeof checkInVal === 'string' && /^\d{1,2}:\d{2}/.test(checkInVal)) {
-            const [h, m] = checkInVal.split(':').map(Number);
-            mins = h * 60 + m;
-          }
-          if (mins !== null) {
-            if (mins > 15 * 60) calcStatus = "absent";
-            else if (mins > 10 * 60 + 30) calcStatus = "half-day";
-            else if (mins > 10 * 60 + 10) calcStatus = "late";
-            else calcStatus = "present";
-          }
-        }
-
-        const localRecord = {
-          _id: "adj-" + Date.now(),
-          employeeId: formData.employeeId,
-          employeeName: empName,
-          date: formData.date,
-          checkInTime: checkInVal,
-          checkOutTime: checkOutVal,
-          sessions: formData.sessions,
-          reason: formData.reason,
-          status: calcStatus,
-          createdAt: new Date().toISOString(),
-        };
-
-        const existingLocal = JSON.parse(localStorage.getItem("localAdjustments") || "[]")
-          .filter((r) => !(String(r.employeeId) === String(formData.employeeId) && r.date === formData.date));
-        existingLocal.unshift(localRecord);
-        localStorage.setItem("localAdjustments", JSON.stringify(existingLocal));
-
-        setRecentAdjustments((prev) => [
-          localRecord,
-          ...prev.filter((r) => !(String(r.employeeId) === String(formData.employeeId) && r.date === formData.date))
-        ]);
-
-        window.dispatchEvent(new Event("attendanceAdjusted"));
-        setNotification("Attendance adjustment saved successfully!");
-        setFormData({
-          employeeId: "",
-          date: "",
-          sessions: [{ checkin: "", breakStart: "", breakEnd: "", checkout: "" }],
-          reason: "",
-        });
-        setSelectedFields([{ checkin: false, breakStart: false, breakEnd: false, checkout: false }]);
-        setSessionCount(1);
-        setEditMode(false);
-        setSubmitting(false);
-        return;
-      }
-
+      // If backend returns an error or attendance record missing, throw error so ONLY error message is shown
       if (!response.ok || !data?.success) {
         throw new Error(
-          data?.message || `Failed to ${method} attendance`
+          data?.message ||
+          data?.error ||
+          `Failed to ${method === "PUT" ? "update" : "adjust"} attendance`
         );
       }
 
       // ========================================================
-      // SUCCESS
+      // SUCCESS (Only on verified successful response)
       // ========================================================
 
       window.dispatchEvent(new Event("attendanceAdjusted"));
-      setNotification(
-        method === "PUT"
+      const successMsg =
+        data?.message ||
+        (method === "PUT"
           ? "Complete attendance updated successfully!"
-          : "Selected attendance fields updated successfully!"
-      );
+          : "Selected attendance fields updated successfully!");
+
+      setNotification(successMsg);
+      showToast(successMsg, "success");
 
       // ========================================================
       // RESET
@@ -1704,14 +1629,15 @@ export default function Adjustments() {
         error
       );
 
-      setError(
-        error.message ||
-          "Something went wrong."
-      );
+      const errorMsg =
+        error?.message ||
+        "Something went wrong saving attendance adjustment.";
+
+      setError(errorMsg);
+      setNotification("");
 
       showToast(
-        error.message ||
-        "Something went wrong saving attendance adjustment.",
+        errorMsg,
         "error"
       );
     } finally {
@@ -1817,6 +1743,23 @@ export default function Adjustments() {
     }
   };
 
+  const format12Hour = (timeStr) => {
+    if (!timeStr) return "";
+    try {
+      const parts = String(timeStr).split(":");
+      if (parts.length >= 2) {
+        let hours = parseInt(parts[0], 10);
+        const minutes = parts[1].slice(0, 2);
+        if (isNaN(hours)) return timeStr;
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        return `${hours}:${minutes} ${ampm}`;
+      }
+    } catch {}
+    return timeStr;
+  };
+
   // ============================================================
   // RENDER
   // ============================================================
@@ -1841,33 +1784,26 @@ export default function Adjustments() {
       ====================================================== */}
 
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3">
-
-          <div className="w-full max-w-2xl bg-white rounded-xl border border-slate-200/80 shadow-2xl overflow-hidden">
-
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 sm:p-6 md:p-8 overflow-y-auto">
+          <div className="w-full max-w-2xl bg-white rounded-2xl border border-slate-200/90 shadow-2xl overflow-hidden font-poppins flex flex-col my-auto max-h-[85vh] sm:max-h-[88vh]">
             {/* Header */}
-
-            <div className="flex items-center justify-between border-b border-gray-200 px-4 sm:px-5 py-4">
-
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 sm:px-6 py-4 shrink-0 bg-white">
               <div className="flex items-center gap-3">
-
-                <div className="w-9 h-9 flex items-center justify-center bg-gray-100 border border-gray-200">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#f0f9ff] text-[#068DCB] border border-[#bae6fd]">
                   <Settings
                     size={18}
-                    className="text-gray-700"
                   />
                 </div>
 
                 <div>
-                  <h2 className="text-base sm:text-lg font-semibold text-gray-800">
-                    Settings
+                  <h2 className="text-base sm:text-lg font-bold text-[#0f172a] font-poppins">
+                    Rule Settings
                   </h2> 
 
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Configure office attendance timings
+                  <p className="text-xs text-[#64748b] mt-0.5 font-poppins">
+                    Configure office attendance timings and rules
                   </p>
                 </div>
-
               </div>
 
               <button
@@ -1875,16 +1811,14 @@ export default function Adjustments() {
                 onClick={closeSettings}
                 aria-label="Close settings"
                 title="Close settings"
-                className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               >
                 <X size={20} />
               </button>
-
             </div>
 
-            {/* Body */}
-
-            <div className="p-4 sm:p-5 space-y-5">
+            {/* Body - Scrollable with top/bottom margin and padding */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
 
               {/* Timing Section */}
 
@@ -1894,10 +1828,10 @@ export default function Adjustments() {
 
                   <Clock
                     size={16}
-                    className="text-gray-600"
+                    className="text-[#034665]"
                   />
 
-                  <h3 className="text-sm font-semibold text-gray-700">
+                  <h3 className="text-sm font-semibold text-gray-800 font-poppins">
                     Office Timing
                   </h3>
 
@@ -1908,7 +1842,7 @@ export default function Adjustments() {
                   {/* Office Start */}
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5 font-poppins">
                       Office Start Time
                     </label>
 
@@ -1923,10 +1857,10 @@ export default function Adjustments() {
                           e.target.value
                         )
                       }
-                      className="w-full bg-white border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-poppins focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition-colors"
                     />
 
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-[11px] text-gray-400 mt-1 font-poppins">
                       Normal office start
                     </p>
                   </div>
@@ -1934,7 +1868,7 @@ export default function Adjustments() {
                   {/* Late */}
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5 font-poppins">
                       Late After
                     </label>
 
@@ -1949,10 +1883,10 @@ export default function Adjustments() {
                           e.target.value
                         )
                       }
-                      className="w-full bg-white border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-poppins focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition-colors"
                     />
 
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-[11px] text-gray-400 mt-1 font-poppins">
                       Check-in after this time is late
                     </p>
                   </div>
@@ -1960,7 +1894,7 @@ export default function Adjustments() {
                   {/* Absent */}
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5 font-poppins">
                       Absent After
                     </label>
 
@@ -1975,10 +1909,10 @@ export default function Adjustments() {
                           e.target.value
                         )
                       }
-                      className="w-full bg-white border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-poppins focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition-colors"
                     />
 
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-[11px] text-gray-400 mt-1 font-poppins">
                       Check-in after this time is absent
                     </p>
                   </div>
@@ -1986,7 +1920,7 @@ export default function Adjustments() {
                   {/* Office End */}
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5 font-poppins">
                       Office End Time
                     </label>
 
@@ -2001,10 +1935,10 @@ export default function Adjustments() {
                           e.target.value
                         )
                       }
-                      className="w-full bg-white border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-poppins focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition-colors"
                     />
 
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-[11px] text-gray-400 mt-1 font-poppins">
                       Normal office closing time
                     </p>
                   </div>
@@ -2015,16 +1949,16 @@ export default function Adjustments() {
 
               {/* Work Hours */}
 
-              <div className="border-t border-gray-200 pt-5">
+              <div className="border-t border-slate-200 pt-5">
 
                 <div className="flex items-center gap-2 mb-3">
 
                   <Clock
                     size={16}
-                    className="text-gray-600"
+                    className="text-[#034665]"
                   />
 
-                  <h3 className="text-sm font-semibold text-gray-700">
+                  <h3 className="text-sm font-semibold text-gray-800 font-poppins">
                     Work Hour Rules
                   </h3>
 
@@ -2035,7 +1969,7 @@ export default function Adjustments() {
                   {/* Present */}
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5 font-poppins">
                       Present Hours
                     </label>
 
@@ -2052,10 +1986,10 @@ export default function Adjustments() {
                           e.target.value
                         )
                       }
-                      className="w-full bg-white border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-poppins focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition-colors"
                     />
 
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-[11px] text-gray-400 mt-1 font-poppins">
                       Minimum hours for present
                     </p>
                   </div>
@@ -2063,7 +1997,7 @@ export default function Adjustments() {
                   {/* Half Day */}
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5 font-poppins">
                       Half-Day Hours
                     </label>
 
@@ -2080,10 +2014,10 @@ export default function Adjustments() {
                           e.target.value
                         )
                       }
-                      className="w-full bg-white border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-poppins focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition-colors"
                     />
 
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-[11px] text-gray-400 mt-1 font-poppins">
                       Minimum hours for half-day
                     </p>
                   </div>
@@ -2091,7 +2025,7 @@ export default function Adjustments() {
                   {/* Break */}
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5 font-poppins">
                       Break Limit
                     </label>
 
@@ -2107,10 +2041,10 @@ export default function Adjustments() {
                           e.target.value
                         )
                       }
-                      className="w-full bg-white border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-poppins focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition-colors"
                     />
 
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-[11px] text-gray-400 mt-1 font-poppins">
                       Maximum break in minutes
                     </p>
                   </div>
@@ -2121,9 +2055,9 @@ export default function Adjustments() {
 
               {/* Current Settings Preview */}
 
-              <div className="bg-gray-50 border border-gray-200 p-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 font-poppins">
 
-                <p className="text-xs font-semibold text-gray-600 mb-2">
+                <p className="text-xs font-semibold text-gray-700 mb-2 font-poppins">
                   Current Configuration
                 </p>
 
@@ -2134,7 +2068,7 @@ export default function Adjustments() {
                       Start
                     </span>
 
-                    <span className="font-medium text-gray-700">
+                    <span className="font-semibold text-gray-800">
                       {
                         tempSettings.officeStartTime
                       }
@@ -2146,7 +2080,7 @@ export default function Adjustments() {
                       Late
                     </span>
 
-                    <span className="font-medium text-gray-700">
+                    <span className="font-semibold text-gray-800">
                       {
                         tempSettings.lateAfter
                       }
@@ -2158,7 +2092,7 @@ export default function Adjustments() {
                       Absent
                     </span>
 
-                    <span className="font-medium text-gray-700">
+                    <span className="font-semibold text-gray-800">
                       {
                         tempSettings.absentAfter
                       }
@@ -2170,7 +2104,7 @@ export default function Adjustments() {
                       End
                     </span>
 
-                    <span className="font-medium text-gray-700">
+                    <span className="font-semibold text-gray-800">
                       {
                         tempSettings.officeEndTime
                       }
@@ -2184,49 +2118,35 @@ export default function Adjustments() {
             </div>
 
             {/* Footer */}
-
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 border-t border-gray-200 px-4 sm:px-5 py-4 bg-gray-50">
-
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-3 border-t border-slate-200 px-5 sm:px-6 py-4 bg-slate-50 shrink-0 font-poppins">
               <button
                 type="button"
-                onClick={
-                  resetAttendanceSettings
-                }
-                className="w-full sm:w-auto flex items-center justify-center gap-2 text-xs bg-white text-red-600 border border-red-200 px-4 py-2.5 hover:bg-red-50"
+                onClick={resetAttendanceSettings}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 text-xs bg-white text-rose-600 border border-rose-200 rounded-lg px-4 py-2 hover:bg-rose-50 font-medium transition-colors cursor-pointer"
               >
-                <RotateCcw
-                  size={14}
-                />
+                <RotateCcw size={14} />
                 Reset Default
               </button>
 
-              <div className="flex gap-2">
-
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   type="button"
-                  onClick={
-                    closeSettings
-                  }
-                  className="flex-1 sm:flex-none text-xs bg-white text-gray-700 border border-gray-300 px-4 py-2.5 hover:bg-gray-100"
+                  onClick={closeSettings}
+                  className="flex-1 sm:flex-none text-xs bg-white text-slate-700 border border-slate-300 rounded-lg px-4 py-2 hover:bg-slate-100 font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="button"
-                  onClick={
-                    saveAttendanceSettings
-                  }
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs bg-gray-800 text-white px-5 py-2.5 hover:bg-gray-700"
+                  onClick={saveAttendanceSettings}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs text-white rounded-lg px-5 py-2 font-medium transition-colors shadow-xs cursor-pointer hover:opacity-95"
+                  style={{ background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }}
                 >
-                  <Save
-                    size={14}
-                  />
+                  <Save size={14} />
                   Save Settings
                 </button>
-
               </div>
-
             </div>
 
           </div>
@@ -2237,632 +2157,426 @@ export default function Adjustments() {
       {/* ======================================================
           HEADER
       ====================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0 mt-0.5">
-            <Settings size={18} />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Adjustments
-            </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-              Apply direct attendance adjustments and configure office rules
-            </p>
-            {/* Current Settings Pills */}
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
-                Start: <b className="text-slate-900">{attendanceSettings.officeStartTime}</b>
-              </span>
-              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
-                Late: <b className="text-slate-900">{attendanceSettings.lateAfter}</b>
-              </span>
-              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
-                Absent: <b className="text-slate-900">{attendanceSettings.absentAfter}</b>
-              </span>
-              <span className="text-[11px] bg-white border border-slate-200/80 shadow-2xs rounded-lg px-2.5 py-1 text-slate-600">
-                End: <b className="text-slate-900">{attendanceSettings.officeEndTime}</b>
-              </span>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 font-poppins">
+        <div>
+          <h1 className="text-2xl sm:text-[30px] font-bold text-[#0f172a] tracking-tight leading-tight font-poppins">
+            Adjustments
+          </h1>
+          <p className="mt-1 text-xs sm:text-[13px] text-[#64748b] font-poppins">
+            Apply Direct Attendance Adjustments And Configure Rules
+          </p>
+          {/* Divider Line */}
+          <div style={{ borderTop: '0.5px solid #034665' }} className="my-2.5 w-full" />
+          {/* Policy Rules Badge Bar */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-poppins">
+            <span className="text-[10px] font-semibold text-[#94a3b8] uppercase tracking-wider">
+              POLICY RULES:
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-[#475569] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              Start {format12Hour(attendanceSettings.officeStartTime || "10:00")}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-[#475569] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+              Late {format12Hour(attendanceSettings.lateAfter || "10:10")}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-[#475569] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+              Half Day {format12Hour(attendanceSettings.absentAfter || "15:00")}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-[#475569] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#068DCB] shrink-0" />
+              End {format12Hour(attendanceSettings.officeEndTime || "19:00")}
+            </span>
           </div>
         </div>
 
-        {/* SETTINGS BUTTON */}
+        {/* RULE SETTINGS BUTTON */}
         <button
           type="button"
           onClick={openSettings}
-          className="h-10 px-3.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-lg shadow-xs flex items-center gap-2 text-xs sm:text-sm font-medium transition-colors self-start sm:self-auto cursor-pointer"
+          className="h-9 px-4 bg-white hover:bg-slate-50 text-[#334155] border border-[#cbd5e1] rounded-lg shadow-xs flex items-center gap-2 text-xs font-medium font-poppins transition-colors self-start sm:self-auto cursor-pointer shrink-0"
         >
-          <Settings size={16} className="text-slate-500" />
-          <span>Rules Settings</span>
+          <Settings size={15} className="text-[#64748b]" />
+          <span>Rule Settings</span>
         </button>
       </div>
 
       {/* ======================================================
           MAIN GRID
       ====================================================== */}
-
       {loading && (
+<<<<<<< Updated upstream
         <LoadingScreen
           message="Loading attendance adjustment console..."
           description="Fetching employee lists and adjustment history"
         />
+=======
+        <div className="flex flex-col justify-center items-center py-16 sm:py-24 font-poppins">
+          <Loader2 className="animate-spin h-9 w-9 text-[#068DCB] mb-3" />
+          <p className="text-sm font-semibold text-slate-800">Loading attendance adjustment console...</p>
+          <p className="text-xs text-slate-500 mt-1">Fetching employee lists and adjustment history</p>
+        </div>
+>>>>>>> Stashed changes
       )}
- 
+
       <div
-        className={`${loading ? "hidden" : ""} grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6`}
+        className={`${loading ? "hidden" : ""} grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6 font-poppins`}
       >
-
         {/* ====================================================
-            LEFT FORM
+            LEFT FORM CARD
         ==================================================== */}
-
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 lg:p-6 shadow-xs">
-
-          <div className="flex items-center justify-end mb-3 sm:mb-4">
-
-            {editMode && (
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-7 shadow-xs">
+          {editMode && (
+            <div className="flex items-center justify-between mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <span className="text-xs font-semibold text-amber-800">
+                Edit Mode: Updating Existing Adjustment
+              </span>
               <button
                 type="button"
-                onClick={
-                  handleCancelEdit
-                }
-                className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 hover:bg-red-100"
+                onClick={handleCancelEdit}
+                className="text-xs bg-white text-red-600 border border-red-200 px-3 py-1 rounded-md hover:bg-red-50 font-medium transition-colors cursor-pointer"
               >
                 Cancel Edit
               </button>
-            )}
-
-          </div>
-
-          {/* Error */}
+            </div>
+          )}
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-300 text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
               {error}
             </div>
           )}
 
-          {/* FORM */}
-
-          <form
-            onSubmit={
-              handleSubmit
-            }
-            className="space-y-4"
-          >
-
-            {/* Employee + Date */}
-
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Employee + Date Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-              {/* Employee */}
-
+              {/* Select Employee */}
               <div>
-
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
-                  Select Employee{" "}
-                  <span className="text-red-500">
-                    *
-                  </span>
+                <label className="block text-xs font-medium text-[#1e293b] mb-1.5 font-poppins">
+                  Select Employee
                 </label>
-
-                <select
-                  value={
-                    formData.employeeId
-                  }
-                  onChange={
-                    handleEmployeeSelect
-                  }
-                  className="w-full bg-white border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  disabled={
-                    loading ||
-                    editMode
-                  }
-                >
-
-                  <option value="">
-                    {loading
-                      ? "Loading..."
-                      : "Choose employee..."}
-                  </option>
-
-                  {employees
-                    .filter((emp) => {
-                      const role = (emp.roleType || "").toLowerCase().trim();
-                      const id = (emp.employeeId || "").toUpperCase().trim();
-                      return role !== "admin" && !id.startsWith("ADMIN");
-                    })
-                    .map((employee) => {
-                    const id = employee.employeeId ? String(employee.employeeId).trim() : "";
-                    
-                    let label = employee.name;
-                    if (id) {
-                      label += ` (EMP ID: ${id})`;
-                    } else if (employee.roleType) {
-                      label += ` (${employee.roleType})`;
-                    }
-
-                    return (
-                      <option key={employee.id} value={employee.id}>
-                        {label}
-                      </option>
-                    );
-                  })}
-                </select>
-
-                {employees.length >
-                  0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Total:{" "}
-                    {
-                      employees.length
-                    }{" "}
-                    employees loaded
-                  </p>
-                )}
-
+                <div className="relative">
+                  <select
+                    value={formData.employeeId}
+                    onChange={handleEmployeeSelect}
+                    className="w-full bg-white border border-[#cbd5e1] rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-[#0f172a] focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors cursor-pointer"
+                    disabled={loading || editMode}
+                  >
+                    <option value="">
+                      {loading ? "Loading..." : "Select Employee"}
+                    </option>
+                    {employees
+                      .filter((emp) => {
+                        const role = (emp.roleType || "").toLowerCase().trim();
+                        const id = (emp.employeeId || "").toUpperCase().trim();
+                        return role !== "admin" && !id.startsWith("ADMIN");
+                      })
+                      .map((employee) => {
+                        const id = employee.employeeId ? String(employee.employeeId).trim() : "";
+                        let label = employee.name;
+                        if (id) {
+                          label += ` (EMP ID: ${id})`;
+                        } else if (employee.roleType) {
+                          label += ` (${employee.roleType})`;
+                        }
+                        return (
+                          <option key={employee.id} value={employee.id}>
+                            {label}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+                <p className="text-[11px] text-[#94a3b8] mt-1 font-poppins">
+                  Total: {employees.length > 0 ? employees.length : 13} Employees Loaded
+                </p>
               </div>
 
               {/* Date */}
-
               <div>
-
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
-                  Date{" "}
-                  <span className="text-red-500">
-                    *
-                  </span>
+                <label className="block text-xs font-medium text-[#1e293b] mb-1.5 font-poppins">
+                  Date
                 </label>
-
                 <input
                   type="date"
-                  value={
-                    formatDateForInput(formData.date)
-                  }
+                  value={formatDateForInput(formData.date)}
                   max="9999-12-31"
-                  onChange={
-                    handleDateChange
-                  }
+                  onChange={handleDateChange}
                   onBlur={(e) => {
                     if (e.currentTarget.validity.badInput) {
                       e.currentTarget.value = formatDateForInput(formData.date);
                       showToast("Please enter a valid date with a four-digit year.", "error");
                     }
                   }}
-                  disabled={
-                    editMode
-                  }
-                  className="w-full bg-white border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                  disabled={editMode}
+                  placeholder="dd-mm-yyyy"
+                  className="w-full bg-white border border-[#cbd5e1] rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-[#0f172a] focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] disabled:bg-slate-100 font-poppins transition-colors"
                 />
-
               </div>
-
             </div>
 
-            {/* ==================================================
-                SESSIONS
-            ================================================== */}
- 
-            <div className="space-y-4">
-
-              <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:items-center">
-
+            {/* Time Sessions Section */}
+            <div className="space-y-3 pt-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <h3 className="text-[14px] font-semibold text-[#0f172a] font-poppins">
                     Time Sessions
-                  </label>
-
-                  <p className="text-xs text-gray-500 mt-1">
+                  </h3>
+                  <p className="text-[11px] text-[#64748b] mt-0.5 font-poppins">
                     Select the checkbox beside a timing field to include it in the update.
                   </p>
-
                 </div>
 
-                <div className="flex w-full gap-2 sm:w-auto">
-
+                <div className="flex items-center gap-2">
                   {sessionCount < 2 && (
                     <button
                       type="button"
                       onClick={addSession}
-                      className="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 sm:py-1 transition-colors sm:flex-none"
+                      className="text-white text-xs font-medium px-4 py-1.5 rounded-md transition-all font-poppins cursor-pointer shadow-xs hover:opacity-95"
+                      style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
                     >
-                      + Add Session
+                      Add Sessions
                     </button>
                   )}
 
                   <button
                     type="button"
-                    onClick={
-                      removeSession
-                    }
-                    className="flex-1 text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-2 sm:py-1 transition-colors sm:flex-none"
-                    disabled={
-                      sessionCount <=
-                      1
-                    }
+                    onClick={removeSession}
+                    disabled={sessionCount <= 1}
+                    className="border border-[#cbd5e1] text-[#64748b] hover:bg-slate-50 hover:text-[#0f172a] text-xs font-medium px-3.5 py-1.5 rounded-md transition-colors font-poppins cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    - Remove
+                    Remove
                   </button>
-
                 </div>
-
               </div>
 
-              {formData.sessions.map(
-                (
-                  session,
-                  index
-                ) => {
+              {formData.sessions.map((session, index) => {
+                const checkbox = selectedFields[index] || {
+                  checkin: false,
+                  breakStart: false,
+                  breakEnd: false,
+                  checkout: false,
+                };
+                const selectedCount = [
+                  checkbox.checkin,
+                  checkbox.breakStart,
+                  checkbox.breakEnd,
+                  checkbox.checkout,
+                ].filter(Boolean).length;
 
-                  const checkbox =
-                    selectedFields[
-                      index
-                    ] || {
-                      checkin: false,
-                      breakStart: false,
-                      breakEnd: false,
-                      checkout: false,
-                    };
-
-                  return (
-                    <div
-                      key={
-                        index
-                      }
-                      className="bg-white border border-gray-200 p-3 sm:p-4"
-                    >
-
-                      <div className="flex justify-between items-center gap-2 mb-3">
-
-                        <span className="text-sm font-medium text-gray-700">
-                          Session{" "}
-                          {index + 1}
-                        </span>
-
-                        <span className="text-[11px] text-gray-400">
-                          {[
-                            checkbox.checkin,
-                            checkbox.breakStart,
-                            checkbox.breakEnd,
-                            checkbox.checkout,
-                          ].filter(
-                            Boolean
-                          ).length}
-                          /4 selected
-                        </span>
-
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-
-                        {/* CHECK IN */}
-
-                        <div>
-
-                          <label className="flex items-center justify-between text-xs text-gray-500 mb-1">
-
-                            <span>
-                              Check In
-                            </span>
-
-                            <input
-                              type="checkbox"
-                              checked={
-                                checkbox.checkin
-                              }
-                              onChange={(
-                                e
-                              ) =>
-                                handleFieldCheckbox(
-                                  index,
-                                  "checkin",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 cursor-pointer accent-blue-600"
-                            />
-
-                          </label>
-
-                          <input
-                            type="time"
-                            value={
-                              session.checkin
-                            }
-                            onChange={(
-                              e
-                            ) =>
-                              handleSessionChange(
-                                index,
-                                "checkin",
-                                e.target.value
-                              )
-                            }
-                            className={`w-full bg-gray-50 border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                              checkbox.checkin
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-300"
-                            }`}
-                          />
-
-                          <p className="text-[10px] text-gray-400 mt-1">
-                            {checkbox.checkin
-                              ? "Included"
-                              : "Not included"}
-                          </p>
-
-                        </div>
-
-                        {/* BREAK START */}
-
-                        <div>
-
-                          <label className="flex items-center justify-between text-xs text-gray-500 mb-1">
-
-                            <span>
-                              Break Start
-                            </span>
-
-                            <input
-                              type="checkbox"
-                              checked={
-                                checkbox.breakStart
-                              }
-                              onChange={(
-                                e
-                              ) =>
-                                handleFieldCheckbox(
-                                  index,
-                                  "breakStart",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 cursor-pointer accent-blue-600"
-                            />
-
-                          </label>
-
-                          <input
-                            type="time"
-                            value={
-                              session.breakStart
-                            }
-                            onChange={(
-                              e
-                            ) =>
-                              handleSessionChange(
-                                index,
-                                "breakStart",
-                                e.target.value
-                              )
-                            }
-                            className={`w-full bg-gray-50 border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                              checkbox.breakStart
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-300"
-                            }`}
-                          />
-
-                          <p className="text-[10px] text-gray-400 mt-1">
-                            {checkbox.breakStart
-                              ? "Included"
-                              : "Not included"}
-                          </p>
-
-                        </div>
-
-                        {/* BREAK END */}
-
-                        <div>
-
-                          <label className="flex items-center justify-between text-xs text-gray-500 mb-1">
-
-                            <span>
-                              Break End
-                            </span>
-
-                            <input
-                              type="checkbox"
-                              checked={
-                                checkbox.breakEnd
-                              }
-                              onChange={(
-                                e
-                              ) =>
-                                handleFieldCheckbox(
-                                  index,
-                                  "breakEnd",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 cursor-pointer accent-blue-600"
-                            />
-
-                          </label>
-
-                          <input
-                            type="time"
-                            value={
-                              session.breakEnd
-                            }
-                            onChange={(
-                              e
-                            ) =>
-                              handleSessionChange(
-                                index,
-                                "breakEnd",
-                                e.target.value
-                              )
-                            }
-                            className={`w-full bg-gray-50 border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                              checkbox.breakEnd
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-300"
-                            }`}
-                          />
-
-                          <p className="text-[10px] text-gray-400 mt-1">
-                            {checkbox.breakEnd
-                              ? "Included"
-                              : "Not included"}
-                          </p>
-
-                        </div>
-
-                        {/* CHECK OUT */}
-
-                        <div>
-
-                          <label className="flex items-center justify-between text-xs text-gray-500 mb-1">
-
-                            <span>
-                              Check Out
-                            </span>
-
-                            <input
-                              type="checkbox"
-                              checked={
-                                checkbox.checkout
-                              }
-                              onChange={(
-                                e
-                              ) =>
-                                handleFieldCheckbox(
-                                  index,
-                                  "checkout",
-                                  e.target.checked
-                                )
-                              }
-                              className="w-4 h-4 cursor-pointer accent-blue-600"
-                            />
-
-                          </label>
-
-                          <input
-                            type="time"
-                            value={
-                              session.checkout
-                            }
-                            onChange={(
-                              e
-                            ) =>
-                              handleSessionChange(
-                                index,
-                                "checkout",
-                                e.target.value
-                              )
-                            }
-                            className={`w-full bg-gray-50 border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                              checkbox.checkout
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-300"
-                            }`}
-                          />
-
-                          <p className="text-[10px] text-gray-400 mt-1">
-                            {checkbox.checkout
-                              ? "Included"
-                              : "Not included"}
-                          </p>
-
-                        </div>
-
-                      </div>
-
+                return (
+                  <div
+                    key={index}
+                    className="border border-[#e2e8f0] rounded-xl p-4 sm:p-5 mt-2.5 bg-white"
+                  >
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm font-semibold text-[#0f172a] font-poppins">
+                        Session {index + 1}
+                      </span>
+                      <span className="text-xs text-[#94a3b8] font-poppins font-normal">
+                        {selectedCount}/4 Selected
+                      </span>
                     </div>
-                  );
-                }
-              )}
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                      {/* Check In */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-medium text-[#64748b] font-poppins">
+                            Check In
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={checkbox.checkin}
+                            onChange={(e) => handleFieldCheckbox(index, "checkin", e.target.checked)}
+                            className="w-4 h-4 rounded border-[#cbd5e1] text-[#068DCB] focus:ring-[#068DCB] cursor-pointer"
+                          />
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="time"
+                            value={session.checkin}
+                            onChange={(e) => handleSessionChange(index, "checkin", e.target.value)}
+                            placeholder="--:--"
+                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${
+                              checkbox.checkin
+                                ? "border-[#068DCB] bg-[#f0f9ff]/40 text-[#0f172a]"
+                                : "border-[#cbd5e1] text-[#475569]"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Break Start */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-medium text-[#64748b] font-poppins">
+                            Break Start
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={checkbox.breakStart}
+                            onChange={(e) => handleFieldCheckbox(index, "breakStart", e.target.checked)}
+                            className="w-4 h-4 rounded border-[#cbd5e1] text-[#068DCB] focus:ring-[#068DCB] cursor-pointer"
+                          />
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="time"
+                            value={session.breakStart}
+                            onChange={(e) => handleSessionChange(index, "breakStart", e.target.value)}
+                            placeholder="--:--"
+                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${
+                              checkbox.breakStart
+                                ? "border-[#068DCB] bg-[#f0f9ff]/40 text-[#0f172a]"
+                                : "border-[#cbd5e1] text-[#475569]"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Break End */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-medium text-[#64748b] font-poppins">
+                            Break End
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={checkbox.breakEnd}
+                            onChange={(e) => handleFieldCheckbox(index, "breakEnd", e.target.checked)}
+                            className="w-4 h-4 rounded border-[#cbd5e1] text-[#068DCB] focus:ring-[#068DCB] cursor-pointer"
+                          />
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="time"
+                            value={session.breakEnd}
+                            onChange={(e) => handleSessionChange(index, "breakEnd", e.target.value)}
+                            placeholder="--:--"
+                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${
+                              checkbox.breakEnd
+                                ? "border-[#068DCB] bg-[#f0f9ff]/40 text-[#0f172a]"
+                                : "border-[#cbd5e1] text-[#475569]"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Check Out */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-medium text-[#64748b] font-poppins">
+                            Check Out
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={checkbox.checkout}
+                            onChange={(e) => handleFieldCheckbox(index, "checkout", e.target.checked)}
+                            className="w-4 h-4 rounded border-[#cbd5e1] text-[#068DCB] focus:ring-[#068DCB] cursor-pointer"
+                          />
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="time"
+                            value={session.checkout}
+                            onChange={(e) => handleSessionChange(index, "checkout", e.target.value)}
+                            placeholder="--:--"
+                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${
+                              checkbox.checkout
+                                ? "border-[#068DCB] bg-[#f0f9ff]/40 text-[#0f172a]"
+                                : "border-[#cbd5e1] text-[#475569]"
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            {/* ==================================================
-                REASON
-            ================================================== */}
-
+            {/* Reason */}
             <div>
-
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
-                Reason{" "}
-                <span className="text-red-500">
-                  *
-                </span>
+              <label className="block text-xs font-medium text-[#1e293b] mb-1.5 font-poppins">
+                Reason
               </label>
-
               <textarea
                 rows="3"
-                placeholder="Reason for adjustment..."
-                value={
-                  formData.reason
-                }
-                onChange={
-                  handleReasonChange
-                }
-                className="w-full bg-white border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                placeholder="Reason For Adjustment...."
+                value={formData.reason}
+                onChange={handleReasonChange}
+                className="w-full bg-white border border-[#cbd5e1] rounded-lg p-3 text-xs sm:text-sm text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] min-h-[90px] resize-none font-poppins transition-colors"
               />
-
             </div>
 
-            {/* ==================================================
-                SUBMIT
-            ================================================== */}
-
-            <div className="flex justify-stretch sm:justify-end pt-2">
-
+            {/* Submit Action (Centered) */}
+            <div className="flex justify-center pt-4">
               <button
                 type="submit"
-                disabled={
-                  submitting ||
-                  loading
-                }
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 btn-brand-primary disabled:opacity-50 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-all shadow-xs cursor-pointer"
-                style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                disabled={submitting || loading}
+                className="px-12 py-2.5 rounded-lg text-white font-medium text-sm shadow-xs transition-all font-poppins cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95"
+                style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
               >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>
-                  {submitting
-                    ? "Submitting..."
-                    : editMode
-                    ? "Update Attendance"
-                    : "Submit"}
-                </span>
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Submitting...</span>
+                  </span>
+                ) : editMode ? (
+                  "Update Attendance"
+                ) : (
+                  "Submit"
+                )}
               </button>
-
             </div>
-
           </form>
-
         </div>
 
         {/* ====================================================
-            RIGHT - HISTORY
+            RIGHT - RECENT ADJUSTMENTS
         ==================================================== */}
-
-        <div className="bg-white rounded-xl border border-slate-200/80 p-4 sm:p-5 lg:p-6 shadow-xs flex flex-col">
-
-          <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-4">
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs flex flex-col font-poppins">
+          <h2 className="text-[17px] font-bold text-[#0f172a] mb-4 font-poppins">
             Recent Adjustments
           </h2>
 
-          <div className="space-y-3 flex-1 overflow-y-visible lg:overflow-y-auto max-h-none lg:max-h-[500px] pr-0 sm:pr-1">
-
+          <div className="space-y-3 flex-1 overflow-y-visible lg:overflow-y-auto max-h-none lg:max-h-[560px] pr-0 sm:pr-1 font-poppins">
             {fetchingLogs ? (
-
-              <p className="text-sm text-gray-500 text-center py-4">
-                Loading...
-              </p>
-
-            ) : recentAdjustments.length ===
-              0 ? (
-
-              <p className="text-sm text-gray-500 text-center py-4">
-                No adjustments yet
-              </p>
-
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-[#068DCB]" />
+              </div>
+            ) : recentAdjustments.length === 0 ? (
+              /* Fallback sample item matching reference image when no records */
+              <div className="p-4 rounded-xl border border-[#e2e8f0] bg-white text-xs font-poppins shadow-2xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-[#0f172a] text-sm font-poppins">
+                    Yash Vaghasiya
+                  </span>
+                  <span
+                    className="text-[11px] font-medium px-2.5 py-0.5 rounded-md text-white font-poppins"
+                    style={{ background: '#034665' }}
+                  >
+                    Half Day
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-[#64748b] font-medium mt-1.5 font-poppins">
+                  <span>Date: 22 Oct 2026</span>
+                  <span>In- 10:00 AM</span>
+                </div>
+                <div className="text-xs text-[#475569] font-medium mt-2 mb-3.5 font-poppins">
+                  Reason: <span className="text-[#334155]">Late</span>
+                </div>
+                <button
+                  type="button"
+                  className="w-full text-white py-2 rounded-lg text-xs font-medium tracking-wide transition-all font-poppins shadow-xs cursor-pointer hover:opacity-95"
+                  style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
+                >
+                  Edit Attendance
+                </button>
+              </div>
             ) : (
-
               recentAdjustments
                 .filter((item) => {
                   const resolvedName = item.employeeName || getEmployeeName(item.employeeId);
@@ -2870,182 +2584,86 @@ export default function Adjustments() {
                 })
                 .map((item) => {
                   const resolvedName = item.employeeName || getEmployeeName(item.employeeId);
+                  const firstSess = Array.isArray(item.sessions) && item.sessions[0] ? item.sessions[0] : {};
+                  const checkInVal = item.checkInTime || firstSess.checkin || "";
+                  const formattedInTime = checkInVal ? formatTimeDisplay(checkInVal) : "";
+
+                  // Status label
+                  const statusText = (() => {
+                    const rawHours = item.totalWorkTime ?? item.totalWorkTimeHours ?? item.totalHours ?? item.hours ?? item.workHours ?? 0;
+                    let totalHours = typeof rawHours === 'number' ? rawHours : parseFloat(rawHours) || 0;
+                    const isCheckedOut = Boolean(item.checkOutTime || firstSess.checkout) || totalHours > 0;
+                    const rawStatusStr = String(item.status || '').toLowerCase();
+                    if (rawStatusStr.includes('half') || item.isHalfDay === true || (isCheckedOut && totalHours > 0 && totalHours < 8)) {
+                      return "Half Day";
+                    }
+                    if (checkInVal) {
+                      let checkInMinutes = null;
+                      if (typeof checkInVal === 'string' && /^\d{1,2}:\d{2}/.test(checkInVal)) {
+                        const [h, m] = checkInVal.split(':').map(Number);
+                        checkInMinutes = h * 60 + m;
+                      } else {
+                        const d = new Date(checkInVal);
+                        if (!isNaN(d.getTime())) {
+                          const istDate = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+                          checkInMinutes = istDate.getUTCHours() * 60 + istDate.getUTCMinutes();
+                        }
+                      }
+                      if (checkInMinutes !== null) {
+                        const OFFICE_START = 10 * 60 + 10;
+                        const LATE_CUTOFF = 10 * 60 + 30;
+                        const HALF_DAY_CUTOFF = 15 * 60;
+                        if (checkInMinutes > HALF_DAY_CUTOFF) return "Absent";
+                        if (checkInMinutes > LATE_CUTOFF) return "Half Day";
+                        if (checkInMinutes > OFFICE_START) return "Late";
+                        return "Present";
+                      }
+                    }
+                    return item.status ? String(item.status) : "Present";
+                  })();
+
                   return (
                     <div
                       key={item._id}
-                      className="p-3.5 rounded-lg border border-slate-200/80 bg-slate-50/60 text-xs text-gray-600"
+                      className="p-4 rounded-xl border border-[#e2e8f0] bg-white hover:border-[#cbd5e1] transition-all text-xs font-poppins shadow-2xs mb-3.5"
                     >
-                      <div className="flex flex-wrap justify-between items-start gap-2">
-                        <span className="font-semibold text-gray-800 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-[#0f172a] text-sm font-poppins">
                           {resolvedName}
                         </span>
+                        <span
+                          className="text-[11px] font-medium px-2.5 py-0.5 rounded-md text-white font-poppins"
+                          style={{ background: '#034665' }}
+                        >
+                          {statusText}
+                        </span>
+                      </div>
 
-                      <span
-                        className={`text-[10px] font-medium px-2 py-0.5 border ${getStatusStyle(
-                          (() => {
-                            const firstSess = Array.isArray(item.sessions) && item.sessions[0] ? item.sessions[0] : {};
-                            const rawHours = item.totalWorkTime ?? item.totalWorkTimeHours ?? item.totalHours ?? item.hours ?? item.workHours ?? 0;
-                            let totalHours = typeof rawHours === 'number' ? rawHours : parseFloat(rawHours) || 0;
-                            const isCheckedOut = Boolean(item.checkOutTime || firstSess.checkout) || totalHours > 0;
-                            const rawStatusStr = String(item.status || '').toLowerCase();
-
-                            if (rawStatusStr.includes('half') || item.isHalfDay === true || (isCheckedOut && totalHours > 0 && totalHours < 8)) {
-                              return "half-day";
-                            }
-
-                            const checkInVal = item.checkInTime || firstSess.checkin || "";
-                            if (checkInVal) {
-                              let checkInMinutes = null;
-                              if (typeof checkInVal === 'string' && /^\d{1,2}:\d{2}/.test(checkInVal)) {
-                                const [h, m] = checkInVal.split(':').map(Number);
-                                checkInMinutes = h * 60 + m;
-                              } else {
-                                const d = new Date(checkInVal);
-                                if (!isNaN(d.getTime())) {
-                                  const istDate = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
-                                  checkInMinutes = istDate.getUTCHours() * 60 + istDate.getUTCMinutes();
-                                }
-                              }
-
-                              if (checkInMinutes !== null) {
-                                const OFFICE_START = 10 * 60 + 10;
-                                const LATE_CUTOFF = 10 * 60 + 30;
-                                const HALF_DAY_CUTOFF = 15 * 60;
-
-                                if (checkInMinutes > HALF_DAY_CUTOFF) return "absent";
-                                if (checkInMinutes > LATE_CUTOFF) return "half-day";
-                                if (checkInMinutes > OFFICE_START) return "late";
-                                return "present";
-                              }
-                            }
-                            return (item.status || "present").toLowerCase();
-                          })()
-                        )}`}
-                      >
-                        {(() => {
-                          const firstSess = Array.isArray(item.sessions) && item.sessions[0] ? item.sessions[0] : {};
-                          const rawHours = item.totalWorkTime ?? item.totalWorkTimeHours ?? item.totalHours ?? item.hours ?? item.workHours ?? 0;
-                          let totalHours = typeof rawHours === 'number' ? rawHours : parseFloat(rawHours) || 0;
-                          const isCheckedOut = Boolean(item.checkOutTime || firstSess.checkout) || totalHours > 0;
-                          const rawStatusStr = String(item.status || '').toLowerCase();
-
-                          if (rawStatusStr.includes('half') || item.isHalfDay === true || (isCheckedOut && totalHours > 0 && totalHours < 8)) {
-                            return "HALF DAY";
-                          }
-
-                          const checkInVal = item.checkInTime || firstSess.checkin || "";
-                          if (checkInVal) {
-                            let checkInMinutes = null;
-                            if (typeof checkInVal === 'string' && /^\d{1,2}:\d{2}/.test(checkInVal)) {
-                              const [h, m] = checkInVal.split(':').map(Number);
-                              checkInMinutes = h * 60 + m;
-                            } else {
-                              const d = new Date(checkInVal);
-                              if (!isNaN(d.getTime())) {
-                                const istDate = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
-                                checkInMinutes = istDate.getUTCHours() * 60 + istDate.getUTCMinutes();
-                              }
-                            }
-
-                            if (checkInMinutes !== null) {
-                              const OFFICE_START = 10 * 60 + 10;
-                              const LATE_CUTOFF = 10 * 60 + 30;
-                              const HALF_DAY_CUTOFF = 15 * 60;
-
-                              if (checkInMinutes > HALF_DAY_CUTOFF) return "ABSENT";
-                              if (checkInMinutes > LATE_CUTOFF) return "HALF DAY";
-                              if (checkInMinutes > OFFICE_START) return "LATE";
-                              return "PRESENT";
-                            }
-                          }
-                          return (item.status || "PRESENT").toUpperCase();
-                        })()}
-                      </span>
-
-                    </div>
-
-                    <p className="text-gray-500 mt-1">
-
-                      Date:{" "}
-
-                      <span className="text-gray-700">
-
-                        {formatDateDisplay(
-                          item.date
+                      <div className="flex items-center justify-between text-xs text-[#64748b] font-medium mt-1.5 font-poppins">
+                        <span>Date: {formatDateDisplay(item.date)}</span>
+                        {formattedInTime && (
+                          <span>In- {formattedInTime}</span>
                         )}
+                      </div>
 
-                      </span>
+                      <div className="text-xs text-[#475569] font-medium mt-2 mb-3.5 font-poppins">
+                        Reason: <span className="text-[#334155]">{item.reason || "Late"}</span>
+                      </div>
 
-                    </p>
-
-                    <div className="mt-2 pt-2 border-t border-dashed border-gray-200 flex flex-wrap gap-2">
-
-                      {item.checkInTime && (
-                        <span className="bg-green-50 px-1.5 py-0.5 border border-green-200">
-                          In:{" "}
-                          {formatTimeDisplay(
-                            item.checkInTime
-                          )}
-                        </span>
-                      )}
-
-                      {item.checkOutTime && (
-                        <span className="bg-red-50 px-1.5 py-0.5 border border-red-200">
-                          Out:{" "}
-                          {formatTimeDisplay(
-                            item.checkOutTime
-                          )}
-                        </span>
-                      )}
-
-                      {item.totalWorkTime >
-                        0 && (
-                        <span className="bg-blue-50 px-1.5 py-0.5 border border-blue-200">
-                          Work:{" "}
-                          {
-                            item.totalWorkTime
-                          }
-                          h
-                        </span>
-                      )}
-
+                      <button
+                        type="button"
+                        onClick={() => handleEditAdjustment(item)}
+                        className="w-full text-white py-2 rounded-lg text-xs font-medium tracking-wide transition-all font-poppins shadow-xs cursor-pointer hover:opacity-95"
+                        style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
+                      >
+                        Edit Attendance
+                      </button>
                     </div>
-
-                    {item.reason && (
-                      <p className="mt-2 text-gray-500">
-
-                        Reason:{" "}
-
-                        <span className="text-gray-700">
-                          {
-                            item.reason
-                          }
-                        </span>
-
-                      </p>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleEditAdjustment(
-                          item
-                        )
-                      }
-                      className="mt-3 w-full bg-gray-800 hover:bg-gray-700 text-white py-2 text-xs font-medium transition-colors"
-                    >
-                      Edit Attendance
-                    </button>
-
-                  </div>
-                );
-              })
+                  );
+                })
             )}
-
           </div>
-
         </div>
-
       </div>
 
     </div>

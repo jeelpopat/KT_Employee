@@ -655,7 +655,7 @@ export const Header = ({ onSignOut }) => {
   return (
     <header
       className="fixed top-0 left-0 right-0 w-full z-50 h-16 border-b border-[#083b4e] text-white transition-colors shadow-xs font-poppins"
-      style={{ background: 'linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)' }}
+      style={{ background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }}
     >
       <div className="flex h-full items-center justify-between px-3 sm:px-6">
 

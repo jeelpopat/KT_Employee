@@ -642,7 +642,7 @@ export const Sidebar = ({ onSignOut }) => {
                       }`}
                     style={
                       isActive
-                        ? { background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }
+                        ? { background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }
                         : undefined
                     }
                   >
@@ -683,7 +683,7 @@ export const Sidebar = ({ onSignOut }) => {
                       </span>
                       <span
                         className="text-[11px] font-medium px-2.5 py-0.5 rounded text-white capitalize leading-tight"
-                        style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                        style={{ background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }}
                       >
                         {userRole === 'admin' ? 'Admin' : (userRole === 'hr' ? 'HR' : (userRole === 'team_leader' ? 'TL' : 'Employee'))}
                       </span>
