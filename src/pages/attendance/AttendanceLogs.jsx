@@ -2000,7 +2000,7 @@ export default function AttendanceLogs() {
       );
 
     const breakMinutes = segments
-      .filter((segment) => segment.color === 'yellow')
+      .filter((segment) => segment.label === 'Break' || segment.label === 'Idle')
       .reduce(
         (total, segment) => total + segment.end - segment.start,
         0
