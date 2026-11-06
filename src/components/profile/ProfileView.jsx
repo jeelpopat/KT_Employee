@@ -64,6 +64,81 @@ const isDocPdf = (doc) => {
   );
 };
 
+const EMPLOYEE_DOCUMENTS_API = 'https://kt-backend-yzr4.onrender.com/api/employee/documents';
+
+const getEmployeeDocumentKind = (document) => {
+  const label = [
+    document?.key,
+    document?.type,
+    document?.documentType,
+    document?.title,
+    document?.name,
+    document?.documentName
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (label.includes('aadhar') || label.includes('aadhaar') || label.includes('uidai')) return 'aadhar';
+  if (label.includes('pan')) return 'pan';
+  if (label.includes('passport') || label.includes('photo') || label.includes('photograph')) return 'passport_photo';
+  return null;
+};
+
+const getEmployeeDocumentRecords = (responseData) => {
+  const payload = responseData?.data ?? responseData;
+  const nestedDocuments = payload?.documents ?? payload?.employeeDocuments ?? payload?.employee?.documents;
+  const toRecord = ([key, value]) => {
+    if (value && typeof value === 'object') return { key, ...value };
+    if (/(number|no)$/i.test(key)) return { key, docNumber: value };
+    return { key, fileUrl: value };
+  };
+  const records = Array.isArray(payload)
+    ? payload
+    : Array.isArray(nestedDocuments)
+      ? nestedDocuments
+      : nestedDocuments && typeof nestedDocuments === 'object'
+        ? Object.entries(nestedDocuments).map(toRecord)
+        : payload && typeof payload === 'object'
+          ? Object.entries(payload).map(toRecord)
+          : [];
+
+  return records.map((record) => {
+    const file = record?.file && typeof record.file === 'object' ? record.file : {};
+    const document = record?.document && typeof record.document === 'object' ? record.document : {};
+    const fileUrl = record?.fileUrl || record?.fileURL || record?.documentUrl || record?.imageUrl ||
+      record?.url || record?.path || file.fileUrl || file.url || document.fileUrl || document.url || '';
+
+    return {
+      kind: getEmployeeDocumentKind(record),
+      fileUrl,
+      fileName: record?.fileName || record?.name || file.fileName || '',
+      fileType: record?.fileType || record?.mimeType || file.fileType || file.mimeType || '',
+      docNumber: record?.docNumber || record?.documentNumber || record?.number || '',
+      uploadedAt: record?.uploadedAt || record?.createdAt || ''
+    };
+  }).filter((record) => record.kind && (record.fileUrl || record.docNumber));
+};
+
+const mergeEmployeeDocuments = (currentDocuments, responseData) => {
+  const remoteDocuments = getEmployeeDocumentRecords(responseData);
+  if (remoteDocuments.length === 0) return currentDocuments;
+
+  return currentDocuments.map((document) => {
+    const remoteDocument = remoteDocuments.find((item) => item.kind === document.id);
+    if (!remoteDocument) return document;
+
+    return {
+      ...document,
+      fileUrl: remoteDocument.fileUrl || document.fileUrl,
+      fileName: remoteDocument.fileName || document.fileName,
+      fileType: remoteDocument.fileType || document.fileType,
+      docNumber: remoteDocument.docNumber || document.docNumber,
+      status: remoteDocument.fileUrl ? 'uploaded' : document.status,
+      uploadedAt: remoteDocument.uploadedAt
+        ? new Date(remoteDocument.uploadedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : document.uploadedAt
+    };
+  });
+};
+
 export const ProfileView = () => {
   const { user: contextUser, updateUserProfile, userRole, roleDetails } = useApp();
   const isAdmin = userRole === 'admin';
@@ -216,6 +291,7 @@ export const ProfileView = () => {
     }
     return toValidObjectId(currentUserId);
   };
+  const employeeDocumentId = resolveEmployeeId();
 
   // Fetch Real-time Live Profile Data (GET /api/users/profile & /api/employee-panel/profile)
   const fetchProfile = useCallback(async (manual = false) => {
@@ -440,6 +516,16 @@ export const ProfileView = () => {
         console.warn("Could not query backend documents endpoint:", err);
       }
 
+      try {
+        const employeeDocumentsRes = await api.get(
+          `${EMPLOYEE_DOCUMENTS_API}/${encodeURIComponent(employeeDocumentId)}`,
+          { skipCache: true }
+        );
+        initialDocs = mergeEmployeeDocuments(initialDocs, employeeDocumentsRes.data);
+      } catch (err) {
+        console.warn('Could not fetch employee documents:', err);
+      }
+
       [
         { id: 'aadhar', value: serverAadharNumber },
         { id: 'pan', value: serverPanNumber }
@@ -461,38 +547,45 @@ export const ProfileView = () => {
     if (!isLoadingData) {
       initializeDocuments();
     }
-  }, [isLoadingData, currentUserId, localStorageDocKey, serverAadharNumber, serverPanNumber]);
+  }, [isLoadingData, currentUserId, localStorageDocKey, employeeDocumentId, serverAadharNumber, serverPanNumber]);
 
-  // Sync documents on-demand from GET /api/document
+  // Sync employee documents and legacy uploads from their respective endpoints
   const syncDocumentsFromBackend = async () => {
     setIsSyncingDocs(true);
     try {
-      const backendRes = await api.get('/api/document');
-      const remoteList = backendRes.data?.data || backendRes.data;
-      if (Array.isArray(remoteList)) {
-        const rawId = resolveEmployeeId();
-        const candidateIds = [
-          String(profileData?.employee?._id || ''),
-          String(profileData?._id || ''),
-          String(contextUser?._id || ''),
-          String(contextUser?.id || ''),
-          String(contextUser?.employeeId || ''),
-          String(currentUserId || ''),
-          String(rawId || '')
-        ].filter(Boolean);
+      let updated = [...documents];
+      const employeeDocumentsRes = await api.get(
+        `${EMPLOYEE_DOCUMENTS_API}/${encodeURIComponent(employeeDocumentId)}`,
+        { skipCache: true }
+      );
+      updated = mergeEmployeeDocuments(updated, employeeDocumentsRes.data);
 
-        const relevantRemote = remoteList.filter(d => {
-          const ref = String(d.referenceId || '');
-          const up = String(d.uploadedBy || '');
-          return candidateIds.includes(ref) || candidateIds.includes(up);
-        });
+      try {
+        const backendRes = await api.get('/api/document');
+        const remoteList = backendRes.data?.data || backendRes.data;
+        if (Array.isArray(remoteList)) {
+          const rawId = resolveEmployeeId();
+          const candidateIds = [
+            String(profileData?.employee?._id || ''),
+            String(profileData?._id || ''),
+            String(contextUser?._id || ''),
+            String(contextUser?.id || ''),
+            String(contextUser?.employeeId || ''),
+            String(currentUserId || ''),
+            String(rawId || '')
+          ].filter(Boolean);
 
-        if (relevantRemote.length > 0) {
-          const updated = [...documents];
+          const relevantRemote = remoteList.filter(d => {
+            const ref = String(d.referenceId || '');
+            const up = String(d.uploadedBy || '');
+            return candidateIds.includes(ref) || candidateIds.includes(up);
+          });
+
           relevantRemote.forEach(remoteDoc => {
-            const matchedCore = updated.find(d => 
-              d.title.toLowerCase().trim() === remoteDoc.title.toLowerCase().trim() ||
-              d.id.toLowerCase() === remoteDoc.title.toLowerCase().replace(/\s+/g, '_')
+            const title = String(remoteDoc.title || '');
+            const matchedCore = updated.find(d =>
+              d.title.toLowerCase().trim() === title.toLowerCase().trim() ||
+              d.id.toLowerCase() === title.toLowerCase().replace(/\s+/g, '_')
             );
             if (matchedCore) {
               matchedCore.fileUrl = remoteDoc.fileUrl || matchedCore.fileUrl;
@@ -507,18 +600,20 @@ export const ProfileView = () => {
                 } catch (e) {}
               }
             } else {
-              const exists = updated.some(d => d.remoteId === remoteDoc._id || d.title.toLowerCase().trim() === remoteDoc.title.toLowerCase().trim());
-              if (!exists) {
+              const exists = updated.some(d =>
+                d.remoteId === remoteDoc._id || d.title.toLowerCase().trim() === title.toLowerCase().trim()
+              );
+              if (!exists && title) {
                 updated.push({
                   id: `remote-${remoteDoc._id}`,
                   remoteId: remoteDoc._id,
-                  title: remoteDoc.title,
+                  title,
                   subtitle: 'Uploaded Employee Document',
                   category: 'Official Record',
                   docNumber: remoteDoc.description || 'Verified Record',
                   status: 'uploaded',
                   fileUrl: remoteDoc.fileUrl,
-                  fileName: remoteDoc.fileName || `${remoteDoc.title}.pdf`,
+                  fileName: remoteDoc.fileName || `${title}.pdf`,
                   fileType: remoteDoc.fileType || 'application/pdf',
                   uploadedAt: remoteDoc.createdAt ? new Date(remoteDoc.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
                   isCore: false
@@ -526,14 +621,14 @@ export const ProfileView = () => {
               }
             }
           });
-          persistDocuments(updated);
-          setDocFeedback({ type: 'success', text: 'Documents synchronized with server successfully!' });
-          setTimeout(() => setDocFeedback({ type: '', text: '' }), 3000);
-        } else {
-          setDocFeedback({ type: 'success', text: 'Documents are up to date!' });
-          setTimeout(() => setDocFeedback({ type: '', text: '' }), 2500);
         }
+      } catch (error) {
+        console.warn('Could not sync legacy employee documents:', error);
       }
+
+      persistDocuments(updated);
+      setDocFeedback({ type: 'success', text: 'Documents synchronized with server successfully!' });
+      setTimeout(() => setDocFeedback({ type: '', text: '' }), 3000);
     } catch (err) {
       console.warn("Could not sync documents:", err);
       setDocFeedback({ type: 'error', text: 'Could not synchronize with server documents.' });
