@@ -678,7 +678,7 @@ export const Sidebar = ({ onSignOut }) => {
                 <div className="bg-white border-b border-[#edf2f7] pb-2">
                   <div className="mx-3 mt-2.5 mb-2 p-3 rounded-md bg-[#f8fafc] border border-[#cfdbe5] font-poppins shadow-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-semibold text-[#8e9aa8] tracking-wider leading-none">
+                      <span className="text-[12px] uppercase font-semi] tracking-wider leading-none">
                         Role
                       </span>
                       <span
@@ -688,9 +688,6 @@ export const Sidebar = ({ onSignOut }) => {
                         {userRole === 'admin' ? 'Admin' : (userRole === 'hr' ? 'HR' : (userRole === 'team_leader' ? 'TL' : 'Employee'))}
                       </span>
                     </div>
-                    <p className="text-[14px] font-semibold text-[#1e293b] mt-1.5 leading-tight">
-                      {roleLabels[userRole] || 'Administrator'}
-                    </p>
                   </div>
 
                   <button

@@ -539,7 +539,8 @@ export const SalaryView = () => {
       const targetY = Number(year);
       const totalMonthDays = getDaysInMonth(targetM, targetY);
       const leavesInfo = calculateApprovedLeaveDaysForMonth(targetUserObj, targetM, targetY, userLeaves);
-      const defaultPayable = Math.max(0, totalMonthDays - (leavesInfo.lopDays || 0));
+      // Total Payable Days = Total Month Days - Approved Leaves - LOP Days
+      const defaultPayable = Math.max(0, totalMonthDays - (leavesInfo.leaveDays || 0) - (leavesInfo.lopDays || 0));
 
       setProcessForm((prev) => ({
         ...prev,
@@ -571,7 +572,7 @@ export const SalaryView = () => {
     setProcessForm({
       ...updated,
       totalDays: totalMonthDays,
-      daysPayable: totalMonthDays
+      daysPayable: Math.max(0, totalMonthDays - (Number(updated.leaveDays) || 0) - (Number(updated.lopDays) || 0))
     });
 
     if (targetUserId) {
@@ -593,13 +594,15 @@ export const SalaryView = () => {
   // Real-time calculation for Process Payroll modal
   // Formula 1: Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
   // Formula 2: net salary = Base Gross + Extra Bonus - Extra Deduction - Fixed Monthly Deduction - TDS - LOP
+  // Formula 3: Total Payable Days = Total Month Days - Approved Leaves - LOP Days
+  // Formula 4: presentDays = Total Payable Days
   const processCalculations = useMemo(() => {
     const totalDays = Number(processForm.totalDays) || getDaysInMonth(processForm.month, processForm.year);
     const lopDays = Number(processForm.lopDays) || 0;
     const leaveDays = Number(processForm.leaveDays) || 0;
-    // Total Payable Days = Total Month Days - LOP Days (fixed calculation)
-    const daysPayable = Math.max(0, totalDays - lopDays);
-    const presentDays = Math.max(0, daysPayable - leaveDays);
+    // Total Payable Days = Total Month Days - Approved Leaves - LOP Days
+    const daysPayable = Math.max(0, totalDays - leaveDays - lopDays);
+    const presentDays = daysPayable;
 
     if (!selectedUserActiveStructure) {
       return {
@@ -844,8 +847,8 @@ export const SalaryView = () => {
         const totalDaysVal = item.totalDays != null ? Number(item.totalDays) : (Number(item.workingDays) || getDaysInMonth(item.month, item.year));
         const leaveDaysVal = item.leaveDays != null ? Number(item.leaveDays) : 0;
         const lopDaysVal = item.lopDays != null ? Number(item.lopDays) : 0;
-        const daysPayableVal = item.daysPayable != null ? Number(item.daysPayable) : totalDaysVal;
-        const presentDaysVal = item.presentDays != null ? Number(item.presentDays) : Math.max(0, daysPayableVal - leaveDaysVal - lopDaysVal);
+        const daysPayableVal = item.daysPayable != null ? Number(item.daysPayable) : Math.max(0, totalDaysVal - leaveDaysVal - lopDaysVal);
+        const presentDaysVal = item.presentDays != null ? Number(item.presentDays) : daysPayableVal;
         const lopDeductionVal = item.lopDeduction != null ? Number(item.lopDeduction) : 0;
 
         return {
@@ -1484,7 +1487,7 @@ export const SalaryView = () => {
     <div>Total Month Days: <strong style="font-family: monospace;">${slip.totalDays || 30}</strong></div>
     <div>Approved Leaves: <strong style="font-family: monospace; color: #b45309;">${slip.leaveDays ?? 0}</strong></div>
     <div>Total Payable Days: <strong style="font-family: monospace; color: #15803d;">${slip.daysPayable ?? 30}</strong></div>
-    <div>Calculated Present Days: <strong style="font-family: monospace; color: #4338ca;">${slip.presentDays != null ? slip.presentDays : (slip.daysPayable != null ? Math.max(0, Number(slip.daysPayable) - (Number(slip.leaveDays) || 0) - (Number(slip.lopDays) || 0)) : '—')}</strong></div>
+    <div>Calculated Present Days: <strong style="font-family: monospace; color: #4338ca;">${slip.presentDays != null ? slip.presentDays : (slip.daysPayable != null ? slip.daysPayable : '—')}</strong></div>
   </div>
 
   <div class="table-grid">
@@ -1566,7 +1569,7 @@ export const SalaryView = () => {
       totalDays: payroll.totalDays != null ? Number(payroll.totalDays) : getDaysInMonth(payroll.month, payroll.year),
       leaveDays: payroll.leaveDays != null ? Number(payroll.leaveDays) : 0,
       lopDays: payroll.lopDays != null ? Number(payroll.lopDays) : 0,
-      daysPayable: payroll.daysPayable != null ? Number(payroll.daysPayable) : (payroll.totalDays || 30)
+      daysPayable: payroll.daysPayable != null ? Number(payroll.daysPayable) : Math.max(0, (payroll.totalDays != null ? Number(payroll.totalDays) : getDaysInMonth(payroll.month, payroll.year)) - (Number(payroll.leaveDays) || 0) - (Number(payroll.lopDays) || 0))
     });
 
     setIsUpdatePayrollModalOpen(true);
@@ -1596,9 +1599,9 @@ export const SalaryView = () => {
     const totalDays = Number(updatePayrollForm.totalDays) || getDaysInMonth(selectedPayrollToUpdate.month, selectedPayrollToUpdate.year);
     const lopDays = Number(updatePayrollForm.lopDays) || 0;
     const leaveDays = Number(updatePayrollForm.leaveDays) || 0;
-    // Total Payable Days = Total Month Days - LOP Days (fixed calculation)
-    const daysPayable = Math.max(0, totalDays - lopDays);
-    const presentDays = Math.max(0, daysPayable - leaveDays);
+    // Total Payable Days = Total Month Days - Approved Leaves - LOP Days
+    const daysPayable = Math.max(0, totalDays - leaveDays - lopDays);
+    const presentDays = daysPayable;
 
     const perDaySalary = totalDays > 0 ? Math.round((baseGross / totalDays) * 100) / 100 : 0;
     const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
@@ -2558,7 +2561,7 @@ export const SalaryView = () => {
                                   Pres: {payroll.presentDays != null
                                     ? payroll.presentDays
                                     : (payroll.daysPayable != null
-                                      ? Math.max(0, Number(payroll.daysPayable) - (Number(payroll.leaveDays) || 0) - (Number(payroll.lopDays) || 0))
+                                      ? payroll.daysPayable
                                       : '—')}d
                                 </span>
                               </div>
@@ -3155,7 +3158,7 @@ export const SalaryView = () => {
                           setUpdatePayrollForm({
                             ...updatePayrollForm,
                             totalDays: val,
-                            daysPayable: Math.max(0, val - (Number(updatePayrollForm.lopDays) || 0))
+                            daysPayable: Math.max(0, val - (Number(updatePayrollForm.leaveDays) || 0) - (Number(updatePayrollForm.lopDays) || 0))
                           });
                         }}
                         className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:border-indigo-500"
@@ -3190,7 +3193,7 @@ export const SalaryView = () => {
                           setUpdatePayrollForm({
                             ...updatePayrollForm,
                             lopDays: val,
-                            daysPayable: Math.max(0, (Number(updatePayrollForm.totalDays) || 0) - val)
+                            daysPayable: Math.max(0, (Number(updatePayrollForm.totalDays) || 0) - (Number(updatePayrollForm.leaveDays) || 0) - val)
                           });
                         }}
                         className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
@@ -3208,7 +3211,7 @@ export const SalaryView = () => {
                         value={updatePayrollCalculations.daysPayable}
                         className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                         placeholder="30"
-                        title="Total Payable Days = Total Month Days - LOP Days (Fixed)"
+                        title="Total Payable Days = Total Month Days - Approved Leaves - LOP Days (Fixed)"
                       />
                     </div>
                   </div>
@@ -3540,7 +3543,7 @@ export const SalaryView = () => {
                         setProcessForm({
                           ...processForm,
                           totalDays: val,
-                          daysPayable: Math.max(0, val - (Number(processForm.lopDays) || 0))
+                          daysPayable: Math.max(0, val - (Number(processForm.leaveDays) || 0) - (Number(processForm.lopDays) || 0))
                         });
                       }}
                       className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:border-indigo-500"
@@ -3575,7 +3578,7 @@ export const SalaryView = () => {
                         setProcessForm({
                           ...processForm,
                           lopDays: val,
-                          daysPayable: Math.max(0, (Number(processForm.totalDays) || 0) - val)
+                          daysPayable: Math.max(0, (Number(processForm.totalDays) || 0) - (Number(processForm.leaveDays) || 0) - val)
                         });
                       }}
                       className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
@@ -3593,9 +3596,17 @@ export const SalaryView = () => {
                       value={processCalculations.daysPayable}
                       className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                       placeholder="30"
-                      title="Total Payable Days = Total Month Days - LOP Days (Fixed)"
+                      title="Total Payable Days = Total Month Days - Approved Leaves - LOP Days (Fixed)"
                     />
                   </div>
+                </div>
+
+                {/* Present Days Calculation Indicator */}
+                <div className="flex items-center justify-between p-2 bg-indigo-50/80 rounded-lg border border-indigo-200/80 text-xs">
+                  <span className="text-indigo-900 font-medium">Calculated Present Days:</span>
+                  <span className="font-mono font-black text-sm text-indigo-700 bg-white px-2.5 py-0.5 rounded-md border border-indigo-300 shadow-2xs">
+                    {processCalculations.presentDays} Days
+                  </span>
                 </div>
               </div>
 
@@ -4053,7 +4064,7 @@ export const SalaryView = () => {
                     {viewingPayslipModal.presentDays != null
                       ? viewingPayslipModal.presentDays
                       : (viewingPayslipModal.daysPayable != null
-                        ? Math.max(0, Number(viewingPayslipModal.daysPayable) - (Number(viewingPayslipModal.leaveDays) || 0) - (Number(viewingPayslipModal.lopDays) || 0))
+                        ? viewingPayslipModal.daysPayable
                         : '—')} Days
                   </span>
                 </div>
