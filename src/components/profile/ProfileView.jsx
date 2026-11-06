@@ -71,6 +71,8 @@ const getEmployeeDocumentKind = (document) => {
     document?.key,
     document?.type,
     document?.documentType,
+    document?.documentCategory,
+    document?.label,
     document?.title,
     document?.name,
     document?.documentName
@@ -83,8 +85,17 @@ const getEmployeeDocumentKind = (document) => {
 };
 
 const getEmployeeDocumentRecords = (responseData) => {
-  const payload = responseData?.data ?? responseData;
-  const nestedDocuments = payload?.documents ?? payload?.employeeDocuments ?? payload?.employee?.documents;
+  let payload = responseData?.data ?? responseData;
+  if (payload?.data && typeof payload.data === 'object') {
+    payload = payload.data;
+  }
+  const nestedDocuments = payload?.documents ??
+    payload?.employeeDocuments ??
+    payload?.identityDocuments ??
+    payload?.statutoryDocuments ??
+    payload?.employee?.documents ??
+    payload?.employee?.identityDocuments ??
+    payload?.employee?.statutoryDocuments;
   const toRecord = ([key, value]) => {
     if (value && typeof value === 'object') return { key, ...value };
     if (/(number|no)$/i.test(key)) return { key, docNumber: value };
@@ -104,7 +115,8 @@ const getEmployeeDocumentRecords = (responseData) => {
     const file = record?.file && typeof record.file === 'object' ? record.file : {};
     const document = record?.document && typeof record.document === 'object' ? record.document : {};
     const fileUrl = record?.fileUrl || record?.fileURL || record?.documentUrl || record?.imageUrl ||
-      record?.url || record?.path || file.fileUrl || file.url || document.fileUrl || document.url || '';
+      record?.downloadUrl || record?.secureUrl || record?.path || (typeof record?.file === 'string' ? record.file : '') ||
+      file.fileUrl || file.url || file.secure_url || file.path || document.fileUrl || document.url || '';
 
     return {
       kind: getEmployeeDocumentKind(record),
@@ -471,10 +483,14 @@ export const ProfileView = () => {
 
           if (relevantRemote.length > 0) {
             relevantRemote.forEach(remoteDoc => {
-              const matchedCore = initialDocs.find(d => 
-                d.title.toLowerCase().trim() === remoteDoc.title.toLowerCase().trim() ||
-                d.id.toLowerCase() === remoteDoc.title.toLowerCase().replace(/\s+/g, '_')
-              );
+              const title = String(remoteDoc.title || remoteDoc.documentName || remoteDoc.name || '');
+              const documentKind = getEmployeeDocumentKind(remoteDoc);
+              const matchedCore = documentKind
+                ? initialDocs.find(d => d.isCore && d.id === documentKind)
+                : initialDocs.find(d =>
+                    d.title.toLowerCase().trim() === title.toLowerCase().trim() ||
+                    d.id.toLowerCase() === title.toLowerCase().replace(/\s+/g, '_')
+                  );
               if (matchedCore) {
                 matchedCore.fileUrl = remoteDoc.fileUrl || matchedCore.fileUrl;
                 matchedCore.fileName = remoteDoc.fileName || matchedCore.fileName;
@@ -491,12 +507,15 @@ export const ProfileView = () => {
                 }
               } else {
                 // Add as custom document if not already in list
-                const exists = initialDocs.some(d => d.remoteId === remoteDoc._id || d.title.toLowerCase().trim() === remoteDoc.title.toLowerCase().trim());
-                if (!exists) {
+                const exists = initialDocs.some(d =>
+                  d.remoteId === remoteDoc._id ||
+                  (title && d.title.toLowerCase().trim() === title.toLowerCase().trim())
+                );
+                if (!exists && title) {
                   initialDocs.push({
                     id: `remote-${remoteDoc._id}`,
                     remoteId: remoteDoc._id,
-                    title: remoteDoc.title,
+                    title,
                     subtitle: 'Uploaded Employee Document',
                     category: 'Official Record',
                     docNumber: remoteDoc.description || 'Verified Record',
@@ -582,11 +601,14 @@ export const ProfileView = () => {
           });
 
           relevantRemote.forEach(remoteDoc => {
-            const title = String(remoteDoc.title || '');
-            const matchedCore = updated.find(d =>
-              d.title.toLowerCase().trim() === title.toLowerCase().trim() ||
-              d.id.toLowerCase() === title.toLowerCase().replace(/\s+/g, '_')
-            );
+            const title = String(remoteDoc.title || remoteDoc.documentName || remoteDoc.name || '');
+            const documentKind = getEmployeeDocumentKind(remoteDoc);
+            const matchedCore = documentKind
+              ? updated.find(d => d.isCore && d.id === documentKind)
+              : updated.find(d =>
+                  d.title.toLowerCase().trim() === title.toLowerCase().trim() ||
+                  d.id.toLowerCase() === title.toLowerCase().replace(/\s+/g, '_')
+                );
             if (matchedCore) {
               matchedCore.fileUrl = remoteDoc.fileUrl || matchedCore.fileUrl;
               matchedCore.fileName = remoteDoc.fileName || matchedCore.fileName;
@@ -601,7 +623,7 @@ export const ProfileView = () => {
               }
             } else {
               const exists = updated.some(d =>
-                d.remoteId === remoteDoc._id || d.title.toLowerCase().trim() === title.toLowerCase().trim()
+                d.remoteId === remoteDoc._id || (title && d.title.toLowerCase().trim() === title.toLowerCase().trim())
               );
               if (!exists && title) {
                 updated.push({
