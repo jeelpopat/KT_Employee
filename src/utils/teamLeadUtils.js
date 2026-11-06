@@ -1,7 +1,8 @@
 import api from '../api/axios.js';
+import { BASE_URL } from '../api/config.js';
 export { isHrRoleOrUser, isStrictEmployeeRole, filterOutHrUsers } from './roleFilters.js';
 
-const TEAM_API_URL = 'https://kt-backend-ttzj.onrender.com/api/teamLead/team';
+const TEAM_API_URL = `${BASE_URL}/api/teamLead/team`;
 
 /**
  * Normalizes role string for comparison
@@ -162,7 +163,7 @@ export const getLoggedInUserIdentifiers = (currentUser) => {
 };
 
 /**
- * Fetches all teams from GET https://kt-backend-ttzj.onrender.com/api/teamLead/team
+ * Fetches all teams from GET /api/teamLead/team
  */
 export const fetchTeamsList = async () => {
   try {
@@ -660,7 +661,7 @@ export const isEmployeeRole = (role, user = null) => {
 
 /**
  * Fetches the assigned Team Lead for the currently authenticated employee
- * GET https://kt-backend-ttzj.onrender.com/api/auth/team-lead
+ * GET /api/auth/team-lead
  */
 export const fetchEmployeeTeamLead = async () => {
   try {

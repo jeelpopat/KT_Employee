@@ -9,8 +9,9 @@ import {
   isStrictEmployeeRole
 } from "../utils/roleFilters";
 import { showToast } from "../components/common/Toast";
+import { BASE_URL as BACKEND_URL } from "../api/config";
 
-const BASE_URL = "https://kt-backend-ttzj.onrender.com/api";
+const BASE_URL = `${BACKEND_URL}/api`;
 
 const isInvalidName = (name) => {
   if (!name || typeof name !== 'string') return true;

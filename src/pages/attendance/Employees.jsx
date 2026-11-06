@@ -38,8 +38,9 @@ import {
   matchesEmployeeDepartment,
   matchesEmployeeRole
 } from "../../utils/employeeRoles";
+import { BASE_URL } from "../../api/config";
 
-const API_BASE = "https://kt-backend-ttzj.onrender.com/api";
+const API_BASE = `${BASE_URL}/api`;
 
 const initialFormData = {
   fullName: "",
@@ -176,7 +177,7 @@ export default function Employees() {
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/users/all",
+        `${API_BASE}/users/all`,
         {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -195,7 +196,7 @@ export default function Employees() {
 
       let employeeRecords = [];
       try {
-        const employeeRes = await fetch("https://kt-backend-ttzj.onrender.com/api/employee/list", {
+        const employeeRes = await fetch(`${API_BASE}/employee/list`, {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
@@ -218,7 +219,7 @@ export default function Employees() {
 
       let roleNamesById = new Map();
       try {
-        const rolesRes = await fetch("https://kt-backend-ttzj.onrender.com/api/role", {
+        const rolesRes = await fetch(`${API_BASE}/role`, {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
@@ -455,8 +456,8 @@ export default function Employees() {
       const targetUserId = empObj ? (empObj.userId || empObj._id) : employeeId;
 
       const url = isTeamLead
-        ? `https://kt-backend-ttzj.onrender.com/api/employee/remove-tl/${employeeId}`
-        : `https://kt-backend-ttzj.onrender.com/api/employee/assign-tl/${employeeId}`;
+        ? `${API_BASE}/employee/remove-tl/${employeeId}`
+        : `${API_BASE}/employee/assign-tl/${employeeId}`;
 
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
@@ -747,7 +748,7 @@ export default function Employees() {
       }
 
       let res = await fetch(
-        `https://kt-backend-ttzj.onrender.com/api/employee/edit/${targetId}`,
+        `${API_BASE}/employee/edit/${targetId}`,
         {
           method: "PUT",
           headers: {
@@ -763,7 +764,7 @@ export default function Employees() {
       // Fallback: If employee was not found (e.g. ID mismatch), query /api/employee/list live to find the employee document _id and retry
       if ((!res.ok || data?.success === false || data?.message === "Employee not found") && (formData.email || selectedEmployee?.email)) {
         try {
-          const freshListRes = await fetch("https://kt-backend-ttzj.onrender.com/api/employee/list", {
+          const freshListRes = await fetch(`${API_BASE}/employee/list`, {
             headers: {
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
@@ -782,7 +783,7 @@ export default function Employees() {
             });
             if (matchedFresh?._id && String(matchedFresh._id) !== String(targetId)) {
               const retryRes = await fetch(
-                `https://kt-backend-ttzj.onrender.com/api/employee/edit/${matchedFresh._id}`,
+                `${API_BASE}/employee/edit/${matchedFresh._id}`,
                 {
                   method: "PUT",
                   headers: {
@@ -844,7 +845,7 @@ export default function Employees() {
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
       const res = await fetch(
-        `https://kt-backend-ttzj.onrender.com/api/employee/delete/${employeeId}`,
+        `${API_BASE}/employee/delete/${employeeId}`,
         {
           method: "DELETE",
           headers: {

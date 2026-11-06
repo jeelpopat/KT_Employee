@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { BASE_URL } from '../api/config';
 import { 
   MapPin, 
   Phone, 
@@ -137,7 +138,7 @@ export default function Profile() {
         process.env.REACT_APP_API_BASE_URL ||
         (window.location.hostname === "localhost"
           ? "http://localhost:5000"
-          : "https://kt-backend-ttzj.onrender.com");
+          : BASE_URL);
 
       // Change Password API for logged-in user
       const response = await fetch(`${API_BASE}/api/users/change-password`, {

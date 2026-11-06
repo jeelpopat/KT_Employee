@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { LoadingScreen } from "../components/common/Loader.jsx";
+import { BASE_URL } from "../api/config";
 import { 
   Users, Mail, FolderOpen, Search, Filter, TrendingUp, Clock, ChevronDown, 
   X, Calendar, User, Briefcase, Tag, AlertCircle, CheckCircle, MessageCircle,
@@ -27,7 +28,7 @@ export default function PortfolioLeads() {
   const fetchPortfolio = async () => {
     try {
       const res = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/portfolio/get"
+        `${BASE_URL}/api/portfolio/get`
       );
       const data = await res.json();
 

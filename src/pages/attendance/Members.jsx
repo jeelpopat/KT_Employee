@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BASE_URL } from "../../api/config";
 import { LoadingScreen } from "../../components/common/Loader.jsx";
 import { 
   Users, 
@@ -165,7 +166,7 @@ const isAttendanceMatch = (member, record) => {
   return false;
 };
 
-const API_BASE = 'https://kt-backend-ttzj.onrender.com/api';
+const API_BASE = `${BASE_URL}/api`;
 const PROJECT_API_BASE = `${API_BASE}/projectManage`;
 
 const normalizeArrayPayload = (payload, depth = 0) => {
@@ -337,7 +338,7 @@ const fetchAllMembers = async () => {
     let usersList = [];
     try {
       const usersRes = await fetch(
-        'https://kt-backend-ttzj.onrender.com/api/users/all',
+        `${API_BASE}/users/all`,
         { headers }
       );
       if (usersRes.ok) {
@@ -357,7 +358,7 @@ const fetchAllMembers = async () => {
     let employeesList = [];
     try {
       const employeesRes = await fetch(
-        'https://kt-backend-ttzj.onrender.com/api/employee/list',
+        `${API_BASE}/employee/list`,
         { headers }
       );
       if (employeesRes.ok) {
@@ -378,7 +379,7 @@ const fetchAllMembers = async () => {
     let teamsList = [];
     try {
       const teamsRes = await fetch(
-        'https://kt-backend-ttzj.onrender.com/api/teamLead/team',
+        `${API_BASE}/teamLead/team`,
         { headers }
       );
       if (teamsRes.ok) {
@@ -815,7 +816,7 @@ const fetchAllMembers = async () => {
       if (!token) return;
 
       try {
-        const response = await fetch('https://kt-backend-ttzj.onrender.com/api/attendance/admin/all', {
+        const response = await fetch(`${API_BASE}/attendance/admin/all`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -1009,7 +1010,7 @@ const fetchAllMembers = async () => {
 
       let dailyUpdates = [];
       try {
-        const res = await fetch('https://kt-backend-ttzj.onrender.com/api/dailyUpdate/list', { headers });
+        const res = await fetch(`${API_BASE}/dailyUpdate/list`, { headers });
         if (res.ok) {
           const payload = await res.json();
           const allReports = normalizeArrayPayload(payload);

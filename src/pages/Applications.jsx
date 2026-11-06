@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { LoadingScreen } from "../components/common/Loader.jsx";
 import { Briefcase } from "lucide-react";
 import Toast from "../components/common/Toast";
+import { BASE_URL } from "../api/config";
 
 const INITIAL_ROUND_FORM = {
   roundType: "",
@@ -46,7 +47,7 @@ export default function Applications() {
     try {
       setLoading(true);
       const response = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/application/all",
+        `${BASE_URL}/api/application/all`,
         {
           headers: getAuthHeaders(false),
         }
@@ -94,7 +95,7 @@ export default function Applications() {
       };
 
       const interviewRes = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/interviewRound/addInterview",
+        `${BASE_URL}/api/interviewRound/addInterview`,
         {
           method: "POST",
           headers: getAuthHeaders(true),
@@ -120,7 +121,7 @@ export default function Applications() {
       };
 
       const roundRes = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/interviewRound/add",
+        `${BASE_URL}/api/interviewRound/add`,
         {
           method: "POST",
           headers: getAuthHeaders(true),
@@ -171,7 +172,7 @@ export default function Applications() {
       };
 
       const res = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/interviewRound/add",
+        `${BASE_URL}/api/interviewRound/add`,
         {
           method: "POST",
           headers: getAuthHeaders(true),

@@ -30,12 +30,13 @@ import {
   filterOutUnknownUsers
 } from '../../utils/roleFilters';
 import { showToast } from '../../components/common/Toast';
+import { BASE_URL } from '../../api/config.js';
 
 const ATTENDANCE_URL =
-  'https://kt-backend-ttzj.onrender.com/api/attendance/admin/all';
+  `${BASE_URL}/api/attendance/admin/all`;
 
 const PENDING_URL =
-  'https://kt-backend-ttzj.onrender.com/api/attendance/pending';
+  `${BASE_URL}/api/attendance/pending`;
 
 const AVATAR_COLORS = [
   'bg-blue-600',
@@ -1317,7 +1318,7 @@ export default function AttendanceLogs() {
 
       // 2. Fetch all users from /users/all to guarantee HR, TL, Employee are all in table (Excluding Admin & Finance)
       try {
-        const usersUrl = 'https://kt-backend-ttzj.onrender.com/api/users/all';
+        const usersUrl = `${BASE_URL}/api/users/all`;
         const usersRes = await fetch(usersUrl, { method: 'GET', headers });
         if (usersRes.ok) {
           const usersData = await usersRes.json();

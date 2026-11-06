@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { LoadingScreen } from "../components/common/Loader.jsx";
+import { BASE_URL } from "../api/config";
 import { createPortal } from "react-dom";
 import {
   Mail, Phone, MessageCircle, X, Send, Users, Activity,
@@ -361,7 +362,7 @@ export default function Contacts() {
     try {
       setLoading(true);
       const response = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/contact"
+        `${BASE_URL}/api/contact`
       );
       const result = await response.json();
 

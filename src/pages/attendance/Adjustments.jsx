@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
+import { BASE_URL } from "../../api/config.js";
 
 // Helper to reliably format any date string/object/timestamp to YYYY-MM-DD for HTML date inputs
 export const formatDateForInput = (raw) => {
@@ -167,7 +168,7 @@ export default function Adjustments() {
     useState(false);
 
   const API_BASE_URL =
-    "https://kt-backend-ttzj.onrender.com/api";
+    `${BASE_URL}/api`;
 
   // ============================================================
   // LOAD ATTENDANCE SETTINGS

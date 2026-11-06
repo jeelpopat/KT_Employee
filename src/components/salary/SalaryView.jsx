@@ -1602,7 +1602,6 @@ export const SalaryView = () => {
     // Total Payable Days = Total Month Days - Approved Leaves - LOP Days
     const daysPayable = Math.max(0, totalDays - leaveDays - lopDays);
     const presentDays = daysPayable;
-
     const perDaySalary = totalDays > 0 ? Math.round((baseGross / totalDays) * 100) / 100 : 0;
     const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
     const tdsAmount = Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
@@ -1688,7 +1687,7 @@ export const SalaryView = () => {
     try {
       let res;
       try {
-        // PUT: https://kt-backend-ttzj.onrender.com/api/salaries/:id/pay
+        // PUT: /api/salaries/:id/pay
         res = await api.put(`/api/salaries/${empId}/pay`, payload);
       } catch (errPrimary) {
         if (selectedPayrollToUpdate._id && String(selectedPayrollToUpdate._id) !== String(empId)) {

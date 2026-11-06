@@ -7,7 +7,7 @@ import {
   Menu, X, Calendar, Clock, Edit3, Trash2, ExternalLink, Activity
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
-import api from '../../api/axios.js';
+import api, { BASE_URL } from '../../api/axios.js';
 import companyLogo from '../../assets/Logo.png';
 import whiteLogo from '../../assets/white logo.png';
 import { tabToPath, pathToTab } from '../../utils/navigation.js';
@@ -173,7 +173,7 @@ export const Header = ({ onSignOut }) => {
 
       // Try unified backend endpoint first
       try {
-        const response = await fetch('https://kt-backend-ttzj.onrender.com/api/notification/admin/all', {
+        const response = await fetch(`${BASE_URL}/api/notification/admin/all`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
@@ -194,7 +194,7 @@ export const Header = ({ onSignOut }) => {
       if (!backendSucceeded) {
         let announcementsList = [];
         try {
-          const annRes = await fetch('https://kt-backend-ttzj.onrender.com/api/notification/announcement/all', {
+          const annRes = await fetch(`${BASE_URL}/api/notification/announcement/all`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const annData = await annRes.json();
@@ -231,7 +231,7 @@ export const Header = ({ onSignOut }) => {
 
         // Fetch pending leaves
         try {
-          const leaveRes = await fetch('https://kt-backend-ttzj.onrender.com/api/leave/all', {
+          const leaveRes = await fetch(`${BASE_URL}/api/leave/all`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const leaveData = await leaveRes.json();
@@ -258,7 +258,7 @@ export const Header = ({ onSignOut }) => {
 
         // Fetch upcoming holidays
         try {
-          const holRes = await fetch('https://kt-backend-ttzj.onrender.com/api/holiday/current-month');
+          const holRes = await fetch(`${BASE_URL}/api/holiday/current-month`);
           if (holRes.ok) {
             const holData = await holRes.json();
             const holList = Array.isArray(holData)
@@ -347,7 +347,7 @@ export const Header = ({ onSignOut }) => {
 
       const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
       if (token && id && !id.startsWith('leave_') && !id.startsWith('holiday_')) {
-        fetch(`https://kt-backend-ttzj.onrender.com/api/notification/read/${id}`, {
+        fetch(`${BASE_URL}/api/notification/read/${id}`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
         }).catch(() => { });
@@ -368,7 +368,7 @@ export const Header = ({ onSignOut }) => {
 
       const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
       if (token) {
-        fetch('https://kt-backend-ttzj.onrender.com/api/notification/read-all', {
+        fetch(`${BASE_URL}/api/notification/read-all`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
         }).catch(() => { });
@@ -410,8 +410,8 @@ export const Header = ({ onSignOut }) => {
       };
 
       const endpoint = editingAnnouncementId
-        ? `https://kt-backend-ttzj.onrender.com/api/notification/announcement/${editingAnnouncementId}`
-        : 'https://kt-backend-ttzj.onrender.com/api/notification/announcement/create';
+        ? `${BASE_URL}/api/notification/announcement/${editingAnnouncementId}`
+        : `${BASE_URL}/api/notification/announcement/create`;
       const method = editingAnnouncementId ? 'PUT' : 'POST';
 
       const response = await fetch(endpoint, {
@@ -465,7 +465,7 @@ export const Header = ({ onSignOut }) => {
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
       const response = await fetch(
-        `https://kt-backend-ttzj.onrender.com/api/notification/announcement/${announcementId}`,
+        `${BASE_URL}/api/notification/announcement/${announcementId}`,
         {
           method: 'DELETE',
           headers: {

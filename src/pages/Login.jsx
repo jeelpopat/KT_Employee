@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Lock, Mail, ShieldCheck } from "lucide-react";
 import Button from "../components/common/Button";
 import Input from "../components/common/Input";
+import { BASE_URL } from "../api/config";
 
 function Login({ setIsAuthenticated }) {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ function Login({ setIsAuthenticated }) {
       setLoading(true);
 
       const response = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/users/login",
+        `${BASE_URL}/api/users/login`,
         {
           method: "POST",
           headers: {

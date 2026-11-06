@@ -1,5 +1,6 @@
 import axios from "axios";
 import { stopScreenCapture } from "../services/monitoringService.js";
+import { BASE_URL } from "../api/config.js";
 
 export const SCREEN_CAPTURE_ENABLED_SESSION_KEY = "kt_screen_capture_enabled";
 
@@ -80,7 +81,7 @@ export const performAutoCheckout = async (authToken) => {
   // If user is checked in, send auto-checkout request to backend API
   if (isCheckedIn && token) {
     try {
-      const resp = await fetch("https://kt-backend-ttzj.onrender.com/api/attendance/check-out", {
+      const resp = await fetch(`${BASE_URL}/api/attendance/check-out`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -92,7 +93,7 @@ export const performAutoCheckout = async (authToken) => {
         })
       });
       if (!resp.ok) {
-        await fetch("https://kt-backend-ttzj.onrender.com/api/attendance/check-out", {
+        await fetch(`${BASE_URL}/api/attendance/check-out`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`,
@@ -329,7 +330,7 @@ export const validateUserSession = async () => {
   try {
     let response;
     try {
-      response = await fetch("https://kt-backend-ttzj.onrender.com/api/users/profile", {
+      response = await fetch(`${BASE_URL}/api/users/profile`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -410,7 +411,7 @@ export const validateUserSession = async () => {
 
     if ((!liveRole || liveRole === 'employee') && rawRoleId && /^[0-9a-fA-F]{24}$/.test(String(rawRoleId).trim())) {
       try {
-        const roleRes = await fetch("https://kt-backend-ttzj.onrender.com/api/role", {
+        const roleRes = await fetch(`${BASE_URL}/api/role`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (roleRes.ok) {

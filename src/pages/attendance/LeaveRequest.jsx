@@ -28,20 +28,21 @@ import {
   extractAssignedTeamEmployees,
   isLeaveOfAssignedTeam,
 } from "../../utils/teamLeadUtils";
+import { BASE_URL } from "../../api/config";
 
-const BASE_URL = "https://kt-backend-ttzj.onrender.com/api/leave";
+const LEAVE_BASE_URL = `${BASE_URL}/api/leave`;
 
-const LEAVE_URL = `${BASE_URL}/all`;
+const LEAVE_URL = `${LEAVE_BASE_URL}/all`;
 
 
-const TL_APPROVE_URL = `${BASE_URL}/teamlead/approve`;
-const TL_REJECT_URL = `${BASE_URL}/teamlead/reject`;
+const TL_APPROVE_URL = `${LEAVE_BASE_URL}/teamlead/approve`;
+const TL_REJECT_URL = `${LEAVE_BASE_URL}/teamlead/reject`;
 
-const HR_APPROVE_URL = `${BASE_URL}/hr/approve`;
-const HR_REJECT_URL = `${BASE_URL}/hr/reject`;
+const HR_APPROVE_URL = `${LEAVE_BASE_URL}/hr/approve`;
+const HR_REJECT_URL = `${LEAVE_BASE_URL}/hr/reject`;
 
-const ADMIN_APPROVE_URL = `${BASE_URL}/admin/approve`;
-const ADMIN_REJECT_URL = `${BASE_URL}/admin/reject`;
+const ADMIN_APPROVE_URL = `${LEAVE_BASE_URL}/admin/approve`;
+const ADMIN_REJECT_URL = `${LEAVE_BASE_URL}/admin/reject`;
 
 // ============================================================
 // HELPERS
@@ -452,7 +453,7 @@ export default function LeaveRequest() {
           },
         }).then(r => r.json().catch(() => ({}))),
         fetchTeamsList(),
-        fetch("https://kt-backend-ttzj.onrender.com/api/users/all", {
+        fetch(`${BASE_URL}/api/users/all`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",

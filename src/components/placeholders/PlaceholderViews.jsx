@@ -1458,10 +1458,20 @@ export const TeamTaskManagementView = () => {
     assignedTo: '',
     priority: 'medium',
     status: 'pending',
+    startDate: '',
     dueDate: '',
     estimatedHours: ''
   };
   const [taskForm, setTaskForm] = useState(initialForm);
+  const lastTaskActionTimeRef = useRef(0);
+  const checkTaskActionCooldown = (cooldownMs = 300) => {
+    const now = Date.now();
+    if (now - lastTaskActionTimeRef.current < cooldownMs) {
+      return false;
+    }
+    lastTaskActionTimeRef.current = now;
+    return true;
+  };
 
   const showAlert = (message, type = 'success') => {
     setAlertNotice({ message, type });
@@ -1550,6 +1560,7 @@ export const TeamTaskManagementView = () => {
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
+    if (!checkTaskActionCooldown(300)) return;
     setTaskForm({
       ...initialForm,
       projectId: projects[0]?._id || ''
@@ -1561,16 +1572,21 @@ export const TeamTaskManagementView = () => {
   // Open Edit Modal
   const handleOpenEditModal = (task, e) => {
     if (e) e.stopPropagation();
-    const assignedUser = task.assignedEmployee?._id || task.assignedEmployee || '';
+    if (!checkTaskActionCooldown(300)) return;
+    const assignedUser = task.assignedEmployee?._id || task.assignedEmployee?.id || task.assignedEmployee || task.assignedTo?._id || task.assignedTo || '';
+    const projId = task.projectId?._id || task.projectId?.id || task.projectId || task.project?._id || task.project || '';
+    const rawStart = task.startDate || task.taskStartDate || task.start || task.startingDate || task.start_date || '';
+    const rawDue = task.dueDate || task.deadline || task.endDate || task.taskDueDate || task.due_date || '';
     setTaskForm({
-      taskTitle: task.taskTitle || task.title || '',
-      projectId: task.projectId?._id || task.projectId || '',
-      taskDescription: task.taskDescription || task.description || '',
+      taskTitle: task.taskTitle || task.title || task.name || '',
+      projectId: projId,
+      taskDescription: task.taskDescription || task.description || task.details || '',
       assignedTo: assignedUser,
-      priority: task.priority || 'medium',
-      status: task.status || 'pending',
-      dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-      estimatedHours: task.estimatedHours || ''
+      priority: String(task.priority || 'medium').toLowerCase(),
+      status: task.status ? normalizeTaskStatus(task.status) : 'pending',
+      startDate: rawStart ? String(rawStart).split('T')[0] : '',
+      dueDate: rawDue ? String(rawDue).split('T')[0] : '',
+      estimatedHours: task.estimatedHours != null ? task.estimatedHours : ''
     });
     setEditingTask(task);
     setIsCreateModalOpen(true);
@@ -1579,6 +1595,8 @@ export const TeamTaskManagementView = () => {
   // CREATE or UPDATE Task
   const handleSaveTask = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    if (!checkTaskActionCooldown(300)) return;
     if (!taskForm.taskTitle.trim()) {
       showToast('Please enter a task title.', 'error');
       return;
@@ -1600,6 +1618,7 @@ export const TeamTaskManagementView = () => {
         progress: autoProgress !== null ? autoProgress : 0,
         estimatedHours: Number(taskForm.estimatedHours) || 0
       };
+      if (taskForm.startDate) payload.startDate = taskForm.startDate;
       if (taskForm.dueDate) payload.dueDate = taskForm.dueDate;
 
       // Assign employee
@@ -2186,6 +2205,11 @@ export const TeamTaskManagementView = () => {
                       </option>
                     );
                   })}
+                  {taskForm.assignedTo && !usersList.some(u => String(u._id || u.id) === String(taskForm.assignedTo)) && (
+                    <option value={taskForm.assignedTo}>
+                      {editingTask?.assignedEmployee?.name || editingTask?.assignedEmployeeName || 'Assigned Member'}
+                    </option>
+                  )}
                 </select>
               </div>
 
@@ -2228,33 +2252,46 @@ export const TeamTaskManagementView = () => {
                 </div>
               </div>
 
-              {/* Due Date & Estimated Hours */}
+              {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Due Date
+                    Start Date
                   </label>
                   <input
                     type="date"
-                    value={taskForm.dueDate}
-                    onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+                    value={taskForm.startDate || ''}
+                    onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Estimated Hours
+                    Due Date
                   </label>
                   <input
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 16"
-                    value={taskForm.estimatedHours}
-                    onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: e.target.value })}
+                    type="date"
+                    value={taskForm.dueDate || ''}
+                    onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                   />
                 </div>
+              </div>
+
+              {/* Estimated Hours */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Estimated Hours
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 16"
+                  value={taskForm.estimatedHours || ''}
+                  onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
+                />
               </div>
 
               {/* Task Description */}

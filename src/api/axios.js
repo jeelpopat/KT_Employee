@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { BASE_URL } from './config.js';
+export { BASE_URL, API_BASE_URL, getApiUrl } from './config.js';
 
 // In-memory cache store: Map<cacheKey, { data, status, statusText, headers, expiresAt }>
 const cache = new Map();
@@ -151,7 +153,7 @@ const cachingAdapter = async (config) => {
 };
 
 const api = axios.create({
-  baseURL: 'https://kt-backend-ttzj.onrender.com',
+  baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
-import api from '../../api/axios.js'; 
+import api, { BASE_URL } from '../../api/axios.js'; 
 import companyLogo from '../../assets/Logo.png';
 import aadharProofIcon from '../../assets/profile/aadhar-proof-icon.png';
 import panProofIcon from '../../assets/profile/pan-proof-icon.png';
@@ -64,7 +64,7 @@ const isDocPdf = (doc) => {
   );
 };
 
-const EMPLOYEE_DOCUMENTS_API = 'https://kt-backend-yzr4.onrender.com/api/employee/documents';
+const EMPLOYEE_DOCUMENTS_API = `${BASE_URL}/api/employee/documents`;
 
 const getEmployeeDocumentKind = (document) => {
   const label = [

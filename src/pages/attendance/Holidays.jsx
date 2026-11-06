@@ -4,8 +4,9 @@ import { Loader2, Calendar } from 'lucide-react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { invalidateCache } from '../../api/axios.js';
 import { expandHolidayDates } from '../../utils/holidayUtils.js';
+import { BASE_URL } from '../../api/config';
 
-const API_BASE = 'https://kt-backend-ttzj.onrender.com/api/holiday';
+const API_BASE = `${BASE_URL}/api/holiday`;
 
 const toStandardDateString = (input) => {
   if (!input) return '';

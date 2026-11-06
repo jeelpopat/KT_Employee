@@ -28,6 +28,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import api from '../api/axios';
+import { BASE_URL } from '../api/config';
 import {
   isFinanceOrExcludedUser,
   filterOutUnknownUsers,
@@ -203,7 +204,7 @@ const EmployeeRequests = () => {
         setError('');
       }
       let userList = [];
-      const freshUrl = `https://kt-backend-ttzj.onrender.com/api/users/all?_t=${Date.now()}`;
+      const freshUrl = `${BASE_URL}/api/users/all?_t=${Date.now()}`;
       try {
         const res = await api.get(`/api/users/all?_t=${Date.now()}`);
         userList = Array.isArray(res.data) ? res.data : res.data?.users || res.data?.data || [];
@@ -285,7 +286,7 @@ const EmployeeRequests = () => {
 
       if (companyList.length === 0) {
         try {
-          const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/company', { headers });
+          const fetchRes = await fetch(`${BASE_URL}/api/company`, { headers });
           if (fetchRes.ok) {
             const compData = await fetchRes.json();
             const cData = compData?.data || compData?.companies || (Array.isArray(compData) ? compData : []);
@@ -296,7 +297,7 @@ const EmployeeRequests = () => {
 
       if (companyList.length === 0) {
         try {
-          const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/company/', { headers });
+          const fetchRes = await fetch(`${BASE_URL}/api/company/`, { headers });
           if (fetchRes.ok) {
             const compData = await fetchRes.json();
             const cData = compData?.data || compData?.companies || (Array.isArray(compData) ? compData : []);
@@ -324,8 +325,8 @@ const EmployeeRequests = () => {
   };
 
   // 2. Fetch Branches dynamically from API
-  // All branches: GET https://kt-backend-ttzj.onrender.com/api/branch
-  // Company branches: GET https://kt-backend-ttzj.onrender.com/api/branch?companyId=<companyId>
+  // All branches: GET /api/branch
+  // Company branches: GET /api/branch?companyId=<companyId>
   const fetchBranches = async (companyId = null) => {
     setBranchLoadError('');
     const rawCompId = typeof companyId === 'object' && companyId !== null
@@ -338,8 +339,8 @@ const EmployeeRequests = () => {
       ? `/api/branch?companyId=${encodeURIComponent(rawCompId)}`
       : '/api/branch';
     const directUrl = rawCompId
-      ? `https://kt-backend-ttzj.onrender.com/api/branch?companyId=${encodeURIComponent(rawCompId)}`
-      : 'https://kt-backend-ttzj.onrender.com/api/branch';
+      ? `${BASE_URL}/api/branch?companyId=${encodeURIComponent(rawCompId)}`
+      : `${BASE_URL}/api/branch`;
 
     setLoadingBranches(true);
     try {
@@ -382,7 +383,7 @@ const EmployeeRequests = () => {
             const allData = allRes.data?.data || allRes.data?.branches || (Array.isArray(allRes.data) ? allRes.data : []);
             if (Array.isArray(allData) && allData.length > 0) allBranches = allData;
           } catch {
-            const fetchAll = await fetch('https://kt-backend-ttzj.onrender.com/api/branch', { headers });
+            const fetchAll = await fetch(`${BASE_URL}/api/branch`, { headers });
             if (fetchAll.ok) {
               const allJson = await fetchAll.json();
               const allData = allJson?.data || allJson?.branches || (Array.isArray(allJson) ? allJson : []);
@@ -483,7 +484,7 @@ const EmployeeRequests = () => {
 
       if (fyList.length === 0) {
         try {
-          const fetchRes = await fetch(`https://kt-backend-ttzj.onrender.com/api/financial-year?branchId=${encodeURIComponent(rawBranchId)}`, { headers });
+          const fetchRes = await fetch(`${BASE_URL}/api/financial-year?branchId=${encodeURIComponent(rawBranchId)}`, { headers });
           if (fetchRes.ok) {
             const fData = await fetchRes.json();
             const list = fData?.data || fData?.financialYears || fData?.years || (Array.isArray(fData) ? fData : []);
@@ -494,7 +495,7 @@ const EmployeeRequests = () => {
 
       if (fyList.length === 0) {
         try {
-          const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/financial-year', { headers });
+          const fetchRes = await fetch(`${BASE_URL}/api/financial-year`, { headers });
           if (fetchRes.ok) {
             const fData = await fetchRes.json();
             const list = fData?.data || fData?.financialYears || fData?.years || (Array.isArray(fData) ? fData : []);
@@ -528,7 +529,7 @@ const EmployeeRequests = () => {
   };
 
 
-  // Fetch Backend Teams from GET https://kt-backend-ttzj.onrender.com/api/teamLead/team
+  // Fetch Backend Teams from GET /api/teamLead/team
   const fetchBackendTeams = async () => {
     try {
       const teams = await fetchTeamsList();
@@ -1210,7 +1211,7 @@ const EmployeeRequests = () => {
 
         const token = getAuthToken();
         const response = await fetch(
-          `https://kt-backend-ttzj.onrender.com/api/employee/assign-tl/${encodeURIComponent(String(employeeRecordId))}`,
+          `${BASE_URL}/api/employee/assign-tl/${encodeURIComponent(String(employeeRecordId))}`,
           {
             method: 'PUT',
             headers: {
@@ -1242,7 +1243,7 @@ const EmployeeRequests = () => {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         };
 
-        const fetchRes = await fetch('https://kt-backend-ttzj.onrender.com/api/users/approve', {
+        const fetchRes = await fetch(`${BASE_URL}/api/users/approve`, {
           method: 'PUT',
           headers,
           body: JSON.stringify(payload)
@@ -1396,7 +1397,7 @@ const EmployeeRequests = () => {
                       employees: remainingEmps.map(extractMemberId).filter(Boolean)
                     };
                     await api.post('/api/teamLead/create-team', removePayload, { headers }).catch(async () => {
-                      await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/create-team', {
+                      await fetch(`${BASE_URL}/api/teamLead/create-team`, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify(removePayload)
@@ -1420,7 +1421,7 @@ const EmployeeRequests = () => {
             ...employeeIdentifiersToAdd
           ])).filter(Boolean);
 
-          // Step E: Call POST https://kt-backend-ttzj.onrender.com/api/teamLead/create-team
+          // Step E: Call POST /api/teamLead/create-team
           const rawTargetLead = targetTeamDoc?.teamLead || targetTeamDoc?.lead || targetTeamDoc?.teamLeadId;
           const existingLeadId = typeof rawTargetLead === 'object' ? (rawTargetLead?._id || rawTargetLead?.id || rawTargetLead?.userId) : rawTargetLead;
           const backendTLId = existingLeadId ? String(existingLeadId) : String(selectedTL?._id || selectedTeamLeadId);
@@ -1443,7 +1444,7 @@ const EmployeeRequests = () => {
 
             if (!createSuccess) {
               try {
-                await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/create-team', {
+                await fetch(`${BASE_URL}/api/teamLead/create-team`, {
                   method: 'POST',
                   headers,
                   body: JSON.stringify(teamPayload)
@@ -1619,7 +1620,7 @@ const EmployeeRequests = () => {
       return;
     }
     const userId = getUserIdentifier(user, 0);
-    const endpoint = 'https://kt-backend-ttzj.onrender.com/api/users/reject';
+    const endpoint = `${BASE_URL}/api/users/reject`;
 
     setProcessingState({ userId, action });
     setError('');
@@ -1666,14 +1667,14 @@ const EmployeeRequests = () => {
 
       const userIdentifierStrs = allUserIdentifiers.map(x => String(x).toLowerCase().trim());
 
-      // 2. Fetch current backend teams: GET https://kt-backend-ttzj.onrender.com/api/teamLead/team
+      // 2. Fetch current backend teams: GET /api/teamLead/team
       let currentTeams = [];
       try {
         const teamRes = await api.get('/api/teamLead/team', { headers });
         currentTeams = teamRes.data?.data || teamRes.data?.teams || (Array.isArray(teamRes.data) ? teamRes.data : []);
       } catch {
         try {
-          const fetchTeamsRes = await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/team', { headers });
+          const fetchTeamsRes = await fetch(`${BASE_URL}/api/teamLead/team`, { headers });
           if (fetchTeamsRes.ok) {
             const tData = await fetchTeamsRes.json().catch(() => ({}));
             currentTeams = tData?.data || tData?.teams || (Array.isArray(tData) ? tData : []);
@@ -1682,7 +1683,7 @@ const EmployeeRequests = () => {
       }
       if (!Array.isArray(currentTeams)) currentTeams = [];
 
-      // 3. REMOVE user from all teams via POST https://kt-backend-ttzj.onrender.com/api/teamLead/create-team
+      // 3. REMOVE user from all teams via POST /api/teamLead/create-team
       for (const team of currentTeams) {
         if (!Array.isArray(team.employees) || team.employees.length === 0) continue;
 
@@ -1745,7 +1746,7 @@ const EmployeeRequests = () => {
                 throw new Error(response.data?.message || 'Failed to update Team Lead members.');
               }
             } catch (apiError) {
-              const response = await fetch('https://kt-backend-ttzj.onrender.com/api/teamLead/create-team', {
+              const response = await fetch(`${BASE_URL}/api/teamLead/create-team`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(teamPayload)
@@ -1812,7 +1813,7 @@ const EmployeeRequests = () => {
             throw new Error(response.data?.message || 'Failed to update employee status.');
           }
         } catch (apiError) {
-          const response = await fetch(`https://kt-backend-ttzj.onrender.com/api/employee/edit/${empRecordId}`, {
+          const response = await fetch(`${BASE_URL}/api/employee/edit/${empRecordId}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify(employeeStatusPayload)

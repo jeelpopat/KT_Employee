@@ -47,29 +47,23 @@ import {
   isAdminRole 
 } from "../../utils/teamLeadUtils";
 import { normalizeTaskStatus, getProgressForStatus, getTaskProgress } from "../../utils/taskUtils";
+import { BASE_URL as BACKEND_URL } from "../../api/config";
 
-const BASE_URL =
-  "https://kt-backend-ttzj.onrender.com/api/projectManage/project";
+const BASE_URL = `${BACKEND_URL}/api/projectManage/project`;
 
-const API_CORE = BASE_URL.replace(/\/project$/, "");
+const API_CORE = `${BACKEND_URL}/api/projectManage`;
 
-const EMPLOYEE_URL = 
-  "https://kt-backend-ttzj.onrender.com/api/employee/list";
+const EMPLOYEE_URL = `${BACKEND_URL}/api/employee/list`;
 
-const USER_URL =
-  "https://kt-backend-ttzj.onrender.com/api/users/all";
+const USER_URL = `${BACKEND_URL}/api/users/all`;
 
-const TASK_URL =
-  "https://kt-backend-ttzj.onrender.com/api/task";
+const TASK_URL = `${BACKEND_URL}/api/task`;
 
-const TASK_PROJECT_MANAGE_URL =
-  "https://kt-backend-ttzj.onrender.com/api/projectManage/task";
+const TASK_PROJECT_MANAGE_URL = `${BACKEND_URL}/api/projectManage/task`;
 
-const TEAM_LEAD_URL =
-  "https://kt-backend-ttzj.onrender.com/api/teamLead/team";
+const TEAM_LEAD_URL = `${BACKEND_URL}/api/teamLead/team`;
 
-const DAILY_UPDATE_URL =
-  "https://kt-backend-ttzj.onrender.com/api/dailyUpdate/list";
+const DAILY_UPDATE_URL = `${BACKEND_URL}/api/dailyUpdate/list`;
 
 const getLocalDateString = () => {
   const today = new Date();
@@ -371,6 +365,7 @@ export default function Team() {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [users, setUsers] = useState([]);
+  const [rawUsers, setRawUsers] = useState([]);
   const [teamLeadOptions, setTeamLeadOptions] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [expandedProjects, setExpandedProjects] = useState({});
@@ -389,7 +384,7 @@ export default function Team() {
   // Top-level Navigation: 'projects' | 'daily-reports'
   const [activeMainTab, setActiveMainTab] = useState('projects');
 
-  // Daily Work Reports State from API https://kt-backend-ttzj.onrender.com/api/dailyUpdate/list
+  // Daily Work Reports State from API /api/dailyUpdate/list
   const [dailyReports, setDailyReports] = useState([]);
   const [isDailyReportsLoading, setIsDailyReportsLoading] = useState(false);
   const [dailySearchQuery, setDailySearchQuery] = useState("");
@@ -402,7 +397,7 @@ export default function Team() {
     try {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await axios.get("https://kt-backend-ttzj.onrender.com/api/dailyUpdate/list", { headers });
+      const res = await axios.get(DAILY_UPDATE_URL, { headers });
       const list = res.data?.data || res.data?.reports || (Array.isArray(res.data) ? res.data : []);
       if (Array.isArray(list)) {
         const valid = list.filter(r => r && (r.todaysWork || r.workUpdate || r.description) && !isUnknownEmployeeOrUser(r));
@@ -501,6 +496,17 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
   const [taskForm, setTaskForm] = useState({ ...defaultTaskForm });
   const [editingTask, setEditingTask] = useState(null);
+  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
+  const lastTaskActionRef = useRef(0);
+
+  const checkTaskActionCooldown = (cooldownMs = 300) => {
+    const now = Date.now();
+    if (now - lastTaskActionRef.current < cooldownMs) {
+      return false;
+    }
+    lastTaskActionRef.current = now;
+    return true;
+  };
 
   useEffect(() => {
     fetchProjects();
@@ -542,7 +548,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     };
   }, [showProjectModal, showTaskModal, editingTask, selectedProject]);
 
-  // Function to fetch daily updates for a task using https://kt-backend-ttzj.onrender.com/api/dailyUpdate/list
+  // Function to fetch daily updates for a task using DAILY_UPDATE_URL
   const fetchTaskUpdates = async (taskId) => {
     if (!taskId) return;
 
@@ -552,7 +558,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Primary Live API: GET https://kt-backend-ttzj.onrender.com/api/dailyUpdate/list
+      // Primary Live API: GET DAILY_UPDATE_URL
       let rawList = [];
       try {
         const response = await axios.get(DAILY_UPDATE_URL, {
@@ -833,9 +839,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       const res = await axios.get(USER_URL);
       const userData = res.data.data || res.data.users || res.data || [];
       const list = Array.isArray(userData) ? userData : [];
+      setRawUsers(list);
       setUsers(filterOutUnknownUsers(filterOutFinanceUsers(list)));
     } catch (error) {
       console.error("Users fetch error:", error);
+      setRawUsers([]);
       setUsers([]);
     }
   };
@@ -853,7 +861,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       // 1. Fetch from api/user/all (fallback to api/users/all)
       let allUsers = [];
       try {
-        const userRes = await axios.get("https://kt-backend-ttzj.onrender.com/api/user/all", { headers });
+        const userRes = await axios.get(`${BACKEND_URL}/api/user/all`, { headers });
         allUsers = userRes?.data?.users || userRes?.data?.data || (Array.isArray(userRes?.data) ? userRes.data : []);
       } catch (e1) {
         try {
@@ -1419,16 +1427,16 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   const closeTaskModal = () => {
     setShowTaskModal(false);
     setEditingTask(null);
+    setIsSubmittingTask(false);
     setTaskForm({ ...defaultTaskForm });
   };
 
   const openAddTask = (projectId = null) => {
+    if (!checkTaskActionCooldown(300)) return;
     setEditingTask(null);
+    setIsSubmittingTask(false);
     const projId = projectId || selectedProject?._id || "";
     const proj = projects.find(p => isSameId(p._id || p.id, projId));
-    const assignedTeamLead = normalizeId(
-      proj?.teamLeadUser || proj?.teamLeadEmployee
-    );
 
     setSelectedProject(proj || null);
     updateProjectTeamMembers(proj);
@@ -1437,7 +1445,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       projectId: projId,
       taskTitle: "",
       description: "",
-      assignedTeamLead,
+      assignedTeamLead: "",
       assignedTo: "",
       assignedEmployee: "",
       assignedBy: "",
@@ -1451,46 +1459,203 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     setShowTaskModal(true);
   };
 
-  const openEditTask = (task) => {
+  const formatTaskDate = (dateVal) => {
+    if (!dateVal) return "";
+    const str = String(dateVal).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      return str;
+    }
+    if (str.includes("T")) {
+      const part = str.split("T")[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(part)) {
+        return part;
+      }
+    }
+    try {
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+    } catch {}
+    return str.split("T")[0] || "";
+  };
+
+  const openEditTask = async (task) => {
     if (!task) return;
-    setEditingTask(task);
+    if (!checkTaskActionCooldown(300)) return;
+    setIsSubmittingTask(false);
+
+    // Prefer freshest task entity from tasks state if available
+    const taskId = normalizeId(task._id || task.id);
+    const existingInState = tasks.find((t) => isSameId(t._id || t.id, taskId));
+    const sourceTask = existingInState ? { ...existingInState, ...task } : task;
+
+    setEditingTask(sourceTask);
+
     const projId = normalizeId(
-      task.projectId?._id || task.projectId?.id || task.projectId || task.project?._id || task.project
+      sourceTask.projectId?._id ||
+      sourceTask.projectId?.id ||
+      sourceTask.projectId ||
+      sourceTask.project?._id ||
+      sourceTask.project?.id ||
+      sourceTask.project
     );
-    const proj = projects.find((p) => isSameId(p._id || p.id, projId));
+
+    let proj = projects.find((p) => isSameId(p._id || p.id, projId));
+    if (!proj && typeof sourceTask.projectId === "object" && sourceTask.projectId) {
+      proj = sourceTask.projectId;
+    } else if (!proj && typeof sourceTask.project === "object" && sourceTask.project) {
+      proj = sourceTask.project;
+    }
 
     setSelectedProject(proj || null);
     updateProjectTeamMembers(proj);
 
+    // Only assign TL if sourceTask actually had a TL assigned (do NOT default to project TL)
     const assignedTL = normalizeId(
-      task.assignedTeamLeadUser ||
-      task.assignedTeamLeadEmployee ||
-      task.assignedTeamLead ||
-      proj?.teamLeadUser ||
-      proj?.teamLeadEmployee
+      sourceTask.assignedTeamLeadUser?._id ||
+      sourceTask.assignedTeamLeadUser ||
+      sourceTask.assignedTeamLeadEmployee?._id ||
+      sourceTask.assignedTeamLeadEmployee ||
+      sourceTask.assignedTeamLead?._id ||
+      sourceTask.assignedTeamLead ||
+      ""
     );
 
+    // Only assign employee if sourceTask actually had an employee assigned
     const assignedEmp = normalizeId(
-      task.assignedEmployee ||
-      task.assignedTo
+      sourceTask.assignedEmployee?._id ||
+      sourceTask.assignedEmployee?.id ||
+      sourceTask.assignedEmployee ||
+      sourceTask.assignedTo?._id ||
+      sourceTask.assignedTo?.id ||
+      sourceTask.assignedTo ||
+      sourceTask.employee?._id ||
+      sourceTask.employee?.id ||
+      sourceTask.employee ||
+      sourceTask.assignedUser?._id ||
+      sourceTask.assignedUser?.id ||
+      sourceTask.assignedUser ||
+      sourceTask.userId?._id ||
+      sourceTask.userId?.id ||
+      sourceTask.userId ||
+      ""
     );
+
+    const assignedByVal = normalizeId(
+      sourceTask.assignedBy?._id ||
+      sourceTask.assignedBy?.id ||
+      sourceTask.assignedBy ||
+      sourceTask.createdBy?._id ||
+      sourceTask.createdBy?.id ||
+      sourceTask.createdBy ||
+      ""
+    );
+
+    const rawStatus = String(sourceTask.status || "pending").toLowerCase().trim();
+    const normalizedStatus = normalizeTaskStatus(rawStatus);
+
+    const rawStartDate =
+      sourceTask.startDate ||
+      sourceTask.taskStartDate ||
+      sourceTask.start ||
+      sourceTask.startingDate ||
+      sourceTask.start_date ||
+      "";
+
+    const rawDueDate =
+      sourceTask.dueDate ||
+      sourceTask.deadline ||
+      sourceTask.endDate ||
+      sourceTask.taskDueDate ||
+      sourceTask.due_date ||
+      "";
 
     setTaskForm({
       projectId: projId || "",
-      taskTitle: task.taskTitle || task.title || "",
-      description: task.description || task.taskDescription || "",
+      taskTitle: sourceTask.taskTitle || sourceTask.title || sourceTask.name || "",
+      description: sourceTask.description || sourceTask.taskDescription || sourceTask.details || "",
       assignedTeamLead: assignedTL,
       assignedTo: assignedEmp,
       assignedEmployee: assignedEmp,
-      assignedBy: normalizeId(task.assignedBy),
-      startDate: task.startDate ? String(task.startDate).split("T")[0] : "",
-      dueDate: task.dueDate ? String(task.dueDate).split("T")[0] : "",
-      priority: task.priority || "medium",
-      progress: Number(task.progress) || 0,
-      status: task.status || "pending",
+      assignedBy: assignedByVal,
+      startDate: formatTaskDate(rawStartDate),
+      dueDate: formatTaskDate(rawDueDate),
+      priority: String(sourceTask.priority || "medium").toLowerCase(),
+      progress: Number(sourceTask.progress != null ? sourceTask.progress : (getProgressForStatus(normalizedStatus) || 0)),
+      status: normalizedStatus || "pending",
     });
 
     setShowTaskModal(true);
+
+    // Asynchronous silent fetch to ensure all populated fields match backend GET /api/task/:id
+    if (taskId) {
+      try {
+        const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await axios.get(`${TASK_URL}/${taskId}`, { headers });
+        const fresh = res.data?.data || res.data?.task || res.data;
+        if (fresh && typeof fresh === "object") {
+          const freshProjId = normalizeId(
+            fresh.projectId?._id || fresh.projectId?.id || fresh.projectId || fresh.project?._id || fresh.project
+          );
+          const freshEmpRaw =
+            fresh.assignedEmployee?._id ||
+            fresh.assignedEmployee?.id ||
+            fresh.assignedEmployee ||
+            fresh.assignedTo?._id ||
+            fresh.assignedTo?.id ||
+            fresh.assignedTo ||
+            fresh.employee;
+          const freshEmp = freshEmpRaw ? normalizeId(freshEmpRaw) : "";
+
+          const freshTLRaw =
+            fresh.assignedTeamLeadUser?._id ||
+            fresh.assignedTeamLeadUser ||
+            fresh.assignedTeamLeadEmployee?._id ||
+            fresh.assignedTeamLeadEmployee ||
+            fresh.assignedTeamLead;
+          const freshTL = freshTLRaw ? normalizeId(freshTLRaw) : "";
+
+          const freshBy = normalizeId(fresh.assignedBy?._id || fresh.assignedBy || fresh.createdBy);
+
+          const freshStart =
+            fresh.startDate ||
+            fresh.taskStartDate ||
+            fresh.start ||
+            fresh.startingDate ||
+            fresh.start_date;
+          const freshDue =
+            fresh.dueDate ||
+            fresh.deadline ||
+            fresh.endDate ||
+            fresh.taskDueDate ||
+            fresh.due_date;
+
+          setTaskForm((prev) => ({
+            ...prev,
+            projectId: freshProjId || prev.projectId,
+            taskTitle: fresh.taskTitle || fresh.title || prev.taskTitle,
+            description: fresh.description || fresh.taskDescription || prev.description,
+            assignedTeamLead: freshTL || prev.assignedTeamLead,
+            assignedEmployee: freshEmp || prev.assignedEmployee,
+            assignedTo: freshEmp || prev.assignedTo,
+            assignedBy: freshBy || prev.assignedBy,
+            startDate: freshStart ? formatTaskDate(freshStart) : prev.startDate,
+            dueDate: freshDue ? formatTaskDate(freshDue) : prev.dueDate,
+            priority: fresh.priority ? String(fresh.priority).toLowerCase() : prev.priority,
+            progress: fresh.progress != null ? Number(fresh.progress) : prev.progress,
+            status: fresh.status ? normalizeTaskStatus(fresh.status) : prev.status,
+          }));
+          setEditingTask((prev) => ({ ...prev, ...fresh }));
+        }
+      } catch {
+        // Fallback already prefilled
+      }
+    }
   };
 
   const toggleProject = (projectId) => {
@@ -1510,6 +1675,10 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   const addTask = async (e) => {
     e.preventDefault();
 
+    if (isSubmittingTask) return;
+    if (!checkTaskActionCooldown(300)) return;
+
+    setIsSubmittingTask(true);
     try {
       const assignedEmployeeId = taskForm.assignedEmployee || taskForm.assignedTo;
       const taskProject = findEntity(
@@ -1518,16 +1687,23 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       );
       const projectTeamLeadUserId = normalizeId(taskProject?.teamLeadUser);
       const projectTeamLeadEmployeeId = normalizeId(taskProject?.teamLeadEmployee);
-      const assignedTeamLeadUserId =
-        taskForm.assignedTeamLead &&
-        isSameId(taskForm.assignedTeamLead, projectTeamLeadUserId)
+      const assignedTLId = normalizeId(taskForm.assignedTeamLead);
+      let assignedTeamLeadUserId =
+        assignedTLId && isSameId(assignedTLId, projectTeamLeadUserId)
           ? projectTeamLeadUserId
           : null;
-      const assignedTeamLeadEmployeeId =
-        taskForm.assignedTeamLead &&
-        isSameId(taskForm.assignedTeamLead, projectTeamLeadEmployeeId)
+      let assignedTeamLeadEmployeeId =
+        assignedTLId && isSameId(assignedTLId, projectTeamLeadEmployeeId)
           ? projectTeamLeadEmployeeId
           : null;
+
+      if (assignedTLId && !assignedTeamLeadUserId && !assignedTeamLeadEmployeeId) {
+        const u = findEntity(users, assignedTLId) || findEntity(rawUsers, assignedTLId);
+        const e = findEntity(employees, assignedTLId);
+        if (u) assignedTeamLeadUserId = normalizeId(u);
+        else if (e) assignedTeamLeadEmployeeId = normalizeId(e);
+        else assignedTeamLeadUserId = assignedTLId;
+      }
       
       const assignedEmployee = users.find(user => 
         isSameId(user._id, assignedEmployeeId)
@@ -1538,6 +1714,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         taskTitle: (taskForm.taskTitle || "").trim(),
         taskDescription: taskForm.description || "",
         description: taskForm.description || "",
+        assignedTeamLead: assignedTLId || null,
         assignedTeamLeadUser: assignedTeamLeadUserId,
         assignedTeamLeadEmployee: assignedTeamLeadEmployeeId,
         assignedEmployee: assignedEmployeeId || null,
@@ -1548,16 +1725,18 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         priority: taskForm.priority || "medium",
         progress: Number(taskForm.progress) || 0,
         status: taskForm.status || "pending",
-        assignedEmployeeName: assignedEmployee ? getUserName(assignedEmployee) : "",
+        assignedEmployeeName: assignedEmployee ? getUserName(assignedEmployee) : (editingTask?.assignedEmployeeName || ""),
       };
 
       if (!payload.projectId) {
         showToast("Please select a project before saving a task.", "error");
+        setIsSubmittingTask(false);
         return;
       }
 
       if (!assignedTeamLeadUserId && !assignedTeamLeadEmployeeId && !payload.assignedEmployee) {
         showToast("Please assign this task to a team lead or an employee.", "error");
+        setIsSubmittingTask(false);
         return;
       }
 
@@ -1565,6 +1744,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         const allowedAssigneeIds = getAvailableTaskAssignees(taskProject, editingTask ? payload.assignedEmployee : null).map(normalizeId);
         if (!allowedAssigneeIds.includes(normalizeId(payload.assignedEmployee))) {
           showToast("Please assign this task to an employee assigned to the selected project.", "error");
+          setIsSubmittingTask(false);
           return;
         }
       }
@@ -1608,6 +1788,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     } catch (error) {
       console.error("Task save error:", error);
       showToast(`Task ${editingTask ? "update" : "creation"} failed: ` + (error?.response?.data?.message || error?.message || "Unknown error"), "error");
+    } finally {
+      setIsSubmittingTask(false);
     }
   };
 
@@ -1824,6 +2006,56 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     }
   };
 
+  const getProjectTeamLeadOptions = (project = selectedProject) => {
+    if (!project) return [];
+    const candidates = [
+      project.teamLeadUser,
+      project.teamLeadEmployee,
+      project.assignedTL,
+      project.teamLead,
+    ].filter(Boolean);
+
+    if (Array.isArray(project.teamLeads)) {
+      candidates.push(...project.teamLeads);
+    }
+
+    const uniqueTLs = [];
+    const seenIds = new Set();
+    const seenNames = new Set();
+
+    candidates.forEach((cand) => {
+      const id = normalizeId(cand);
+      if (!id) return;
+      const resolved =
+        findEntity(teamLeadOptions, cand) ||
+        findEntity(users, cand) ||
+        findEntity(employees, cand) ||
+        (typeof cand === "object" ? cand : null);
+
+      const name =
+        getTeamLeadNameById(cand) ||
+        (resolved ? extractName(resolved) || getUserName(resolved) : null) ||
+        getUserNameById(id) ||
+        "Team Lead";
+
+      if (!name || isUnknownEmployeeOrUser(name)) return;
+      const lowerName = name.trim().toLowerCase();
+
+      const candidateIds = getIdCandidates(cand);
+      if (candidateIds.some((cid) => seenIds.has(cid)) || seenNames.has(lowerName)) {
+        return;
+      }
+
+      candidateIds.forEach((cid) => seenIds.add(cid));
+      seenIds.add(id);
+      seenNames.add(lowerName);
+
+      uniqueTLs.push({ id, name });
+    });
+
+    return uniqueTLs;
+  };
+
   const getAvailableTaskAssignees = (project = selectedProject, extraAssigneeId = null) => {
     const projectEmployees = Array.isArray(project?.employees) ? [...project.employees] : [];
     if (extraAssigneeId) {
@@ -1833,38 +2065,171 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       }
     }
 
-    return projectEmployees
-      .map((employee) => {
-        const member =
-          findEntity(employees, employee) ||
-          findEntity(users, employee) ||
-          (typeof employee === "object" ? employee : null);
-        return member ? { ...member, role: "Employee" } : null;
-      })
-      .filter((employee, index, allEmployees) => {
-        if (!employee) return false;
-        const employeeId = normalizeId(employee);
-        return (
-          employeeId &&
-          allEmployees.findIndex((candidate) => normalizeId(candidate) === employeeId) === index
-        );
-      });
+    const resolved = [];
+    projectEmployees.forEach((employee) => {
+      const member =
+        findEntity(employees, employee) ||
+        findEntity(users, employee) ||
+        (typeof employee === "object" ? employee : null);
+
+      if (member) {
+        resolved.push({ ...member, role: "Employee" });
+      } else if (extraAssigneeId && isSameId(employee, extraAssigneeId)) {
+        const fallbackName =
+          editingTask?.assignedEmployeeName ||
+          (typeof editingTask?.assignedEmployee === "object" ? extractName(editingTask.assignedEmployee) : null) ||
+          (typeof editingTask?.assignedTo === "object" ? extractName(editingTask.assignedTo) : null) ||
+          getUserNameById(extraAssigneeId) ||
+          "Assigned Employee";
+        resolved.push({ _id: normalizeId(extraAssigneeId), name: fallbackName, role: "Employee" });
+      }
+    });
+
+    if (editingTask) {
+      const editEmpId = normalizeId(editingTask.assignedEmployee || editingTask.assignedTo);
+      if (editEmpId) {
+        const fallbackName =
+          editingTask.assignedEmployeeName ||
+          (typeof editingTask.assignedEmployee === "object" ? extractName(editingTask.assignedEmployee) : null) ||
+          (typeof editingTask.assignedTo === "object" ? extractName(editingTask.assignedTo) : null) ||
+          getUserNameById(editEmpId) ||
+          "Assigned Employee";
+        resolved.push({ _id: editEmpId, name: fallbackName, role: "Employee" });
+      }
+    }
+
+    // Strict deduplication by candidate IDs AND by user name
+    const seenCandidates = new Set();
+    const seenNames = new Set();
+    const uniqueList = [];
+
+    resolved.forEach((item) => {
+      if (!item) return;
+      const itemId = normalizeId(item);
+      const name = (getUserName(item) || extractName(item) || "").trim();
+      const lowerName = name.toLowerCase();
+      const candidates = getIdCandidates(item);
+
+      const hasDuplicateId = candidates.some((c) => seenCandidates.has(c));
+      const hasDuplicateName = lowerName && !isUnknownEmployeeOrUser(name) && seenNames.has(lowerName);
+
+      if (hasDuplicateId || hasDuplicateName) {
+        if (extraAssigneeId && (candidates.includes(String(extraAssigneeId)) || isSameId(item, extraAssigneeId))) {
+          const existing = uniqueList.find((u) => 
+            (lowerName && (getUserName(u) || extractName(u) || "").trim().toLowerCase() === lowerName) ||
+            getIdCandidates(u).some((cid) => candidates.includes(cid))
+          );
+          if (existing) {
+            existing._matchedAssigneeId = String(extraAssigneeId);
+          }
+        }
+        return; // Skip duplicate!
+      }
+
+      if (extraAssigneeId && (candidates.includes(String(extraAssigneeId)) || isSameId(item, extraAssigneeId))) {
+        item._matchedAssigneeId = String(extraAssigneeId);
+      }
+
+      candidates.forEach((c) => seenCandidates.add(c));
+      if (itemId) seenCandidates.add(itemId);
+      if (lowerName && !isUnknownEmployeeOrUser(name)) seenNames.add(lowerName);
+
+      uniqueList.push(item);
+    });
+
+    return uniqueList;
   };
 
   const getHrAndAdminUsers = () => {
-    return users.filter(user => {
-      const role = String(user.role || user.userRole || "").trim().toLowerCase();
-      return (
-        role === 'hr' || 
-        role === 'admin' || 
-        role === 'human resources' || 
-        role === 'team lead' || 
-        role === 'tl' || 
-        role === 'team_leader' || 
-        role === 'teamlead' || 
-        role.includes('lead')
-      );
+    const pool = [...rawUsers, ...users, ...employees];
+
+    try {
+      const storedUser = localStorage.getItem("user") || localStorage.getItem("auth_user");
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        if (parsed && typeof parsed === "object") {
+          pool.push(parsed);
+        }
+      }
+    } catch {}
+
+    const eligible = pool.filter((u) => {
+      if (!u) return false;
+      const role = String(u.role || u.userRole || u.roleType || "").trim().toLowerCase();
+      const desig = String(u.designation?.designationName || u.designation?.name || u.designation || "").trim().toLowerCase();
+      const name = String(u.name || u.fullName || u.userName || "").trim().toLowerCase();
+
+      const isAdmin =
+        role === "admin" ||
+        role === "administrator" ||
+        desig === "admin" ||
+        desig === "administrator" ||
+        name === "admin" ||
+        name === "administrator";
+      const isHR =
+        role === "hr" ||
+        role === "human resources" ||
+        desig.includes("hr") ||
+        desig.includes("human resources");
+      const isTL =
+        role === "team lead" ||
+        role === "tl" ||
+        role === "teamlead" ||
+        role === "team_leader" ||
+        role.includes("lead") ||
+        desig.includes("team lead");
+      const isManager =
+        role === "manager" ||
+        role === "project manager" ||
+        desig.includes("manager");
+
+      return isAdmin || isHR || isTL || isManager;
     });
+
+    const seenCandidates = new Set();
+    const seenNames = new Set();
+    const result = [];
+
+    eligible.forEach((u) => {
+      const id = normalizeId(u);
+      const name = (getUserName(u) || extractName(u) || "").trim();
+      const lowerName = name.toLowerCase();
+      const candidates = getIdCandidates(u);
+
+      if (candidates.some((c) => seenCandidates.has(c)) || (lowerName && seenNames.has(lowerName))) {
+        return;
+      }
+
+      candidates.forEach((c) => seenCandidates.add(c));
+      if (id) seenCandidates.add(id);
+      if (lowerName) seenNames.add(lowerName);
+
+      const rawRole = String(u.role || u.userRole || "").trim();
+      const cleanRole = /admin/i.test(rawRole) || /admin/i.test(name)
+        ? "Admin"
+        : /hr|human/i.test(rawRole)
+          ? "HR"
+          : /tl|lead/i.test(rawRole)
+            ? "Team Lead"
+            : rawRole || "Admin";
+
+      result.push({
+        _id: id,
+        name: name || "Admin",
+        role: cleanRole,
+        ...u,
+      });
+    });
+
+    if (!result.some((u) => /admin/i.test(u.role) || /admin/i.test(u.name))) {
+      result.unshift({
+        _id: "admin",
+        name: "Administrator",
+        role: "Admin",
+      });
+    }
+
+    return result;
   };
  
   const getStatusColor = (status) => {
@@ -2706,7 +3071,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           </>
         )}
 
-        {/* DAILY WORK REPORTS SECTION (API: https://kt-backend-ttzj.onrender.com/api/dailyUpdate/list) */}
+        {/* DAILY WORK REPORTS SECTION (API: DAILY_UPDATE_URL) */}
         {activeMainTab === 'daily-reports' && (
           <div className="space-y-6 animate-fade-in">
             {/* KPI Metrics Dashboard Cards */}
@@ -3414,15 +3779,13 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       const projectId = e.target.value;
                       const project = accessibleProjects.find(
                         (p) => isSameId(p._id || p.id, projectId)
-                      );
+                      ) || projects.find((p) => isSameId(p._id || p.id, projectId));
                       setSelectedProject(project || null);
                       updateProjectTeamMembers(project);
                       setTaskForm((prev) => ({
                         ...prev,
-                        projectId: project?._id || projectId || "",
-                        assignedTeamLead: normalizeId(
-                          project?.teamLeadUser || project?.teamLeadEmployee
-                        ),
+                        projectId: project?._id || project?.id || projectId || "",
+                        assignedTeamLead: "",
                         assignedTo: "",
                         assignedEmployee: "",
                       }));
@@ -3432,10 +3795,15 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   >
                     <option value="">Select Project</option>
                     {accessibleProjects.map((project) => (
-                      <option key={project._id} value={project._id}>
-                        {project.projectName}
+                      <option key={project._id || project.id} value={project._id || project.id}>
+                        {project.projectName || project.name}
                       </option>
                     ))}
+                    {taskForm.projectId && !accessibleProjects.some((p) => isSameId(p._id || p.id, taskForm.projectId)) && (
+                      <option value={taskForm.projectId}>
+                        {selectedProject?.projectName || (typeof editingTask?.projectId === "object" ? editingTask.projectId?.projectName : null) || "Assigned Project"}
+                      </option>
+                    )}
                   </select>
                 </div>
 
@@ -3473,14 +3841,26 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Assign Team Lead</label>
                   <select
                     name="assignedTeamLead"
-                    value={taskForm.assignedTeamLead}
+                    value={taskForm.assignedTeamLead || ""}
                     onChange={handleTaskChange}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="">No Team Lead</option>
-                    {selectedProject && (selectedProject.teamLeadUser || selectedProject.teamLeadEmployee) && (
-                      <option value={normalizeId(selectedProject.teamLeadUser || selectedProject.teamLeadEmployee)}>
-                        {getTeamLeadNameById(selectedProject.teamLeadUser || selectedProject.teamLeadEmployee)}
+                    <option value="">
+                      {!taskForm.projectId
+                        ? "Select a project first"
+                        : getProjectTeamLeadOptions(selectedProject).length === 0
+                          ? "No Team Lead assigned to this project"
+                          : "Select Team Lead"}
+                    </option>
+                    {getProjectTeamLeadOptions(selectedProject).map((tl) => (
+                      <option key={tl.id} value={tl.id}>
+                        {tl.name}
+                      </option>
+                    ))}
+                    {taskForm.assignedTeamLead && 
+                      !getProjectTeamLeadOptions(selectedProject).some((tl) => isSameId(tl.id, taskForm.assignedTeamLead)) && (
+                      <option value={taskForm.assignedTeamLead}>
+                        {getTeamLeadNameById(taskForm.assignedTeamLead) || "Assigned Team Lead"}
                       </option>
                     )}
                   </select>
@@ -3490,7 +3870,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Assign Employee</label>
                   <select
                     name="assignedEmployee"
-                    value={taskForm.assignedEmployee}
+                    value={taskForm.assignedEmployee || ""}
                     onChange={handleTaskChange}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
@@ -3501,11 +3881,36 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                           ? "No employees assigned to this project"
                           : "Select Employee"}
                     </option>
-                    {getAvailableTaskAssignees(selectedProject, taskForm.assignedEmployee).map((member) => (
-                      <option key={normalizeId(member)} value={normalizeId(member)}>
-                        {getUserName(member)}
-                      </option>
-                    ))}
+                    {getAvailableTaskAssignees(selectedProject, taskForm.assignedEmployee).map((member) => {
+                      const memberId = normalizeId(member);
+                      const isMatch =
+                        taskForm.assignedEmployee &&
+                        (member._matchedAssigneeId === String(taskForm.assignedEmployee) ||
+                          isSameId(member, taskForm.assignedEmployee) ||
+                          getIdCandidates(member).includes(String(taskForm.assignedEmployee)));
+                      const optValue = isMatch ? taskForm.assignedEmployee : memberId;
+                      return (
+                        <option key={optValue} value={optValue}>
+                          {getUserName(member)}
+                        </option>
+                      );
+                    })}
+                    {taskForm.assignedEmployee &&
+                      !getAvailableTaskAssignees(selectedProject, taskForm.assignedEmployee).some(
+                        (m) =>
+                          m._matchedAssigneeId === String(taskForm.assignedEmployee) ||
+                          isSameId(m, taskForm.assignedEmployee) ||
+                          getIdCandidates(m).includes(String(taskForm.assignedEmployee))
+                      ) && (
+                        <option value={taskForm.assignedEmployee}>
+                          {editingTask?.assignedEmployeeName ||
+                            (typeof editingTask?.assignedEmployee === "object"
+                              ? extractName(editingTask.assignedEmployee)
+                              : null) ||
+                            getUserNameById(taskForm.assignedEmployee) ||
+                            "Assigned Employee"}
+                        </option>
+                      )}
                   </select>
                 </div>
 
@@ -3513,17 +3918,22 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By (Admin / HR / TL)</label>
                   <select
                     name="assignedBy"
-                    value={taskForm.assignedBy}
+                    value={taskForm.assignedBy || ""}
                     onChange={handleTaskChange}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select Assigner</option>
                     {getHrAndAdminUsers().map((user) => (
-                      <option key={user._id} value={user._id}>
-                        {getUserName(user)} ({user.role || "Admin/HR/TL"})
+                      <option key={normalizeId(user) || user._id || user.id} value={normalizeId(user) || user._id || user.id}>
+                        {getUserName(user)} ({user.role || "Admin"})
                       </option>
                     ))}
-                    {getHrAndAdminUsers().length === 0 && (
+                    {taskForm.assignedBy && !getHrAndAdminUsers().some((u) => isSameId(u, taskForm.assignedBy)) && (
+                      <option value={taskForm.assignedBy}>
+                        {getUserNameById(taskForm.assignedBy) || "Assigned By"}
+                      </option>
+                    )}
+                    {getHrAndAdminUsers().length === 0 && !taskForm.assignedBy && (
                       <option value="">No Admin/HR/TL users available</option>
                     )}
                   </select>
@@ -3540,7 +3950,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     <input
                       type="date"
                       name="startDate"
-                      value={taskForm.startDate}
+                      value={taskForm.startDate || ""}
                       onChange={handleTaskChange}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
@@ -3550,7 +3960,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     <input
                       type="date"
                       name="dueDate"
-                      value={taskForm.dueDate}
+                      value={taskForm.dueDate || ""}
                       onChange={handleTaskChange}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
@@ -3608,17 +4018,24 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
               <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 sm:px-7 flex flex-col-reverse sm:flex-row gap-3">
                 <button
                   type="button"
+                  disabled={isSubmittingTask}
                   onClick={closeTaskModal}
-                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer"
+                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:flex-1 rounded-lg text-white py-3 font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer"
+                  disabled={isSubmittingTask}
+                  className="w-full sm:flex-1 rounded-lg text-white py-3 font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
                 >
-                  {editingTask ? "Update Task" : "Create Task"}
+                  {isSubmittingTask && <Loader2 className="w-5 h-5 animate-spin" />}
+                  <span>
+                    {isSubmittingTask
+                      ? (editingTask ? "Updating Task..." : "Creating Task...")
+                      : (editingTask ? "Update Task" : "Create Task")}
+                  </span>
                 </button>
               </div>
             </form>

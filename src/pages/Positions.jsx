@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useConfirm } from "../components/common/ConfirmDialog";
 import { showToast } from "../components/common/Toast";
+import { BASE_URL } from "../api/config";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
@@ -56,7 +57,7 @@ export default function Positions() {
   const fetchPositions = async () => {
     try {
       setLoading(true);
-      const res = await fetch("https://kt-backend-ttzj.onrender.com/api/position", {
+      const res = await fetch(`${BASE_URL}/api/position`, {
         headers: getAuthHeaders()
       });
       const data = await res.json();
@@ -84,8 +85,8 @@ export default function Positions() {
 
     try {
       const url = editId
-        ? `https://kt-backend-ttzj.onrender.com/api/position/${editId}`
-        : `https://kt-backend-ttzj.onrender.com/api/position/add`;
+        ? `${BASE_URL}/api/position/${editId}`
+        : `${BASE_URL}/api/position/add`;
 
       const method = editId ? "PUT" : "POST";
 
@@ -153,7 +154,7 @@ export default function Positions() {
     });
     if (confirmed) {
       try {
-        const response = await fetch(`https://kt-backend-ttzj.onrender.com/api/position/${id}`, {
+        const response = await fetch(`${BASE_URL}/api/position/${id}`, {
           method: "DELETE",
           headers: getAuthHeaders(),
         });

@@ -5,7 +5,7 @@ import {
   Umbrella, LogIn, Coffee, ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, fetchLiveUserProfile } from '../../context/AppContext.jsx';
-import api from '../../api/axios.js';
+import api, { BASE_URL } from '../../api/axios.js';
 import { showToast } from '../common/Toast.jsx';
 import {
   computeNineHourTimeline,
@@ -318,7 +318,7 @@ export const DashboardView = () => {
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
       return trimmed;
     }
-    const base = 'https://kt-backend-ttzj.onrender.com';
+    const base = BASE_URL;
     return trimmed.startsWith('/') ? `${base}${trimmed}` : `${base}/${trimmed}`;
   };
 

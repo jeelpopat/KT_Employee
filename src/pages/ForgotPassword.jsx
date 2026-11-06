@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Mail, CheckCircle2, AlertCircle, KeyRound } from "lucide-react";
 import Button from "../components/common/Button";
 import Input from "../components/common/Input";
+import { BASE_URL } from "../api/config";
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -21,7 +22,7 @@ function ForgotPassword() {
         process.env.REACT_APP_API_BASE_URL ||
         (window.location.hostname === "localhost"
           ? "http://localhost:5000"
-          : "https://kt-backend-ttzj.onrender.com");
+          : BASE_URL);
 
       const response = await fetch(`${API_BASE}/api/users/forgot-password`, {
         method: "POST",

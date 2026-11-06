@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
 import { performAutoCheckout, clearAuth, isTokenExpired, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
+import { BASE_URL } from './api/config.js';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
@@ -413,7 +414,7 @@ export default function App() {
     try {
       await performAutoCheckout(token);
       if (token) {
-        await fetch('https://kt-backend-ttzj.onrender.com/api/users/logout', {
+        await fetch(`${BASE_URL}/api/users/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

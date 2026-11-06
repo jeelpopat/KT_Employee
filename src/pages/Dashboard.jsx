@@ -17,6 +17,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import api from "../api/axios";
+import { BASE_URL } from "../api/config";
 import { useConfirm } from "../components/common/ConfirmDialog";
 import { showToast } from "../components/common/Toast";
 import {
@@ -166,7 +167,7 @@ export default function Dashboard() {
   async function fetchUsers() {
     try {
       // Fetch employees from employee/list API
-      const employeeResponse = await fetch("https://kt-backend-ttzj.onrender.com/api/employee/list");
+      const employeeResponse = await fetch(`${BASE_URL}/api/employee/list`);
       const employeeData = await employeeResponse.json();
 
       let employees = [];
@@ -184,7 +185,7 @@ export default function Dashboard() {
       const employeeCount = filteredEmployees.length;
 
       // Fetch users for birthdays
-      const usersResponse = await fetch("https://kt-backend-ttzj.onrender.com/api/users/all");
+      const usersResponse = await fetch(`${BASE_URL}/api/users/all`);
       const usersData = await usersResponse.json();
       const users = usersData.users || usersData.data || [];
       const filteredUsers = filterOutUnknownUsers(filterOutFinanceUsers(users));
@@ -223,19 +224,19 @@ export default function Dashboard() {
       let userList = [];
       let employeeList = [];
       try {
-        const res = await fetch("https://kt-backend-ttzj.onrender.com/api/users/all", { headers });
+        const res = await fetch(`${BASE_URL}/api/users/all`, { headers });
         const d = await res.json();
         const list = d.users || d.data?.users || d.data?.employees || d.data || d.employees || d;
         userList = Array.isArray(list) ? list : [];
       } catch (e1) {
         try {
-          const res = await fetch("https://kt-backend-ttzj.onrender.com/api/user/all", { headers });
+          const res = await fetch(`${BASE_URL}/api/user/all`, { headers });
           const d = await res.json();
           const list = d.users || d.data?.users || d.data?.employees || d.data || d.employees || d;
           userList = Array.isArray(list) ? list : [];
         } catch (e2) {
           try {
-            const res = await fetch("https://kt-backend-ttzj.onrender.com/api/users/all");
+            const res = await fetch(`${BASE_URL}/api/users/all`);
             const d = await res.json();
             const list = d.users || d.data?.users || d.data?.employees || d.data || d.employees || d;
             userList = Array.isArray(list) ? list : [];
@@ -246,7 +247,7 @@ export default function Dashboard() {
       }
 
       try {
-        const res = await fetch("https://kt-backend-ttzj.onrender.com/api/employee/list", { headers });
+        const res = await fetch(`${BASE_URL}/api/employee/list`, { headers });
         if (res.ok) {
           const data = await res.json();
           const list = data.employees || data.data?.employees || data.employeesList ||
@@ -300,7 +301,7 @@ export default function Dashboard() {
       // If users API had 0 team leads, fallback to teamLead/team
       if (finalCount === 0) {
         try {
-          const response = await fetch("https://kt-backend-ttzj.onrender.com/api/teamLead/team", {
+          const response = await fetch(`${BASE_URL}/api/teamLead/team`, {
             headers,
           });
           const data = await response.json();
@@ -330,7 +331,7 @@ export default function Dashboard() {
         projectList = res.data?.data || res.data?.projects || (Array.isArray(res.data) ? res.data : []);
       } catch (e1) {
         try {
-          const res = await fetch("https://kt-backend-ttzj.onrender.com/api/projectManage/project/all", { headers });
+          const res = await fetch(`${BASE_URL}/api/projectManage/project/all`, { headers });
           const d = await res.json();
           projectList = d?.data || d?.projects || (Array.isArray(d) ? d : []);
         } catch (e2) {
@@ -351,7 +352,7 @@ export default function Dashboard() {
   async function fetchLeaves() {
     try {
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
-      const response = await fetch("https://kt-backend-ttzj.onrender.com/api/leave/all", {
+      const response = await fetch(`${BASE_URL}/api/leave/all`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
@@ -371,7 +372,7 @@ export default function Dashboard() {
   async function fetchHolidays() {
     try {
       const response = await fetch(
-        "https://kt-backend-ttzj.onrender.com/api/holiday/current-month"
+        `${BASE_URL}/api/holiday/current-month`
       );
 
       if (!response.ok) {
@@ -518,7 +519,7 @@ export default function Dashboard() {
 
       // Fetch absent records from the dedicated API
       const absentResponse = await fetch(
-        `https://kt-backend-ttzj.onrender.com/api/attendance/absent/all?_t=${Date.now()}`,
+        `${BASE_URL}/api/attendance/absent/all?_t=${Date.now()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -555,7 +556,7 @@ export default function Dashboard() {
       setAbsentRecords(normalizedAbsent);
 
       // Fetch present records (with cache-busting)
-      const attendanceResponse = await fetch(`https://kt-backend-ttzj.onrender.com/api/attendance/admin/all?_t=${Date.now()}`, {
+      const attendanceResponse = await fetch(`${BASE_URL}/api/attendance/admin/all?_t=${Date.now()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -585,7 +586,7 @@ export default function Dashboard() {
 
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch("https://kt-backend-ttzj.onrender.com/api/attendance/admin/all", {
+        const response = await fetch(`${BASE_URL}/api/attendance/admin/all`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();
@@ -626,7 +627,7 @@ export default function Dashboard() {
   const updateLeaveStatus = async (leaveId, status, remark = "") => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("https://kt-backend-ttzj.onrender.com/api/leave/admin/approve", {
+      const response = await fetch(`${BASE_URL}/api/leave/admin/approve`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
