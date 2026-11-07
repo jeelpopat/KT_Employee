@@ -125,18 +125,50 @@ const getEmployeeDocumentRecords = (responseData) => {
       fileName: record?.fileName || record?.name || file.fileName || '',
       fileType: record?.fileType || record?.mimeType || file.fileType || file.mimeType || '',
       docNumber: record?.docNumber || record?.documentNumber || record?.number || '',
-      uploadedAt: record?.uploadedAt || record?.createdAt || ''
+      uploadedAt: record?.updatedAt || record?.createdAt || record?.uploadedAt || ''
     };
   }).filter((record) => record.kind && (record.fileUrl || record.docNumber));
 };
 
+const getDocumentTimestamp = (document) => {
+  const timestamp = Date.parse(
+    document?.remoteUpdatedAt || document?.updatedAt || document?.createdAt || document?.uploadedAt || ''
+  );
+  if (!Number.isNaN(timestamp)) return timestamp;
+
+  const objectId = String(document?._id || document?.remoteId || '');
+  return /^[0-9a-f]{24}$/i.test(objectId) ? Number.parseInt(objectId.slice(0, 8), 16) * 1000 : 0;
+};
+
+const getLatestEmployeeDocumentsByKind = (employeeDocuments) => employeeDocuments.reduce((latestByKind, document) => {
+  const kind = document.kind || getEmployeeDocumentKind(document);
+  if (!kind) return latestByKind;
+
+  const previous = latestByKind.get(kind);
+  const documentTimestamp = getDocumentTimestamp(document);
+  const previousTimestamp = getDocumentTimestamp(previous);
+  if (
+    !previous ||
+    (documentTimestamp && documentTimestamp >= previousTimestamp)
+  ) {
+    latestByKind.set(kind, document);
+  }
+  return latestByKind;
+}, new Map());
+
 const mergeEmployeeDocuments = (currentDocuments, responseData) => {
-  const remoteDocuments = getEmployeeDocumentRecords(responseData);
+  const remoteDocuments = [...getLatestEmployeeDocumentsByKind(getEmployeeDocumentRecords(responseData)).values()];
   if (remoteDocuments.length === 0) return currentDocuments;
 
   return currentDocuments.map((document) => {
     const remoteDocument = remoteDocuments.find((item) => item.kind === document.id);
     if (!remoteDocument) return document;
+    if (
+      getDocumentTimestamp(remoteDocument) &&
+      getDocumentTimestamp(document) > getDocumentTimestamp(remoteDocument)
+    ) {
+      return document;
+    }
 
     return {
       ...document,
@@ -147,7 +179,8 @@ const mergeEmployeeDocuments = (currentDocuments, responseData) => {
       status: remoteDocument.fileUrl ? 'uploaded' : document.status,
       uploadedAt: remoteDocument.uploadedAt
         ? new Date(remoteDocument.uploadedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-        : document.uploadedAt
+        : document.uploadedAt,
+      remoteUpdatedAt: remoteDocument.uploadedAt || document.remoteUpdatedAt
     };
   });
 };
@@ -497,7 +530,7 @@ export const ProfileView = () => {
 
       // 3. Attempt to fetch remote documents from backend /api/document
       try {
-        const backendRes = await api.get('/api/document');
+        const backendRes = await api.get('/api/document', { skipCache: true });
         const remoteList = backendRes.data?.data || backendRes.data;
         if (Array.isArray(remoteList) && remoteList.length > 0) {
           const rawId = resolveEmployeeId();
@@ -516,11 +549,13 @@ export const ProfileView = () => {
             const up = String(d.uploadedBy || '');
             return candidateIds.includes(ref) || candidateIds.includes(up);
           });
+          const latestCoreDocuments = getLatestEmployeeDocumentsByKind(relevantRemote);
 
           if (relevantRemote.length > 0) {
             relevantRemote.forEach(remoteDoc => {
               const title = String(remoteDoc.title || remoteDoc.documentName || remoteDoc.name || '');
               const documentKind = getEmployeeDocumentKind(remoteDoc);
+              if (documentKind && latestCoreDocuments.get(documentKind) !== remoteDoc) return;
               const matchedCore = documentKind
                 ? initialDocs.find(d => d.isCore && d.id === documentKind)
                 : initialDocs.find(d =>
@@ -528,6 +563,8 @@ export const ProfileView = () => {
                     d.id.toLowerCase() === title.toLowerCase().replace(/\s+/g, '_')
                   );
               if (matchedCore) {
+                const remoteTimestamp = getDocumentTimestamp(remoteDoc);
+                if (remoteTimestamp && getDocumentTimestamp(matchedCore) > remoteTimestamp) return;
                 matchedCore.fileUrl = remoteDoc.fileUrl || matchedCore.fileUrl;
                 matchedCore.fileName = remoteDoc.fileName || matchedCore.fileName;
                 matchedCore.fileType = remoteDoc.fileType || matchedCore.fileType;
@@ -536,6 +573,7 @@ export const ProfileView = () => {
                 }
                 matchedCore.status = 'uploaded';
                 matchedCore.remoteId = remoteDoc._id;
+                matchedCore.remoteUpdatedAt = remoteDoc.updatedAt || remoteDoc.createdAt || remoteDoc.uploadedAt || matchedCore.remoteUpdatedAt;
                 if (remoteDoc.createdAt) {
                   try {
                     matchedCore.uploadedAt = new Date(remoteDoc.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -626,7 +664,7 @@ export const ProfileView = () => {
       }
 
       try {
-        const backendRes = await api.get('/api/document');
+        const backendRes = await api.get('/api/document', { skipCache: true });
         syncedFromServer = true;
         const remoteList = backendRes.data?.data || backendRes.data;
         if (Array.isArray(remoteList)) {
@@ -646,10 +684,12 @@ export const ProfileView = () => {
             const up = String(d.uploadedBy || '');
             return candidateIds.includes(ref) || candidateIds.includes(up);
           });
+          const latestCoreDocuments = getLatestEmployeeDocumentsByKind(relevantRemote);
 
           relevantRemote.forEach(remoteDoc => {
             const title = String(remoteDoc.title || remoteDoc.documentName || remoteDoc.name || '');
             const documentKind = getEmployeeDocumentKind(remoteDoc);
+            if (documentKind && latestCoreDocuments.get(documentKind) !== remoteDoc) return;
             const matchedCore = documentKind
               ? updated.find(d => d.isCore && d.id === documentKind)
               : updated.find(d =>
@@ -657,12 +697,15 @@ export const ProfileView = () => {
                   d.id.toLowerCase() === title.toLowerCase().replace(/\s+/g, '_')
                 );
             if (matchedCore) {
+              const remoteTimestamp = getDocumentTimestamp(remoteDoc);
+              if (remoteTimestamp && getDocumentTimestamp(matchedCore) > remoteTimestamp) return;
               matchedCore.fileUrl = remoteDoc.fileUrl || matchedCore.fileUrl;
               matchedCore.fileName = remoteDoc.fileName || matchedCore.fileName;
               matchedCore.fileType = remoteDoc.fileType || matchedCore.fileType;
               if (remoteDoc.description) matchedCore.docNumber = remoteDoc.description;
               matchedCore.status = 'uploaded';
               matchedCore.remoteId = remoteDoc._id;
+              matchedCore.remoteUpdatedAt = remoteDoc.updatedAt || remoteDoc.createdAt || remoteDoc.uploadedAt || matchedCore.remoteUpdatedAt;
               if (remoteDoc.createdAt) {
                 try {
                   matchedCore.uploadedAt = new Date(remoteDoc.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
