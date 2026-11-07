@@ -27,7 +27,8 @@ import {
   Search,
   Filter,
   Sparkles,
-  Layers
+  Layers,
+  Box
 } from "lucide-react";
 import { useConfirm } from "../../components/common/ConfirmDialog";
 import { showToast } from "../../components/common/Toast";
@@ -2388,188 +2389,225 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   ).length;
   const overallProgress = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
 
+  const formatProjectDate = (dVal) => {
+    if (!dVal) return "";
+    try {
+      const d = new Date(dVal);
+      if (isNaN(d.getTime())) return String(dVal);
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return "";
+    }
+  };
+
+  const formatReportDateTime = (dVal) => {
+    if (!dVal) return { dateStr: "N/A", timeStr: "" };
+    try {
+      const d = new Date(dVal);
+      if (isNaN(d.getTime())) return { dateStr: String(dVal), timeStr: "" };
+      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }).toLowerCase();
+      return { dateStr, timeStr };
+    } catch {
+      return { dateStr: "N/A", timeStr: "" };
+    }
+  };
+
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full space-y-5 font-poppins">
       {confirmationDialog}
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-            <ListTodo size={18} />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Task Management
-            </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-              Organize projects, assign tasks to members, and track daily progress
-            </p>
-          </div>
-        </div>
-      </div>
-        
-        {/* Top Action & Navigation Tabs Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mt-1 sm:-mt-2 mb-1">
-          {/* Main Tab Switcher */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-xl w-fit">
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('projects')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeMainTab === 'projects'
-                  ? 'bg-white text-blue-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-              <span>Projects & Tasks</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
-                {totalProjectsCount}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('daily-reports')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeMainTab === 'daily-reports'
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Daily Work Reports</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-bold">
-                {accessibleDailyReports.length}
-              </span>
-            </button>
-          </div>
-
-          {activeMainTab === 'projects' ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedProject(null);
-                setProjectForm({
-                  ...defaultProjectForm,
-                  assignedTL: isTL ? normalizeId(user) : "",
-                });
-                setShowProjectModal(true);
-              }}
-              className="btn-brand-primary text-white px-4 py-2 sm:px-5 sm:py-2 rounded-lg shadow-xs transition-all flex items-center justify-center gap-2 font-semibold text-xs cursor-pointer"
-              style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
-            >
-              <Plus className="w-4 h-4" />
-              New Project
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={fetchAllDailyReports}
-              disabled={isDailyReportsLoading}
-              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all text-xs font-semibold flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-[#0088cc] ${isDailyReportsLoading ? 'animate-spin' : ''}`} />
-              <span>Refresh Reports</span>
-            </button>
-          )}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            Task Management
+          </h1>
+          <p className="mt-1 text-xs sm:text-sm text-slate-500">
+            Organize projects, assign tasks to members and track daily progress
+          </p>
         </div>
 
         {activeMainTab === 'projects' && (
-          <>
-            {/* KPI Metrics Dashboard Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-              {[
-                { label: "TOTAL PROJECTS", value: totalProjectsCount },
-                { label: "TOTAL TASKS", value: totalTasksCount },
-                { label: "IN PROGRESS", value: inProgressTasksCount },
-                { label: "COMPLETED", value: completedTasksCount }
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 sm:p-5 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-7 rounded-full bg-[#004b73]" />
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
-                </div>
-              ))}
-            </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedProject(null);
+              setProjectForm({
+                ...defaultProjectForm,
+                assignedTL: isTL ? normalizeId(user) : "",
+              });
+              setShowProjectModal(true);
+            }}
+            className="text-white px-5 py-2.5 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 font-semibold text-xs sm:text-sm cursor-pointer hover:opacity-95 shrink-0 self-start sm:self-auto"
+            style={{ background: 'linear-gradient(100.88deg, #034665 -11.43%, #068DCB 85.83%)' }}
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Project</span>
+          </button>
+        )}
+      </div>
 
-        {/* Search and Filters Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by project name, client, TL, or task title..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-9 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800 placeholder-slate-400"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* Status Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
-              >
-                <option value="all">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="testing">Testing</option>
-                <option value="review">Review</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-
-            {/* Priority Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Priority:</span>
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
-              >
-                <option value="all">All</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-
-            {(searchQuery || statusFilter !== "all" || priorityFilter !== "all") && (
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setStatusFilter("all");
-                  setPriorityFilter("all");
-                }}
-                className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline px-2 py-1"
-              >
-                Reset
-              </button>
-            )}
-          </div>
+      {/* Tabs Navigation */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('projects')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeMainTab === 'projects'
+                ? 'text-white shadow-sm'
+                : 'bg-white text-slate-700 border border-slate-200 hover:text-slate-900'
+            }`}
+            style={
+              activeMainTab === 'projects'
+                ? { background: 'linear-gradient(100.88deg, #034665 -11.43%, #068DCB 85.83%)' }
+                : undefined
+            }
+          >
+            Project & Tasks ({totalProjectsCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('daily-reports')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeMainTab === 'daily-reports'
+                ? 'text-white shadow-sm'
+                : 'bg-white text-slate-700 border border-slate-200 hover:text-slate-900'
+            }`}
+            style={
+              activeMainTab === 'daily-reports'
+                ? { background: 'linear-gradient(100.88deg, #034665 -11.43%, #068DCB 85.83%)' }
+                : undefined
+            }
+          >
+            Daily Work Reports ({accessibleDailyReports.length})
+          </button>
         </div>
 
-        {/* Project List */}
+        {activeMainTab === 'daily-reports' && (
+          <button
+            type="button"
+            onClick={fetchAllDailyReports}
+            disabled={isDailyReportsLoading}
+            className="px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isDailyReportsLoading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
+        )}
+      </div>
+
+      {activeMainTab === 'projects' && (
+        <>
+          {/* KPI Metrics Dashboard Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
+            {[
+              { label: "Total Projects", value: totalProjectsCount },
+              { label: "Team Tasks", value: totalTasksCount },
+              { label: "In Progress", value: inProgressTasksCount },
+              { label: "Completed", value: completedTasksCount }
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="relative flex items-center h-[60px] w-full"
+              >
+                {/* Left card for the border: width: 16; height: 60; border-top-left-radius: 10px; border-bottom-left-radius: 10px; */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+                  style={{ background: "#034665", opacity: 1 }}
+                />
+                {/* Inner card: height: 60; border-radius: 10px; border-width: 0.2px; */}
+                <div
+                  className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+                  style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+                >
+                  <p className="text-[12px] sm:text-[13px] font-medium text-[#718096] font-poppins select-none">
+                    {item.label}
+                  </p>
+                  <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                    {item.value}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Search and Filters Bar */}
+          <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by employee name, email or department..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-9 py-2 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#034665] focus:border-[#034665]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {/* Status Filter */}
+              <div className="flex items-center bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-transparent text-xs sm:text-sm font-medium text-slate-700 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="testing">Testing</option>
+                  <option value="review">Review</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              {/* Priority Filter */}
+              <div className="flex items-center bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+                <span className="text-xs sm:text-sm font-medium text-slate-500 mr-1">Priority:</span>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="bg-transparent text-xs sm:text-sm font-medium text-slate-700 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">All</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+
+              {(searchQuery || statusFilter !== "all" || priorityFilter !== "all") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("all");
+                    setPriorityFilter("all");
+                  }}
+                  className="text-xs font-medium text-[#034665] hover:underline px-2 py-1 cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Project List */}
         {loading ? (
           <LoadingScreen message="Loading projects and tasks..." />
         ) : (
@@ -2600,11 +2638,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 return (
                   <div
                     key={project._id}
-                    className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.07)] hover:border-slate-300/80 transition-all duration-200 overflow-hidden"
+                    className="bg-white rounded-xl border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all duration-200 overflow-hidden"
                   >
                     {/* Project Header Card */}
                     <div
-                      className="p-5 sm:p-6 cursor-pointer hover:bg-slate-50/60 transition-colors duration-150 select-none"
+                      className="p-4 sm:p-5 cursor-pointer hover:bg-slate-50/50 transition-colors select-none"
                       onClick={() => toggleProject(project._id)}
                     >
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -2614,7 +2652,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                           <div className="flex items-center gap-3 flex-wrap">
                             <button
                               type="button"
-                              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors flex-shrink-0"
+                              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors shrink-0"
                             >
                               {isExpanded ? (
                                 <ChevronDown className="w-4 h-4 transition-transform duration-200" />
@@ -2623,30 +2661,25 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                               )}
                             </button>
 
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-50 to-indigo-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">
-                              {(project.projectName || "P").charAt(0).toUpperCase()}
+                            <div className="w-8 h-8 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center text-[#034665] font-bold text-xs shrink-0">
+                              <Box className="w-4 h-4 text-[#034665]" />
                             </div>
 
-                            <h3 className="text-lg sm:text-xl font-bold text-slate-800 truncate">
+                            <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
                               {project.projectName}
                             </h3>
 
-                            {/* Status Badge with Dot */}
+                            {/* Status Badge */}
                             <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(
-                                project.status
-                              )}`}
+                              className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize"
                             >
-                              <span className={`w-1.5 h-1.5 rounded-full ${getStatusDotColor(project.status)}`} />
-                              {project.status || "pending"}
+                              {project.status || "Pending"}
                             </span>
 
                             {/* Priority Badge */}
                             {project.priority && (
                               <span
-                                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border uppercase tracking-wider ${getPriorityColor(
-                                  project.priority
-                                )}`}
+                                className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 capitalize"
                               >
                                 {project.priority}
                               </span>
@@ -2654,56 +2687,39 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                           </div>
 
                           {/* Metadata Row */}
-                          <div className="mt-3 sm:ml-10 flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-slate-600">
+                          <div className="mt-2.5 sm:ml-10 flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500">
                             {project.clientName && (
-                              <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200/70 px-2.5 py-1 rounded-lg">
-                                <User className="w-3.5 h-3.5 text-slate-500" />
-                                <span className="text-slate-500">Client:</span>
-                                <span className="font-semibold text-slate-800">{project.clientName}</span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <User className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Client: <strong className="text-slate-700 font-semibold">{project.clientName}</strong></span>
                               </span>
                             )}
 
                             {getProjectTeamLeadName(project) && (
-                              <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200/70 px-2.5 py-1 rounded-lg">
-                                <Users className="w-3.5 h-3.5 text-blue-500" />
-                                <span className="text-slate-500">TL:</span>
-                                <span className="font-semibold text-slate-800">{getProjectTeamLeadName(project)}</span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <Users className="w-3.5 h-3.5 text-slate-400" />
+                                <span>TL: <strong className="text-slate-700 font-semibold">{getProjectTeamLeadName(project)}</strong></span>
                               </span>
                             )}
 
                             {project.projectBudget && (
-                              <span className="inline-flex items-center bg-emerald-50 border border-emerald-200/80 text-emerald-700 px-2.5 py-1 rounded-lg font-semibold text-xs">
-                                Budget: Rs. {project.projectBudget}
+                              <span className="inline-flex items-center gap-1">
+                                <span>Budget: <strong className="text-slate-700 font-semibold">₹{project.projectBudget}</strong></span>
                               </span>
                             )}
 
-                            {project.startDate && (
-                              <span className="inline-flex items-center gap-1 text-slate-500 text-xs">
-                                <Calendar className="w-3.5 h-3.5" />
-                                {new Date(project.startDate).toLocaleDateString()}
+                            {(project.startDate || project.createdAt) && (
+                              <span className="inline-flex items-center gap-1 text-slate-500">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{formatProjectDate(project.startDate || project.createdAt)}</span>
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Right: Progress & Action Buttons */}
-                        <div className="flex items-center gap-3 sm:gap-4 flex-wrap sm:flex-nowrap justify-between lg:justify-end sm:ml-10 lg:ml-0">
+                        {/* Right: Actions and Progress */}
+                        <div className="flex flex-col items-end gap-2 shrink-0 sm:ml-10 lg:ml-0">
                           
-                          {/* Mini Progress Widget */}
-                          <div className="flex flex-col items-end min-w-[120px]">
-                            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-                              <ListTodo className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{completedCount} / {projectTasks.length} Tasks</span>
-                              <span className="font-bold text-slate-800">({projectPercent}%)</span>
-                            </div>
-                            <div className="w-28 sm:w-32 bg-slate-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
-                              <div
-                                className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(projectPercent)}`}
-                                style={{ width: `${projectPercent}%` }}
-                              />
-                            </div>
-                          </div>
-
                           {/* Quick Action Buttons */}
                           <div className="flex items-center gap-2">
                             <button
@@ -2712,10 +2728,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                 e.stopPropagation();
                                 openAddTask(project._id);
                               }}
-                              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 rounded-xl transition-all text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                              className="px-3.5 py-1.5 text-white rounded-lg transition-all text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer hover:opacity-95"
+                              style={{ background: 'linear-gradient(100.88deg, #034665 -11.43%, #068DCB 85.83%)' }}
                             >
                               <Plus className="w-3.5 h-3.5" />
-                              Task
+                              <span>Task</span>
                             </button>
 
                             <button
@@ -2724,10 +2741,10 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                 e.stopPropagation();
                                 openEditProject(project);
                               }}
-                              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl transition-all text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+                              title="Edit Project"
                             >
-                              <Edit2 className="w-3.5 h-3.5 text-slate-500" />
-                              Edit
+                              <Edit2 className="w-4 h-4" />
                             </button>
 
                             <button
@@ -2736,13 +2753,29 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                 e.stopPropagation();
                                 handleDeleteProject(project._id);
                               }}
-                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl transition-all text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
                               title="Delete Project"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                              Delete
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
+
+                          {/* Progress Bar & Counter */}
+                          <div className="flex flex-col items-end w-36 sm:w-44">
+                            <div className="text-[11px] text-slate-500 font-medium">
+                              {completedCount} / {projectTasks.length} Tasks ({projectPercent}%)
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
+                              <div
+                                className="h-1.5 rounded-full transition-all duration-300"
+                                style={{
+                                  width: `${projectPercent}%`,
+                                  backgroundColor: '#068DCB'
+                                }}
+                              />
+                            </div>
+                          </div>
+
                         </div>
 
                       </div>
@@ -2750,30 +2783,14 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
                     {/* Expanded Project View - Tasks List */}
                     {isExpanded && (
-                      <div className="border-t border-slate-200/80 bg-slate-50/50 p-4 sm:p-6">
+                      <div className="border-t border-slate-200/80 bg-[#FAFBFD] p-4 sm:p-5 space-y-3">
                         
                         {/* Section Header */}
-                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200/60">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                              <ListTodo className="w-4 h-4" />
-                            </div>
-                            <h4 className="font-bold text-slate-800 text-sm sm:text-base">
-                              Project Tasks
-                            </h4>
-                            <span className="text-xs bg-slate-200/80 text-slate-700 font-semibold px-2 py-0.5 rounded-full">
-                              {projectTasks.length}
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => openAddTask(project._id, null)}
-                            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            Add Task
-                          </button>
+                        <div className="flex items-center gap-2">
+                          <ListTodo className="w-4 h-4 text-slate-700" />
+                          <h4 className="font-bold text-slate-800 text-sm">
+                            Project Tasks
+                          </h4>
                         </div>
 
                         {/* Task Cards */}
@@ -2790,79 +2807,26 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                               return (
                                 <div
                                   key={task._id}
-                                  onClick={() => {
-                                    setSelectedTaskDetails(task);
-                                    fetchTaskUpdates(task._id);
-                                  }}
-                                  className={`bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all p-4 cursor-pointer group ${getPriorityLeftBorder(
-                                    task.priority
-                                  )}`}
+                                  className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5"
                                 >
                                   {/* Task Top Row */}
                                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span
-                                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getPriorityColor(
-                                            task.priority
-                                          )}`}
-                                        >
-                                          {task.priority || "NORMAL"}
-                                        </span>
-                                        <h5 className="font-bold text-slate-900 text-sm sm:text-base truncate">
-                                          {task.taskTitle || task.title || "Untitled Task"}
-                                        </h5>
-                                      </div>
-
-                                      {task.description && (
-                                        <p className="text-xs sm:text-sm text-slate-600 mt-1 line-clamp-2">
-                                          {task.description}
-                                        </p>
-                                      )}
-
-                                      {/* Assigned Details & Due Date */}
-                                      <div className="flex flex-wrap items-center gap-2.5 mt-2.5 text-xs text-slate-600">
-                                        {assignedMember && (
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleReportMemberClick(task._id, assignedMember.member);
-                                            }}
-                                            className="inline-flex items-center gap-1.5 bg-blue-50/80 hover:bg-blue-100 border border-blue-200/80 text-blue-700 px-2.5 py-1 rounded-lg font-medium transition-colors"
-                                            title={`View ${assignedMember.role} daily reports`}
-                                          >
-                                            <div className="w-4 h-4 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-[10px] font-bold">
-                                              {(getUserName(assignedMember.member) || "U").charAt(0).toUpperCase()}
-                                            </div>
-                                            <span>{getUserName(assignedMember.member)}</span>
-                                            <span className="text-[10px] opacity-75">({assignedMember.role})</span>
-                                          </button>
-                                        )}
-
-                                        {p.tlName && (
-                                          <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-slate-600 font-medium">
-                                            <Users className="w-3 h-3 text-slate-400" />
-                                            <span>TL: {p.tlName}</span>
-                                          </span>
-                                        )}
-
-                                        {task.dueDate && (
-                                          <span className="inline-flex items-center gap-1 text-slate-500 font-medium">
-                                            <Calendar className="w-3 h-3 text-slate-400" />
-                                            Due: {new Date(task.dueDate).toLocaleDateString()}
-                                          </span>
-                                        )}
-                                      </div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h5 className="font-bold text-slate-900 text-sm">
+                                        {task.taskTitle || task.title || "Untitled Task"}
+                                      </h5>
+                                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-50 text-slate-600 border border-slate-200 uppercase">
+                                        {task.priority || "Medium"}
+                                      </span>
                                     </div>
 
                                     {/* Task Status & Actions */}
-                                    <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
+                                    <div className="flex items-center gap-2 shrink-0">
                                       <select
-                                        value={task.status || "pending"} onClick={(e) => e.stopPropagation()} onChange={(e) => handleStatusChange(task._id, e.target.value)}
-                                        className={`text-xs px-2.5 py-1.5 rounded-lg border font-semibold focus:outline-none cursor-pointer transition-colors shadow-sm ${getStatusColor(
-                                          task.status || "pending"
-                                        )}`}
+                                        value={task.status || "pending"}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => handleStatusChange(task._id, e.target.value)}
+                                        className="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-700 bg-white font-medium focus:outline-none cursor-pointer"
                                       >
                                         <option value="pending">Pending</option>
                                         <option value="in_progress">In Progress</option>
@@ -2882,7 +2846,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                             fetchTaskUpdates(task._id);
                                           }
                                         }}
-                                        className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 p-1.5 rounded-lg transition-colors"
+                                        className="p-1 text-slate-400 hover:text-[#034665] transition-colors cursor-pointer"
                                         title="View Daily Updates"
                                       >
                                         <MessageSquare className="w-4 h-4" />
@@ -2894,7 +2858,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                           e.stopPropagation();
                                           openEditTask(task);
                                         }}
-                                        className="text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 p-1.5 rounded-lg transition-colors cursor-pointer"
+                                        className="p-1 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
                                         title="Edit Task"
                                       >
                                         <Edit2 className="w-4 h-4" />
@@ -2902,8 +2866,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
                                       <button
                                         type="button"
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task._id); }}
-                                        className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 p-1.5 rounded-lg transition-colors cursor-pointer"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteTask(task._id);
+                                        }}
+                                        className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                                         title="Delete Task"
                                       >
                                         <Trash2 className="w-4 h-4" />
@@ -2911,87 +2878,66 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                     </div>
                                   </div>
 
+                                  {/* Assigned Details & Due Date */}
+                                  <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                                    {assignedMember && (
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <User className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>{getUserName(assignedMember.member)} <span className="text-slate-400">({assignedMember.role})</span></span>
+                                      </span>
+                                    )}
+
+                                    {p.tlName && (
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>TL: {p.tlName}</span>
+                                      </span>
+                                    )}
+
+                                    {task.dueDate && (
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>Due: {formatProjectDate(task.dueDate)}</span>
+                                      </span>
+                                    )}
+                                  </div>
+
                                   {/* Daily Reports Box */}
-                                  <div className="mt-3.5 border-t border-slate-100 pt-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <h6 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                        <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                                        Daily Reports
-                                      </h6>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          fetchTaskUpdates(task._id);
-                                        }}
-                                        className="text-[11px] text-blue-600 hover:text-blue-700 font-semibold inline-flex items-center gap-1"
-                                      >
-                                        Refresh
-                                      </button>
+                                  <div className="pt-2 border-t border-slate-100">
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium mb-1.5">
+                                      <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                                      <span>Daily Reports</span>
                                     </div>
 
                                     {loadingTaskUpdates[task._id] ? (
-                                      <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                                        Loading reports...
+                                      <div className="flex items-center gap-2 text-xs text-slate-400 py-1">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#034665]" />
+                                        <span>Loading reports...</span>
                                       </div>
                                     ) : taskReports.length > 0 ? (
-                                      <div className="space-y-2">
+                                      <div className="space-y-2 mt-2">
                                         {taskReports.map((update) => (
                                           <div
                                             key={update._id || update.id}
-                                            className="rounded-xl border border-slate-200 bg-slate-50/80 p-3"
+                                            className="rounded-lg border border-slate-200/80 bg-slate-50/60 p-2.5 text-xs"
                                           >
-                                            <div className="flex items-center justify-between gap-2 mb-1.5">
-                                              <div className="flex items-center gap-2">
-                                                <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px] font-bold">
-                                                  {(getUpdateMemberName(update) || "U").charAt(0).toUpperCase()}
-                                                </div>
-                                                <span className="text-xs font-semibold text-slate-800">
-                                                  {getUpdateMemberName(update)}
-                                                </span>
-                                                {update.hoursWorked ? (
-                                                  <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium border border-blue-200/60">
-                                                    {update.hoursWorked}h
-                                                  </span>
-                                                ) : null}
-                                              </div>
-                                              <span className="text-[10px] text-slate-400 font-medium">
-                                                {update.createdAt ? new Date(update.createdAt).toLocaleString() : "No date"}
+                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                              <span className="font-semibold text-slate-800">
+                                                {getUpdateMemberName(update)}
+                                              </span>
+                                              <span className="text-[10px] text-slate-400">
+                                                {update.createdAt ? new Date(update.createdAt).toLocaleDateString() : ""}
                                               </span>
                                             </div>
-                                            <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                                              {update.todaysWork || update.workUpdate || update.updateText || update.message || update.description || "No report details provided."}
+                                            <p className="text-slate-600">
+                                              {update.todaysWork || update.workUpdate || update.updateText || update.message || update.description}
                                             </p>
-                                            {update.pendingWork && (
-                                              <p className="text-[11px] text-amber-700 mt-1">
-                                                <span className="font-semibold">Pending:</span> {update.pendingWork}
-                                              </p>
-                                            )}
-                                            {update.tomorrowPlan && (
-                                              <p className="text-[11px] text-indigo-700 mt-0.5">
-                                                <span className="font-semibold">Next:</span> {update.tomorrowPlan}
-                                              </p>
-                                            )}
-                                            {typeof update.progress === "number" && (
-                                              <div className="mt-2 flex items-center gap-2">
-                                                <div className="h-1.5 flex-1 rounded-full bg-slate-200 overflow-hidden">
-                                                  <div
-                                                    className={`h-1.5 rounded-full ${getProgressColor(update.progress)}`}
-                                                    style={{ width: `${Math.max(0, Math.min(100, update.progress))}%` }}
-                                                  />
-                                                </div>
-                                                <span className="text-[10px] font-bold text-slate-700">{update.progress}%</span>
-                                              </div>
-                                            )}
                                           </div>
                                         ))}
                                       </div>
                                     ) : (
-                                      <p className="text-xs text-slate-400 py-1">
-                                        {selectedReportMemberId
-                                          ? "No daily reports for this assigned member yet."
-                                          : "No daily reports submitted yet for this task."}
+                                      <p className="text-xs text-slate-400">
+                                        No daily reports submitted yet for this Task.
                                       </p>
                                     )}
                                   </div>
@@ -3001,17 +2947,15 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                             })}
                           </div>
                         ) : (
-                          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-                            <ListTodo className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-                            <p className="text-sm font-semibold text-slate-700">No tasks created yet</p>
-                            <p className="text-xs text-slate-400 mt-0.5 mb-3">Add tasks to track progress and assign team members</p>
+                          <div className="bg-white rounded-xl border border-slate-200 p-6 text-center">
+                            <p className="text-xs sm:text-sm text-slate-500">No tasks created yet for this project.</p>
                             <button
                               type="button"
                               onClick={() => openAddTask(project._id, null)}
-                              className="text-xs text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-4 py-2 rounded-xl font-semibold inline-flex items-center gap-1.5 transition-colors shadow-sm"
+                              className="mt-2 text-xs text-[#034665] font-semibold hover:underline inline-flex items-center gap-1"
                             >
-                              <Plus className="w-4 h-4" />
-                              Create first task
+                              <Plus className="w-3.5 h-3.5" />
+                              Add first task
                             </button>
                           </div>
                         )}
@@ -3058,10 +3002,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       setProjectForm(defaultProjectForm);
                       setShowProjectModal(true);
                     }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all text-xs font-semibold inline-flex items-center gap-1.5 mx-auto cursor-pointer"
+                    className="text-white px-5 py-2.5 rounded-xl shadow-md transition-all text-xs font-semibold inline-flex items-center gap-1.5 mx-auto cursor-pointer"
+                    style={{ background: 'linear-gradient(100.88deg, #034665 -11.43%, #068DCB 85.83%)' }}
                   >
                     <Plus className="w-4 h-4" />
-                    Create Project
+                    <span>Create Project</span>
                   </button>
                 )}
               </div>
@@ -3073,40 +3018,54 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
         {/* DAILY WORK REPORTS SECTION (API: DAILY_UPDATE_URL) */}
         {activeMainTab === 'daily-reports' && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-5">
             {/* KPI Metrics Dashboard Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
               {[
-                { label: "Total Reports", value: accessibleDailyReports.length, accent: "border-l-indigo-600" },
-                { label: "Total Hours Logged", value: accessibleDailyReports.reduce((acc, r) => acc + (Number(r.hoursWorked) || 0), 0), accent: "border-l-blue-500" },
-                { label: "Staff Reporting", value: new Set(accessibleDailyReports.map(r => r.employeeId?._id || r.employeeId?.email || r.employeeId).filter(Boolean)).size, accent: "border-l-purple-500" },
-                { label: "Active Submissions", value: accessibleDailyReports.filter(r => r.todaysWork || r.workUpdate).length, accent: "border-l-emerald-500" }
+                { label: "Total Reports", value: accessibleDailyReports.length },
+                { label: "Total Hours Logged", value: accessibleDailyReports.reduce((acc, r) => acc + (Number(r.hoursWorked) || 0), 0) },
+                { label: "Staff Reporting", value: new Set(accessibleDailyReports.map(r => r.employeeId?._id || r.employeeId?.email || r.employeeId).filter(Boolean)).size },
+                { label: "Active Submissions", value: accessibleDailyReports.filter(r => r.todaysWork || r.workUpdate).length }
               ].map((item, idx) => (
                 <div
                   key={idx}
-                  className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}
+                  className="relative flex items-center h-[60px] w-full"
                 >
-                  <div className="flex items-start justify-between">
-                    <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-                    <p className="text-xl font-bold text-slate-900">{item.value}</p>
+                  {/* Left card for the border */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+                    style={{ background: "#034665", opacity: 1 }}
+                  />
+                  {/* Inner card */}
+                  <div
+                    className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+                    style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+                  >
+                    <p className="text-[12px] sm:text-[13px] font-medium text-[#718096] font-poppins select-none">
+                      {item.label}
+                    </p>
+                    <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                      {item.value}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Filter Bar */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search by employee name, project, work description, plan..."
+                  placeholder="Search by employee name, email or department..."
                   value={dailySearchQuery}
                   onChange={(e) => setDailySearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-9 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-800 placeholder-slate-400"
+                  className="w-full pl-10 pr-9 py-2 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#034665] focus:border-[#034665]"
                 />
                 {dailySearchQuery && (
                   <button
+                    type="button"
                     onClick={() => setDailySearchQuery("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
@@ -3117,29 +3076,28 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 {/* Project Filter */}
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-                  <FolderOpen className="w-3.5 h-3.5 text-slate-400" />
+                <div className="flex items-center bg-white border border-slate-200 rounded-lg px-3 py-1.5">
                   <select
                     value={dailyProjectFilter}
                     onChange={(e) => setDailyProjectFilter(e.target.value)}
-                    className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+                    className="bg-transparent text-xs sm:text-sm font-medium text-slate-700 focus:outline-none cursor-pointer"
                   >
-                    <option value="all">All Projects</option>
+                    <option value="all">All Status</option>
                     {Array.from(new Set(accessibleDailyReports.map(r => r.projectId?.projectName || r.projectId?.name || r.projectName || r.remarks || 'Other').filter(Boolean))).map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Employee Filter */}
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-                  <User className="w-3.5 h-3.5 text-slate-400" />
+                {/* Priority / Employee Filter */}
+                <div className="flex items-center bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+                  <span className="text-xs sm:text-sm font-medium text-slate-500 mr-1">Priority:</span>
                   <select
                     value={dailyEmployeeFilter}
                     onChange={(e) => setDailyEmployeeFilter(e.target.value)}
-                    className="bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+                    className="bg-transparent text-xs sm:text-sm font-medium text-slate-700 focus:outline-none cursor-pointer"
                   >
-                    <option value="all">All Employees</option>
+                    <option value="all">All</option>
                     {Array.from(new Set(accessibleDailyReports.map(r => r.employeeId?.name || r.employeeName || (typeof r.employeeId === 'string' ? r.employeeId : '')).filter(Boolean))).map((emp) => (
                       <option key={emp} value={emp}>{emp}</option>
                     ))}
@@ -3148,12 +3106,13 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
                 {(dailySearchQuery || dailyProjectFilter !== "all" || dailyEmployeeFilter !== "all") && (
                   <button
+                    type="button"
                     onClick={() => {
                       setDailySearchQuery("");
                       setDailyProjectFilter("all");
                       setDailyEmployeeFilter("all");
                     }}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline px-2 py-1 cursor-pointer"
+                    className="text-xs font-medium text-[#034665] hover:underline px-2 py-1 cursor-pointer"
                   >
                     Reset
                   </button>
@@ -3162,11 +3121,15 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
             </div>
 
             {/* Daily Reports Table */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-200/80">
+                <h3 className="text-xs sm:text-sm font-semibold text-slate-800">Processed Monthly Payroll Records</h3>
+              </div>
+
               {isDailyReportsLoading ? (
-                <div className="flex flex-col justify-center items-center py-20">
-                  <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
-                  <p className="text-sm font-medium text-slate-500">Loading daily reports from API...</p>
+                <div className="flex flex-col justify-center items-center py-16">
+                  <Loader2 className="w-8 h-8 text-[#034665] animate-spin mb-3" />
+                  <p className="text-xs sm:text-sm font-medium text-slate-500">Loading daily reports...</p>
                 </div>
               ) : (() => {
                 const q = dailySearchQuery.toLowerCase().trim();
@@ -3178,10 +3141,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   const tomorrow = (report.tomorrowPlan || report.tomorrow_plan || '').toLowerCase();
 
                   const matchesQuery = !q || empName.includes(q) || empEmail.includes(q) || projName.includes(q) || work.includes(q) || tomorrow.includes(q);
-
                   const rawProj = report.projectId?.projectName || report.projectId?.name || report.projectName || report.remarks || 'Other';
                   const matchesProject = dailyProjectFilter === 'all' || rawProj === dailyProjectFilter;
-
                   const rawEmp = report.employeeId?.name || report.employeeName || (typeof report.employeeId === 'string' ? report.employeeId : '');
                   const matchesEmp = dailyEmployeeFilter === 'all' || rawEmp === dailyEmployeeFilter;
 
@@ -3209,14 +3170,14 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 return (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs sm:text-sm min-w-[950px]">
-                      <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-semibold tracking-wider">
+                      <thead className="bg-[#F8FAFC] border-b border-slate-200 text-slate-500 text-xs font-medium">
                         <tr>
                           <th className="px-5 py-3.5">Employee</th>
                           <th className="px-4 py-3.5">Project</th>
                           <th className="px-4 py-3.5">Date & Time</th>
-                          <th className="px-3 py-3.5 text-center">Hours</th>
-                          <th className="px-5 py-3.5 w-1/3">Today's Work</th>
-                          <th className="px-4 py-3.5">Tomorrow's Plan</th>
+                          <th className="px-3 py-3.5">Hours</th>
+                          <th className="px-5 py-3.5 w-1/4">Today's Work</th>
+                          <th className="px-5 py-3.5 w-1/4">Tomorrow's Plan</th>
                           <th className="px-4 py-3.5 text-right">Action</th>
                         </tr>
                       </thead>
@@ -3224,45 +3185,44 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                         {filtered.map((report) => {
                           const empName = report.employeeId?.name || report.employeeName || report.name || "Employee";
                           const empEmail = report.employeeId?.email || report.email || "";
-                          const empRole = report.employeeId?.role || report.role || "EMP";
-                          const projName = report.projectId?.projectName || report.projectId?.name || report.projectName || report.remarks || "Other";
+                          const empRole = report.employeeId?.role || report.role || "";
+                          const isEmpTL = isTeamLeadRole(empRole) || (empRole || '').toLowerCase().includes('lead');
+                          const projName = report.projectId?.projectName || report.projectId?.name || report.projectName || report.remarks || "Digital marketing";
                           
-                          let rDate = 'N/A';
-                          let rTime = '';
-                          try {
-                            const dVal = report.createdAt || report.date || report.reportDate;
-                            if (dVal) {
-                              const d = new Date(dVal);
-                              if (!isNaN(d.getTime())) {
-                                rDate = d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
-                                rTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                              }
-                            }
-                          } catch (e) {}
-
+                          const { dateStr, timeStr } = formatReportDateTime(report.createdAt || report.date || report.reportDate);
                           const hours = report.hoursWorked ?? report.hours ?? 8;
                           const work = report.todaysWork || report.workUpdate || report.description || "—";
                           const plan = report.tomorrowPlan || report.tomorrow_plan || "—";
                           const issues = report.issuesFaced || report.blockers || "";
 
+                          const initials = empName
+                            .split(" ")
+                            .filter(Boolean)
+                            .map((n) => n[0])
+                            .slice(0, 2)
+                            .join("")
+                            .toUpperCase() || "E";
+
                           return (
                             <tr key={report._id} className="hover:bg-slate-50/70 transition-colors">
                               <td className="px-5 py-3.5">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                                    {empName.charAt(0).toUpperCase()}
+                                  <div className="w-8 h-8 rounded-full bg-[#034665] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                    {initials}
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-semibold text-slate-900 truncate max-w-[140px]">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-semibold text-slate-900 truncate">
                                         {empName}
                                       </span>
-                                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded uppercase font-mono bg-slate-100 text-slate-600 border border-slate-200">
-                                        {empRole}
-                                      </span>
+                                      {isEmpTL ? (
+                                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
+                                          Team lead
+                                        </span>
+                                      ) : null}
                                     </div>
                                     {empEmail && (
-                                      <p className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                                      <p className="text-[11px] text-slate-400 truncate">
                                         {empEmail}
                                       </p>
                                     )}
@@ -3271,19 +3231,19 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                               </td>
 
                               <td className="px-4 py-3.5 whitespace-nowrap">
-                                <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200/80 font-medium text-xs inline-block">
+                                <span className="px-3 py-1 rounded-lg text-xs font-medium bg-sky-50 text-sky-800 border border-sky-200 inline-block">
                                   {projName}
                                 </span>
                               </td>
 
-                              <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">
-                                <div className="font-medium text-slate-800">{rDate}</div>
-                                {rTime && <div className="text-[11px] text-slate-400 font-mono">{rTime}</div>}
+                              <td className="px-4 py-3.5 whitespace-nowrap text-xs">
+                                <div className="font-medium text-slate-800">Date: {dateStr}</div>
+                                {timeStr && <div className="text-[11px] text-slate-400">Time: {timeStr}</div>}
                               </td>
 
-                              <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono font-semibold text-xs border border-indigo-100">
-                                  {hours} hrs
+                              <td className="px-3 py-3.5 whitespace-nowrap">
+                                <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+                                  {hours} Hours
                                 </span>
                               </td>
 
@@ -3292,13 +3252,13 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                   {work}
                                 </p>
                                 {issues && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-200/70 px-1.5 py-0.5 rounded mt-1 font-medium">
-                                    <AlertCircle size={10} /> Issue: {issues}
+                                  <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
+                                    Issue solved
                                   </span>
                                 )}
                               </td>
 
-                              <td className="px-4 py-3.5 max-w-xs text-slate-600">
+                              <td className="px-5 py-3.5 max-w-xs text-slate-700">
                                 <p className="line-clamp-2 text-xs leading-relaxed" title={plan}>
                                   {plan}
                                 </p>
@@ -3308,9 +3268,9 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                                 <button
                                   type="button"
                                   onClick={() => setSelectedDailyReportModal(report)}
-                                  className="px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-700 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                                 >
-                                  <Eye size={13} />
+                                  <Eye className="w-3.5 h-3.5 text-slate-500" />
                                   <span>Details</span>
                                 </button>
                               </td>
