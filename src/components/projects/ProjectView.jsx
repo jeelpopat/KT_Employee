@@ -241,6 +241,12 @@ export const ProjectView = () => {
       if (formData.projectBudget) payload.projectBudget = Number(formData.projectBudget);
       if (formData.startDate) payload.startDate = formData.startDate;
       if (formData.endDate) payload.endDate = formData.endDate;
+
+      if (payload.startDate && payload.endDate && payload.endDate < payload.startDate) {
+        setFormError('Target end date cannot be earlier than start date.');
+        setIsSubmitting(false);
+        return;
+      }
       if (formData.teamLeadUser) payload.teamLeadUser = formData.teamLeadUser;
       if (formData.employees && formData.employees.length > 0) payload.employees = formData.employees;
 
@@ -1343,7 +1349,15 @@ export const ProjectView = () => {
                   <input
                     type="date"
                     value={formData.startDate}
-                    onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                    max={formData.endDate || undefined}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setFormData(prev => ({
+                        ...prev,
+                        startDate: val,
+                        ...(val && prev.endDate && prev.endDate < val ? { endDate: val } : {})
+                      }));
+                    }}
                     className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
@@ -1355,7 +1369,16 @@ export const ProjectView = () => {
                   <input
                     type="date"
                     value={formData.endDate}
-                    onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                    min={formData.startDate || undefined}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val && formData.startDate && val < formData.startDate) {
+                        setFormError('Target end date cannot be earlier than start date.');
+                        return;
+                      }
+                      setFormError('');
+                      setFormData(prev => ({ ...prev, endDate: val }));
+                    }}
                     className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>

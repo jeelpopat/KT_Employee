@@ -2029,16 +2029,23 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   };
 
   const getProjectTeamLeadOptions = (project = selectedProject) => {
-    if (!project) return [];
+    const currentProject =
+      project ||
+      projects.find((p) => isSameId(p._id || p.id, taskForm.projectId)) ||
+      (typeof editingTask?.projectId === "object" ? editingTask.projectId : null) ||
+      (typeof editingTask?.project === "object" ? editingTask.project : null) ||
+      selectedProject;
+
+    if (!currentProject) return [];
     const candidates = [
-      project.teamLeadUser,
-      project.teamLeadEmployee,
-      project.assignedTL,
-      project.teamLead,
+      currentProject.teamLeadUser,
+      currentProject.teamLeadEmployee,
+      currentProject.assignedTL,
+      currentProject.teamLead,
     ].filter(Boolean);
 
-    if (Array.isArray(project.teamLeads)) {
-      candidates.push(...project.teamLeads);
+    if (Array.isArray(currentProject.teamLeads)) {
+      candidates.push(...currentProject.teamLeads);
     }
 
     const uniqueTLs = [];
@@ -2079,7 +2086,14 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
   };
 
   const getAvailableTaskAssignees = (project = selectedProject, extraAssigneeId = null) => {
-    const projectEmployees = Array.isArray(project?.employees) ? [...project.employees] : [];
+    const currentProject =
+      project ||
+      projects.find((p) => isSameId(p._id || p.id, taskForm.projectId)) ||
+      (typeof editingTask?.projectId === "object" ? editingTask.projectId : null) ||
+      (typeof editingTask?.project === "object" ? editingTask.project : null) ||
+      selectedProject;
+
+    const projectEmployees = Array.isArray(currentProject?.employees) ? [...currentProject.employees] : [];
     if (extraAssigneeId) {
       const extraIdStr = normalizeId(extraAssigneeId);
       if (extraIdStr && !projectEmployees.some((e) => isSameId(e, extraIdStr))) {
@@ -2120,6 +2134,14 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       }
     }
 
+    const extraName = (
+      editingTask?.assignedEmployeeName ||
+      (typeof editingTask?.assignedEmployee === "object" ? extractName(editingTask.assignedEmployee) : null) ||
+      (typeof editingTask?.assignedTo === "object" ? extractName(editingTask.assignedTo) : null) ||
+      (extraAssigneeId ? getUserNameById(extraAssigneeId) : "") ||
+      ""
+    ).trim().toLowerCase();
+
     // Strict deduplication by candidate IDs AND by user name
     const seenCandidates = new Set();
     const seenNames = new Set();
@@ -2135,21 +2157,31 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       const hasDuplicateId = candidates.some((c) => seenCandidates.has(c));
       const hasDuplicateName = lowerName && !isUnknownEmployeeOrUser(name) && seenNames.has(lowerName);
 
+      const matchesExtra =
+        extraAssigneeId &&
+        (candidates.includes(String(extraAssigneeId)) ||
+          isSameId(item, extraAssigneeId) ||
+          (extraName && !isUnknownEmployeeOrUser(extraName) && lowerName === extraName));
+
       if (hasDuplicateId || hasDuplicateName) {
-        if (extraAssigneeId && (candidates.includes(String(extraAssigneeId)) || isSameId(item, extraAssigneeId))) {
+        if (matchesExtra) {
           const existing = uniqueList.find((u) => 
             (lowerName && (getUserName(u) || extractName(u) || "").trim().toLowerCase() === lowerName) ||
             getIdCandidates(u).some((cid) => candidates.includes(cid))
           );
           if (existing) {
             existing._matchedAssigneeId = String(extraAssigneeId);
+            if (!existing._extraCandidateIds) existing._extraCandidateIds = [];
+            existing._extraCandidateIds.push(String(extraAssigneeId));
           }
         }
         return; // Skip duplicate!
       }
 
-      if (extraAssigneeId && (candidates.includes(String(extraAssigneeId)) || isSameId(item, extraAssigneeId))) {
+      if (matchesExtra) {
         item._matchedAssigneeId = String(extraAssigneeId);
+        if (!item._extraCandidateIds) item._extraCandidateIds = [];
+        item._extraCandidateIds.push(String(extraAssigneeId));
       }
 
       candidates.forEach((c) => seenCandidates.add(c));
@@ -3407,7 +3439,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                     type="date"
                     name="startDate"
                     value={projectForm.startDate}
-                    max="9999-12-31"
+                    max={projectForm.endDate || "9999-12-31"}
                     onChange={handleProjectDateChange}
                     onBlur={handleProjectDateBlur}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -3421,9 +3453,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   <input
                     type="date"
                     name="endDate"
-                    min={projectForm.startDate && projectForm.startDate > todayDate
-                      ? projectForm.startDate
-                      : todayDate}
+                    min={projectForm.startDate || (!selectedProject ? todayDate : undefined)}
                     max="9999-12-31"
                     value={projectForm.endDate}
                     onChange={handleProjectDateChange}
@@ -3862,36 +3892,61 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                           ? "No employees assigned to this project"
                           : "Select Employee"}
                     </option>
-                    {getAvailableTaskAssignees(selectedProject, taskForm.assignedEmployee).map((member) => {
-                      const memberId = normalizeId(member);
-                      const isMatch =
-                        taskForm.assignedEmployee &&
-                        (member._matchedAssigneeId === String(taskForm.assignedEmployee) ||
-                          isSameId(member, taskForm.assignedEmployee) ||
-                          getIdCandidates(member).includes(String(taskForm.assignedEmployee)));
-                      const optValue = isMatch ? taskForm.assignedEmployee : memberId;
+                    {(() => {
+                      const assignees = getAvailableTaskAssignees(selectedProject, taskForm.assignedEmployee);
+                      const assignedVal = taskForm.assignedEmployee ? String(taskForm.assignedEmployee) : "";
+                      const extraName = (
+                        editingTask?.assignedEmployeeName ||
+                        (typeof editingTask?.assignedEmployee === "object" ? extractName(editingTask.assignedEmployee) : null) ||
+                        (typeof editingTask?.assignedTo === "object" ? extractName(editingTask.assignedTo) : null) ||
+                        (assignedVal ? getUserNameById(assignedVal) : "") ||
+                        ""
+                      ).trim().toLowerCase();
+
+                      const hasMatchedInList = assignees.some((member) => {
+                        const mName = (getUserName(member) || extractName(member) || "").trim().toLowerCase();
+                        return (
+                          assignedVal &&
+                          (member._matchedAssigneeId === assignedVal ||
+                            isSameId(member, assignedVal) ||
+                            getIdCandidates(member).includes(assignedVal) ||
+                            (member._extraCandidateIds && member._extraCandidateIds.includes(assignedVal)) ||
+                            (extraName && !isUnknownEmployeeOrUser(extraName) && mName === extraName))
+                        );
+                      });
+
                       return (
-                        <option key={optValue} value={optValue}>
-                          {getUserName(member)}
-                        </option>
+                        <>
+                          {assignees.map((member) => {
+                            const memberId = normalizeId(member);
+                            const mName = (getUserName(member) || extractName(member) || "").trim();
+                            const isMatch =
+                              assignedVal &&
+                              (member._matchedAssigneeId === assignedVal ||
+                                isSameId(member, assignedVal) ||
+                                getIdCandidates(member).includes(assignedVal) ||
+                                (member._extraCandidateIds && member._extraCandidateIds.includes(assignedVal)) ||
+                                (extraName && !isUnknownEmployeeOrUser(extraName) && mName.toLowerCase() === extraName));
+                            const optValue = isMatch ? assignedVal : memberId;
+                            return (
+                              <option key={optValue} value={optValue}>
+                                {mName}
+                              </option>
+                            );
+                          })}
+                          {assignedVal && !hasMatchedInList && (
+                            <option value={assignedVal}>
+                              {editingTask?.assignedEmployeeName ||
+                                (typeof editingTask?.assignedEmployee === "object"
+                                  ? extractName(editingTask.assignedEmployee)
+                                  : null) ||
+                                getUserNameById(assignedVal) ||
+                                "Assigned Employee"}
+                            </option>
+                          )}
+                        </>
                       );
-                    })}
-                    {taskForm.assignedEmployee &&
-                      !getAvailableTaskAssignees(selectedProject, taskForm.assignedEmployee).some(
-                        (m) =>
-                          m._matchedAssigneeId === String(taskForm.assignedEmployee) ||
-                          isSameId(m, taskForm.assignedEmployee) ||
-                          getIdCandidates(m).includes(String(taskForm.assignedEmployee))
-                      ) && (
-                        <option value={taskForm.assignedEmployee}>
-                          {editingTask?.assignedEmployeeName ||
-                            (typeof editingTask?.assignedEmployee === "object"
-                              ? extractName(editingTask.assignedEmployee)
-                              : null) ||
-                            getUserNameById(taskForm.assignedEmployee) ||
-                            "Assigned Employee"}
-                        </option>
-                      )}
+                    })()}
                   </select>
                 </div>
 
@@ -3932,6 +3987,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       type="date"
                       name="startDate"
                       value={taskForm.startDate || ""}
+                      max={taskForm.dueDate || undefined}
                       onChange={handleTaskChange}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
@@ -3942,6 +3998,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       type="date"
                       name="dueDate"
                       value={taskForm.dueDate || ""}
+                      min={taskForm.startDate || undefined}
                       onChange={handleTaskChange}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />

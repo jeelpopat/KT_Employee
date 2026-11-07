@@ -1621,6 +1621,12 @@ export const TeamTaskManagementView = () => {
       if (taskForm.startDate) payload.startDate = taskForm.startDate;
       if (taskForm.dueDate) payload.dueDate = taskForm.dueDate;
 
+      if (payload.startDate && payload.dueDate && payload.dueDate < payload.startDate) {
+        showToast('Due date cannot be earlier than start date.', 'error');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Assign employee
       if (taskForm.assignedTo) {
         payload.assignedEmployee = taskForm.assignedTo;
@@ -2261,7 +2267,15 @@ export const TeamTaskManagementView = () => {
                   <input
                     type="date"
                     value={taskForm.startDate || ''}
-                    onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })}
+                    max={taskForm.dueDate || undefined}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTaskForm((prev) => ({
+                        ...prev,
+                        startDate: val,
+                        ...(val && prev.dueDate && prev.dueDate < val ? { dueDate: val } : {})
+                      }));
+                    }}
                     className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                   />
                 </div>
@@ -2273,7 +2287,15 @@ export const TeamTaskManagementView = () => {
                   <input
                     type="date"
                     value={taskForm.dueDate || ''}
-                    onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+                    min={taskForm.startDate || undefined}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val && taskForm.startDate && val < taskForm.startDate) {
+                        showToast('Due date cannot be earlier than start date.', 'error');
+                        return;
+                      }
+                      setTaskForm((prev) => ({ ...prev, dueDate: val }));
+                    }}
                     className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-900"
                   />
                 </div>
