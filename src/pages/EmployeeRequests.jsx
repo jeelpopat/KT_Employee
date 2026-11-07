@@ -1619,6 +1619,7 @@ const EmployeeRequests = () => {
       handleApproveClick(user);
       return;
     }
+    const wasApproved = isUserApproved(user);
     const userId = getUserIdentifier(user, 0);
     const targetUserId = String(user?._id || user?.id || user?.userId || userId || '').trim();
 
@@ -1853,7 +1854,7 @@ const EmployeeRequests = () => {
 
       // 5. Update employee list record ONLY IF a real employee document ID exists in employee collection
       let actualEmployeeDocId = explicitEmpDocId;
-      if (!actualEmployeeDocId && isApproved) {
+      if (!actualEmployeeDocId && wasApproved) {
         try {
           const empListRes = await api.get('/api/employee/list', { headers });
           const empList = empListRes.data?.data || empListRes.data?.employees || (Array.isArray(empListRes.data) ? empListRes.data : []);
@@ -2463,13 +2464,6 @@ const EmployeeRequests = () => {
 
                 {/* Action Buttons */}
                 {!isReadOnlyRequestRole(user) && (() => {
-                  const isUserInactive =
-                    user?.isActive === false ||
-                    String(user?.employeeStatus || '').trim().toLowerCase() === 'inactive' ||
-                    String(user?.status || '').trim().toLowerCase() === 'rejected' ||
-                    String(user?.status || '').trim().toLowerCase() === 'inactive';
-                  const isRejectDisabled = !isApproved && isUserInactive;
-
                   return (
                     <div className="mt-3 sm:mt-4 flex flex-col xs:flex-row gap-1.5 sm:gap-2">
                       <button
@@ -2495,41 +2489,34 @@ const EmployeeRequests = () => {
                           </span>
                         )}
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isRejectDisabled || isProcessingReject) return;
-                          handleAction(user, isApproved ? 'revoke' : 'reject');
-                        }}
-                        disabled={isProcessingReject || isRejectDisabled}
-                        title={isRejectDisabled ? "User is already inactive / rejected" : isApproved ? "Revoke approval" : "Reject access"}
-                        className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 ${isProcessingReject
-                          ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                          : isRejectDisabled
-                            ? 'cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200/80 shadow-none'
-                            : isApproved
-                              ? 'cursor-pointer bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-[1.02] active:scale-[0.98]'
-                              : 'cursor-pointer bg-rose-100 text-rose-700 hover:bg-rose-200 hover:scale-[1.02] active:scale-[0.98]'
-                          }`}
-                      >
-                        {isProcessingReject ? (
-                          <span className="flex items-center justify-center gap-1.5">
-                            <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                            Processing...
-                          </span>
-                        ) : isApproved ? (
-                          <span className="flex items-center justify-center gap-1.5">
-                            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-                            Revoke
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center gap-1.5">
-                            <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                            {isRejectDisabled ? 'Reject' : 'Reject'}
-                          </span>
-                        )}
-                      </button>
+                      {isApproved && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isProcessingReject) return;
+                            handleAction(user, 'revoke');
+                          }}
+                          disabled={isProcessingReject}
+                          title="Revoke approval"
+                          className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 ${isProcessingReject
+                            ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                            : 'cursor-pointer bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-[1.02] active:scale-[0.98]'
+                            }`}
+                        >
+                          {isProcessingReject ? (
+                            <span className="flex items-center justify-center gap-1.5">
+                              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                              Processing...
+                            </span>
+                          ) : (
+                            <span className="flex items-center justify-center gap-1.5">
+                              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
+                              Revoke
+                            </span>
+                          )}
+                        </button>
+                      )}
                     </div>
                   );
                 })()}
