@@ -3633,7 +3633,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   type="button"
                   disabled={isProjectSubmitting}
                   onClick={closeProjectModal}
-                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-center"
                 >
                   Cancel
                 </button>
@@ -3658,8 +3658,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 <button
                   type="submit"
                   disabled={isProjectSubmitting}
-                  className="w-full sm:flex-1 btn-brand-primary text-white py-3 rounded-lg font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                  className="w-full sm:flex-1 text-white py-3 rounded-lg font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(100.88deg, #034665 -11.43%, #068DCB 85.83%)' }}
                 >
                   {isProjectSubmitting ? (
                     <>
@@ -3980,7 +3980,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   type="button"
                   disabled={isSubmittingTask}
                   onClick={closeTaskModal}
-                  className="w-full sm:w-1/3 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50"
+                  className="w-full sm:flex-1 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 text-center"
                 >
                   Cancel
                 </button>
@@ -3988,7 +3988,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   type="submit"
                   disabled={isSubmittingTask}
                   className="w-full sm:flex-1 rounded-lg text-white py-3 font-semibold shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                  style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                  style={{ background: 'linear-gradient(100.88deg, #034665 -11.43%, #068DCB 85.83%)' }}
                 >
                   {isSubmittingTask && <Loader2 className="w-5 h-5 animate-spin" />}
                   <span>

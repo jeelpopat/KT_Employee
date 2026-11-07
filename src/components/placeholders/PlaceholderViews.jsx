@@ -2309,18 +2309,19 @@ export const TeamTaskManagementView = () => {
               </div>
 
               {/* Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                  className="flex-1 py-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition cursor-pointer text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2.5 text-xs font-semibold text-white rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  style={{ background: 'linear-gradient(100.88deg, #034665 -11.43%, #068DCB 85.83%)' }}
                 >
                   {isSubmitting && <Loader2 size={13} className="animate-spin" />}
                   {editingTask ? 'Save Changes' : 'Create Task'}
