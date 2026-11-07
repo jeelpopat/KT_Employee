@@ -4,11 +4,17 @@ import {
   AlertCircle, X, Download, Printer, Users, Shield, ArrowUpRight,
   ArrowDownRight, DollarSign, Percent, Calendar, Check, ChevronRight,
   Building2, CreditCard, Sparkles, FileText, Info, Award, UserCheck,
-  TrendingUp, Clock, ChevronDown, CheckSquare, Layers, Send, Calculator
+  TrendingUp, Clock, ChevronDown, CheckSquare, Layers, Send, Calculator,
+  FileSpreadsheet, Receipt, PieChart
 } from 'lucide-react';
 import api, { invalidateCache } from '../../api/axios.js';
 import { useApp, deriveUserRole, getRealAuthUserId, resolveEmployeeName } from '../../context/AppContext.jsx';
 import { filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
+import { DeductionBreakdownSection } from '../deductions/DeductionBreakdownSection.jsx';
+import { DeductionMasterView } from '../deductions/DeductionMasterView.jsx';
+import { EmployeeDeductionsView } from '../deductions/EmployeeDeductionsView.jsx';
+import { DeductionReportsView } from '../deductions/DeductionReportsView.jsx';
+import { previewPayrollWithDeductions, fetchEmployeeDeductions } from '../../services/deductionService.js';
 
 // Currency Formatter (Indian Rupee)
 const formatINR = (val) => {
@@ -42,6 +48,21 @@ const getPayrollDeductionBreakdown = (payroll, fallbackPayslip) => {
     return firstDefinedAmount;
   };
 
+  // Check for itemized employee custom deductions
+  const rawCustomDeds = (
+    payroll?.customDeductions?.approvedAndPermissible ||
+    payroll?.employeeDeductions ||
+    payroll?.customDeductions ||
+    fallbackPayslip?.customDeductions?.approvedAndPermissible ||
+    fallbackPayslip?.employeeDeductions ||
+    fallbackPayslip?.customDeductions ||
+    []
+  );
+  const customDeductionsList = Array.isArray(rawCustomDeds) ? rawCustomDeds : [];
+  const customDeductionTotal = customDeductionsList.length > 0
+    ? Math.round(customDeductionsList.reduce((sum, d) => sum + (Number(d.amount) || 0), 0) * 100) / 100
+    : (readAmount(['totalCustomDeductions', 'customDeductionTotal', 'employeeDeductionTotal']) || 0);
+
   const components = [
     { key: 'fixedDeduction', label: 'Fixed Monthly Deduction', amount: readAmount(['fixedDeduction']) || 0 },
     { key: 'extraDeduction', label: 'Extra Deduction', amount: readAmount(['extraDeduction']) || 0 },
@@ -50,7 +71,8 @@ const getPayrollDeductionBreakdown = (payroll, fallbackPayslip) => {
     { key: 'professionalTax', label: 'Professional Tax', amount: readAmount(['professionalTax']) || 0 },
     { key: 'otherDeductions', label: 'Other Deductions', amount: readAmount(['otherDeductions']) || 0 },
     { key: 'lopDeduction', label: 'Loss of Pay (LOP)', amount: readAmount(['lopDeduction']) || 0 },
-    { key: 'tdsAmount', label: 'TDS / Income Tax', amount: readAmount(['tdsAmount', 'tds']) || 0 }
+    { key: 'tdsAmount', label: 'TDS / Income Tax', amount: readAmount(['tdsAmount', 'tds']) || 0 },
+    ...(customDeductionTotal > 0 ? [{ key: 'employeeDeductions', label: 'Additional Employee Deductions', amount: customDeductionTotal, isCustom: true }] : [])
   ];
   const componentTotal = Math.round(components.reduce((sum, item) => sum + item.amount, 0) * 100) / 100;
   const persistedTotal = readAmount(['totalDeduction', 'totalDeductions']);
@@ -64,6 +86,8 @@ const getPayrollDeductionBreakdown = (payroll, fallbackPayslip) => {
 
   return {
     components,
+    customDeductionsList,
+    customDeductionTotal,
     totalDeduction,
     tdsPercentage,
     reconciliation: Math.round((totalDeduction - componentTotal) * 100) / 100
@@ -526,6 +550,48 @@ export const SalaryView = () => {
   };
   const [processForm, setProcessForm] = useState(initialProcessForm);
   const [isFetchingLeaves, setIsFetchingLeaves] = useState(false);
+  const [processCustomDeductions, setProcessCustomDeductions] = useState([]);
+  const [processExcludedDeductions, setProcessExcludedDeductions] = useState([]);
+  const [isLoadingDeductionPreview, setIsLoadingDeductionPreview] = useState(false);
+  const [liveDeductionPreview, setLiveDeductionPreview] = useState(null);
+
+  // Live sync employee custom approved deductions from backend
+  const syncCustomDeductionsForPayroll = async (targetUserId, targetM, targetY) => {
+    if (!targetUserId) {
+      setProcessCustomDeductions([]);
+      setProcessExcludedDeductions([]);
+      setLiveDeductionPreview(null);
+      return;
+    }
+    setIsLoadingDeductionPreview(true);
+    try {
+      const preview = await previewPayrollWithDeductions({
+        employeeId: targetUserId,
+        month: targetM,
+        year: targetY
+      }).catch(() => null);
+
+      if (preview && preview.customDeductions) {
+        setProcessCustomDeductions(preview.customDeductions.approvedAndPermissible || []);
+        setProcessExcludedDeductions(preview.customDeductions.excludedDeductions || []);
+        setLiveDeductionPreview(preview);
+      } else {
+        const approved = await fetchEmployeeDeductions({
+          employeeId: targetUserId,
+          month: targetM,
+          year: targetY,
+          status: 'Approved'
+        }).catch(() => []);
+        setProcessCustomDeductions(Array.isArray(approved) ? approved : []);
+        setProcessExcludedDeductions([]);
+        setLiveDeductionPreview(null);
+      }
+    } catch (err) {
+      console.warn('Failed to sync live deductions preview:', err);
+    } finally {
+      setIsLoadingDeductionPreview(false);
+    }
+  };
 
   // Live sync user leaves from backend API (GET /api/leave/my-leaves/:userId or /api/leave/all filtered by name/id)
   const syncUserLeavesFromBackend = async (userId, month, year, staffList = companyStaff) => {
@@ -577,6 +643,7 @@ export const SalaryView = () => {
 
     if (targetUserId) {
       syncUserLeavesFromBackend(targetUserId, targetM, targetY, companyStaff);
+      syncCustomDeductionsForPayroll(targetUserId, targetM, targetY);
     }
   };
 
@@ -652,14 +719,21 @@ export const SalaryView = () => {
     // TDS = (Base Gross * tdsPercentage) / 100
     const tdsAmount = Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
 
-    // Formula 2: net salary = Base Gross + Extra Bonus - Extra Deduction - Fixed Monthly Deduction - TDS - LOP
+    // Additional Approved Employee Deductions
+    const customDeductionsSum = Math.round(
+      processCustomDeductions.reduce((sum, d) => sum + (Number(d.amount) || 0), 0) * 100
+    ) / 100;
+
+    // Total deductions = Extra Deduction + Fixed Monthly Deduction + TDS + LOP + Custom Deductions
+    const totalDeduction = Math.round(
+      (extraDeduction + fixedDeduction + tdsAmount + lopDeduction + customDeductionsSum) * 100
+    ) / 100;
+
+    // Formula 2: net salary = Base Gross + Extra Bonus - Total Deductions
     const netSalary = Math.max(
       0,
-      Math.round((baseGross + extraBonus - extraDeduction - fixedDeduction - tdsAmount - lopDeduction) * 100) / 100
+      Math.round((baseGross + extraBonus - totalDeduction) * 100) / 100
     );
-
-    // Total deductions = Extra Deduction + Fixed Monthly Deduction + TDS + LOP
-    const totalDeduction = Math.round((extraDeduction + fixedDeduction + tdsAmount + lopDeduction) * 100) / 100;
 
     // Total gross earnings including extra bonus
     const grossSalary = Math.round((baseGross + extraBonus) * 100) / 100;
@@ -674,6 +748,8 @@ export const SalaryView = () => {
       fixedDeduction,
       extraBonus,
       extraDeduction,
+      customDeductionsSum,
+      processCustomDeductions,
       baseGross,
       grossSalary,
       tdsPercentage,
@@ -688,7 +764,7 @@ export const SalaryView = () => {
       perDaySalary,
       lopDeduction
     };
-  }, [selectedUserActiveStructure, processForm]);
+  }, [selectedUserActiveStructure, processForm, processCustomDeductions]);
 
   // ==========================================
   // 1. DATA FETCHING LOGIC
@@ -1137,6 +1213,7 @@ export const SalaryView = () => {
 
     if (selectedUserId) {
       syncUserLeavesFromBackend(selectedUserId, m, y, companyStaff);
+      syncCustomDeductionsForPayroll(selectedUserId, m, y);
     }
   };
 
@@ -1176,6 +1253,9 @@ export const SalaryView = () => {
       basicForPf: Number(selectedUserActiveStructure.basicForPf) || 0,
       fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
       extraDeduction: extraDeductionValue,
+      totalCustomDeductions: processCalculations.customDeductionsSum || 0,
+      customDeductions: processCustomDeductions,
+      employeeDeductions: processCustomDeductions,
       pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
       esicDeduction: Number(selectedUserActiveStructure.esicDeduction) || 0,
       professionalTax: Number(selectedUserActiveStructure.professionalTax) || 0,
@@ -1258,6 +1338,9 @@ export const SalaryView = () => {
       tdsAmount: processCalculations.tdsAmount,
       fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
       extraDeduction: extraDeductionValue,
+      totalCustomDeductions: processCalculations.customDeductionsSum || 0,
+      customDeductions: processCustomDeductions,
+      employeeDeductions: processCustomDeductions,
       otherDeductions: Number(selectedUserActiveStructure.otherDeductions) || 0,
       lopDeduction: targetLopDeduction,
       totalDeduction: targetTotalDeduction,
@@ -1414,8 +1497,22 @@ export const SalaryView = () => {
     const fixBonusVal = Number(slip.fixedBonus) || 0;
     const extBonusVal = Number(slip.extraBonus) || 0;
     const deductionBreakdown = getPayrollDeductionBreakdown(slip);
+    const customDeductionsHtml = deductionBreakdown.customDeductionsList && deductionBreakdown.customDeductionsList.length > 0
+      ? `
+      <div style="margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
+        <div class="col-title deductions-title" style="font-size: 10px; color: #991b1b; border-color: #fca5a5;">Additional Employee Deductions</div>
+        <table>
+          <tbody>
+            ${deductionBreakdown.customDeductionsList.map((d) => `<tr><td>${d.deductionMasterId?.name || d.name || 'Employee Deduction'}</td><td class="amount" style="color: #dc2626;">-${formatINR(d.amount)}</td></tr>`).join('')}
+            <tr class="total-row" style="font-size: 11px; border-top: 1px solid #cbd5e1;"><td>Employee Deduction Total</td><td class="amount" style="color: #dc2626;">-${formatINR(deductionBreakdown.customDeductionTotal)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      `
+      : '';
+
     const deductionRows = deductionBreakdown.components
-      .filter((item) => item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount')
+      .filter((item) => (item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount') && !item.isCustom)
       .map((item) => {
         const label = item.key === 'tdsAmount' ? `${item.label} (${deductionBreakdown.tdsPercentage}%)` : item.label;
         return `<tr><td>${label}</td><td class="amount" style="color: #dc2626;">-${formatINR(item.amount)}</td></tr>`;
@@ -1514,6 +1611,7 @@ export const SalaryView = () => {
           <tr class="total-row"><td>Total Deductions</td><td class="amount" style="color: #dc2626;">-${formatINR(totDedVal)}</td></tr>
         </tbody>
       </table>
+      ${customDeductionsHtml}
     </div>
   </div>
 
@@ -2282,7 +2380,7 @@ export const SalaryView = () => {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Admin Tabs */}
           {isAdmin && (
-            <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold border border-slate-200">
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold border border-slate-200 flex-wrap gap-1">
               <button
                 onClick={() => setAdminViewMode('processed-payrolls')}
                 className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'processed-payrolls'
@@ -2302,6 +2400,36 @@ export const SalaryView = () => {
               >
                 <CreditCard size={13} />
                 <span>Structures ({allSalaries.length})</span>
+              </button>
+              <button
+                onClick={() => setAdminViewMode('deduction-masters')}
+                className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'deduction-masters'
+                  ? 'bg-white text-[#0088cc] shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <FileSpreadsheet size={13} />
+                <span>Deduction Master</span>
+              </button>
+              <button
+                onClick={() => setAdminViewMode('employee-deductions')}
+                className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'employee-deductions'
+                  ? 'bg-white text-[#0088cc] shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <Receipt size={13} />
+                <span>Employee Deductions</span>
+              </button>
+              <button
+                onClick={() => setAdminViewMode('deduction-reports')}
+                className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${adminViewMode === 'deduction-reports'
+                  ? 'bg-white text-[#0088cc] shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <PieChart size={13} />
+                <span>Deduction Reports</span>
               </button>
             </div>
           )}
@@ -2888,6 +3016,33 @@ export const SalaryView = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* ADMIN VIEW: TAB 3 - DEDUCTION MASTER */}
+      {/* ==================================================== */}
+      {isAdmin && adminViewMode === 'deduction-masters' && (
+        <div className="space-y-6">
+          <DeductionMasterView />
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* ADMIN VIEW: TAB 4 - EMPLOYEE DEDUCTIONS */}
+      {/* ==================================================== */}
+      {isAdmin && adminViewMode === 'employee-deductions' && (
+        <div className="space-y-6">
+          <EmployeeDeductionsView />
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* ADMIN VIEW: TAB 5 - DEDUCTION REPORTS */}
+      {/* ==================================================== */}
+      {isAdmin && adminViewMode === 'deduction-reports' && (
+        <div className="space-y-6">
+          <DeductionReportsView />
         </div>
       )}
 
@@ -3687,67 +3842,63 @@ export const SalaryView = () => {
                 <span>Status is changeable anytime from payrolls table • Official payslip automatically generated</span>
               </div> */}
 
-              {/* Summary Payout Preview commented out as requested */}
-              {/*
-              selectedUserActiveStructure && (
-                <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/70 space-y-2 text-xs">
-                  <div className="flex justify-between font-bold text-slate-800 border-b border-emerald-200/50 pb-1.5">
-                    <span>Summary Payout Preview</span>
-                    <span className="font-mono text-emerald-700">
-                      {formatMonthYear(processForm.month, processForm.year)}
-                    </span>
+              {/* Module 5: Integrated Salary Preview & Expandable Employee Deduction Breakdown */}
+              {selectedUserActiveStructure && (
+                <div className="space-y-3 pt-2">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/90 space-y-3 text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200 gap-1">
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                          Salary Preview: {companyStaff.find((s) => String(s._id || s.id) === String(processForm.userId))?.name || 'Staff Member'}
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-mono block">
+                          Employee ID: {companyStaff.find((s) => String(s._id || s.id) === String(processForm.userId))?.uniqueID || processForm.userId}
+                        </span>
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Salary Period</span>
+                        <span className="font-bold text-indigo-700 font-mono text-xs">
+                          {formatMonthYear(processForm.month, processForm.year)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-white p-3 rounded-lg border border-slate-200/70">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-semibold">Gross Salary</span>
+                        <span className="font-mono font-bold text-slate-900 text-xs">
+                          {formatINR(processCalculations.grossSalary)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-semibold">Existing Deductions</span>
+                        <span className="font-mono font-semibold text-rose-600">
+                          -{formatINR((processCalculations.totalDeduction || 0) - (processCalculations.customDeductionsSum || 0))}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-semibold">Additional Deductions</span>
+                        <span className="font-mono font-bold text-rose-700">
+                          -{formatINR(processCalculations.customDeductionsSum || 0)}
+                        </span>
+                      </div>
+                      <div className="bg-emerald-50/80 p-1.5 rounded border border-emerald-100">
+                        <span className="text-[10px] text-emerald-800 uppercase block font-bold">Final Net Salary</span>
+                        <span className="font-mono font-black text-emerald-700 text-xs sm:text-sm">
+                          {formatINR(processCalculations.netSalary)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-b border-emerald-200/40 pb-2 text-[11px]">
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Total Days</span>
-                      <span className="font-mono font-bold text-slate-800">{processCalculations.totalDays}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-amber-700 block uppercase">Approved Leaves</span>
-                      <span className="font-mono font-bold text-amber-800">{processCalculations.leaveDays} days</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-emerald-700 block uppercase">Payable Days</span>
-                      <span className="font-mono font-bold text-emerald-800">{processCalculations.daysPayable} days</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-indigo-700 block uppercase">Present Days</span>
-                      <span className="font-mono font-black text-indigo-800">{processCalculations.presentDays} days</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Gross Payout</span>
-                      <span className="font-mono font-bold text-slate-900">
-                        {formatINR(processCalculations.grossSalary)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Total Deduct</span>
-                      <span className="font-mono font-semibold text-rose-600">
-                        -{formatINR(processCalculations.totalDeduction)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">TDS ({processCalculations.tdsPercentage}%)</span>
-                      <span className="font-mono font-semibold text-rose-600">
-                        -{formatINR(processCalculations.tdsAmount)}
-                      </span>
-                    </div>
-                    <div className="bg-emerald-100/70 p-1.5 rounded">
-                      <span className="text-[10px] text-emerald-800 block font-bold uppercase">
-                        Net Disbursed
-                      </span>
-                      <span className="font-mono font-black text-emerald-700 text-sm">
-                        {formatINR(processCalculations.netSalary)}
-                      </span>
-                    </div>
-                  </div>
+                  {/* Expandable Employee Deduction Breakdown Section */}
+                  <DeductionBreakdownSection
+                    deductions={processCustomDeductions}
+                    totalCustomDeductions={processCalculations.customDeductionsSum || 0}
+                    excludedDeductions={processExcludedDeductions}
+                  />
                 </div>
-              )
-              */}
+              )}
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
@@ -4117,7 +4268,7 @@ export const SalaryView = () => {
                   </span>
                   <div className="space-y-1.5 text-slate-700">
                     {viewingPayslipModal.deductionBreakdown.components
-                      .filter((item) => item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount')
+                      .filter((item) => (item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount') && !item.isCustom)
                       .map((item) => (
                         <div key={item.key} className="flex justify-between">
                           <span>
@@ -4128,6 +4279,21 @@ export const SalaryView = () => {
                           </span>
                         </div>
                       ))}
+                    {viewingPayslipModal.deductionBreakdown.customDeductionsList?.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200/60 space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-rose-700 block">
+                          Employee Additional Deductions:
+                        </span>
+                        {viewingPayslipModal.deductionBreakdown.customDeductionsList.map((d, i) => (
+                          <div key={d._id || i} className="flex justify-between text-slate-700 pl-2 border-l border-rose-200">
+                            <span>{d.deductionMasterId?.name || d.name || 'Deduction'}:</span>
+                            <span className="font-mono font-semibold text-rose-600">
+                              -{formatINR(d.amount)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {Math.abs(viewingPayslipModal.deductionBreakdown.reconciliation) >= 0.01 && (
                       <div className="flex justify-between text-rose-700">
                         <span>Unitemized Deduction Reconciliation:</span>

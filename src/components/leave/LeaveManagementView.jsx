@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LoadingScreen } from '../common/Loader.jsx';
+import { LoadingScreen, TableSkeleton } from '../common/Loader.jsx';
 import { 
   Plus, CheckCircle2, Clock, XCircle, 
   Paperclip, Search, Info, Calendar, FileText, Loader2, RefreshCw, AlertCircle, AlertTriangle, UserX, UserCheck
@@ -808,7 +808,7 @@ export const LeaveManagementView = () => {
 
         <div className="overflow-x-auto">
           {isLoading ? (
-            <LoadingScreen message="Loading history..." />
+            <TableSkeleton rows={5} cols={4} />
           ) : (
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wider border-b border-slate-200">

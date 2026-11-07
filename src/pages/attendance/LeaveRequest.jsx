@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LoadingScreen } from "../../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
 import {
   Calendar,
   CalendarDays,
@@ -1627,10 +1627,7 @@ export default function LeaveRequest() {
   // ==========================================================
 
   const Loader = () => (
-    <LoadingScreen
-      message="Loading leave requests..."
-      description="Fetching latest employee leave applications"
-    />
+    <TableSkeleton rows={7} cols={6} />
   );
 
   // ==========================================================

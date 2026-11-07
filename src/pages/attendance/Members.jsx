@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BASE_URL } from "../../api/config";
-import { LoadingScreen } from "../../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
 import { 
   Users, 
   UserPlus, 
@@ -1344,10 +1344,7 @@ const fetchAllMembers = async () => {
 
         {/* Content */}
         {loading ? (
-          <LoadingScreen
-            message="Loading team members..."
-            description="Fetching live roles and attendance profiles"
-          />
+          <TableSkeleton rows={7} cols={5} />
         ) : error ? (
           <div className="border border-rose-200 bg-rose-50/80 rounded-xl px-4 py-3 text-rose-700 flex items-center gap-2.5 text-sm">
             <UserX className="w-4 h-4 text-rose-600 flex-shrink-0" />

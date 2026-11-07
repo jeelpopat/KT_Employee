@@ -88,6 +88,15 @@ const getEmployeeRequestCount = (payload) => {
   }).length;
 };
 
+const getDeductionRequestCount = (payload) => {
+  const records = getResponseRecords(payload, ['deductions', 'data', 'records', 'items', 'result']);
+  return records.filter((record) => {
+    if (!record) return false;
+    const status = String(record.status || '').trim().toLowerCase();
+    return status === 'pending';
+  }).length;
+};
+
 // ==========================================================
 // EXACT REFERENCE ICONS MATCHING USER SCREENSHOT (media_1792663861944.png)
 // ==========================================================
@@ -210,6 +219,15 @@ const SalaryIcon = ({ size = 18, className = "" }) => (
   </svg>
 );
 
+// Deduction Icon: Document with minus sign
+const DeductionIcon = ({ size = 18, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="9" y1="15" x2="15" y2="15" strokeWidth="2.5" />
+  </svg>
+);
+
 // 13. Task Management: Checklist
 const TaskManagementIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -302,10 +320,10 @@ export const Sidebar = ({ onSignOut }) => {
     isMobileSidebarOpen, setIsMobileSidebarOpen,
     attendanceStatus, handleCheckOut, userRole
   } = useApp();
-  const [requestCountState, setRequestCountState] = useState({ role: '', checkIn: 0, leave: 0, employee: 0 });
+  const [requestCountState, setRequestCountState] = useState({ role: '', checkIn: 0, leave: 0, employee: 0, deduction: 0 });
   const requestCounts = requestCountState.role === userRole
     ? requestCountState
-    : { checkIn: 0, leave: 0, employee: 0 };
+    : { checkIn: 0, leave: 0, employee: 0, deduction: 0 };
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -323,14 +341,15 @@ export const Sidebar = ({ onSignOut }) => {
         api.get(`/api/attendance/pending?_t=${Date.now()}`, { skipCache: true }),
         api.get(`/api/leave/all?_t=${Date.now()}`, { skipCache: true }),
         api.get(`/api/users/all?_t=${Date.now()}`, { skipCache: true }),
+        api.get(`/api/employee-deductions?status=Pending&_t=${Date.now()}`, { skipCache: true }).catch(() => api.get(`/api/deductions?status=Pending&_t=${Date.now()}`, { skipCache: true }))
       ]);
 
       isRefreshing = false;
       if (!isMounted) return;
 
       const countUpdates = {};
-      const countGetters = [getCheckInRequestCount, getLeaveRequestCount, getEmployeeRequestCount];
-      const countKeys = ['checkIn', 'leave', 'employee'];
+      const countGetters = [getCheckInRequestCount, getLeaveRequestCount, getEmployeeRequestCount, getDeductionRequestCount];
+      const countKeys = ['checkIn', 'leave', 'employee', 'deduction'];
 
       results.forEach((result, index) => {
         if (result.status === 'fulfilled') {
@@ -342,7 +361,7 @@ export const Sidebar = ({ onSignOut }) => {
 
       if (Object.keys(countUpdates).length > 0) {
         setRequestCountState((previous) => ({
-          ...(previous.role === userRole ? previous : { checkIn: 0, leave: 0, employee: 0 }),
+          ...(previous.role === userRole ? previous : { checkIn: 0, leave: 0, employee: 0, deduction: 0 }),
           ...countUpdates,
           role: userRole,
         }));
@@ -395,6 +414,9 @@ export const Sidebar = ({ onSignOut }) => {
       'team-leaves': ['team-leaves', 'admin-leave-requests'],
       'admin-settings': ['settings', 'admin-settings', 'setting'],
       'settings': ['settings', 'admin-settings', 'setting'],
+      'employee-deductions': ['employee-deductions', 'deduction-approvals', 'deductions'],
+      'team-deductions': ['team-deductions', 'employee-deductions'],
+      'my-deductions': ['my-deductions'],
     };
 
     if (aliases[itemTab] && aliases[itemTab].includes(currentTab)) {
@@ -439,6 +461,9 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'admin-team-lead', label: 'Team Leads', icon: TeamLeadsIcon },
         { tab: 'salary', label: 'Salary & Payroll', icon: SalaryIcon },
+        { tab: 'deduction-master', label: 'Deduction Master', icon: DeductionIcon },
+        { tab: 'employee-deductions', label: 'Employee Deductions', icon: DeductionIcon, requestCount: requestCounts.deduction },
+        { tab: 'deduction-reports', label: 'Deduction Reports', icon: PerformanceIcon },
         { tab: 'admin-team-tasks', label: 'Task Management', icon: TaskManagementIcon },
       ]
     },
@@ -489,6 +514,9 @@ export const Sidebar = ({ onSignOut }) => {
         // { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon, requestCount: requestCounts.employee },
         { tab: 'admin-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'salary', label: 'Salary & Payroll', icon: SalaryIcon },
+        { tab: 'deduction-master', label: 'Deduction Master', icon: DeductionIcon },
+        { tab: 'employee-deductions', label: 'Employee Deductions', icon: DeductionIcon, requestCount: requestCounts.deduction },
+        { tab: 'deduction-reports', label: 'Deduction Reports', icon: PerformanceIcon },
         { tab: 'admin-team-tasks', label: 'Task Management', icon: TaskManagementIcon },
       ]
     },
@@ -527,6 +555,7 @@ export const Sidebar = ({ onSignOut }) => {
       items: [
         { tab: 'team-tasks', label: 'Task Management', icon: TaskManagementIcon },
         { tab: 'team-leaves', label: 'Team Leave Requests', icon: LeaveRequestsIcon },
+        { tab: 'team-deductions', label: 'Team Deductions', icon: DeductionIcon },
         { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: CheckInsIcon },
         { tab: 'team-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'employees', label: 'Employees', icon: EmployeeIcon },
@@ -540,6 +569,7 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'projects', label: 'My Projects', icon: ProjectsIcon },
         { tab: 'leave', label: 'My Leaves', icon: LeaveRequestsIcon },
         { tab: 'salary', label: 'My Salary', icon: SalaryIcon },
+        { tab: 'my-deductions', label: 'My Deductions', icon: DeductionIcon },
         { tab: 'daily-report', label: 'Daily Report', icon: DailyReportIcon },
         { tab: 'holiday', label: 'Holidays', icon: HolidaysIcon },
       ]
@@ -574,6 +604,7 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
         { tab: 'leave', label: 'My Leaves', icon: LeaveRequestsIcon },
         { tab: 'salary', label: 'Salary', icon: SalaryIcon },
+        { tab: 'my-deductions', label: 'My Deductions', icon: DeductionIcon },
         { tab: 'holiday', label: 'Holidays', icon: HolidaysIcon },
         { tab: 'team-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'employees', label: 'Employees', icon: EmployeeIcon },

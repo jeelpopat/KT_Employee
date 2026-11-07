@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { LoadingScreen } from '../../components/common/Loader.jsx';
+import { LoadingScreen, TableSkeleton } from '../../components/common/Loader.jsx';
 import { Loader2, Calendar, Trash2 } from 'lucide-react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { invalidateCache } from '../../api/axios.js';
@@ -695,10 +695,7 @@ export default function Holidays() {
       <div>
         <div className="w-full">
           {loading ? (
-            <LoadingScreen
-              message="Loading holiday schedule..."
-              description="Fetching official office calendar and festive breaks"
-            />
+            <TableSkeleton rows={6} cols={4} />
           ) : view === 'calendar' ? (
             renderCalendar()
           ) : (

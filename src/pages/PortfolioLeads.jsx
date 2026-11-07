@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { LoadingScreen } from "../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../components/common/Loader.jsx";
 import { BASE_URL } from "../api/config";
 import { 
   Users, Mail, FolderOpen, Search, Filter, TrendingUp, Clock, ChevronDown, 
@@ -362,7 +362,7 @@ export default function PortfolioLeads() {
           </div>
 
           {loading ? (
-            <LoadingScreen message="Loading portfolio leads..." />
+            <TableSkeleton rows={7} cols={6} />
           ) : filteredLeads.length === 0 ? (
             <div className="text-center py-16 sm:py-20">
               <div className="flex justify-center mb-4">

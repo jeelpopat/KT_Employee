@@ -17,6 +17,8 @@ const TTL_CONFIG = [
   { pattern: /\/api\/projectManage\/project\/all/, ttl: 2 * 60 * 1000 },// 2 minutes
   { pattern: /\/api\/projectManage\/project\/members\//, ttl: 5 * 60 * 1000 }, // 5 minutes
   { pattern: /\/api\/payroll/, ttl: 60 * 1000 },                        // 1 minute
+  { pattern: /\/api\/deduction/, ttl: 30 * 1000 },                      // 30 seconds
+  { pattern: /\/api\/employee-deduction/, ttl: 30 * 1000 },             // 30 seconds
   { pattern: /\/api\/task\/all/, ttl: 60 * 1000 },                      // 1 minute
   { pattern: /\/api\/employee-panel\/dashboard/, ttl: 30 * 1000 },      // 30 seconds
   { pattern: /\/api\/employee-panel\/leaves\/overview/, ttl: 60 * 1000 }, // 1 minute
@@ -58,9 +60,10 @@ const invalidateOnMutation = (url = '') => {
     invalidateCache(/holiday/);
   } else if (urlLower.includes('/project')) {
     invalidateCache(/project/);
-  } else if (urlLower.includes('/salary') || urlLower.includes('/payroll')) {
+  } else if (urlLower.includes('/salary') || urlLower.includes('/payroll') || urlLower.includes('/deduction')) {
     invalidateCache(/salary/);
     invalidateCache(/payroll/);
+    invalidateCache(/deduction/);
   } else if (urlLower.includes('/screenshot') || urlLower.includes('/monitoring')) {
     invalidateCache(/screenshot/);
     invalidateCache(/monitoring/);

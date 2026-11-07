@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LoadingScreen } from "../../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
@@ -2268,10 +2268,7 @@ export default function AttendanceLogs() {
 
         {/* LOADING & TABLE */}
         {loading ? (
-          <LoadingScreen
-            message="Loading attendance records..."
-            description={`Fetching latest team logs for ${formatIndianDate(selectedDate)}`}
-          />
+          <TableSkeleton rows={7} cols={6} />
         ) : filteredAndSortedLogs.length === 0 ? (
           <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50 font-poppins">
             <Clock size={36} className="text-slate-300 mx-auto mb-3" />

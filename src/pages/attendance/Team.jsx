@@ -2662,7 +2662,22 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
           {/* Project List */}
         {loading ? (
-          <LoadingScreen message="Loading projects and tasks..." />
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white border border-slate-200/80 rounded-xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 skeleton-shimmer" />
+                    <div className="space-y-1.5">
+                      <div className="w-40 h-4 bg-slate-100 skeleton-shimmer rounded" />
+                      <div className="w-24 h-3 bg-slate-100 skeleton-shimmer rounded" />
+                    </div>
+                  </div>
+                  <div className="w-20 h-7 bg-slate-100 skeleton-shimmer rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="space-y-4">
             {filteredProjects.length > 0 ? (

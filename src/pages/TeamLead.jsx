@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { LoadingScreen } from "../components/common/Loader.jsx";
+import { LoadingScreen, PageSkeleton } from "../components/common/Loader.jsx";
 import axios from "axios";
 import { AlertTriangle, ArrowRight, Crown, X } from "lucide-react";
 import {
@@ -1750,7 +1750,7 @@ const getDesignation = (lead) => {
   const isAdmin = userRole === 'admin';
 
   if (loading) {
-    return <LoadingScreen message="Loading team lead data..." />;
+    return <PageSkeleton />;
   }
  
   if (error) {

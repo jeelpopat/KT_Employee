@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { LoadingScreen } from "../../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
 import {
   Users,
   Plus,
@@ -1237,10 +1237,7 @@ export default function Employees() {
               LOADING & EMPTY STATES
           ================================================== */}
         {loading ? (
-          <LoadingScreen
-            message="Loading employee directory..."
-            description="Fetching team records and credentials"
-          />
+          <TableSkeleton rows={8} cols={6} />
         ) : filteredEmployees.length === 0 ? (
           <div className="py-16 text-center font-poppins">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-slate-100 mb-4 text-[#034665]">

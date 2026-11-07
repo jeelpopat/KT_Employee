@@ -40,6 +40,13 @@ export const pathToTab = {
   '/learning-hub': 'learning-hub',
   '/documents': 'documents',
   '/report': 'report',
+  '/deduction-master': 'deduction-master',
+  '/employee-deductions': 'employee-deductions',
+  '/deductions': 'employee-deductions',
+  '/deduction-approvals': 'employee-deductions',
+  '/deduction-reports': 'deduction-reports',
+  '/team-deductions': 'team-deductions',
+  '/my-deductions': 'my-deductions',
 };
 
 export const tabToPath = {
@@ -81,5 +88,11 @@ export const tabToPath = {
   'learning-hub': '/learning-hub',
   'documents': '/documents',
   'report': '/report',
+  'deduction-master': '/deduction-master',
+  'employee-deductions': '/employee-deductions',
+  'deduction-approvals': '/employee-deductions',
+  'deduction-reports': '/deduction-reports',
+  'team-deductions': '/team-deductions',
+  'my-deductions': '/my-deductions',
 };
 

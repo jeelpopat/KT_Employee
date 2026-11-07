@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { LoadingScreen } from '../components/common/Loader.jsx';
+import { LoadingScreen, TableSkeleton } from '../components/common/Loader.jsx';
 import {
   Users,
   CheckCircle,
@@ -2191,7 +2191,7 @@ const EmployeeRequests = () => {
 
       {/* Loading State */}
       {loading && (
-        <LoadingScreen message="Loading employee requests..." />
+        <TableSkeleton rows={8} cols={6} />
       )}
 
       {/* Error State */}

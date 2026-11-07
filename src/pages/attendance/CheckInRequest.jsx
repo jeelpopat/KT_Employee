@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LoadingScreen } from "../../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
 import {
   Clock,
   CheckCircle,
@@ -1507,10 +1507,7 @@ export default function CheckInRequest() {
 
         {/* Loading State */}
         {loading && requests.length === 0 ? (
-          <LoadingScreen
-            message="Loading check-in requests..."
-            description="Fetching employee attendance punch-in submissions"
-          />
+          <TableSkeleton rows={6} cols={6} />
         ) : filteredRequests.length === 0 ? (
           /* Empty State */
           <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50 font-poppins">

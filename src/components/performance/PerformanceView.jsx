@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LoadingScreen } from '../common/Loader.jsx';
+import { LoadingScreen, CardSkeleton } from '../common/Loader.jsx';
 import { TrendingUp, RefreshCw, Loader2, Award } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
@@ -286,7 +286,11 @@ export const PerformanceView = () => {
       </div>
 
       {initialLoading && !hasLoadedRef.current && !performanceData ? (
-        <LoadingScreen message="Loading your performance metrics..." />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
       ) : !performanceData ? (
         <div className="flex flex-col items-center justify-center p-16 bg-white border border-slate-200/80 rounded-xl text-center space-y-3">
           <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">

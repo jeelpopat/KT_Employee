@@ -978,7 +978,11 @@ export const AdminScreenshotPortal = () => {
         </div>
 
         {isLoading ? (
-          <LoadingScreen message="Loading screenshot archives..." />
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="aspect-video bg-slate-100 skeleton-shimmer rounded-xl border border-slate-200/80" />
+            ))}
+          </div>
         ) : filteredScreenshots.length === 0 ? (
           <div className="p-16 text-center space-y-2">
             <Camera size={36} className="mx-auto text-slate-400" />

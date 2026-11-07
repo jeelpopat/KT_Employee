@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LoadingScreen } from '../common/Loader.jsx';
+import { LoadingScreen, TableSkeleton } from '../common/Loader.jsx';
 import { 
   PhoneCall, Clock, Calendar, User, Briefcase, AlertCircle, 
   CheckCircle2, Search, ChevronDown, ChevronUp, RefreshCw, 
@@ -450,7 +450,7 @@ export const DailyFollowUpView = () => {
 
       {/* 3. Loading & Error States */}
       {isLoading ? (
-        <LoadingScreen message="Loading Team Daily Reports..." />
+        <TableSkeleton rows={6} cols={5} />
       ) : fetchError && groupedByPerson.length === 0 ? (
         <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center space-y-2">
           <AlertCircle size={28} className="text-rose-600 mx-auto" />

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, ArrowUpDown, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
-import { LoadingScreen } from './Loader.jsx';
+import { LoadingScreen, Skeleton } from './Loader.jsx';
 import EmptyState from './EmptyState';
 
 export const Table = ({
@@ -120,11 +120,26 @@ export const Table = ({
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {isLoading ? (
-                <tr>
-                  <td colSpan={columns.length} className="p-0">
-                    <LoadingScreen message="Loading records..." />
-                  </td>
-                </tr>
+                Array.from({ length: 6 }).map((_, rIdx) => (
+                  <tr key={`tbl-skel-${rIdx}`} className="border-b border-slate-100">
+                    {columns.map((col, cIdx) => (
+                      <td key={`tbl-col-${cIdx}`} className="py-2.5 px-3.5">
+                        <div className="flex items-center gap-2">
+                          {cIdx === 0 && <Skeleton className="w-6 h-6 rounded-full shrink-0" />}
+                          <Skeleton
+                            className={`h-3.5 ${
+                              cIdx === 0
+                                ? 'w-28'
+                                : cIdx === columns.length - 1
+                                ? 'w-14 ml-auto'
+                                : 'w-20'
+                            }`}
+                          />
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : paginatedData.length > 0 ? (
                 paginatedData.map((row, idx) => (
                   <tr

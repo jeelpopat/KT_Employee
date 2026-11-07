@@ -715,7 +715,27 @@ export const ProjectView = () => {
 
       {/* Projects Grid */}
       {isLoading ? (
-        <LoadingScreen message="Loading live projects and assigned team members..." />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1.5 w-3/4">
+                  <div className="h-5 w-40 bg-slate-100 skeleton-shimmer rounded" />
+                  <div className="h-3 w-28 bg-slate-100 skeleton-shimmer rounded" />
+                </div>
+                <div className="w-16 h-6 bg-slate-100 skeleton-shimmer rounded-full" />
+              </div>
+              <div className="h-3 w-full bg-slate-100 skeleton-shimmer rounded" />
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <div className="flex justify-between">
+                  <div className="h-3 w-16 bg-slate-100 skeleton-shimmer rounded" />
+                  <div className="h-3 w-12 bg-slate-100 skeleton-shimmer rounded" />
+                </div>
+                <div className="h-2 w-full bg-slate-100 skeleton-shimmer rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : filteredProjects.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-lg p-12 text-center shadow-xs">
           <FolderKanban size={40} className="mx-auto text-slate-400 mb-3 opacity-60" />

@@ -1,18 +1,53 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { 
+  Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, 
+  Sparkles, Shield, User, CheckCircle2, AlertCircle, Phone 
+} from 'lucide-react';
 import api, { clearApiCache } from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
-import Button from '../common/Button.jsx';
-import Input from '../common/Input.jsx';
+import whiteLogo from '../../assets/white logo.png';
+import colorLogo from '../../assets/Logo.png';
 
-export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
+export const LoginView = ({ 
+  initialMode = 'login',
+  onLoginSuccess, 
+  onForgotPassword,
+  onNavigateToRegister
+}) => {
   const { loginUser } = useApp();
+  const [mode, setMode] = useState(initialMode); // 'login' | 'register'
+  
+  // Login Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Register Form States (When in register mode)
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regRole, setRegRole] = useState('employee');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [regShowPassword, setRegShowPassword] = useState(false);
+  const [regAgreeTerms, setRegAgreeTerms] = useState(true);
+  const [regSuccess, setRegSuccess] = useState(false);
+
+  // Registration Password Strength Calculation
+  const hasMinLength = regPassword.length >= 8;
+  const hasLetter = /[A-Za-z]/.test(regPassword);
+  const hasNumber = /\d/.test(regPassword);
+  const passwordsMatch = regPassword.length > 0 && regPassword === regConfirmPassword;
+  const strengthScore = [hasMinLength, hasLetter, hasNumber].filter(Boolean).length;
+  const strengthColor = strengthScore === 3 ? 'bg-emerald-500' : strengthScore === 2 ? 'bg-amber-500' : 'bg-rose-500';
+  const strengthLabel = strengthScore === 3 ? 'Strong' : strengthScore === 2 ? 'Medium' : 'Weak';
+
+  // -------------------------------------------------------------
+  // LOGIN SUBMISSION HANDLER
+  // -------------------------------------------------------------
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -32,11 +67,24 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
     localStorage.removeItem('kt_employee_full_name');
 
     try {
-      const response = await api.post('/api/users/login', {
-        login: email,
-        email: email,
-        password: password
-      });
+      let response;
+      try {
+        response = await api.post('/api/users/login', {
+          login: email.trim(),
+          email: email.trim(),
+          password: password
+        });
+      } catch (postErr) {
+        if (postErr.response?.status === 404) {
+          response = await api.post('/api/auth/login', {
+            login: email.trim(),
+            email: email.trim(),
+            password: password
+          });
+        } else {
+          throw postErr;
+        }
+      }
 
       const data = response.data || {};
 
@@ -69,7 +117,7 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
 
     } catch (err) {
       console.error('Login error:', err);
-      let errorMessage = 'Server is unavailable. Please try again.';
+      let errorMessage = 'Invalid credentials or server unavailable. Please try again.';
       if (err.message && err.message.toLowerCase().includes('unauthorized')) {
         errorMessage = err.message;
       } else if (err.response?.data?.message) {
@@ -85,78 +133,587 @@ export const LoginView = ({ onLoginSuccess, onForgotPassword }) => {
     }
   };
 
+  // -------------------------------------------------------------
+  // REGISTRATION SUBMISSION HANDLER
+  // -------------------------------------------------------------
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!hasMinLength || !hasLetter || !hasNumber) {
+      setError('Password must be at least 8 characters and include at least one letter and one number.');
+      return;
+    }
+
+    if (regPassword !== regConfirmPassword) {
+      setError('Passwords do not match. Please verify.');
+      return;
+    }
+
+    if (!regAgreeTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      let formattedPhone = regPhone.trim();
+      if (formattedPhone && !formattedPhone.startsWith('+')) {
+        formattedPhone = `+91${formattedPhone.replace(/^0+/, '')}`;
+      }
+
+      const payload = {
+        name: regName.trim(),
+        email: regEmail.trim().toLowerCase(),
+        password: regPassword,
+        role: regRole.toLowerCase(),
+        phone: formattedPhone || undefined,
+        phoneNumber: formattedPhone || undefined
+      };
+
+      try {
+        await api.post('/api/auth/register', payload);
+      } catch (authErr) {
+        if (authErr.response?.status === 404) {
+          await api.post('/api/users/register', payload);
+        } else {
+          throw authErr;
+        }
+      }
+
+      setRegSuccess(true);
+      setEmail(regEmail.trim());
+    } catch (err) {
+      console.error('Registration error:', err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Registration failed. Please check your inputs and try again.';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8 antialiased font-sans">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200/80 bg-white p-6 shadow-xs animate-fade-in">
-        
-        {/* Header Icon & Title matching KT-admin */}
-        <div className="mb-5 text-center flex flex-col items-center">
-          <div className="h-10 w-10 rounded-xl bg-indigo-50 border border-indigo-200/60 flex items-center justify-center text-indigo-600 mb-3 shadow-xs">
-            <ShieldCheck className="h-5 w-5" />
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#FAFCFD] font-poppins selection:bg-[#068DCB] selection:text-white antialiased">
+      
+      {/* ============================================================== */}
+      {/* LEFT COLUMN: HERO BRANDING & PRODUCT HIGHLIGHTS (DESKTOP)     */}
+      {/* ============================================================== */}
+      <div 
+        className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-10 xl:p-14 text-white relative overflow-hidden shrink-0"
+        style={{
+          background: 'linear-gradient(145deg, #022e43 0%, #034665 40%, #055c83 75%, #068DCB 100%)'
+        }}
+      >
+        {/* Ambient Decorative Glow Orbs */}
+        <div className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 bg-cyan-400/20 rounded-full blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl" />
+        <div className="pointer-events-none absolute top-1/2 left-1/3 w-72 h-72 bg-sky-300/10 rounded-full blur-2xl" />
+
+        {/* Top Brand Logo & Version Pill */}
+        <div className="relative z-10 flex items-center justify-between">
+          <img 
+            src={whiteLogo} 
+            alt="Kevalon Technology" 
+            className="h-10 w-auto object-contain drop-shadow-md"
+          />
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-medium tracking-wide">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Enterprise Suite v2.4</span>
           </div>
-          <h1 className="text-lg font-semibold text-slate-900 tracking-tight">
-            Welcome Back
-          </h1>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Sign in to access your portal workspace
-          </p>
         </div>
 
-        {/* Form matching KT-admin */}
-        <form onSubmit={handleLogin} className="space-y-3.5">
-          <Input
-            label="Email Address"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@kevalon.com"
-            leftIcon={Mail}
-            required
-          />
-
-          <div>
-            <Input
-              label="Password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              leftIcon={Lock}
-              rightIcon={showPassword ? EyeOff : Eye}
-              onRightIconClick={() => setShowPassword(!showPassword)}
-              rightIconAriaLabel={showPassword ? 'Hide password' : 'Show password'}
-              required
-            />
-            <div className="flex justify-end mt-1.5">
-              <button
-                type="button"
-                onClick={onForgotPassword}
-                className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
-              >
-                Forgot Password?
-              </button>
-            </div>
+        {/* Center Hero Content */}
+        <div className="relative z-10 my-auto py-8 max-w-lg">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-sky-400/20 to-blue-500/20 border border-sky-300/30 text-sky-200 text-xs font-medium mb-6 backdrop-blur-xs">
+            <Sparkles size={14} className="text-sky-300 animate-spin-slow" />
+            <span>Intelligent HRMS & Operations Portal</span>
           </div>
 
-          {error && (
-            <div className="p-2 rounded-lg bg-rose-50 border border-rose-200/60 text-xs font-medium text-rose-600 text-center">
-              {error}
+          <h1 className="text-3xl xl:text-4xl font-bold tracking-tight text-white leading-tight">
+            Manage your team, attendance & payroll in one place
+          </h1>
+          <p className="mt-4 text-sm xl:text-base text-sky-100/80 leading-relaxed font-light">
+            Empower your workforce with high-precision time tracking, geofenced mobile verification, automated salary disbursements, and itemized deduction management.
+          </p>
+
+          {/* Interactive Feature Cards */}
+          <div className="mt-8 space-y-3.5">
+            {[
+              {
+                icon: ShieldCheck,
+                title: 'Automated Attendance & GPS Check-In',
+                desc: 'Geofenced punch-in verification with live break and activity logs.'
+              },
+              {
+                icon: Shield,
+                title: 'Integrated Payroll & Deduction Engine',
+                desc: 'Itemized deduction ledgers, legal compliance, and 1-click payslips.'
+              },
+              {
+                icon: User,
+                title: 'Role-Based Workspace Governance',
+                desc: 'Dedicated views for Employees, Team Leaders, HR and Executives.'
+              }
+            ].map((f, idx) => (
+              <div 
+                key={idx}
+                className="flex items-start gap-3.5 p-3.5 rounded-xl bg-white/10 hover:bg-white/15 transition-all border border-white/10 backdrop-blur-md"
+              >
+                <div className="w-8 h-8 rounded-lg bg-sky-400/25 flex items-center justify-center shrink-0 border border-sky-300/30 text-sky-200 mt-0.5">
+                  <f.icon size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-white tracking-wide">{f.title}</h4>
+                  <p className="text-[11px] text-sky-100/70 mt-0.5 leading-snug">{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Trust & Compliance Bar */}
+        <div className="relative z-10 pt-6 border-t border-white/15 flex items-center justify-between text-xs text-sky-200/70">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              99.98% Uptime
+            </span>
+            <span>•</span>
+            <span>256-Bit SSL Encrypted</span>
+          </div>
+          <span>© {new Date().getFullYear()} Kevalon Technology</span>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* RIGHT COLUMN: INTERACTIVE AUTH PANEL                          */}
+      {/* ============================================================== */}
+      <div className="w-full lg:w-7/12 xl:w-1/2 flex flex-col justify-between p-6 sm:p-10 xl:p-14 overflow-y-auto">
+        
+        {/* Mobile Header with Logo */}
+        <div className="flex lg:hidden items-center justify-between mb-8 pb-4 border-b border-slate-100">
+          <img 
+            src={colorLogo} 
+            alt="Kevalon Technology" 
+            className="h-8 w-auto object-contain"
+          />
+          <div className="flex items-center gap-1 text-xs font-semibold text-[#0088cc]">
+            <ShieldCheck size={14} />
+            <span>HRMS Portal</span>
+          </div>
+        </div>
+
+        <div className="max-w-md w-full mx-auto my-auto py-4">
+          
+          {/* Segmented Mode Switcher: Sign In vs Create Account */}
+          <div className="p-1 bg-slate-100 rounded-xl flex items-center mb-7 border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setError(''); }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                mode === 'login'
+                  ? 'bg-white text-[#0088cc] shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span>Sign In</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('register'); setError(''); }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                mode === 'register'
+                  ? 'bg-white text-[#0088cc] shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span>Create Account</span>
+            </button>
+          </div>
+
+          {/* ========================================================== */}
+          {/* VIEW A: SIGN IN FORM                                       */}
+          {/* ========================================================== */}
+          {mode === 'login' && (
+            <div className="animate-fade-in space-y-6">
+              
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  Welcome Back
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Enter your credentials to access your Kevalon workspace.
+                </p>
+              </div>
+
+              {/* Error Alert */}
+              {error && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-xs text-rose-700 flex items-start gap-2.5 animate-fade-in">
+                  <AlertCircle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                  <span className="font-medium">{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                {/* Email Input */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Official Email or Username <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@kevalon.com"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Password Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Password <span className="text-rose-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={onForgotPassword}
+                      className="text-2xs font-semibold text-[#0088cc] hover:underline cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember Me Checkbox */}
+                <div className="flex items-center justify-between pt-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-500">Remember this device</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400">SSL Protected</span>
+                </div>
+
+                {/* Submit Primary Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-11 btn-brand-primary text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition cursor-pointer disabled:opacity-60"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Signing In...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Sign In to Workspace</span>
+                      <ArrowRight size={15} />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Bottom Toggle Note */}
+              <div className="pt-2 text-center border-t border-slate-100">
+                <p className="text-xs text-slate-500">
+                  New to Kevalon Technology?{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setMode('register'); setError(''); }}
+                    className="font-semibold text-[#0088cc] hover:underline cursor-pointer ml-1"
+                  >
+                    Create an account
+                  </button>
+                </p>
+              </div>
             </div>
           )}
 
-          <Button
-            type="submit"
-            isLoading={isLoading}
-            className="w-full py-2 text-xs font-semibold"
-          >
-            {isLoading ? "Signing In..." : "Sign In"}
-          </Button>
-        </form>
+          {/* ========================================================== */}
+          {/* VIEW B: CREATE ACCOUNT / REGISTER FORM                     */}
+          {/* ========================================================== */}
+          {mode === 'register' && (
+            <div className="animate-fade-in space-y-6">
+              
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  Create your account
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Set up your Kevalon HRMS credentials and workspace profile.
+                </p>
+              </div>
 
-        <div className="mt-5 pt-4 border-t border-slate-100 text-center">
-          <p className="text-[11px] text-slate-400">
-            Kevalon Technology © {new Date().getFullYear()}
-          </p>
+              {regSuccess ? (
+                /* Registration Success Card */
+                <div className="bg-white rounded-2xl border border-emerald-200/80 p-7 shadow-xs text-center space-y-4 animate-fade-in">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto text-emerald-600 shadow-xs">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+                      Account Registered!
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+                      Your credentials have been generated for <span className="font-semibold text-slate-700">{regEmail}</span>. You can now sign in to your workspace.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setRegSuccess(false); setMode('login'); }}
+                    className="w-full h-11 btn-brand-primary text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-sm cursor-pointer hover:shadow-md transition"
+                  >
+                    <span>Proceed to Sign In</span>
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              ) : (
+                /* Register Form */
+                <form onSubmit={handleRegister} className="space-y-3.5">
+                  
+                  {/* Error Alert */}
+                  {error && (
+                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-xs text-rose-700 flex items-start gap-2.5 animate-fade-in">
+                      <AlertCircle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                      <span className="font-medium">{error}</span>
+                    </div>
+                  )}
+
+                  {/* Full Name */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        placeholder="e.g. Rahul Sharma"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Work Email */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Work Email Address <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="email"
+                        required
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        placeholder="name@kevalon.com"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Phone & Role (Grid) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Phone Number
+                      </label>
+                      <div className="relative">
+                        <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="tel"
+                          value={regPhone}
+                          onChange={(e) => setRegPhone(e.target.value)}
+                          placeholder="+91 98765 43210"
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Role <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Shield size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={regRole}
+                          onChange={(e) => setRegRole(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer"
+                        >
+                          <option value="employee">Employee</option>
+                          <option value="teamlead">Team Leader</option>
+                          <option value="hr">HR Executive</option>
+                          <option value="admin">Administrator</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Password & Strength */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Password <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type={regShowPassword ? 'text' : 'password'}
+                        required
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRegShowPassword(!regShowPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {regShowPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+
+                    {/* Password Strength Meter */}
+                    {regPassword.length > 0 && (
+                      <div className="mt-2 space-y-1.5 animate-fade-in">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500">Security strength:</span>
+                          <span className="font-semibold text-slate-700">{strengthLabel}</span>
+                        </div>
+                        <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden flex gap-1">
+                          <div className={`h-full flex-1 rounded-full ${strengthColor}`} />
+                          <div className={`h-full flex-1 rounded-full ${strengthScore >= 2 ? strengthColor : 'bg-slate-200'}`} />
+                          <div className={`h-full flex-1 rounded-full ${strengthScore === 3 ? strengthColor : 'bg-slate-200'}`} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Confirm Password <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type={regShowPassword ? 'text' : 'password'}
+                        required
+                        value={regConfirmPassword}
+                        onChange={(e) => setRegConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className={`w-full pl-10 pr-10 py-2.5 bg-white border rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition ${
+                          regConfirmPassword && !passwordsMatch 
+                            ? 'border-rose-300 focus:ring-2 focus:ring-rose-200' 
+                            : regConfirmPassword && passwordsMatch 
+                            ? 'border-emerald-300 focus:ring-2 focus:ring-emerald-200' 
+                            : 'border-slate-200 focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15'
+                        }`}
+                      />
+                      {regConfirmPassword && passwordsMatch && (
+                        <CheckCircle2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Terms */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="regTerms"
+                      checked={regAgreeTerms}
+                      onChange={(e) => setRegAgreeTerms(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer"
+                    />
+                    <label htmlFor="regTerms" className="text-[11px] text-slate-500 cursor-pointer select-none">
+                      I agree to the <span className="text-[#0088cc] hover:underline font-medium">Terms of Service</span> and <span className="text-[#0088cc] hover:underline font-medium">Privacy Policy</span>.
+                    </label>
+                  </div>
+
+                  {/* Register CTA */}
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full h-11 btn-brand-primary text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition cursor-pointer disabled:opacity-60"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Creating Account...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Create Workspace Account</span>
+                        <ArrowRight size={15} />
+                      </>
+                    )}
+                  </button>
+
+                  {/* Back to Sign In Link */}
+                  <div className="text-center pt-2">
+                    <p className="text-xs text-slate-500">
+                      Already registered?{' '}
+                      <button
+                        type="button"
+                        onClick={() => { setMode('login'); setError(''); }}
+                        className="font-semibold text-[#0088cc] hover:underline cursor-pointer ml-1"
+                      >
+                        Sign In
+                      </button>
+                    </p>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        {/* Panel Footer */}
+        <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
+          <span>Kevalon Technology HRMS Suite</span>
+          <div className="flex items-center gap-4">
+            <span className="hover:text-slate-600 transition cursor-pointer">Security Policy</span>
+            <span className="hover:text-slate-600 transition cursor-pointer">Privacy</span>
+            <span className="hover:text-slate-600 transition cursor-pointer">Support</span>
+          </div>
         </div>
       </div>
     </div>

@@ -467,7 +467,21 @@ export const TaskManagementView = () => {
       </div>
 
       {isLoading ? (
-        <LoadingScreen message="Loading live tasks..." />
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-slate-100/60 rounded-xl p-3 border border-slate-200/60 space-y-3">
+              <div className="h-5 w-20 bg-slate-200 skeleton-shimmer rounded" />
+              <div className="space-y-2">
+                {[1, 2].map((j) => (
+                  <div key={j} className="h-24 bg-white rounded-lg border border-slate-200/80 p-3 space-y-2">
+                    <div className="h-4 w-3/4 bg-slate-100 skeleton-shimmer rounded" />
+                    <div className="h-3 w-1/2 bg-slate-100 skeleton-shimmer rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           {viewMode === 'kanban' ? (

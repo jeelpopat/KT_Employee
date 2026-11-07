@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { LoadingScreen } from "../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../components/common/Loader.jsx";
 import { BASE_URL } from "../api/config";
 import { createPortal } from "react-dom";
 import {
@@ -516,7 +516,7 @@ export default function Contacts() {
         {/* Main Content */}
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden p-4 sm:p-5 lg:p-6">
           {loading ? (
-            <LoadingScreen message="Loading contacts..." />
+            <TableSkeleton rows={6} cols={5} />
           ) : filteredContacts.length === 0 ? (
             <div className="text-center py-12 sm:py-16 md:py-20">
               <div className="inline-flex p-4 sm:p-5 md:p-6 rounded-3xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 mb-4">

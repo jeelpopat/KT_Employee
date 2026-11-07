@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LoadingScreen } from "../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../components/common/Loader.jsx";
 import { Briefcase } from "lucide-react";
 import Toast from "../components/common/Toast";
 import { BASE_URL } from "../api/config";
@@ -259,7 +259,7 @@ export default function Applications() {
       {/* Main Content */}
       <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
         {loading ? (
-          <LoadingScreen message="Loading applications..." />
+          <TableSkeleton rows={6} cols={5} />
         ) : applications.length === 0 ? (
           <div className="text-center py-12 sm:py-16">
             <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

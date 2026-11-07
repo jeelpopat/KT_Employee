@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { LoadingScreen } from "../components/common/Loader.jsx";
+import { LoadingScreen, TableSkeleton } from "../components/common/Loader.jsx";
 import { useConfirm } from "../components/common/ConfirmDialog";
 import { BASE_URL } from "../api/config";
 import {
@@ -2383,7 +2383,7 @@ const Performance = () => {
 
         {/* Table Container */}
         {initialLoading && performances.length === 0 ? (
-          <LoadingScreen message="Loading performance data..." />
+          <TableSkeleton rows={8} cols={6} />
         ) : filteredPerformances.length === 0 ? (
           <div className="p-16 text-center font-poppins">
             <Award size={36} className="text-slate-300 mx-auto mb-3" />

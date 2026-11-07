@@ -1589,7 +1589,36 @@ export const ProfileView = () => {
   };
 
   if (isLoadingData) {
-    return <LoadingScreen message="Loading your profile & documents..." />;
+    return (
+      <div className="space-y-6 font-poppins animate-fade-in">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col sm:flex-row items-center gap-5">
+          <div className="w-24 h-24 rounded-full bg-slate-100 skeleton-shimmer shrink-0" />
+          <div className="space-y-2 text-center sm:text-left w-full max-w-md">
+            <div className="h-6 w-48 bg-slate-100 skeleton-shimmer rounded" />
+            <div className="h-4 w-36 bg-slate-100 skeleton-shimmer rounded" />
+            <div className="h-3 w-64 bg-slate-100 skeleton-shimmer rounded" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-4">
+            <div className="h-5 w-36 bg-slate-100 skeleton-shimmer rounded" />
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 bg-slate-100 skeleton-shimmer rounded-lg" />
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-4">
+            <div className="h-5 w-36 bg-slate-100 skeleton-shimmer rounded" />
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 bg-slate-100 skeleton-shimmer rounded-lg" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const fullName = name || resolveEmployeeName(profileData) || resolveEmployeeName(contextUser) || (contextUser?.email ? contextUser.email.split('@')[0] : '') || '';

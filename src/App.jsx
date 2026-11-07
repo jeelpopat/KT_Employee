@@ -8,7 +8,7 @@ import { LoginView } from './components/auth/LoginView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
 import { ToastContainer, showToast } from './components/common/Toast.jsx';
-import { LoadingScreen } from './components/common/Loader.jsx';
+import { LoadingScreen, PageSkeleton, TopProgressBar } from './components/common/Loader.jsx';
 import { stopScreenCapture } from './services/monitoringService.js';
 
 // Lazy-load layout and views so unauthenticated users download ONLY the Login screen
@@ -57,6 +57,9 @@ const DailyFollowUpView = lazy(() => import('./components/placeholders/Placehold
 const TeamTaskManagementView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.TeamTaskManagementView })));
 const TeamLeaveManagementView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.TeamLeaveManagementView })));
 const ReportView = lazy(() => import('./components/placeholders/PlaceholderViews.jsx').then(m => ({ default: m.ReportView })));
+const DeductionMasterView = lazy(() => import('./components/deductions/DeductionMasterView.jsx').then(m => ({ default: m.DeductionMasterView || m.default })));
+const EmployeeDeductionsView = lazy(() => import('./components/deductions/EmployeeDeductionsView.jsx').then(m => ({ default: m.EmployeeDeductionsView || m.default })));
+const DeductionReportsView = lazy(() => import('./components/deductions/DeductionReportsView.jsx').then(m => ({ default: m.DeductionReportsView || m.default })));
 
 const MainLayout = ({ handleSignOut }) => {
   const {
@@ -181,6 +184,12 @@ const MainLayout = ({ handleSignOut }) => {
       case 'team-tasks': return <AdminTeamTasksView />;
       case 'team-leaves': return (userRole === 'admin' || userRole === 'hr') ? <AdminLeaveRequestsView /> : <TeamLeaveManagementView />;
       case 'report': return <ReportView />;
+      case 'deduction-master': return <DeductionMasterView />;
+      case 'employee-deductions':
+      case 'deduction-approvals':
+      case 'team-deductions':
+      case 'my-deductions': return <EmployeeDeductionsView />;
+      case 'deduction-reports': return <DeductionReportsView />;
 
       default: return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;
     }
@@ -227,9 +236,9 @@ const MainLayout = ({ handleSignOut }) => {
         <div className="lg:pl-60 flex flex-col min-h-screen pt-16 bg-[#F4F4F4]">
           <main className="flex-1 p-3 pt-4 sm:p-5 sm:pt-6 lg:p-6 lg:pt-6 bg-[#F4F4F4]">
             <div className="page-content w-full">
-              <Suspense fallback={<LoadingScreen message="Loading section..." />}>
-                    {renderActiveTab()}
-                  </Suspense>
+              <Suspense fallback={<PageSkeleton />}>
+                {renderActiveTab()}
+              </Suspense>
             </div>
           </main>
         </div>
@@ -346,6 +355,12 @@ export default function App() {
       if (path.includes('reset-password') || hasToken) {
         return 'reset_password';
       }
+      if (path.includes('register') || path.includes('signup')) {
+        return 'register';
+      }
+      if (path.includes('forgot-password')) {
+        return 'forgot_password';
+      }
     }
     return 'login';
   });
@@ -449,8 +464,10 @@ export default function App() {
         <ForgotPasswordView onBackToLogin={() => setAuthView('login')} />
       ) : (
         <LoginView
+          initialMode={authView === 'register' ? 'register' : 'login'}
           onLoginSuccess={handleLoginSuccess}
           onForgotPassword={() => setAuthView('forgot_password')}
+          onNavigateToRegister={() => setAuthView('register')}
         />
       )}
     </AppProvider>

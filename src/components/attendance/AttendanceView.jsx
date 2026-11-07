@@ -416,8 +416,26 @@ export const AttendanceView = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {isLoading ? (
-          <div className="xl:col-span-2">
-            <LoadingScreen message="Loading attendance history..." />
+          <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 skeleton-shimmer" />
+                    <div className="space-y-1.5">
+                      <div className="w-24 h-4 bg-slate-100 skeleton-shimmer rounded" />
+                      <div className="w-16 h-3 bg-slate-100 skeleton-shimmer rounded" />
+                    </div>
+                  </div>
+                  <div className="w-20 h-6 bg-slate-100 skeleton-shimmer rounded-full" />
+                </div>
+                <div className="pt-2 grid grid-cols-3 gap-2">
+                  <div className="h-8 bg-slate-50 skeleton-shimmer rounded-lg" />
+                  <div className="h-8 bg-slate-50 skeleton-shimmer rounded-lg" />
+                  <div className="h-8 bg-slate-50 skeleton-shimmer rounded-lg" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredRecords.length === 0 ? (
           <div className="xl:col-span-2 flex flex-col items-center justify-center p-16 space-y-4 bg-white border border-slate-200/80 rounded-xl shadow-xs">
