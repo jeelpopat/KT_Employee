@@ -23,7 +23,7 @@ import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
 import { useApp, deriveUserRole, getRealAuthUserId, resolveEmployeeName } from '../../context/AppContext.jsx';
 import { filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
-import { fetchTeamsList, extractAssignedTeamEmployees, getLoggedInUserIdentifiers } from '../../utils/teamLeadUtils.js';
+import { fetchTeamsList, extractAssignedTeamEmployees, getLoggedInUserIdentifiers, isTeamOwnedByLead } from '../../utils/teamLeadUtils.js';
 
 // Format Indian Rupee Currency
 const formatINR = (val) => {
@@ -202,26 +202,49 @@ export const EmployeeDeductionsView = () => {
         });
 
         const myIdentities = getLoggedInUserIdentifiers(user);
-        const myAssignedTeams = loadedTeams.filter((t) => {
-          const tLeader = t.teamLead || t.teamLeadId || t.teamLeadUser || t.teamLeader;
-          if (!tLeader) return false;
-          if (typeof tLeader === 'string') {
-            return myIdentities.ids.has(tLeader.toLowerCase()) || myIdentities.names.has(tLeader.toLowerCase());
+        const myAssignedTeams = loadedTeams.filter((t) => isTeamOwnedByLead(t, myIdentities));
+
+        const { memberRecords } = extractAssignedTeamEmployees(myAssignedTeams, usersMap);
+
+        // Also identify any direct reporting employees in allUsers
+        const directReports = allUsers.filter((u) => {
+          if (!u) return false;
+          const uId = String(u._id || u.id || '').toLowerCase();
+          if (myIdentities.ids.has(uId)) return false; // Exclude TL themselves
+
+          const repTL = u.teamLeadId || u.teamLead || u.reportingManager || u.teamLeader || u.manager;
+          if (!repTL) return false;
+          if (typeof repTL === 'string' || typeof repTL === 'number') {
+            const s = String(repTL).toLowerCase().trim();
+            return myIdentities.ids.has(s) || (myIdentities.names && myIdentities.names.has(s));
           }
-          if (typeof tLeader === 'object') {
-            const id = tLeader._id || tLeader.id || tLeader.uniqueID;
-            return id && myIdentities.ids.has(String(id).toLowerCase());
+          if (typeof repTL === 'object') {
+            const tlObjId = repTL._id || repTL.id || repTL.userId || repTL.uniqueID;
+            return (
+              (tlObjId && myIdentities.ids.has(String(tlObjId).toLowerCase().trim())) ||
+              (repTL.email && myIdentities.emails && myIdentities.emails.has(String(repTL.email).toLowerCase().trim()))
+            );
           }
           return false;
         });
 
-        const { memberRecords } = extractAssignedTeamEmployees(myAssignedTeams, usersMap);
-        // Exclude the TL themselves from team employee choices
-        const filteredMembers = memberRecords.filter((m) => {
+        // Combine team members and direct reports, deduplicating strictly by ID
+        const combinedMap = new Map();
+        [...memberRecords, ...directReports].forEach((m) => {
+          if (!m) return;
           const mId = String(m._id || m.id || m.uniqueID || '').toLowerCase();
-          return !myIdentities.ids.has(mId);
+          // Guarantee the TL themselves is NEVER shown as an employee under themselves
+          if (!myIdentities.ids.has(mId)) {
+            const canonicalId = m._id || m.id || m.uniqueID;
+            if (canonicalId && !combinedMap.has(String(canonicalId))) {
+              combinedMap.set(String(canonicalId), m);
+            }
+          }
         });
-        setMyTeamMembers(filteredMembers.length > 0 ? filteredMembers : allUsers.filter((u) => u._id !== user?._id));
+
+        const finalTLMembers = Array.from(combinedMap.values());
+        // STRICT: Only show the Team Leader's actual subordinates (never dump all company employees)
+        setMyTeamMembers(finalTLMembers);
       }
     } catch (e) {
       console.warn('Initial data load warning:', e);
@@ -364,16 +387,26 @@ export const EmployeeDeductionsView = () => {
   // Selected Deduction Master in Add Modal
   const selectedMasterDoc = useMemo(() => {
     if (!addForm.deductionMasterId) return null;
-    return masters.find((m) => String(m._id) === String(addForm.deductionMasterId)) || null;
+    return (
+      masters.find(
+        (m) =>
+          String(m._id || m.id) === String(addForm.deductionMasterId) ||
+          String(m.code) === String(addForm.deductionMasterId)
+      ) || null
+    );
   }, [addForm.deductionMasterId, masters]);
 
   // Auto-populate default amount when master changes
   const handleMasterChange = (masterId) => {
-    const doc = masters.find((m) => String(m._id) === String(masterId));
+    const doc = masters.find(
+      (m) =>
+        String(m._id || m.id) === String(masterId) ||
+        String(m.code) === String(masterId)
+    );
     setAddForm((prev) => ({
       ...prev,
       deductionMasterId: masterId,
-      amount: doc ? String(doc.defaultAmount || '') : prev.amount
+      amount: doc ? String(doc.defaultAmount ?? doc.amount ?? '') : prev.amount
     }));
   };
 
@@ -532,6 +565,15 @@ export const EmployeeDeductionsView = () => {
     });
     setAddFormErrors({});
     setIsAddModalOpen(true);
+
+    // Refresh masters immediately if list is empty
+    if (!masters || masters.length === 0) {
+      fetchDeductionMasters().then((list) => {
+        if (Array.isArray(list) && list.length > 0) {
+          setMasters(list);
+        }
+      });
+    }
   };
 
   // Open Edit Modal for Pending Deduction
@@ -1597,49 +1639,60 @@ export const EmployeeDeductionsView = () => {
                   }`}
                 >
                   <option value="">-- Choose Employee --</option>
-                  {(isTL ? myTeamMembers : usersList).map((u) => {
-                    const uRole = getRoleLabel(u);
-                    const code = u.uniqueID || u.employeeID || '';
-                    const uId = String(u._id || u.id).toLowerCase();
-                    const alreadyHasThisDeduction = deductions.some((d) => {
-                      const dEmpId = String(
-                        d.employeeId?._id ||
-                        d.employeeId?.id ||
-                        d.employeeId ||
-                        d.userId?._id ||
-                        d.userId?.id ||
-                        d.userId ||
-                        ''
-                      ).toLowerCase();
-                      const dMasterId = String(
-                        d.deductionMasterId?._id ||
-                        d.deductionMasterId ||
-                        ''
-                      ).toLowerCase();
-                      const dMonth = Number(d.month);
-                      const dYear = Number(d.year);
-                      const dStatus = String(d.status || '').toLowerCase();
-                      return (
-                        dEmpId === uId &&
-                        addForm.deductionMasterId &&
-                        dMasterId === String(addForm.deductionMasterId).toLowerCase() &&
-                        dMonth === Number(addForm.month) &&
-                        dYear === Number(addForm.year) &&
-                        !['cancelled', 'rejected'].includes(dStatus)
-                      );
-                    });
+                  {isTL && myTeamMembers.length === 0 ? (
+                    <option value="" disabled>
+                      No assigned team members found in your team roster
+                    </option>
+                  ) : (
+                    (isTL ? myTeamMembers : usersList).map((u) => {
+                      const uRole = getRoleLabel(u);
+                      const code = u.uniqueID || u.employeeID || '';
+                      const uId = String(u._id || u.id).toLowerCase();
+                      const alreadyHasThisDeduction = deductions.some((d) => {
+                        const dEmpId = String(
+                          d.employeeId?._id ||
+                          d.employeeId?.id ||
+                          d.employeeId ||
+                          d.userId?._id ||
+                          d.userId?.id ||
+                          d.userId ||
+                          ''
+                        ).toLowerCase();
+                        const dMasterId = String(
+                          d.deductionMasterId?._id ||
+                          d.deductionMasterId ||
+                          ''
+                        ).toLowerCase();
+                        const dMonth = Number(d.month);
+                        const dYear = Number(d.year);
+                        const dStatus = String(d.status || '').toLowerCase();
+                        return (
+                          dEmpId === uId &&
+                          addForm.deductionMasterId &&
+                          dMasterId === String(addForm.deductionMasterId).toLowerCase() &&
+                          dMonth === Number(addForm.month) &&
+                          dYear === Number(addForm.year) &&
+                          !['cancelled', 'rejected'].includes(dStatus)
+                        );
+                      });
 
-                    return (
-                      <option key={u._id || u.id} value={u._id || u.id}>
-                        {u.name || u.fullName} {code ? `(${code})` : ''} — [{uRole}]
-                        {alreadyHasThisDeduction ? ' ⚠️ (Already Has This Deduction)' : ''}
-                      </option>
-                    );
-                  })}
+                      return (
+                        <option key={u._id || u.id} value={u._id || u.id}>
+                          {u.name || u.fullName} {code ? `(${code})` : ''} — [{uRole}]
+                          {alreadyHasThisDeduction ? ' ⚠️ (Already Has This Deduction)' : ''}
+                        </option>
+                      );
+                    })
+                  )}
                 </select>
                 {addFormErrors.employeeId && (
                   <p className="mt-1 text-[11px] text-rose-600 font-medium">
                     {addFormErrors.employeeId}
+                  </p>
+                )}
+                {isTL && myTeamMembers.length === 0 && (
+                  <p className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                    ℹ️ You do not currently have any assigned team members in your team. Team Leads can only submit deduction requests for their assigned team members.
                   </p>
                 )}
               </div>
@@ -1707,12 +1760,20 @@ export const EmployeeDeductionsView = () => {
                   >
                     <option value="">-- Choose Deduction Type --</option>
                     {masters
-                      .filter((m) => m.isActive)
-                      .map((m) => (
-                        <option key={m._id} value={m._id}>
-                          {m.name} ({m.code}) — {m.calculationType === 'PERCENTAGE' ? `${m.percentage}%` : formatINR(m.defaultAmount)}
-                        </option>
-                      ))}
+                      .filter((m) => m && m.isActive !== false && String(m.status || '').toLowerCase() !== 'inactive')
+                      .map((m) => {
+                        const title = m.name || m.title || m.deductionTitle || m.code;
+                        const code = m.code || m.deductionCode || '';
+                        const amountLabel =
+                          m.calculationType === 'PERCENTAGE'
+                            ? `${m.percentage || m.defaultAmount || 0}%`
+                            : formatINR(m.defaultAmount ?? m.amount ?? 0);
+                        return (
+                          <option key={m._id || m.id || code} value={m._id || m.id || code}>
+                            {title} {code ? `(${code})` : ''} — {amountLabel}
+                          </option>
+                        );
+                      })}
                   </select>
                   {addFormErrors.deductionMasterId && (
                     <p className="mt-1 text-[11px] text-rose-600 font-medium">
