@@ -36,3 +36,26 @@ export const expandHolidayDates = (holidays) => {
     return dates;
   });
 };
+
+export const calculateLeaveDays = (startValue, endValue, holidays = [], isHalfDay = false) => {
+  const start = normalizeDate(startValue);
+  const end = normalizeDate(endValue || startValue);
+  if (!start || !end || start > end) return 0;
+
+  const holidayDates = new Set(holidays);
+  if (isHalfDay) return holidayDates.has(start) ? 0 : 0.5;
+
+  const [startYear, startMonth, startDay] = start.split('-').map(Number);
+  const [endYear, endMonth, endDay] = end.split('-').map(Number);
+  const current = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+  const last = Date.UTC(endYear, endMonth - 1, endDay);
+  let totalDays = 0;
+
+  while (current.getTime() <= last) {
+    const date = current.toISOString().slice(0, 10);
+    if (current.getUTCDay() !== 0 && !holidayDates.has(date)) totalDays += 1;
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return totalDays;
+};

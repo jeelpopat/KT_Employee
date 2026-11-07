@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LoadingScreen } from '../../components/common/Loader.jsx';
-import { Loader2, Calendar } from 'lucide-react';
+import { Loader2, Calendar, Trash2 } from 'lucide-react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { invalidateCache } from '../../api/axios.js';
 import { expandHolidayDates } from '../../utils/holidayUtils.js';
@@ -238,7 +238,7 @@ export default function Holidays() {
   const handleDelete = async (id) => {
     const confirmed = await confirm({
       title: 'Delete holiday?',
-      message: 'Are you sure you want to delete this holiday?',
+      message: 'Are you sure you want to delete this holiday? This date will no longer be excluded from leave totals (weekly offs still do not count).',
       confirmLabel: 'Delete',
     });
     if (!confirmed) return;
@@ -518,15 +518,28 @@ export default function Holidays() {
             }
 
             return (
-              <button
+              <div
                 key={index}
-                type="button"
-                onClick={() => {
-                  if (day.isCurrentMonth) {
+                role="button"
+                tabIndex={day.isCurrentMonth ? 0 : -1}
+                onKeyDown={(event) => {
+                  if (
+                    event.target === event.currentTarget &&
+                    day.isCurrentMonth &&
+                    (event.key === 'Enter' || event.key === ' ')
+                  ) {
+                    event.preventDefault();
                     openAddHolidayModal(day.dateStr);
                   }
                 }}
-                className={`min-h-[55px] sm:min-h-[65px] md:min-h-[75px] border ${dayBgClass} ${borderClass} p-1 sm:p-1.5 text-left cursor-pointer hover:bg-slate-100 transition-colors`}
+                onClick={() => {
+                  if (day.isCurrentMonth) {
+                    const holiday = holidays.find(item => item.date === day.dateStr);
+                    if (holiday) handleEdit(holiday);
+                    else openAddHolidayModal(day.dateStr);
+                  }
+                }}
+                className={`relative min-h-[55px] sm:min-h-[65px] md:min-h-[75px] border ${dayBgClass} ${borderClass} p-1 sm:p-1.5 text-left cursor-pointer hover:bg-slate-100 transition-colors`}
               >
                 <div className="flex items-center justify-between">
                   <span className={`inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center text-[10px] sm:text-xs font-semibold ${day.isToday ? 'bg-orange-500 text-white rounded-full' : day.isCurrentMonth ? 'text-slate-900' : 'text-slate-400'}`}>
@@ -541,12 +554,27 @@ export default function Holidays() {
 
                 <div className="mt-0.5">
                   {day.hasHoliday && day.holidayTitle && (
-                    <p className="text-[8px] sm:text-[9px] md:text-[10px] font-semibold text-slate-700 leading-tight truncate">
+                    <p className="pr-5 text-[8px] sm:text-[9px] md:text-[10px] font-semibold text-slate-700 leading-tight truncate">
                       {day.holidayTitle}
                     </p>
                   )}
                 </div>
-              </button>
+                {day.hasHoliday && day.isCurrentMonth && (
+                  <button
+                    type="button"
+                    aria-label={`Delete ${day.holidayTitle} holiday on ${day.dateStr}`}
+                    title="Delete holiday"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      const holiday = holidays.find(item => item.date === day.dateStr);
+                      if (holiday) handleDelete(holiday.id);
+                    }}
+                    className="absolute bottom-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded text-rose-600 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>

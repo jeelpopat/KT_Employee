@@ -7,7 +7,7 @@ import {
 import api from '../../api/axios.js'; 
 import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
 import { isEmployeeRole, fetchEmployeeTeamLead } from '../../utils/teamLeadUtils.js';
-import { expandHolidayDates } from '../../utils/holidayUtils.js';
+import { calculateLeaveDays, expandHolidayDates } from '../../utils/holidayUtils.js';
 import { LeaveDatePicker } from '../common/LeaveDatePicker.jsx';
 
 export const LeaveManagementView = () => {
@@ -333,14 +333,22 @@ export const LeaveManagementView = () => {
       // Calculate personal leave metrics strictly based on my leaves
       const totalQuota = (summary?.totalLeaves !== undefined) ? summary.totalLeaves : 12;
       const myApprovedLeaves = myLeavesOnly.filter(l => String(l.status || '').toLowerCase() === 'approved');
-      const myUsedDays = myApprovedLeaves.reduce((acc, curr) => acc + (Number(curr.totalDays) || 1), 0);
+      const myUsedDays = myApprovedLeaves.reduce((acc, curr) => acc + calculateLeaveDays(
+        curr.startDate || curr.fromDate,
+        curr.endDate || curr.toDate,
+        holidaysList,
+        curr.isHalfDay === true ||
+          curr.leaveType === 'half_day' ||
+          Number(curr.totalDays) === 0.5 ||
+          ['first-half', 'second-half'].includes(String(curr.halfDayType || '').toLowerCase())
+      ), 0);
       const myPendingCount = myLeavesOnly.filter(l => String(l.status || '').toLowerCase().includes('pending')).length;
       const myRemainingDays = Math.max(0, totalQuota - myUsedDays);
 
       setLeaveBalance({
         totalLeaves: totalQuota,
-        usedLeaves: (summary?.usedLeaves !== undefined && summary?.usedLeaves <= myUsedDays) ? summary.usedLeaves : myUsedDays,
-        remainingLeaves: (summary?.remainingLeaves !== undefined) ? summary.remainingLeaves : myRemainingDays,
+        usedLeaves: myUsedDays,
+        remainingLeaves: myRemainingDays,
         pendingRequests: (summary?.pendingRequests !== undefined && summary?.pendingRequests <= myPendingCount) ? summary.pendingRequests : myPendingCount
       });
 
@@ -417,35 +425,32 @@ export const LeaveManagementView = () => {
   // Safely calculate actual working days excluding Sundays and Holidays
   const getCalculatedDays = () => {
     const isHalfDayActive = Boolean(isHalfDay || leaveType === 'half_day');
-    if (isHalfDayActive) {
-      return startDate && holidaysLoaded && !holidaysList.includes(startDate) ? 0.5 : 0;
-    }
-    if (!startDate || !endDate) return 0;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (start > end) return 0;
-
-    let count = 0;
-    let curr = new Date(start);
-    
-    while (curr <= end) {
-      const year = curr.getFullYear();
-      const month = String(curr.getMonth() + 1).padStart(2, '0');
-      const day = String(curr.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      const isSunday = curr.getDay() === 0;
-
-      // Only count if it's NOT a Sunday AND NOT in the backend holiday list
-      if (!isSunday && !holidaysList.includes(dateStr)) {
-        count++;
-      }
-      curr.setDate(curr.getDate() + 1);
-    }
-
-    return count;
+    if (!holidaysLoaded) return 0;
+    return calculateLeaveDays(startDate, endDate, holidaysList, isHalfDayActive);
   };
 
   const calculatedDays = getCalculatedDays();
+
+  useEffect(() => {
+    const approvedLeaves = leaveRequests.filter(leave =>
+      String(leave.status || '').toLowerCase() === 'approved'
+    );
+    const usedLeaves = approvedLeaves.reduce((total, leave) => total + calculateLeaveDays(
+      leave.startDate || leave.fromDate,
+      leave.endDate || leave.toDate,
+      holidaysList,
+      leave.isHalfDay === true ||
+        leave.leaveType === 'half_day' ||
+        Number(leave.totalDays) === 0.5 ||
+        ['first-half', 'second-half'].includes(String(leave.halfDayType || '').toLowerCase())
+    ), 0);
+
+    setLeaveBalance(previous => ({
+      ...previous,
+      usedLeaves,
+      remainingLeaves: Math.max(0, previous.totalLeaves - usedLeaves)
+    }));
+  }, [leaveRequests, holidaysList]);
 
   const filteredLeaves = leaveRequests.filter(l => {
     if (!isMyLeave(l)) return false;
@@ -822,6 +827,15 @@ export const LeaveManagementView = () => {
                 ) : (
                   filteredLeaves.map((l, index) => {
                     const activeRemarks = l.adminRemark || l.hrRemark || l.teamLeadRemark || l.remark;
+                    const currentTotalDays = calculateLeaveDays(
+                      l.startDate || l.fromDate,
+                      l.endDate || l.toDate,
+                      holidaysList,
+                      l.isHalfDay === true ||
+                        l.leaveType === 'half_day' ||
+                        Number(l.totalDays) === 0.5 ||
+                        ['first-half', 'second-half'].includes(String(l.halfDayType || '').toLowerCase())
+                    );
                     return (
                       <tr key={l._id || index} className="hover:bg-slate-50 transition-colors">
                         <td className="px-5 py-4">
@@ -832,7 +846,7 @@ export const LeaveManagementView = () => {
                             {formatDate(l.startDate)} {l.startDate !== l.endDate ? `to ${formatDate(l.endDate)}` : ''}
                           </span>
                           <span className="text-xs text-indigo-600 font-semibold mt-1 block">
-                            {l.totalDays} {l.totalDays === 1 || l.totalDays === 0.5 ? 'Day' : 'Days'} {l.isHalfDay ? `(${l.halfDayType === 'first-half' ? '1st Half' : l.halfDayType === 'second-half' ? '2nd Half' : 'Half Day'})` : ''}
+                            {currentTotalDays} {currentTotalDays === 1 || currentTotalDays === 0.5 ? 'Day' : 'Days'} {l.isHalfDay ? `(${l.halfDayType === 'first-half' ? '1st Half' : l.halfDayType === 'second-half' ? '2nd Half' : 'Half Day'})` : ''}
                           </span>
                         </td>
                         <td className="px-5 py-4 text-slate-600 max-w-xs">

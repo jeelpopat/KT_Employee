@@ -29,6 +29,7 @@ import {
   isLeaveOfAssignedTeam,
 } from "../../utils/teamLeadUtils";
 import { BASE_URL } from "../../api/config";
+import { calculateLeaveDays, expandHolidayDates } from "../../utils/holidayUtils.js";
 
 const LEAVE_BASE_URL = `${BASE_URL}/api/leave`;
 
@@ -330,6 +331,7 @@ const getEmployeeRole = (employee, leave) => {
 
 export default function LeaveRequest() {
   const [requests, setRequests] = useState([]);
+  const holidayDatesRef = useRef([]);
   const [loading, setLoading] = useState(true);
 
   const [currentUser, setCurrentUser] = useState(null);
@@ -462,6 +464,25 @@ export default function LeaveRequest() {
       ]);
 
       const responseData = leaveRes.status === "fulfilled" ? leaveRes.value : {};
+      let currentHolidayDates = holidayDatesRef.current;
+      try {
+        const holidayResponse = await fetch(`${BASE_URL}/api/holiday/all`, {
+          headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!holidayResponse.ok) throw new Error("Holiday request failed.");
+        const holidayData = await holidayResponse.json();
+        const holidayPayload = holidayData?.holidays ||
+          holidayData?.data ||
+          (Array.isArray(holidayData) ? holidayData : []);
+        if (!Array.isArray(holidayPayload)) throw new Error("Holiday response has an invalid format.");
+        currentHolidayDates = expandHolidayDates(holidayPayload);
+        holidayDatesRef.current = currentHolidayDates;
+      } catch (holidayError) {
+        console.warn("Could not refresh holidays for leave totals:", holidayError);
+      }
 
       let uMap = {};
       if (uRes.status === "fulfilled" && uRes.value) {
@@ -649,12 +670,17 @@ export default function LeaveRequest() {
               leave?.endDate || leave?.toDate || ""
             ),
 
-            totalDays:
-              leave?.totalDays ??
-              calculateDays(
-                leave?.startDate,
-                leave?.endDate
-              ),
+            totalDays: calculateLeaveDays(
+              leave?.startDate || leave?.fromDate,
+              leave?.endDate || leave?.toDate,
+              currentHolidayDates,
+              leave?.isHalfDay === true ||
+                leave?.leaveType === "half_day" ||
+                Number(leave?.totalDays) === 0.5 ||
+                ["first-half", "second-half"].includes(
+                  String(leave?.halfDayType || "").trim().toLowerCase().replace(/[_\s]+/g, "-")
+                )
+            ),
 
             reason: leave?.reason || "",
 
@@ -740,31 +766,6 @@ export default function LeaveRequest() {
       }
     }
   };
-
-  // ==========================================================
-  // CALCULATE DAYS
-  // ==========================================================
-
-  function calculateDays(startDate, endDate) {
-    if (!startDate || !endDate) return 0;
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    if (
-      Number.isNaN(start.getTime()) ||
-      Number.isNaN(end.getTime())
-    ) {
-      return 0;
-    }
-
-    return (
-      Math.ceil(
-        (end - start) /
-        (1000 * 60 * 60 * 24)
-      ) + 1
-    );
-  }
 
   // ==========================================================
   // INITIAL LOAD

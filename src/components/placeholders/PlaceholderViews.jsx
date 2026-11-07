@@ -12,6 +12,7 @@ import {
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
 import { ProjectView } from '../projects/ProjectView.jsx';
+import { calculateLeaveDays, expandHolidayDates } from '../../utils/holidayUtils.js';
 import {
   getLoggedInUserIdentifiers,
   fetchTeamsList,
@@ -2447,6 +2448,7 @@ const extractLeaveList = (responseData) => {
 export const TeamLeaveManagementView = () => {
   const { user } = useApp();
   const [leaves, setLeaves] = useState([]);
+  const [holidayDates, setHolidayDates] = useState([]);
   const [usersMap, setUsersMap] = useState({});
   const [assignedTeams, setAssignedTeams] = useState([]);
   const [assignedEmployeesCount, setAssignedEmployeesCount] = useState(0);
@@ -2545,10 +2547,22 @@ export const TeamLeaveManagementView = () => {
     try {
       // 1. Fetch Users directory and Teams collection simultaneously
       let uMap = {};
-      const [uRes, teamsData] = await Promise.allSettled([
+      const [uRes, teamsData, holidaysRes] = await Promise.allSettled([
         api.get('/api/users/all'),
-        fetchTeamsList()
+        fetchTeamsList(),
+        api.get('/api/holiday/all')
       ]);
+
+      if (holidaysRes.status === 'fulfilled') {
+        const holidayPayload = holidaysRes.value.data?.holidays ||
+          holidaysRes.value.data?.data ||
+          holidaysRes.value.data;
+        if (Array.isArray(holidayPayload)) {
+          setHolidayDates(expandHolidayDates(holidayPayload));
+        }
+      } else {
+        console.warn('Could not load holidays for leave totals:', holidaysRes.reason);
+      }
 
       if (uRes.status === 'fulfilled') {
         const rawUsers = uRes.value.data?.users || uRes.value.data?.data || (Array.isArray(uRes.value.data) ? uRes.value.data : []);
@@ -2897,6 +2911,15 @@ export const TeamLeaveManagementView = () => {
             const tlStatus = getTlStatus(l);
             const isPending = tlStatus === 'pending';
             const tlRemark = l.teamLeadRemark || l.adminRemark || l.hrRemark || l.remark;
+            const totalDays = calculateLeaveDays(
+              l.startDate,
+              l.endDate,
+              holidayDates,
+              l.isHalfDay === true ||
+                l.leaveType === 'half_day' ||
+                Number(l.totalDays) === 0.5 ||
+                ['first-half', 'second-half'].includes(String(l.halfDayType || '').toLowerCase())
+            );
 
             return (
               <div
@@ -2960,7 +2983,7 @@ export const TeamLeaveManagementView = () => {
                         {formatDate(l.startDate)} {l.endDate && l.endDate !== l.startDate ? `to ${formatDate(l.endDate)}` : ''}
                       </span>
                       <span className="ml-2 text-slate-500">
-                        ({l.totalDays || 1} {l.totalDays === 1 ? 'Day' : 'Days'})
+                        ({totalDays} {totalDays === 1 || totalDays === 0.5 ? 'Day' : 'Days'})
                         {l.isHalfDay && (
                           <span className="ml-1 text-slate-500">
                             • {l.halfDayType === 'second-half' ? 'Second Half' : 'First Half'}
@@ -3054,7 +3077,17 @@ export const TeamLeaveManagementView = () => {
                 </span>
               </p>
               <p className="text-slate-500">
-                {formatDate(actionModal.leave?.startDate)} to {formatDate(actionModal.leave?.endDate)} ({actionModal.leave?.totalDays || 1} Days)
+                {formatDate(actionModal.leave?.startDate)} to {formatDate(actionModal.leave?.endDate)} ({
+                  calculateLeaveDays(
+                    actionModal.leave?.startDate,
+                    actionModal.leave?.endDate,
+                    holidayDates,
+                    actionModal.leave?.isHalfDay === true ||
+                      actionModal.leave?.leaveType === 'half_day' ||
+                      Number(actionModal.leave?.totalDays) === 0.5 ||
+                      ['first-half', 'second-half'].includes(String(actionModal.leave?.halfDayType || '').toLowerCase())
+                  )
+                } Days)
               </p>
               <p className="text-slate-600 italic">
                 "{actionModal.leave?.reason}"
