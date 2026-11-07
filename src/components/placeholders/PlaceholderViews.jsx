@@ -1307,15 +1307,44 @@ export const DocumentsView = () => {
   const { user, setCurrentTab } = useApp();
   const currentUserId = user?.id || user?._id || user?.employeeId || 'current_user';
 
-  const [employeeDocs] = useState(() => {
+  const [employeeDocs, setEmployeeDocs] = useState(() => {
     try {
       const saved = localStorage.getItem(`employee_documents_${currentUserId}`);
       if (saved) return JSON.parse(saved);
     } catch (e) {
-      console.warn(e);
+      console.warn('Could not read employee documents:', e);
     }
     return [];
   });
+
+  useEffect(() => {
+    const storageKey = `employee_documents_${currentUserId}`;
+    const readEmployeeDocuments = () => {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) return JSON.parse(saved);
+      } catch (error) {
+        console.warn('Could not read employee documents:', error);
+      }
+      return [];
+    };
+    const refreshDocuments = () => setEmployeeDocs(readEmployeeDocuments());
+    const handleDocumentUpdate = (event) => {
+      if (String(event.detail?.userId || '') !== String(currentUserId)) return;
+      setEmployeeDocs(Array.isArray(event.detail?.documents) ? event.detail.documents : readEmployeeDocuments());
+    };
+    const handleStorageUpdate = (event) => {
+      if (event.key === storageKey) refreshDocuments();
+    };
+
+    window.addEventListener('kt_employee_documents_updated', handleDocumentUpdate);
+    window.addEventListener('storage', handleStorageUpdate);
+    refreshDocuments();
+    return () => {
+      window.removeEventListener('kt_employee_documents_updated', handleDocumentUpdate);
+      window.removeEventListener('storage', handleStorageUpdate);
+    };
+  }, [currentUserId]);
 
   const docs = [];
 

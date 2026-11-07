@@ -120,14 +120,62 @@ const getEmployeeDocumentRecords = (responseData) => {
       file.fileUrl || file.url || file.secure_url || file.path || document.fileUrl || document.url || '';
 
     return {
-      kind: getEmployeeDocumentKind(record),
+      kind: getEmployeeDocumentKind({ ...record, ...document }),
+      remoteId: record?._id || record?.id || document?._id || document?.id || '',
       fileUrl,
-      fileName: record?.fileName || record?.name || file.fileName || '',
-      fileType: record?.fileType || record?.mimeType || file.fileType || file.mimeType || '',
+      fileName: record?.fileName || record?.name || file.fileName || document?.fileName || '',
+      fileType: record?.fileType || record?.mimeType || file.fileType || file.mimeType || document?.fileType || '',
       docNumber: record?.docNumber || record?.documentNumber || record?.number || '',
-      uploadedAt: record?.updatedAt || record?.createdAt || record?.uploadedAt || ''
+      uploadedAt: record?.updatedAt || record?.createdAt || record?.uploadedAt || '',
+      updatedAt: record?.updatedAt || document?.updatedAt || '',
+      createdAt: record?.createdAt || document?.createdAt || ''
     };
   }).filter((record) => record.kind && (record.fileUrl || record.docNumber));
+};
+
+const getApiDocumentList = (responseData) => {
+  let payload = responseData?.data ?? responseData;
+  if (payload?.data && typeof payload.data === 'object') {
+    payload = payload.data;
+  }
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.documents)) return payload.documents;
+  if (Array.isArray(payload?.results)) return payload.results;
+  return [];
+};
+
+const getRemoteDocumentId = (document) => String(document?._id || document?.id || document?.documentId || '');
+
+const reconcileRemoteDocuments = (documents, remoteIds) => documents
+  .map((document) => {
+    if (!document.remoteId || remoteIds.has(String(document.remoteId))) return document;
+    if (!document.isCore) return null;
+    return {
+      ...document,
+      fileUrl: '',
+      fileName: '',
+      remoteId: null,
+      remoteUpdatedAt: '',
+      status: 'pending',
+      uploadedAt: 'Pending'
+    };
+  })
+  .filter(Boolean);
+
+const getUploadedDocument = (responseData) => {
+  let payload = responseData?.data ?? responseData;
+  if (payload?.data && typeof payload.data === 'object') payload = payload.data;
+  if (payload?.document && typeof payload.document === 'object') payload = payload.document;
+  const file = payload?.file && typeof payload.file === 'object' ? payload.file : {};
+  const fileUrl = payload?.fileUrl || payload?.fileURL || payload?.documentUrl || payload?.url ||
+    payload?.secureUrl || payload?.path || file.fileUrl || file.url || file.secure_url || file.path || '';
+  const remoteId = payload?._id || payload?.id || payload?.documentId || '';
+
+  if (responseData?.success === false || !fileUrl) {
+    throw new Error(responseData?.message || 'The document API did not return a saved file URL.');
+  }
+
+  return { fileUrl, remoteId: String(remoteId) };
 };
 
 const getDocumentTimestamp = (document) => {
@@ -177,6 +225,7 @@ const mergeEmployeeDocuments = (currentDocuments, responseData) => {
       fileType: remoteDocument.fileType || document.fileType,
       docNumber: remoteDocument.docNumber || document.docNumber,
       status: remoteDocument.fileUrl ? 'uploaded' : document.status,
+      remoteId: remoteDocument.remoteId || document.remoteId,
       uploadedAt: remoteDocument.uploadedAt
         ? new Date(remoteDocument.uploadedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
         : document.uploadedAt,
@@ -477,6 +526,9 @@ export const ProfileView = () => {
         console.warn("Could not read local documents", e);
       }
 
+      let legacyDocumentsFetched = false;
+      const serverRemoteIds = new Set();
+
       // 2. Fallback default documents if none saved yet
       if (!initialDocs || !Array.isArray(initialDocs) || initialDocs.length === 0) {
         const aadharNum = emp?.aadharNumber || prof?.aadharNumber || prof?.aadhar || '';
@@ -531,8 +583,9 @@ export const ProfileView = () => {
       // 3. Attempt to fetch remote documents from backend /api/document
       try {
         const backendRes = await api.get('/api/document', { skipCache: true });
-        const remoteList = backendRes.data?.data || backendRes.data;
-        if (Array.isArray(remoteList) && remoteList.length > 0) {
+        const remoteList = getApiDocumentList(backendRes.data);
+        legacyDocumentsFetched = true;
+        if (Array.isArray(remoteList)) {
           const rawId = resolveEmployeeId();
           const candidateIds = [
             String(profileData?.employee?._id || ''),
@@ -548,6 +601,10 @@ export const ProfileView = () => {
             const ref = String(d.referenceId || '');
             const up = String(d.uploadedBy || '');
             return candidateIds.includes(ref) || candidateIds.includes(up);
+          });
+          relevantRemote.forEach(remoteDoc => {
+            const remoteId = getRemoteDocumentId(remoteDoc);
+            if (remoteId) serverRemoteIds.add(remoteId);
           });
           const latestCoreDocuments = getLatestEmployeeDocumentsByKind(relevantRemote);
 
@@ -572,7 +629,7 @@ export const ProfileView = () => {
                   matchedCore.docNumber = remoteDoc.description;
                 }
                 matchedCore.status = 'uploaded';
-                matchedCore.remoteId = remoteDoc._id;
+                matchedCore.remoteId = getRemoteDocumentId(remoteDoc);
                 matchedCore.remoteUpdatedAt = remoteDoc.updatedAt || remoteDoc.createdAt || remoteDoc.uploadedAt || matchedCore.remoteUpdatedAt;
                 if (remoteDoc.createdAt) {
                   try {
@@ -580,26 +637,32 @@ export const ProfileView = () => {
                   } catch (e) {}
                 }
               } else {
-                // Add as custom document if not already in list
-                const exists = initialDocs.some(d =>
-                  d.remoteId === remoteDoc._id ||
-                  (title && d.title.toLowerCase().trim() === title.toLowerCase().trim())
+                const remoteId = getRemoteDocumentId(remoteDoc);
+                const remoteKey = remoteId || title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                const existingIndex = initialDocs.findIndex(d =>
+                  d.remoteId === remoteId ||
+                  (title && !d.isCore && d.title.toLowerCase().trim() === title.toLowerCase().trim())
                 );
-                if (!exists && title) {
-                  initialDocs.push({
-                    id: `remote-${remoteDoc._id}`,
-                    remoteId: remoteDoc._id,
+                if (title) {
+                  const remoteDocument = {
+                    id: `remote-${remoteKey}`,
+                    remoteId,
                     title,
                     subtitle: 'Uploaded Employee Document',
                     category: 'Official Record',
                     docNumber: remoteDoc.description || 'Verified Record',
                     status: 'uploaded',
                     fileUrl: remoteDoc.fileUrl,
-                    fileName: remoteDoc.fileName || `${remoteDoc.title}.pdf`,
+                    fileName: remoteDoc.fileName || `${title}.pdf`,
                     fileType: remoteDoc.fileType || 'application/pdf',
                     uploadedAt: remoteDoc.createdAt ? new Date(remoteDoc.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
                     isCore: false
-                  });
+                  };
+                  if (existingIndex >= 0) {
+                    initialDocs[existingIndex] = { ...initialDocs[existingIndex], ...remoteDocument };
+                  } else {
+                    initialDocs.push(remoteDocument);
+                  }
                 }
               }
             });
@@ -614,9 +677,16 @@ export const ProfileView = () => {
           `${EMPLOYEE_DOCUMENTS_API}/${encodeURIComponent(employeeDocumentId)}`,
           { skipCache: true }
         );
+        getEmployeeDocumentRecords(employeeDocumentsRes.data).forEach(document => {
+          if (document.remoteId) serverRemoteIds.add(String(document.remoteId));
+        });
         initialDocs = mergeEmployeeDocuments(initialDocs, employeeDocumentsRes.data);
       } catch (err) {
         console.warn('Could not fetch employee documents:', err);
+      }
+
+      if (legacyDocumentsFetched) {
+        initialDocs = reconcileRemoteDocuments(initialDocs, serverRemoteIds);
       }
 
       [
@@ -633,13 +703,18 @@ export const ProfileView = () => {
       setDocuments(initialDocs);
       try {
         localStorage.setItem(localStorageDocKey, JSON.stringify(initialDocs));
-      } catch (e) {
-        console.warn("Could not cache documents in localStorage", e);
+      } catch (error) {
+        console.warn('Could not cache documents in localStorage:', error);
       }
+      window.dispatchEvent(new CustomEvent('kt_employee_documents_updated', {
+        detail: { userId: String(currentUserId), documents: initialDocs }
+      }));
     };
 
     if (!isLoadingData) {
       initializeDocuments();
+      window.addEventListener('focus', initializeDocuments);
+      return () => window.removeEventListener('focus', initializeDocuments);
     }
   }, [isLoadingData, currentUserId, localStorageDocKey, employeeDocumentId, serverAadharNumber, serverPanNumber]);
 
@@ -649,6 +724,8 @@ export const ProfileView = () => {
     try {
       let updated = [...documents];
       let syncedFromServer = false;
+      let legacyDocumentsFetched = false;
+      const serverRemoteIds = new Set();
       const syncErrors = [];
 
       try {
@@ -656,6 +733,9 @@ export const ProfileView = () => {
           `${EMPLOYEE_DOCUMENTS_API}/${encodeURIComponent(employeeDocumentId)}`,
           { skipCache: true }
         );
+        getEmployeeDocumentRecords(employeeDocumentsRes.data).forEach(document => {
+          if (document.remoteId) serverRemoteIds.add(String(document.remoteId));
+        });
         updated = mergeEmployeeDocuments(updated, employeeDocumentsRes.data);
         syncedFromServer = true;
       } catch (error) {
@@ -666,8 +746,9 @@ export const ProfileView = () => {
       try {
         const backendRes = await api.get('/api/document', { skipCache: true });
         syncedFromServer = true;
-        const remoteList = backendRes.data?.data || backendRes.data;
+        const remoteList = getApiDocumentList(backendRes.data);
         if (Array.isArray(remoteList)) {
+          legacyDocumentsFetched = true;
           const rawId = resolveEmployeeId();
           const candidateIds = [
             String(profileData?.employee?._id || ''),
@@ -683,6 +764,10 @@ export const ProfileView = () => {
             const ref = String(d.referenceId || '');
             const up = String(d.uploadedBy || '');
             return candidateIds.includes(ref) || candidateIds.includes(up);
+          });
+          relevantRemote.forEach(remoteDoc => {
+            const remoteId = getRemoteDocumentId(remoteDoc);
+            if (remoteId) serverRemoteIds.add(remoteId);
           });
           const latestCoreDocuments = getLatestEmployeeDocumentsByKind(relevantRemote);
 
@@ -704,7 +789,7 @@ export const ProfileView = () => {
               matchedCore.fileType = remoteDoc.fileType || matchedCore.fileType;
               if (remoteDoc.description) matchedCore.docNumber = remoteDoc.description;
               matchedCore.status = 'uploaded';
-              matchedCore.remoteId = remoteDoc._id;
+              matchedCore.remoteId = getRemoteDocumentId(remoteDoc);
               matchedCore.remoteUpdatedAt = remoteDoc.updatedAt || remoteDoc.createdAt || remoteDoc.uploadedAt || matchedCore.remoteUpdatedAt;
               if (remoteDoc.createdAt) {
                 try {
@@ -712,13 +797,15 @@ export const ProfileView = () => {
                 } catch (e) {}
               }
             } else {
-              const exists = updated.some(d =>
-                d.remoteId === remoteDoc._id || (title && d.title.toLowerCase().trim() === title.toLowerCase().trim())
+              const remoteId = getRemoteDocumentId(remoteDoc);
+              const remoteKey = remoteId || title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              const existingIndex = updated.findIndex(d =>
+                d.remoteId === remoteId || (title && !d.isCore && d.title.toLowerCase().trim() === title.toLowerCase().trim())
               );
-              if (!exists && title) {
-                updated.push({
-                  id: `remote-${remoteDoc._id}`,
-                  remoteId: remoteDoc._id,
+              if (title) {
+                const remoteDocument = {
+                  id: `remote-${remoteKey}`,
+                  remoteId,
                   title,
                   subtitle: 'Uploaded Employee Document',
                   category: 'Official Record',
@@ -729,7 +816,12 @@ export const ProfileView = () => {
                   fileType: remoteDoc.fileType || 'application/pdf',
                   uploadedAt: remoteDoc.createdAt ? new Date(remoteDoc.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
                   isCore: false
-                });
+                };
+                if (existingIndex >= 0) {
+                  updated[existingIndex] = { ...updated[existingIndex], ...remoteDocument };
+                } else {
+                  updated.push(remoteDocument);
+                }
               }
             }
           });
@@ -745,6 +837,10 @@ export const ProfileView = () => {
           .filter(Boolean)
           .join('; ');
         throw new Error(details || 'Both document endpoints are unavailable.');
+      }
+
+      if (legacyDocumentsFetched) {
+        updated = reconcileRemoteDocuments(updated, serverRemoteIds);
       }
 
       updated = normalizeCoreDocuments(updated);
@@ -771,6 +867,9 @@ export const ProfileView = () => {
     } catch (e) {
       console.warn("Could not persist documents to localStorage", e);
     }
+    window.dispatchEvent(new CustomEvent('kt_employee_documents_updated', {
+      detail: { userId: String(currentUserId), documents: updatedDocs }
+    }));
   };
 
   // --- Profile Photo Upload & Management ---
@@ -987,6 +1086,29 @@ export const ProfileView = () => {
     }
   };
 
+  const uploadEmployeeDocument = async (file, title, description) => {
+    const employeeId = resolveEmployeeId();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('documentType', 'employee');
+    formData.append('referenceId', employeeId);
+    formData.append('fileName', file.name);
+    formData.append('fileType', file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'));
+    if (employeeId) formData.append('uploadedBy', employeeId);
+
+    const response = await api.post('/api/document/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    const responseData = response.data;
+    if (responseData?.success === false || responseData?.data?.success === false) {
+      throw new Error(responseData?.message || responseData?.data?.message || 'The document upload was rejected.');
+    }
+
+    return getUploadedDocument(responseData);
+  };
+
   const handleDocFileChanged = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !targetActionDocId) return;
@@ -1028,82 +1150,47 @@ export const ProfileView = () => {
     setDocFeedback({ type: '', text: '' });
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (readEvent) => {
-        const dataUrl = readEvent.target.result;
-        let finalFileUrl = dataUrl;
-
-        // Try backend upload to /api/document/upload with Mongoose documentSchema
-        let uploadedRemoteId = null;
-        try {
-          const validId = resolveEmployeeId();
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('title', docToUpdate.title);
-          formData.append('description', docToUpdate.docNumber || docToUpdate.subtitle || '');
-          formData.append('documentType', 'employee');
-          formData.append('referenceId', validId);
-          formData.append('fileName', file.name);
-          formData.append('fileType', file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'));
-          if (validId) formData.append('uploadedBy', validId);
-
-          const uploadRes = await api.post('/api/document/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-
-          if (uploadRes.data?.data?.fileUrl) {
-            finalFileUrl = uploadRes.data.data.fileUrl;
+      const uploadedDocument = await uploadEmployeeDocument(
+        file,
+        docToUpdate.title,
+        docToUpdate.docNumber || docToUpdate.subtitle || ''
+      );
+      const nowFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const updatedDocs = documents.map(doc => doc.id === targetActionDocId
+        ? {
+            ...doc,
+            remoteId: uploadedDocument.remoteId || doc.remoteId,
+            fileUrl: uploadedDocument.fileUrl,
+            fileName: file.name,
+            fileType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+            status: 'uploaded',
+            uploadedAt: nowFormatted
           }
-          if (uploadRes.data?.data?._id) {
-            uploadedRemoteId = uploadRes.data.data._id;
+        : doc
+      );
+
+      persistDocuments(updatedDocs);
+
+      if (docViewerModal.isOpen && docViewerModal.doc?.id === targetActionDocId) {
+        setDocViewerModal(prev => ({
+          ...prev,
+          doc: {
+            ...prev.doc,
+            remoteId: uploadedDocument.remoteId || prev.doc.remoteId,
+            fileUrl: uploadedDocument.fileUrl,
+            fileName: file.name,
+            fileType: file.type,
+            status: 'uploaded',
+            uploadedAt: nowFormatted
           }
-        } catch (uploadErr) {
-          console.warn("Upload endpoint fallback to Data URL:", uploadErr);
-        }
+        }));
+      }
 
-        const nowFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-
-        const updatedDocs = documents.map(d => {
-          if (d.id === targetActionDocId) {
-            return {
-              ...d,
-              remoteId: uploadedRemoteId || d.remoteId,
-              fileUrl: finalFileUrl,
-              fileName: file.name,
-              fileType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
-              status: 'uploaded',
-              uploadedAt: nowFormatted
-            };
-          }
-          return d;
-        });
-
-        persistDocuments(updatedDocs);
-
-        // If doc viewer is open with this doc, update viewer state too
-        if (docViewerModal.isOpen && docViewerModal.doc?.id === targetActionDocId) {
-          setDocViewerModal(prev => ({
-            ...prev,
-            doc: {
-              ...prev.doc,
-              fileUrl: finalFileUrl,
-              fileName: file.name,
-              fileType: file.type,
-              status: 'uploaded',
-              uploadedAt: nowFormatted
-            }
-          }));
-        }
-
-        setDocFeedback({ type: 'success', text: `${docToUpdate.title} updated successfully!` });
-        setTimeout(() => setDocFeedback({ type: '', text: '' }), 4000);
-      };
-
-      reader.readAsDataURL(file);
+      setDocFeedback({ type: 'success', text: `${docToUpdate.title} updated successfully!` });
     } catch (err) {
       console.error("Error uploading document:", err);
-      setDocFeedback({ type: 'error', text: 'Failed to upload document.' });
-      setTimeout(() => setDocFeedback({ type: '', text: '' }), 3500);
+      const message = err.response?.data?.message || err.message || 'Please try again.';
+      setDocFeedback({ type: 'error', text: `Failed to upload document: ${message}` });
     } finally {
       setUploadingDocId(null);
       setTargetActionDocId(null);
@@ -1274,81 +1361,52 @@ export const ProfileView = () => {
     setIsSubmittingNewDoc(true);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (readEvent) => {
-        const dataUrl = readEvent.target.result;
-        let finalFileUrl = dataUrl;
-
-        let newRemoteId = null;
-        try {
-          const validId = resolveEmployeeId();
-          const formData = new FormData();
-          formData.append('file', newDocForm.file);
-          formData.append('title', finalTitle);
-          formData.append('description', newDocForm.docNumber.trim() || 'Verified Official Record');
-          formData.append('documentType', 'employee');
-          formData.append('referenceId', validId);
-          formData.append('fileName', newDocForm.file.name);
-          formData.append('fileType', newDocForm.file.type || (newDocForm.file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'));
-          if (validId) formData.append('uploadedBy', validId);
-
-          const uploadRes = await api.post('/api/document/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-
-          if (uploadRes.data?.data?.fileUrl) {
-            finalFileUrl = uploadRes.data.data.fileUrl;
-          }
-          if (uploadRes.data?.data?._id) {
-            newRemoteId = uploadRes.data.data._id;
-          }
-        } catch (uploadErr) {
-          console.warn("Add document upload warning:", uploadErr);
-        }
-
-        const newDocItem = {
-          id: `custom-doc-${Date.now()}`,
-          remoteId: newRemoteId,
-          title: finalTitle,
-          subtitle: 'Verified Statutory Document',
-          category: 'Official Record',
-          docNumber: newDocForm.docNumber.trim() || 'Verified Record',
-          status: 'uploaded',
-          fileUrl: finalFileUrl,
-          fileName: newDocForm.file.name,
-          fileType: newDocForm.file.type || (newDocForm.file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
-          uploadedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-          isCore: false
-        };
-
-        const updatedDocs = documentKind && documents.some(d => d.isCore && d.id === documentKind)
-          ? mergeDocumentIntoCore(documents, newDocItem)
-          : [...documents, newDocItem];
-        persistDocuments(updatedDocs);
-
-        setIsAddDocModalOpen(false);
-        setNewDocForm({
-          presetType: 'Driving License',
-          customTitle: '',
-          docNumber: '',
-          file: null,
-          fileName: '',
-          filePreview: ''
-        });
-
-        setDocFeedback({
-          type: 'success',
-          text: documentKind
-            ? `"${finalTitle}" uploaded to Mandatory Identity Documents.`
-            : `"${finalTitle}" added to your documents!`
-        });
-        setTimeout(() => setDocFeedback({ type: '', text: '' }), 4000);
+      const file = newDocForm.file;
+      const uploadedDocument = await uploadEmployeeDocument(
+        file,
+        finalTitle,
+        newDocForm.docNumber.trim() || 'Verified Official Record'
+      );
+      const newDocItem = {
+        id: `custom-doc-${Date.now()}`,
+        remoteId: uploadedDocument.remoteId,
+        title: finalTitle,
+        subtitle: 'Verified Statutory Document',
+        category: 'Official Record',
+        docNumber: newDocForm.docNumber.trim() || 'Verified Record',
+        status: 'uploaded',
+        fileUrl: uploadedDocument.fileUrl,
+        fileName: file.name,
+        fileType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+        uploadedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        isCore: false
       };
 
-      reader.readAsDataURL(newDocForm.file);
+      const updatedDocs = documentKind && documents.some(d => d.isCore && d.id === documentKind)
+        ? mergeDocumentIntoCore(documents, newDocItem)
+        : [...documents, newDocItem];
+      persistDocuments(updatedDocs);
+
+      setIsAddDocModalOpen(false);
+      setNewDocForm({
+        presetType: 'Driving License',
+        customTitle: '',
+        docNumber: '',
+        file: null,
+        fileName: '',
+        filePreview: ''
+      });
+
+      setDocFeedback({
+        type: 'success',
+        text: documentKind
+          ? `"${finalTitle}" uploaded to Mandatory Identity Documents.`
+          : `"${finalTitle}" added to your documents!`
+      });
     } catch (err) {
       console.error("Failed to add document:", err);
-      showToast("Failed to add document. Please try again.", "error");
+      const message = err.response?.data?.message || err.message || 'Please try again.';
+      showToast(`Failed to add document: ${message}`, "error");
     } finally {
       setIsSubmittingNewDoc(false);
     }
@@ -1363,9 +1421,14 @@ export const ProfileView = () => {
 
     if (docToDelete.remoteId) {
       try {
-        await api.delete(`/api/document/${docToDelete.remoteId}`);
+        const response = await api.delete(`/api/document/${encodeURIComponent(docToDelete.remoteId)}`);
+        if (response.data?.success === false) {
+          throw new Error(response.data?.message || 'The document API rejected the deletion.');
+        }
       } catch (err) {
-        console.warn("Backend delete document warning:", err);
+        console.error("Could not delete document from backend:", err);
+        showToast(`Could not remove "${docToDelete.title}" from the server. Please try again.`, 'error');
+        return;
       }
     }
 
@@ -1385,7 +1448,10 @@ export const ProfileView = () => {
     setDocFeedback({ type: '', text: '' });
     try {
       if (docToDelete.remoteId) {
-        await api.delete(`/api/document/${docToDelete.remoteId}`);
+        const response = await api.delete(`/api/document/${encodeURIComponent(docToDelete.remoteId)}`);
+        if (response.data?.success === false) {
+          throw new Error(response.data?.message || 'The document API rejected the deletion.');
+        }
       }
 
       const updatedDocs = documents.map(doc => doc.id === 'passport_photo'
