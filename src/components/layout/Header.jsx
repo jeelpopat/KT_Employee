@@ -14,6 +14,17 @@ import { tabToPath, pathToTab } from '../../utils/navigation.js';
 import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
 
+const isDeletableAdminNotification = (notification) => {
+  const id = notification?._id || notification?.id;
+  return Boolean(
+    id &&
+    notification.category !== 'announcement' &&
+    notification.category !== 'request' &&
+    !String(id).startsWith('leave_') &&
+    !String(id).startsWith('holiday_')
+  );
+};
+
 export const Header = ({ onSignOut }) => {
   const {
     user, setCurrentTab,
@@ -56,6 +67,8 @@ export const Header = ({ onSignOut }) => {
   const [adminNotifications, setAdminNotifications] = useState([]);
   const [adminUnreadCount, setAdminUnreadCount] = useState(0);
   const [adminTab, setAdminTab] = useState('unread'); // 'unread' | 'all' | 'read'
+  const [deletingNotificationIds, setDeletingNotificationIds] = useState(() => new Set());
+  const [isDeletingAllNotifications, setIsDeletingAllNotifications] = useState(false);
   const previousAdminUnreadRef = useRef(0);
 
   // --- Global Announcement Management States (Admin) ---
@@ -563,6 +576,83 @@ export const Header = ({ onSignOut }) => {
     return true;
   });
 
+  const handleDeleteNotification = async (notification) => {
+    const id = notification?._id || notification?.id;
+    if (!id || deletingNotificationIds.has(id) || isDeletingAllNotifications) return;
+
+    const confirmed = await confirm({
+      title: 'Delete notification?',
+      message: 'This will permanently delete the notification from the database.',
+      confirmLabel: 'Delete',
+    });
+    if (!confirmed) return;
+
+    setDeletingNotificationIds((prev) => new Set(prev).add(id));
+    try {
+      const response = await api.delete(`/api/notification/${encodeURIComponent(id)}`);
+      if (response.data?.success === false) {
+        throw new Error(response.data.message || 'Failed to delete notification.');
+      }
+
+      if (isAdmin) {
+        setAdminNotifications((prev) => prev.filter((item) => (item._id || item.id) !== id));
+        if (!notification.isRead) setAdminUnreadCount((prev) => Math.max(0, prev - 1));
+      } else {
+        setEmployeeNotifications((prev) => prev.filter((item) => (item._id || item.id) !== id));
+        if (!notification.isRead) setEmployeeUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+      showToast('Notification deleted successfully.', 'success');
+    } catch (error) {
+      console.error('Failed to delete notification:', error);
+      showToast(error.response?.data?.message || error.message || 'Failed to delete notification.', 'error');
+    } finally {
+      setDeletingNotificationIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
+  const handleDeleteAllNotifications = async () => {
+    if (isDeletingAllNotifications) return;
+
+    const confirmed = await confirm({
+      title: 'Delete all notifications?',
+      message: 'This will permanently delete your notifications from the database.',
+      confirmLabel: 'Delete all',
+    });
+    if (!confirmed) return;
+
+    setIsDeletingAllNotifications(true);
+    try {
+      const response = await api.delete('/api/notification/delete-all');
+      if (response.data?.success === false) {
+        throw new Error(response.data.message || 'Failed to delete notifications.');
+      }
+
+      if (isAdmin) {
+        const remainingNotifications = adminNotifications.filter(
+          (item) => !isDeletableAdminNotification(item)
+        );
+        setAdminNotifications(remainingNotifications);
+        const unreadCount = remainingNotifications.filter((item) => !item.isRead).length;
+        setAdminUnreadCount(unreadCount);
+        previousAdminUnreadRef.current = unreadCount;
+      } else {
+        setEmployeeNotifications([]);
+        setEmployeeUnreadCount(0);
+        previousEmployeeUnreadRef.current = 0;
+      }
+      showToast('All notifications deleted successfully.', 'success');
+    } catch (error) {
+      console.error('Failed to delete all notifications:', error);
+      showToast(error.response?.data?.message || error.message || 'Failed to delete notifications.', 'error');
+    } finally {
+      setIsDeletingAllNotifications(false);
+    }
+  };
+
   // User Profile Data
   useEffect(() => {
     let isMounted = true;
@@ -761,10 +851,22 @@ export const Header = ({ onSignOut }) => {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
+                        {adminNotifications.some(isDeletableAdminNotification) && (
+                          <button
+                            type="button"
+                            onClick={handleDeleteAllNotifications}
+                            disabled={isDeletingAllNotifications || deletingNotificationIds.size > 0}
+                            className="text-[11px] font-medium text-rose-600 hover:text-rose-800 flex items-center gap-1 transition-colors hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete all notifications"
+                          >
+                            <Trash2 size={13} /> Delete all
+                          </button>
+                        )}
                         {adminUnreadCount > 0 && (
                           <button
                             type="button"
                             onClick={handleAdminMarkAllAsRead}
+                            disabled={isDeletingAllNotifications}
                             className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors hover:underline cursor-pointer"
                             title="Mark all as read"
                           >
@@ -890,6 +992,21 @@ export const Header = ({ onSignOut }) => {
                                       </button>
                                     </>
                                   )}
+                                  {isDeletableAdminNotification(item) && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteNotification(item);
+                                      }}
+                                      disabled={deletingNotificationIds.has(item._id || item.id) || isDeletingAllNotifications}
+                                      className="p-0.5 text-slate-400 hover:text-rose-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                      title="Delete notification"
+                                      aria-label="Delete notification"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  )}
                                   {item.link && (
                                     <span className="text-indigo-600 font-medium flex items-center gap-0.5 text-[10px]">
                                       Open <ExternalLink size={10} />
@@ -937,14 +1054,28 @@ export const Header = ({ onSignOut }) => {
                       <span className="text-xs font-semibold text-slate-800">
                         Notifications ({employeeUnreadCount} unread)
                       </span>
-                      {employeeUnreadCount > 0 && (
-                        <button
-                          onClick={handleEmployeeMarkAllAsRead}
-                          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <CheckCheck size={13} /> Mark all read
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {employeeNotifications.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleDeleteAllNotifications}
+                            disabled={isDeletingAllNotifications || deletingNotificationIds.size > 0}
+                            className="text-[11px] font-medium text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 size={13} /> Delete all
+                          </button>
+                        )}
+                        {employeeUnreadCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleEmployeeMarkAllAsRead}
+                            disabled={isDeletingAllNotifications}
+                            className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <CheckCheck size={13} /> Mark all read
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Employee Filter Tabs */}
@@ -1015,6 +1146,19 @@ export const Header = ({ onSignOut }) => {
                                 {notif.message}
                               </p>
                             </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteNotification(notif);
+                              }}
+                              disabled={deletingNotificationIds.has(notif._id || notif.id) || isDeletingAllNotifications}
+                              className="mt-0.5 shrink-0 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Delete notification"
+                              aria-label="Delete notification"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                             {!notif.isRead && (
                               <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 self-center shrink-0 ml-1" />
                             )}
