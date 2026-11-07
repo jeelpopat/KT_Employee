@@ -68,6 +68,7 @@ const EMPLOYEE_DOCUMENTS_API = `${BASE_URL}/api/employee/documents`;
 
 const getEmployeeDocumentKind = (document) => {
   const label = [
+    document?.id,
     document?.key,
     document?.type,
     document?.documentType,
@@ -76,11 +77,11 @@ const getEmployeeDocumentKind = (document) => {
     document?.title,
     document?.name,
     document?.documentName
-  ].filter(Boolean).join(' ').toLowerCase();
+  ].filter(Boolean).join(' ').toLowerCase().replace(/[_-]+/g, ' ');
 
-  if (label.includes('aadhar') || label.includes('aadhaar') || label.includes('uidai')) return 'aadhar';
-  if (label.includes('pan')) return 'pan';
-  if (label.includes('passport') || label.includes('photo') || label.includes('photograph')) return 'passport_photo';
+  if (/\b(aadhar|aadhaar|adhar|uidai)\b|unique identification/.test(label)) return 'aadhar';
+  if (/\bpan\b|permanent account number/.test(label)) return 'pan';
+  if (/\bpassport (size )?(photo|photograph)\b|\bpassport_photo\b/.test(label)) return 'passport_photo';
   return null;
 };
 
@@ -150,6 +151,41 @@ const mergeEmployeeDocuments = (currentDocuments, responseData) => {
     };
   });
 };
+
+const mergeDocumentIntoCore = (documents, source) => {
+  const kind = getEmployeeDocumentKind(source);
+  const coreDocument = documents.find(document => document.isCore && document.id === kind);
+  if (!coreDocument) return documents;
+
+  const mergedCoreDocument = {
+    ...coreDocument,
+    fileUrl: source.fileUrl || coreDocument.fileUrl,
+    fileName: source.fileName || coreDocument.fileName,
+    fileType: source.fileType || coreDocument.fileType,
+    docNumber: source.docNumber && source.docNumber !== 'Verified Record'
+      ? source.docNumber
+      : coreDocument.docNumber,
+    status: source.fileUrl ? 'uploaded' : coreDocument.status,
+    uploadedAt: source.uploadedAt || coreDocument.uploadedAt,
+    remoteId: source.remoteId || coreDocument.remoteId
+  };
+
+  return documents
+    .map(document => {
+      if (document === coreDocument) return mergedCoreDocument;
+      if (!document.isCore && getEmployeeDocumentKind(document) === kind) return null;
+      return document;
+    })
+    .filter(Boolean);
+};
+
+const normalizeCoreDocuments = (documents) => documents.reduce((normalized, document) => {
+  const kind = getEmployeeDocumentKind(document);
+  if (!document.isCore && kind && normalized.some(item => item.isCore && item.id === kind)) {
+    return mergeDocumentIntoCore(normalized, document);
+  }
+  return [...normalized, document];
+}, []);
 
 export const ProfileView = () => {
   const { user: contextUser, updateUserProfile, userRole, roleDetails } = useApp();
@@ -555,6 +591,7 @@ export const ProfileView = () => {
         }
       });
 
+      initialDocs = normalizeCoreDocuments(initialDocs);
       setDocuments(initialDocs);
       try {
         localStorage.setItem(localStorageDocKey, JSON.stringify(initialDocs));
@@ -573,14 +610,24 @@ export const ProfileView = () => {
     setIsSyncingDocs(true);
     try {
       let updated = [...documents];
-      const employeeDocumentsRes = await api.get(
-        `${EMPLOYEE_DOCUMENTS_API}/${encodeURIComponent(employeeDocumentId)}`,
-        { skipCache: true }
-      );
-      updated = mergeEmployeeDocuments(updated, employeeDocumentsRes.data);
+      let syncedFromServer = false;
+      const syncErrors = [];
+
+      try {
+        const employeeDocumentsRes = await api.get(
+          `${EMPLOYEE_DOCUMENTS_API}/${encodeURIComponent(employeeDocumentId)}`,
+          { skipCache: true }
+        );
+        updated = mergeEmployeeDocuments(updated, employeeDocumentsRes.data);
+        syncedFromServer = true;
+      } catch (error) {
+        syncErrors.push(error);
+        console.warn('Could not fetch employee documents:', error);
+      }
 
       try {
         const backendRes = await api.get('/api/document');
+        syncedFromServer = true;
         const remoteList = backendRes.data?.data || backendRes.data;
         if (Array.isArray(remoteList)) {
           const rawId = resolveEmployeeId();
@@ -645,15 +692,28 @@ export const ProfileView = () => {
           });
         }
       } catch (error) {
+        syncErrors.push(error);
         console.warn('Could not sync legacy employee documents:', error);
       }
 
+      if (!syncedFromServer) {
+        const details = syncErrors
+          .map(error => error.response?.data?.message || error.message)
+          .filter(Boolean)
+          .join('; ');
+        throw new Error(details || 'Both document endpoints are unavailable.');
+      }
+
+      updated = normalizeCoreDocuments(updated);
       persistDocuments(updated);
       setDocFeedback({ type: 'success', text: 'Documents synchronized with server successfully!' });
       setTimeout(() => setDocFeedback({ type: '', text: '' }), 3000);
     } catch (err) {
       console.warn("Could not sync documents:", err);
-      setDocFeedback({ type: 'error', text: 'Could not synchronize with server documents.' });
+      setDocFeedback({
+        type: 'error',
+        text: `Could not synchronize with server documents: ${err.message}`
+      });
       setTimeout(() => setDocFeedback({ type: '', text: '' }), 3000);
     } finally {
       setIsSyncingDocs(false);
@@ -1144,6 +1204,30 @@ export const ProfileView = () => {
       return;
     }
 
+    const documentKind = getEmployeeDocumentKind({ title: finalTitle });
+    if (newDocForm.file.size > 15 * 1024 * 1024) {
+      showToast("File size exceeds 15MB limit. Please upload a smaller file.", "error");
+      return;
+    }
+
+    if (documentKind === 'passport_photo') {
+      if (!newDocForm.file.type.startsWith('image/')) {
+        showToast("Please upload a passport-size photo in PNG, JPG, or WEBP format.", "error");
+        return;
+      }
+
+      try {
+        if (!(await isPassportSizePhoto(newDocForm.file))) {
+          showToast("Please upload a passport-size portrait photo with a 7:9 aspect ratio (35 x 45).", "error");
+          return;
+        }
+      } catch (error) {
+        console.error("Could not validate passport photo:", error);
+        showToast("Could not read this image. Please select a valid passport-size photo.", "error");
+        return;
+      }
+    }
+
     setIsSubmittingNewDoc(true);
 
     try {
@@ -1194,7 +1278,9 @@ export const ProfileView = () => {
           isCore: false
         };
 
-        const updatedDocs = [...documents, newDocItem];
+        const updatedDocs = documentKind && documents.some(d => d.isCore && d.id === documentKind)
+          ? mergeDocumentIntoCore(documents, newDocItem)
+          : [...documents, newDocItem];
         persistDocuments(updatedDocs);
 
         setIsAddDocModalOpen(false);
@@ -1207,7 +1293,12 @@ export const ProfileView = () => {
           filePreview: ''
         });
 
-        setDocFeedback({ type: 'success', text: `"${finalTitle}" added to your documents!` });
+        setDocFeedback({
+          type: 'success',
+          text: documentKind
+            ? `"${finalTitle}" uploaded to Mandatory Identity Documents.`
+            : `"${finalTitle}" added to your documents!`
+        });
         setTimeout(() => setDocFeedback({ type: '', text: '' }), 4000);
       };
 
@@ -2809,6 +2900,9 @@ export const ProfileView = () => {
                   onChange={e => setNewDocForm(p => ({ ...p, presetType: e.target.value }))}
                   className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-indigo-500"
                 >
+                  <option value="Aadhar Card">Aadhar Card</option>
+                  <option value="PAN Card">PAN Card</option>
+                  <option value="Passport Size Photo">Passport Size Photo</option>
                   <option value="Driving License">Driving License</option>
                   <option value="Voter ID Card">Voter ID Card</option>
                   <option value="Passport">Passport</option>
