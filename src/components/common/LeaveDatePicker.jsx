@@ -22,7 +22,6 @@ const formatDateKey = (date) => {
 export const LeaveDatePicker = ({
   value,
   minDate,
-  rangeStart,
   disabledDates,
   onChange,
   disabled = false,
@@ -68,7 +67,6 @@ export const LeaveDatePicker = ({
     0
   ).getDate();
   const selectedDate = parseDate(value);
-  const holidayDates = [...holidayDateSet];
   const displayValue = selectedDate
     ? selectedDate.toLocaleDateString('en-IN', {
       day: '2-digit',
@@ -147,9 +145,6 @@ export const LeaveDatePicker = ({
               );
               const dateKey = formatDateKey(date);
               const isHoliday = holidayDateSet.has(dateKey);
-              const crossesHoliday = Boolean(rangeStart && holidayDates.some((holidayDate) =>
-                holidayDate > rangeStart && holidayDate <= dateKey
-              ));
               const isBeforeMinimum = Boolean(minDate && dateKey < minDate);
               const isSelected = dateKey === value;
 
@@ -157,9 +152,9 @@ export const LeaveDatePicker = ({
                 <button
                   key={dateKey}
                   type="button"
-                  disabled={isHoliday || isBeforeMinimum || crossesHoliday}
-                  title={isHoliday ? 'Company holiday' : crossesHoliday ? 'Date range includes a company holiday' : undefined}
-                  aria-label={isHoliday ? `${day}, company holiday` : crossesHoliday ? `${dateKey}, range includes a company holiday` : dateKey}
+                  disabled={isHoliday || isBeforeMinimum}
+                  title={isHoliday ? 'Company holiday' : undefined}
+                  aria-label={isHoliday ? `${day}, company holiday` : dateKey}
                   onClick={() => {
                     onChange(dateKey);
                     setIsOpen(false);
@@ -167,7 +162,7 @@ export const LeaveDatePicker = ({
                   className={`h-8 rounded-md text-xs transition-colors ${
                     isSelected
                       ? 'bg-indigo-600 font-semibold text-white'
-                      : isHoliday || crossesHoliday
+                      : isHoliday
                         ? 'cursor-not-allowed bg-slate-100 text-slate-300 line-through'
                         : isBeforeMinimum
                           ? 'cursor-not-allowed text-slate-300'

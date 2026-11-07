@@ -417,7 +417,9 @@ export const LeaveManagementView = () => {
   // Safely calculate actual working days excluding Sundays and Holidays
   const getCalculatedDays = () => {
     const isHalfDayActive = Boolean(isHalfDay || leaveType === 'half_day');
-    if (isHalfDayActive) return startDate ? 0.5 : 0;
+    if (isHalfDayActive) {
+      return startDate && holidaysLoaded && !holidaysList.includes(startDate) ? 0.5 : 0;
+    }
     if (!startDate || !endDate) return 0;
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -514,11 +516,8 @@ export const LeaveManagementView = () => {
       return;
     }
 
-    const holidayInRange = holidaysList.find((holidayDate) =>
-      holidayDate >= startDate && holidayDate <= finalEndDate
-    );
-    if (holidayInRange) {
-      setFormError(`${holidayInRange} is a company holiday. Select a leave range that does not include it.`);
+    if (holidaysList.includes(startDate) || holidaysList.includes(finalEndDate)) {
+      setFormError('Company holidays cannot be selected as the start or end date. Choose another date.');
       return;
     }
 
@@ -1149,7 +1148,6 @@ export const LeaveManagementView = () => {
                     <LeaveDatePicker
                       value={(isHalfDay || leaveType === 'half_day') ? startDate : endDate}
                       minDate={startDate || minAllowedDate}
-                      rangeStart={startDate}
                       disabledDates={holidaysList}
                       disabled={!holidaysLoaded || isHalfDay || leaveType === 'half_day' || !startDate}
                       onChange={val => {
@@ -1174,7 +1172,7 @@ export const LeaveManagementView = () => {
                   </div>
                 </div>
                 <p className="text-[11px] text-amber-600 font-medium">
-                  Notice: Leaves must be applied at least 2 days in advance. Company holidays cannot be included in the requested date range.
+                  Notice: Leaves must be applied at least 2 days in advance. Company holidays cannot be selected and are excluded from the working-day count.
                 </p>
               </div>
               
