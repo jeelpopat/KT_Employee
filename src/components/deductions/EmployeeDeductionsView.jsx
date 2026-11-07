@@ -1595,36 +1595,36 @@ export const EmployeeDeductionsView = () => {
       {/* MODAL 1: ADD / EDIT EMPLOYEE DEDUCTION                   */}
       {/* ======================================================== */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/50 backdrop-blur-xs font-poppins">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
           <div
             className="fixed inset-0"
             onClick={() => !isSubmittingAdd && setIsAddModalOpen(false)}
           />
 
-          <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in my-auto max-h-[88vh] flex flex-col">
-            <form onSubmit={handleSubmitAddForm} className="flex flex-col h-full max-h-[88vh] min-h-0">
-              {/* Header - Fixed & Pinned */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {editingDeductionId ? 'Edit Deduction Record' : 'Record New Employee Deduction'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Record penalty, asset damage, recovery, or policy deductions with mandatory reporting line resolution.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  disabled={isSubmittingAdd}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
-                >
-                  <XCircle size={18} />
-                </button>
+          <div className="relative w-full max-w-xl max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,660px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
+            {/* Header - Fixed & Strictly Pinned at Top */}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {editingDeductionId ? 'Edit Deduction Record' : 'Record New Employee Deduction'}
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Record penalty, asset damage, recovery, or policy deductions with mandatory reporting line resolution.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                disabled={isSubmittingAdd}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
 
-              {/* Scrollable Form Body */}
-              <div className="overflow-y-auto p-6 space-y-4 text-xs grow modal-scrollbar">
+            <form onSubmit={handleSubmitAddForm} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {/* Scrollable Form Body - Strictly contained between Header and Footer */}
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5 text-xs modal-scrollbar">
                 {/* Employee Selection */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1963,14 +1963,14 @@ export const EmployeeDeductionsView = () => {
       {/* MODAL 2: REJECT DEDUCTION WITH REASON                    */}
       {/* ======================================================== */}
       {isRejectModalOpen && selectedDeduction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/50 backdrop-blur-xs font-poppins">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
           <div
             className="fixed inset-0"
             onClick={() => !isSubmittingRejection && setIsRejectModalOpen(false)}
           />
 
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in my-auto max-h-[88vh] flex flex-col p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="relative w-full max-w-md max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,580px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
               <div className="flex items-center gap-2 text-rose-600">
                 <AlertCircle size={18} />
                 <h3 className="text-sm font-bold text-slate-900">
@@ -1980,65 +1980,67 @@ export const EmployeeDeductionsView = () => {
               <button
                 type="button"
                 onClick={() => setIsRejectModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
               >
                 <XCircle size={18} />
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              You are rejecting deduction record{' '}
-              <strong className="text-slate-900 font-mono">
-                {selectedDeduction.deductionRecordId}
-              </strong>{' '}
-              ({formatINR(selectedDeduction.amount)}) for{' '}
-              <strong className="text-slate-900">
-                {selectedDeduction.employeeId?.name || 'this employee'}
-              </strong>
-              . A mandatory reason must be provided for audit compliance.
-            </p>
+            <form onSubmit={handleConfirmReject} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-3.5 text-xs modal-scrollbar">
+                <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200/80">
+                  You are rejecting deduction record{' '}
+                  <strong className="text-slate-900 font-mono">
+                    {selectedDeduction.deductionRecordId}
+                  </strong>{' '}
+                  ({formatINR(selectedDeduction.amount)}) for{' '}
+                  <strong className="text-slate-900">
+                    {selectedDeduction.employeeId?.name || 'this employee'}
+                  </strong>
+                  . A mandatory reason must be provided for audit compliance.
+                </p>
 
-            <form onSubmit={handleConfirmReject} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Rejection Reason <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  rows={2}
-                  required
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="e.g. Evidence inconclusive, waiver granted by management, duplicate entry"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500"
-                />
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Rejection Reason <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="e.g. Evidence inconclusive, waiver granted by management, duplicate entry"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Additional Internal Comments (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={rejectionComments}
+                    onChange={(e) => setRejectionComments(e.target.value)}
+                    placeholder="Audit reference note"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Additional Internal Comments (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={rejectionComments}
-                  onChange={(e) => setRejectionComments(e.target.value)}
-                  placeholder="Audit reference note"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <div className="px-6 py-3.5 bg-slate-50/90 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsRejectModalOpen(false)}
                   disabled={isSubmittingRejection}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer shadow-2xs transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingRejection}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-60 transition"
                 >
                   {isSubmittingRejection ? (
                     <RefreshCw size={13} className="animate-spin" />
@@ -2057,14 +2059,14 @@ export const EmployeeDeductionsView = () => {
       {/* MODAL 3: VIEW DEDUCTION DETAILS & AUDIT TRAIL            */}
       {/* ======================================================== */}
       {isDetailModalOpen && selectedDeduction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/50 backdrop-blur-xs font-poppins">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
           <div
             className="fixed inset-0"
             onClick={() => setIsDetailModalOpen(false)}
           />
 
-          <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in my-auto p-6 space-y-4 max-h-[88vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+          <div className="relative w-full max-w-xl max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,660px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
               <div>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
                   {selectedDeduction.deductionRecordId}
@@ -2076,13 +2078,13 @@ export const EmployeeDeductionsView = () => {
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
               >
                 <XCircle size={18} />
               </button>
             </div>
 
-            <div className="overflow-y-auto space-y-3 text-xs modal-scrollbar pr-1">
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-3.5 text-xs modal-scrollbar">
               {/* Top Summary Card */}
               <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
                 <div>
@@ -2200,11 +2202,11 @@ export const EmployeeDeductionsView = () => {
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end shrink-0 border-t border-slate-100">
+            <div className="px-6 py-3.5 bg-slate-50/90 border-t border-slate-100 flex items-center justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs cursor-pointer"
+                className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs cursor-pointer shadow-2xs transition"
               >
                 Close
               </button>
@@ -2217,14 +2219,14 @@ export const EmployeeDeductionsView = () => {
       {/* MODAL 4: EMPLOYEE DISPUTE / CLARIFICATION                */}
       {/* ======================================================== */}
       {isDisputeModalOpen && selectedDeduction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/50 backdrop-blur-xs font-poppins">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
           <div
             className="fixed inset-0"
             onClick={() => !isSubmittingDispute && setIsDisputeModalOpen(false)}
           />
 
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in my-auto p-6 space-y-4 max-h-[88vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="relative w-full max-w-md max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,560px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
               <div className="flex items-center gap-2 text-indigo-600">
                 <HelpCircle size={18} />
                 <h3 className="text-sm font-bold text-slate-900">
@@ -2234,48 +2236,50 @@ export const EmployeeDeductionsView = () => {
               <button
                 type="button"
                 onClick={() => setIsDisputeModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
               >
                 <XCircle size={18} />
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Have questions regarding deduction{' '}
-              <strong className="text-slate-900 font-mono">
-                {selectedDeduction.deductionRecordId}
-              </strong>{' '}
-              ({formatINR(selectedDeduction.amount)})? Submit your query to HR and your Team Leader.
-            </p>
+            <form onSubmit={handleSendDispute} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-3.5 text-xs modal-scrollbar">
+                <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200/80">
+                  Have questions regarding deduction{' '}
+                  <strong className="text-slate-900 font-mono">
+                    {selectedDeduction.deductionRecordId}
+                  </strong>{' '}
+                  ({formatINR(selectedDeduction.amount)})? Submit your query to HR and your Team Leader.
+                </p>
 
-            <form onSubmit={handleSendDispute} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Your Question or Dispute Statement <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={disputeMessage}
-                  onChange={(e) => setDisputeMessage(e.target.value)}
-                  placeholder="Detail your question, dispute ground, or request for evidence review..."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
-                />
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Your Question or Dispute Statement <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={disputeMessage}
+                    onChange={(e) => setDisputeMessage(e.target.value)}
+                    placeholder="Detail your question, dispute ground, or request for evidence review..."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
+                  />
+                </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <div className="px-6 py-3.5 bg-slate-50/90 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsDisputeModalOpen(false)}
                   disabled={isSubmittingDispute}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer shadow-2xs transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingDispute}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-60 transition"
                 >
                   {isSubmittingDispute ? (
                     <RefreshCw size={13} className="animate-spin" />

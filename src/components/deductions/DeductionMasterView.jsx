@@ -802,36 +802,36 @@ export const DeductionMasterView = () => {
       {/* MODAL: CREATE / EDIT DEDUCTION MASTER                     */}
       {/* ======================================================== */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/50 backdrop-blur-xs font-poppins">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
           <div
             className="fixed inset-0"
             onClick={() => !isSubmitting && setIsModalOpen(false)}
           />
 
-          <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in my-auto max-h-[88vh] flex flex-col">
-            <form onSubmit={handleSubmitForm} className="flex flex-col h-full max-h-[88vh] min-h-0">
-              {/* Header - Fixed & Pinned */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {editingMaster ? 'Edit Deduction Master' : 'Create New Deduction Master'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Define standardized parameters for employee deductions and payroll processing.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  disabled={isSubmitting}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
-                >
-                  <XCircle size={18} />
-                </button>
+          <div className="relative w-full max-w-xl max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,660px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
+            {/* Header - Fixed & Pinned at Top */}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {editingMaster ? 'Edit Deduction Master' : 'Create New Deduction Master'}
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Define standardized parameters for employee deductions and payroll processing.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                disabled={isSubmitting}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
 
-              {/* Scrollable Form Body */}
-              <div className="overflow-y-auto p-6 space-y-4 text-xs grow modal-scrollbar">
+            <form onSubmit={handleSubmitForm} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {/* Scrollable Form Body - Strictly contained between Header and Footer */}
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs modal-scrollbar">
                 {/* Deduction Title */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1082,14 +1082,14 @@ export const DeductionMasterView = () => {
       {/* MODAL: VIEW DEDUCTION MASTER DETAILS                     */}
       {/* ======================================================== */}
       {viewingMaster && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/50 backdrop-blur-xs font-poppins">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
           <div
             className="fixed inset-0"
             onClick={() => setViewingMaster(null)}
           />
 
-          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in my-auto max-h-[88vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
+          <div className="relative w-full max-w-lg max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,660px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
               <div>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-sky-50 text-[#0088cc] font-bold border border-sky-100">
                   {viewingMaster.code}
@@ -1107,7 +1107,7 @@ export const DeductionMasterView = () => {
               </button>
             </div>
 
-            <div className="overflow-y-auto p-6 space-y-4 text-xs grow modal-scrollbar">
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs modal-scrollbar">
               <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-semibold">
