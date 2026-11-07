@@ -45,7 +45,6 @@ export const LoadingScreen = ({
       <div className="mx-auto mt-8 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-sky-50 to-cyan-100/70 shadow-inner">
         <div className="relative flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-sky-100">
           <span className="absolute inset-[-3px] rounded-full border-[3px] border-transparent border-t-[#034665] border-r-[#068DCB] animate-spin" />
-          <Loader2 className="h-6 w-6 text-[#068DCB]" />
         </div>
       </div>
       <p className="mt-6 text-lg font-semibold tracking-tight text-slate-800">{message}</p>
