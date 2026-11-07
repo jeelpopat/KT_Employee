@@ -1363,7 +1363,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       return;
     }
 
-    if (name === "endDate" && value && value < todayDate) {
+    if (!selectedProject && name === "endDate" && value && value < todayDate) {
       e.currentTarget.value = previousValue;
       showToast("End date must be today or later.", "error");
       return;
@@ -1406,23 +1406,38 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
     const { name, value } = e.target;
     
     if (name === "assignedEmployee") {
-      setTaskForm({
-        ...taskForm,
+      setTaskForm((prev) => ({
+        ...prev,
         assignedTo: value,
         assignedEmployee: value,
-      });
+      }));
     } else if (name === "status") {
       const autoProgress = getProgressForStatus(value);
-      setTaskForm({
-        ...taskForm,
+      setTaskForm((prev) => ({
+        ...prev,
         status: value,
-        progress: autoProgress !== null ? autoProgress : taskForm.progress,
-      });
+        progress: autoProgress !== null ? autoProgress : prev.progress,
+      }));
+    } else if (name === "dueDate") {
+      if (value && taskForm.startDate && value < taskForm.startDate) {
+        showToast("Due date cannot be earlier than start date.", "error");
+        return;
+      }
+      setTaskForm((prev) => ({
+        ...prev,
+        dueDate: value,
+      }));
+    } else if (name === "startDate") {
+      setTaskForm((prev) => ({
+        ...prev,
+        startDate: value,
+        ...(value && prev.dueDate && prev.dueDate < value ? { dueDate: value } : {}),
+      }));
     } else {
-      setTaskForm({
-        ...taskForm,
+      setTaskForm((prev) => ({
+        ...prev,
         [name]: value,
-      });
+      }));
     }
   };
   const closeTaskModal = () => {
@@ -1731,6 +1746,12 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
       if (!payload.projectId) {
         showToast("Please select a project before saving a task.", "error");
+        setIsSubmittingTask(false);
+        return;
+      }
+
+      if (payload.startDate && payload.dueDate && payload.dueDate < payload.startDate) {
+        showToast("Due date cannot be earlier than the start date.", "error");
         setIsSubmittingTask(false);
         return;
       }
