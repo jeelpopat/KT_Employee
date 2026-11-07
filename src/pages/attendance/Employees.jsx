@@ -530,9 +530,13 @@ export default function Employees() {
   // FORM CHANGE
   // =========================
   const handleChange = (e) => {
+    const value = e.target.name === "mobile"
+      ? e.target.value.replace(/\D/g, "").slice(0, 10)
+      : e.target.value;
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [e.target.name]: value,
     });
   };
 
@@ -540,6 +544,18 @@ export default function Employees() {
     const fullName = (formData.fullName || "").trim();
     if (!fullName) {
       showToast("Full Name is required", "error");
+      return null;
+    }
+
+    const email = String(formData.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      showToast("Enter a valid email address", "error");
+      return null;
+    }
+
+    const mobile = String(formData.mobile || "").trim();
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      showToast("Enter a valid 10-digit mobile number", "error");
       return null;
     }
 
@@ -556,8 +572,11 @@ export default function Employees() {
       fullName: fullName,
       firstName: fullName,
       lastName: "",
+      email,
+      mobile,
       address: (formData.address || "").trim(),
       role: cleanRole,
+      gender: String(formData.gender || "").trim().toLowerCase(),
     };
 
     if (!payload.address) {
@@ -666,7 +685,7 @@ export default function Employees() {
     setFormData({
       fullName: displayName,
       email: employee.email || "",
-      mobile:
+      mobile: String(
         employee.mobile ||
         employee.phone ||
         employee.phoneNumber ||
@@ -675,7 +694,8 @@ export default function Employees() {
         employee.userId?.phone ||
         employee.userID?.phoneNumber ||
         employee.userID?.phone ||
-        "",
+        ""
+      ).replace(/\D/g, "").slice(-10),
       designation: rawDesig,
       department: rawDept,
       role: (() => {
@@ -705,7 +725,7 @@ export default function Employees() {
             : employee.currentAddress ||
             employee.permanentAddress ||
             "",
-      gender: employee.gender || "",
+      gender: String(employee.gender || "").trim().toLowerCase(),
       bloodGroup: employee.bloodGroup || "",
     });
 
@@ -1681,10 +1701,15 @@ export default function Employees() {
                   <input
                     id="employee-mobile"
                     name="mobile"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[6-9][0-9]{9}"
+                    maxLength={10}
                     placeholder="00000 00000"
                     value={formData.mobile}
                     onChange={handleChange}
                     required
+                    title="Enter a valid 10-digit mobile number starting with 6, 7, 8, or 9"
                     className="w-full h-11 px-3.5 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins"
                   />
                 </div>
@@ -1812,14 +1837,15 @@ export default function Employees() {
                     <select
                       id="employee-gender"
                       name="gender"
-                      value={formData.gender || "Male"}
+                      value={formData.gender}
                       onChange={handleChange}
                       required
                       className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins appearance-none cursor-pointer"
                     >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
                     </select>
                     <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#787878] pointer-events-none" />
                   </div>
