@@ -316,6 +316,7 @@ const LogOutIcon = ({ size = 18, className = "" }) => (
 
 export const Sidebar = ({ onSignOut }) => {
   const {
+    user,
     currentTab, setCurrentTab,
     isMobileSidebarOpen, setIsMobileSidebarOpen,
     attendanceStatus, handleCheckOut, userRole
@@ -642,12 +643,12 @@ export const Sidebar = ({ onSignOut }) => {
 
       {/* Sidebar Container positioned seamlessly below the full-width navbar */}
       <aside
-        className={`fixed top-16 left-0 bottom-0 h-[calc(100vh-4rem)] w-60 bg-white border-r border-[#e5ecf2] flex flex-col overflow-hidden z-40 transition-transform duration-200 ease-in-out font-poppins
-          ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"} 
-          lg:translate-x-0 shadow-xs`}
+        className={`fixed top-16 left-0 bottom-0 h-[calc(100dvh-4rem)] max-h-[calc(100dvh-4rem)] w-64 max-w-[85vw] bg-white border-r border-[#e5ecf2] flex flex-col z-40 transition-transform duration-200 ease-in-out font-poppins
+          ${isMobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"} 
+          lg:translate-x-0 lg:w-60 lg:shadow-xs`}
       >
-        {/* Navigation Area */}
-        <nav className="flex-1 overflow-y-auto font-poppins scrollbar-thin scrollbar-thumb-slate-200">
+        {/* Navigation Area - scrolls smoothly above pinned footer */}
+        <nav className="flex-1 min-h-0 overflow-y-auto font-poppins scrollbar-thin scrollbar-thumb-slate-200">
           {menuSections.map((section) => (
             <div key={section.title} className="w-full">
               {/* Full-width section header banner matching Image 1 */}
@@ -710,7 +711,7 @@ export const Sidebar = ({ onSignOut }) => {
                 <div className="bg-white border-b border-[#edf2f7] pb-2">
                   <div className="mx-3 mt-2.5 mb-2 p-3 rounded-md bg-[#f8fafc] border border-[#cfdbe5] font-poppins shadow-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-[12px] uppercase font-semi] tracking-wider leading-none">
+                      <span className="text-[12px] uppercase font-semibold tracking-wider leading-none">
                         Role
                       </span>
                       <span
@@ -725,6 +726,7 @@ export const Sidebar = ({ onSignOut }) => {
                   <button
                     type="button"
                     onClick={() => {
+                      setIsMobileSidebarOpen(false);
                       handleCheckOut();
                       if (onSignOut) onSignOut();
                     }}
@@ -738,6 +740,44 @@ export const Sidebar = ({ onSignOut }) => {
             </div>
           ))}
         </nav>
+
+        {/* Pinned Mobile Footer - ALWAYS visible at bottom of mobile sidebar without scrolling */}
+        <div className="shrink-0 p-3 bg-white border-t border-[#e2edf5] font-poppins lg:hidden shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center justify-between gap-2 mb-2 px-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-[#034665] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-800 truncate leading-tight">
+                  {user?.name || 'User'}
+                </p>
+                <span className="text-[10px] text-slate-500 capitalize leading-tight block">
+                  {roleLabels[userRole] || userRole}
+                </span>
+              </div>
+            </div>
+            <span
+              className="text-[10px] font-semibold px-2 py-0.5 rounded text-white capitalize shrink-0"
+              style={{ background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }}
+            >
+              {userRole === 'admin' ? 'Admin' : (userRole === 'hr' ? 'HR' : (userRole === 'team_leader' ? 'TL' : 'Employee'))}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsMobileSidebarOpen(false);
+              handleCheckOut();
+              if (onSignOut) onSignOut();
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+          >
+            <LogOutIcon size={16} className="text-red-500 shrink-0" />
+            <span>Log Out</span>
+          </button>
+        </div>
       </aside>
     </>
   );
