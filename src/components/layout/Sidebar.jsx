@@ -486,7 +486,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "PEOPLE AND ORGANIZATION",
       items: [
         { tab: 'admin-employees', label: 'Employees', icon: EmployeeIcon },
-        { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon, requestCount: requestCounts.employee },
+        // { tab: 'admin-employee-requests', label: 'Employee Requests', icon: EmployeeRequestsIcon, requestCount: requestCounts.employee },
         { tab: 'admin-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'salary', label: 'Salary & Payroll', icon: SalaryIcon },
         { tab: 'admin-team-tasks', label: 'Task Management', icon: TaskManagementIcon },

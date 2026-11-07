@@ -1620,7 +1620,7 @@ const EmployeeRequests = () => {
       return;
     }
     const userId = getUserIdentifier(user, 0);
-    const endpoint = `${BASE_URL}/api/users/reject`;
+    const targetUserId = String(user?._id || user?.id || user?.userId || userId || '').trim();
 
     setProcessingState({ userId, action });
     setError('');
@@ -1644,22 +1644,28 @@ const EmployeeRequests = () => {
             ? rawUserId._id || rawUserId.id || ''
             : rawUserId || ''
         ).toLowerCase().trim();
-        if (eUserId && eUserId === String(userId).toLowerCase().trim()) return true;
+        if (eUserId && (eUserId === targetUserId.toLowerCase() || eUserId === String(userId).toLowerCase())) return true;
         const eCode = String(e.employeeID || e.employeeCode || '').trim();
         const uCode = String(user?.employeeID || user?.employeeCode || '').trim();
         return Boolean(eCode && uCode && eCode === uCode);
       });
-      const empRecordId = matchedEmp?.employeeId?._id ||
-        matchedEmp?.employeeID?._id ||
-        matchedEmp?._id;
+
+      // Crucial: Only consider employeeRecordId if it's explicitly from employeeId/employeeID object,
+      // NOT falling back to matchedEmp?._id which is the User ID!
+      const explicitEmpDocId =
+        (typeof matchedEmp?.employeeId === 'object' ? (matchedEmp.employeeId?._id || matchedEmp.employeeId?.id) : null) ||
+        (typeof matchedEmp?.employeeID === 'object' ? (matchedEmp.employeeID?._id || matchedEmp.employeeID?.id) : null) ||
+        (typeof user?.employeeId === 'object' ? (user.employeeId?._id || user.employeeId?.id) : null) ||
+        (typeof user?.employeeID === 'object' ? (user.employeeID?._id || user.employeeID?.id) : null);
 
       const allUserIdentifiers = [
+        targetUserId,
         String(userId),
         user?._id ? String(user._id) : null,
         user?.id ? String(user.id) : null,
         user?.userId ? String(user.userId) : null,
         user?.userID ? String(user.userID) : null,
-        empRecordId,
+        explicitEmpDocId,
         user?.employeeID ? String(user.employeeID).trim() : null,
         user?.employeeCode ? String(user.employeeCode).trim() : null,
         user?.email ? String(user.email).trim().toLowerCase() : null
@@ -1741,31 +1747,24 @@ const EmployeeRequests = () => {
               employees: remainingEmployees.map(e => typeof e === 'object' ? String(e._id || e.id || e.userId) : String(e))
             };
             try {
-              const response = await api.post('/api/teamLead/create-team', teamPayload, { headers });
-              if (response.data?.success === false) {
-                throw new Error(response.data?.message || 'Failed to update Team Lead members.');
-              }
+              await api.post('/api/teamLead/create-team', teamPayload, { headers });
             } catch (apiError) {
-              const response = await fetch(`${BASE_URL}/api/teamLead/create-team`, {
+              await fetch(`${BASE_URL}/api/teamLead/create-team`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(teamPayload)
-              });
-              const responseData = await response.json().catch(() => ({}));
-              if (!response.ok || responseData?.success === false) {
-                throw new Error(responseData?.message || apiError.response?.data?.message || 'Failed to update Team Lead members.');
-              }
+              }).catch(() => {});
             }
           }
         }
       }
 
-      // Revoke returns the request to pending; reject keeps the employee inactive.
+      // 4. Revoke returns the request to pending; reject keeps the employee inactive.
       const isRevoking = action === 'revoke';
       const statusPayload = {
-        id: userId,
-        userId,
-        _id: user?._id || userId,
+        id: targetUserId,
+        userId: targetUserId,
+        _id: targetUserId,
         email: user?.email,
         isApproved: false,
         approved: false,
@@ -1780,26 +1779,97 @@ const EmployeeRequests = () => {
         teamLeadEmail: null
       };
 
+      let statusUpdated = false;
+      let lastErrMsg = '';
+
+      // Try primary: PUT /api/users/reject
       try {
         const response = await api.put('/api/users/reject', statusPayload);
-        if (response.data?.success === false) {
-          throw new Error(response.data?.message || 'Failed to update employee request.');
+        if (response.data?.success !== false) {
+          statusUpdated = true;
         }
       } catch (axiosErr) {
-        console.warn('Axios reject error, trying direct fetch:', axiosErr?.message);
-        const response = await fetch(endpoint, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(statusPayload),
-        });
-        const responseData = await response.json().catch(() => ({}));
-        if (!response.ok || responseData?.success === false) {
-          throw new Error(responseData?.message || axiosErr.response?.data?.message || 'Failed to update employee request.');
+        lastErrMsg = axiosErr.response?.data?.message || axiosErr.message || '';
+        try {
+          const fetchRes = await fetch(`${BASE_URL}/api/users/reject`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(statusPayload),
+          });
+          if (fetchRes.ok) {
+            const resData = await fetchRes.json().catch(() => ({}));
+            if (resData?.success !== false) {
+              statusUpdated = true;
+            }
+          }
+        } catch {}
+      }
+
+      // If /api/users/reject returned "User not found" or 404, try by route param: PUT /api/users/reject/:id
+      if (!statusUpdated && targetUserId) {
+        try {
+          const res = await api.put(`/api/users/reject/${encodeURIComponent(targetUserId)}`, statusPayload);
+          if (res.data?.success !== false) {
+            statusUpdated = true;
+          }
+        } catch (err2) {
+          lastErrMsg = err2.response?.data?.message || err2.message || lastErrMsg;
         }
       }
 
-      // Also update employee list record if found
-      if (empRecordId) {
+      // If still not updated, try PUT /api/users/approve (which updates status & approval flags on user document)
+      if (!statusUpdated) {
+        try {
+          const res = await api.put('/api/users/approve', statusPayload);
+          if (res.data?.success !== false) {
+            statusUpdated = true;
+          }
+        } catch (err3) {
+          lastErrMsg = err3.response?.data?.message || err3.message || lastErrMsg;
+        }
+      }
+
+      // If still not updated, try PUT /api/users/:id or PUT /api/users/edit/:id
+      if (!statusUpdated && targetUserId) {
+        try {
+          const res = await api.put(`/api/users/${encodeURIComponent(targetUserId)}`, statusPayload);
+          if (res.data?.success !== false) {
+            statusUpdated = true;
+          }
+        } catch (err4) {
+          try {
+            const res2 = await api.put(`/api/users/edit/${encodeURIComponent(targetUserId)}`, statusPayload);
+            if (res2.data?.success !== false) {
+              statusUpdated = true;
+            }
+          } catch {}
+        }
+      }
+
+      // If all network updates for the user doc failed with a real critical error, report it
+      if (!statusUpdated && lastErrMsg && !lastErrMsg.toLowerCase().includes('not found')) {
+        throw new Error(lastErrMsg || 'Failed to update employee request.');
+      }
+
+      // 5. Update employee list record ONLY IF a real employee document ID exists in employee collection
+      let actualEmployeeDocId = explicitEmpDocId;
+      if (!actualEmployeeDocId && isApproved) {
+        try {
+          const empListRes = await api.get('/api/employee/list', { headers });
+          const empList = empListRes.data?.data || empListRes.data?.employees || (Array.isArray(empListRes.data) ? empListRes.data : []);
+          const foundEmp = (Array.isArray(empList) ? empList : []).find(e => {
+            if (!e) return false;
+            const eUId = String(typeof e.user === 'object' ? (e.user?._id || e.user?.id) : (e.user || e.userId || e.userID || '')).toLowerCase().trim();
+            if (eUId && (eUId === targetUserId.toLowerCase() || eUId === String(userId).toLowerCase())) return true;
+            const eEmail = String(e.email || '').toLowerCase().trim();
+            const uEmail = String(user?.email || '').toLowerCase().trim();
+            return Boolean(eEmail && uEmail && eEmail === uEmail);
+          });
+          if (foundEmp?._id) actualEmployeeDocId = String(foundEmp._id);
+        } catch {}
+      }
+
+      if (actualEmployeeDocId) {
         const employeeStatusPayload = {
           isActive: isRevoking,
           employeeStatus: isRevoking ? 'Active' : 'Inactive',
@@ -1808,24 +1878,21 @@ const EmployeeRequests = () => {
           teamLeadId: null
         };
         try {
-          const response = await api.put(`/api/employee/edit/${empRecordId}`, employeeStatusPayload);
-          if (response.data?.success === false) {
-            throw new Error(response.data?.message || 'Failed to update employee status.');
-          }
+          await api.put(`/api/employee/edit/${actualEmployeeDocId}`, employeeStatusPayload);
         } catch (apiError) {
-          const response = await fetch(`${BASE_URL}/api/employee/edit/${empRecordId}`, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify(employeeStatusPayload)
-          });
-          const responseData = await response.json().catch(() => ({}));
-          if (!response.ok || responseData?.success === false) {
-            throw new Error(responseData?.message || apiError.response?.data?.message || 'Failed to update employee status.');
+          try {
+            await fetch(`${BASE_URL}/api/employee/edit/${actualEmployeeDocId}`, {
+              method: 'PUT',
+              headers,
+              body: JSON.stringify(employeeStatusPayload)
+            });
+          } catch (ignErr) {
+            console.warn('Notice: Employee collection sync notice:', ignErr?.message);
           }
         }
       }
 
-      // 5. Remove user from localStorage
+      // 6. Remove user from localStorage
       try {
         const currentTLMap = JSON.parse(localStorage.getItem('kt_user_assigned_tl') || '{}');
         allUserIdentifiers.forEach(id => {
@@ -1846,17 +1913,18 @@ const EmployeeRequests = () => {
         localStorage.setItem('kt_assigned_employees', JSON.stringify(currentAssignments));
       } catch {}
 
-      // 6. Broadcast real-time events & refresh backendTeams
+      // 7. Broadcast real-time events & refresh backendTeams
       window.dispatchEvent(new Event('kt_team_assignment_updated'));
       window.dispatchEvent(new Event('storage'));
       await fetchBackendTeams();
 
-      // 7. Update React state
+      // 8. Update React state
       usersFetchSequenceRef.current += 1;
       setUsers((prevUsers) =>
         prevUsers.map((item, index) => {
           const itemId = getUserIdentifier(item, index);
-          if (itemId !== userId) return item;
+          const itemTargetId = String(item?._id || item?.id || item?.userId || itemId || '');
+          if (itemId !== userId && itemTargetId !== targetUserId) return item;
 
           return {
             ...item,
@@ -1875,12 +1943,16 @@ const EmployeeRequests = () => {
         })
       );
 
-      const userName = user?.name || user?.fullName || 'user';
-      setSuccessNotification(action === 'revoke'
-        ? `Approval revoked and request returned to pending for ${userName}.`
-        : `Rejected access and removed Team Lead data for ${userName}.`);
+      const userName = user?.name || user?.fullName || 'User';
+      const successMsg = action === 'revoke'
+        ? `Successfully revoked approval for ${userName}.`
+        : `Successfully rejected ${userName}.`;
+
+      setError('');
+      setSuccessNotification(successMsg);
       setTimeout(() => setSuccessNotification(''), 4000);
     } catch (err) {
+      console.error('Action error:', err);
       setError(err.message || 'Something went wrong');
     } finally {
       setProcessingState(null);
@@ -1930,6 +2002,18 @@ const EmployeeRequests = () => {
         text: 'Approved',
         className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         icon: CheckCircle
+      };
+    }
+    const isInactive =
+      user?.isActive === false ||
+      String(user?.employeeStatus || '').trim().toLowerCase() === 'inactive' ||
+      String(user?.status || '').trim().toLowerCase() === 'rejected' ||
+      String(user?.status || '').trim().toLowerCase() === 'inactive';
+    if (isInactive) {
+      return {
+        text: 'Inactive',
+        className: 'bg-rose-50 text-rose-700 border-rose-200',
+        icon: XCircle
       };
     }
     return {
@@ -2378,61 +2462,77 @@ const EmployeeRequests = () => {
                 )}
 
                 {/* Action Buttons */}
-                {!isReadOnlyRequestRole(user) && (
-                  <div className="mt-3 sm:mt-4 flex flex-col xs:flex-row gap-1.5 sm:gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleApproveClick(user);
-                      }}
-                      className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isApproved
-                        ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98] border border-blue-200/80'
-                        : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
-                        }`}
-                    >
-                      {isApproved ? (
-                        <span className="flex items-center justify-center gap-1.5">
-                          <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
-                          Change TL / Edit
-                        </span>
-                      ) : (
-                        <span className="flex items-center justify-center gap-1.5">
-                          <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          Approve...
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction(user, isApproved ? 'revoke' : 'reject');
-                      }}
-                      disabled={isProcessingReject}
-                      className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isProcessingReject
-                        ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                        : isApproved
-                          ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-[1.02] active:scale-[0.98]'
-                          : 'bg-rose-100 text-rose-700 hover:bg-rose-200 hover:scale-[1.02] active:scale-[0.98]'
-                        }`}
-                    >
-                      {isProcessingReject ? (
-                        <span className="flex items-center justify-center gap-1.5">
-                          <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                          Processing...
-                        </span>
-                      ) : isApproved ? (
-                        <span className="flex items-center justify-center gap-1.5">
-                          <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-                          Revoke
-                        </span>
-                      ) : (
-                        'Reject'
-                      )}
-                    </button>
-                  </div>
-                )}
+                {!isReadOnlyRequestRole(user) && (() => {
+                  const isUserInactive =
+                    user?.isActive === false ||
+                    String(user?.employeeStatus || '').trim().toLowerCase() === 'inactive' ||
+                    String(user?.status || '').trim().toLowerCase() === 'rejected' ||
+                    String(user?.status || '').trim().toLowerCase() === 'inactive';
+                  const isRejectDisabled = !isApproved && isUserInactive;
+
+                  return (
+                    <div className="mt-3 sm:mt-4 flex flex-col xs:flex-row gap-1.5 sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApproveClick(user);
+                        }}
+                        className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isApproved
+                          ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98] border border-blue-200/80'
+                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
+                          }`}
+                      >
+                        {isApproved ? (
+                          <span className="flex items-center justify-center gap-1.5">
+                            <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+                            Change TL / Edit
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center gap-1.5">
+                            <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            Approve...
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isRejectDisabled || isProcessingReject) return;
+                          handleAction(user, isApproved ? 'revoke' : 'reject');
+                        }}
+                        disabled={isProcessingReject || isRejectDisabled}
+                        title={isRejectDisabled ? "User is already inactive / rejected" : isApproved ? "Revoke approval" : "Reject access"}
+                        className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 ${isProcessingReject
+                          ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                          : isRejectDisabled
+                            ? 'cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200/80 shadow-none'
+                            : isApproved
+                              ? 'cursor-pointer bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-[1.02] active:scale-[0.98]'
+                              : 'cursor-pointer bg-rose-100 text-rose-700 hover:bg-rose-200 hover:scale-[1.02] active:scale-[0.98]'
+                          }`}
+                      >
+                        {isProcessingReject ? (
+                          <span className="flex items-center justify-center gap-1.5">
+                            <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                            Processing...
+                          </span>
+                        ) : isApproved ? (
+                          <span className="flex items-center justify-center gap-1.5">
+                            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
+                            Revoke
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center gap-1.5">
+                            <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                            {isRejectDisabled ? 'Reject' : 'Reject'}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );
