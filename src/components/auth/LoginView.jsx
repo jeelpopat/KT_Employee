@@ -580,7 +580,6 @@ export const LoginView = ({
                           <option value="employee">Employee</option>
                           <option value="teamlead">Team Leader</option>
                           <option value="hr">HR Executive</option>
-                          <option value="admin">Administrator</option>
                         </select>
                       </div>
                     </div>
