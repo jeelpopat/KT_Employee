@@ -7,6 +7,7 @@ import { expandHolidayDates } from '../../utils/holidayUtils.js';
 import { BASE_URL } from '../../api/config';
 
 const API_BASE = `${BASE_URL}/api/holiday`;
+const HIDDEN_DEFAULT_HOLIDAYS_KEY = 'hidden-default-holidays';
 
 const toStandardDateString = (input) => {
   if (!input) return '';
@@ -44,11 +45,26 @@ const parseHolidayDate = (dateStr) => {
 
 const normalizeHoliday = (holiday) => {
   const rawDate = holiday.holidayDate || holiday.date || '';
+  const date = toStandardDateString(rawDate);
+  const title = holiday.holidayName || holiday.title || holiday.name || '';
+  const isDefault = holiday.isDefault === true;
   return {
-    id: holiday._id || holiday.id || String(Math.random()),
-    date: toStandardDateString(rawDate),
-    title: holiday.holidayName || holiday.title || holiday.name || '',
+    id: holiday._id || holiday.id || (isDefault ? `default:${date}:${title}` : `${date}:${title}`),
+    date,
+    title,
+    isDefault,
   };
+};
+
+const getHiddenDefaultHolidayIds = () => {
+  const storedIds = localStorage.getItem(HIDDEN_DEFAULT_HOLIDAYS_KEY);
+  if (!storedIds) return [];
+
+  const parsedIds = JSON.parse(storedIds);
+  if (!Array.isArray(parsedIds) || !parsedIds.every((id) => typeof id === 'string')) {
+    throw new Error('Saved holiday overrides are invalid. Clear this site’s local storage and try again.');
+  }
+  return parsedIds;
 };
 
 const getAuthHeaders = () => {
@@ -89,7 +105,10 @@ export default function Holidays() {
       else if (Array.isArray(data.holidays)) holidaysData = data.holidays;
       else if (Array.isArray(data.data)) holidaysData = data.data;
 
-      setHolidays(holidaysData.map(normalizeHoliday));
+      const hiddenDefaultHolidayIds = new Set(getHiddenDefaultHolidayIds());
+      setHolidays(holidaysData
+        .map(normalizeHoliday)
+        .filter((holiday) => !holiday.isDefault || !hiddenDefaultHolidayIds.has(holiday.id)));
     } catch (fetchError) {
       console.error('Holiday fetch failed', fetchError);
       setError('Unable to load holidays. Please try again.');
@@ -236,9 +255,14 @@ export default function Holidays() {
   };
 
   const handleDelete = async (id) => {
+    const holidayToDelete = holidays.find((holiday) => holiday.id === id);
+    if (!holidayToDelete) return;
+
     const confirmed = await confirm({
       title: 'Delete holiday?',
-      message: 'Are you sure you want to delete this holiday? This date will no longer be excluded from leave totals (weekly offs still do not count).',
+      message: holidayToDelete.isDefault
+        ? 'This is a generated weekly-off entry. Delete will hide it in this browser only; it will not change backend data or other users’ calendars.'
+        : 'Are you sure you want to delete this holiday? This date will no longer be excluded from leave totals (weekly offs still do not count).',
       confirmLabel: 'Delete',
     });
     if (!confirmed) return;
@@ -246,6 +270,17 @@ export default function Holidays() {
     setError('');
 
     try {
+      if (holidayToDelete.isDefault) {
+        const hiddenDefaultHolidayIds = new Set(getHiddenDefaultHolidayIds());
+        hiddenDefaultHolidayIds.add(id);
+        localStorage.setItem(
+          HIDDEN_DEFAULT_HOLIDAYS_KEY,
+          JSON.stringify([...hiddenDefaultHolidayIds])
+        );
+        setHolidays((previous) => previous.filter((holiday) => holiday.id !== id));
+        return;
+      }
+
       const response = await fetch(`${API_BASE}/delete/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
