@@ -1,5 +1,5 @@
-export const BASE_URL = 'https://kt-backend-lf05.onrender.com';
-export const API_BASE_URL = 'https://kt-backend-lf05.onrender.com';
+export const BASE_URL = 'https://api.kevalontechnology.com/';
+export const API_BASE_URL = 'https://api.kevalontechnology.com/';
 
 /**
  * Helper to construct an endpoint URL safely with BASE_URL
