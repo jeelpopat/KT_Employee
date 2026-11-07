@@ -3748,7 +3748,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
                     {editingTask
-                      ? "Update task details, assignment, schedule, and progress."
+                      ? "Update task details, assignment, schedule, and status."
                       : "Choose a project, assign ownership, and set the deadline."}
                   </p>
                 </div>
@@ -3978,7 +3978,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
 
                 <section className="space-y-4">
                   <div className="border-b border-slate-100 pb-2">
-                    <h3 className="text-sm font-semibold text-slate-900">Schedule and progress</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">Schedule</h3>
                   </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -4005,7 +4005,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                     <select
@@ -4018,18 +4018,6 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                       <option value="medium">Medium</option>
                       <option value="high">High</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Progress (%)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      name="progress"
-                      value={taskForm.progress}
-                      onChange={handleTaskChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
                   </div>
                 </div>
 
