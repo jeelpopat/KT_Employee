@@ -86,26 +86,49 @@ export default function Holidays() {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE}/all?_t=${Date.now()}`, {
-        headers: getAuthHeaders()
-      });
-      const data = await response.json();
-
       let holidaysData = [];
-      if (Array.isArray(data)) holidaysData = data;
-      else if (Array.isArray(data.holidays)) holidaysData = data.holidays;
-      else if (Array.isArray(data.data)) holidaysData = data.data;
+
+      // 1. Fetch real MongoDB holidays from /current-month (authoritative database collection)
+      try {
+        const cmRes = await fetch(`${API_BASE}/current-month?_t=${Date.now()}`, {
+          headers: getAuthHeaders()
+        });
+        if (cmRes.ok) {
+          const cmData = await cmRes.json();
+          const list = Array.isArray(cmData) ? cmData : cmData.holidays || cmData.data || [];
+          holidaysData.push(...list);
+        }
+      } catch (e) {
+        console.warn('current-month fetch failed:', e);
+      }
+
+      // 2. Also check /all for any custom non-default items
+      try {
+        const allRes = await fetch(`${API_BASE}/all?_t=${Date.now()}`, {
+          headers: getAuthHeaders()
+        });
+        if (allRes.ok) {
+          const allData = await allRes.json();
+          const allList = Array.isArray(allData) ? allData : allData.holidays || allData.data || [];
+          for (const item of allList) {
+            if (item && !item.isDefault && (item._id || item.id)) {
+              if (!holidaysData.some(h => (h._id || h.id) === (item._id || item.id))) {
+                holidaysData.push(item);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('all fetch failed:', e);
+      }
 
       // STRICT DYNAMIC FILTER: Keep only real holidays created and stored in the database
-      // Exclude auto-generated weekly offs (isDefault === true or missing _id)
+      // Exclude auto-generated weekly offs (isDefault === true)
       const realHolidays = holidaysData.filter((holiday) => {
         if (!holiday) return false;
         if (holiday.isDefault === true) return false;
-        const name = (holiday.holidayName || holiday.name || holiday.title || '').trim().toLowerCase();
-        if ((name === 'sunday' || name === '2nd saturday' || name === '4th saturday') && !holiday._id && !holiday.id) {
-          return false;
-        }
-        return Boolean(name || holiday.holidayDate || holiday.date);
+        const name = (holiday.holidayName || holiday.name || holiday.title || '').trim();
+        return Boolean(name && (holiday.holidayDate || holiday.date || holiday.startDate));
       });
 
       const expandedHolidays = [];
@@ -125,7 +148,7 @@ export default function Holidays() {
               dbId: item._id || item.id,
               date: rDate,
               title,
-              isDefault: item.isDefault === true,
+              isDefault: false,
             });
           }
         } else if (startStr) {
@@ -134,7 +157,7 @@ export default function Holidays() {
             dbId: item._id || item.id,
             date: startStr,
             title,
-            isDefault: item.isDefault === true,
+            isDefault: false,
           });
         }
       }
@@ -266,14 +289,34 @@ export default function Holidays() {
           holidayName: trimmedTitle,
           holidayDate: rangeDate,
         };
-        const response = await fetch(`${API_BASE}/create`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
+
+        // Check if a holiday already exists in backend on this date
+        const existingOnDate = holidays.find(h => h.date === rangeDate);
+        const existingDbId = existingOnDate?.dbId || existingOnDate?.id;
+
+        let response;
+        if (existingDbId) {
+          // UPDATE existing record to avoid MongoDB E11000 duplicate key error
+          response = await fetch(`${API_BASE}/update/${existingDbId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+          });
+        } else {
+          response = await fetch(`${API_BASE}/create`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+          });
+        }
+
         const responseData = await response.json();
         if (!response.ok || responseData.success === false) {
-          throw new Error(responseData.message || `Unable to save holiday for ${rangeDate}.`);
+          const errMsg = responseData.message || '';
+          if (errMsg.includes('E11000') || errMsg.includes('duplicate key')) {
+            throw new Error(`A holiday record already exists for ${rangeDate}. Please edit or delete the existing record.`);
+          }
+          throw new Error(errMsg || `Unable to save holiday for ${rangeDate}.`);
         }
         savedCount += 1;
       }
@@ -286,7 +329,12 @@ export default function Holidays() {
         await fetchHolidays();
         setError(`Saved ${savedCount} holiday date(s), but some failed: ${submitError.message}`);
       } else {
-        setError(submitError.message || 'Unable to save holiday. Please try again.');
+        const rawMsg = submitError.message || '';
+        if (rawMsg.includes('E11000') || rawMsg.includes('duplicate key')) {
+          setError('A holiday already exists for this date in the system. Please edit the existing holiday.');
+        } else {
+          setError(rawMsg || 'Unable to save holiday. Please try again.');
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -500,8 +548,8 @@ export default function Holidays() {
         <div className="grid grid-cols-7 gap-0.5 p-1 bg-white">
           {days.map((day, index) => {
             let dayBgClass = 'bg-white';
-            if (day.isCurrentMonth && (day.isSunday || day.isSecondOrFourthSaturday)) {
-              dayBgClass = 'bg-slate-100';
+            if (day.hasHoliday && day.isCurrentMonth) {
+              dayBgClass = 'bg-blue-50/40';
             } else if (!day.isCurrentMonth) {
               dayBgClass = 'bg-slate-50';
             }
@@ -554,9 +602,9 @@ export default function Holidays() {
                     )}
                   </div>
 
-                  {/* Holiday Title / Weekend label */}
-                  <div className="mt-1">
-                    {day.hasHoliday && day.holidayTitle ? (
+                  {/* Holiday Title (Only show if present in backend DB) */}
+                  {day.hasHoliday && day.holidayTitle && (
+                    <div className="mt-1">
                       <div
                         className="p-1 sm:p-1.5 rounded-md bg-blue-50/95 border border-blue-200/90 shadow-2xs"
                         title={day.holidayTitle}
@@ -564,18 +612,9 @@ export default function Holidays() {
                         <p className="text-[10px] sm:text-[11px] font-bold text-blue-900 leading-tight truncate">
                           {day.holidayTitle}
                         </p>
-                        {(day.isSunday || day.isSecondOrFourthSaturday) && (
-                          <p className="text-[8px] sm:text-[9px] text-blue-600 font-semibold leading-none mt-0.5 truncate">
-                            {day.isSunday ? 'Sunday' : (day.day >= 8 && day.day <= 14 ? '2nd Saturday' : '4th Saturday')}
-                          </p>
-                        )}
                       </div>
-                    ) : day.isCurrentMonth && (day.isSunday || day.isSecondOrFourthSaturday) ? (
-                      <div className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 text-[9px] sm:text-[10px] font-semibold leading-tight truncate">
-                        {day.isSunday ? 'Sunday' : (day.day >= 8 && day.day <= 14 ? '2nd Saturday' : '4th Saturday')}
-                      </div>
-                    ) : null}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {day.hasHoliday && day.isCurrentMonth && (
@@ -602,14 +641,6 @@ export default function Holidays() {
           <div className="flex items-center gap-1.5">
             <div className="h-2.5 w-2.5 bg-blue-500 rounded-sm"></div>
             <span className="text-[10px] sm:text-xs font-medium text-slate-600">Holiday</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-2.5 w-2.5 bg-slate-300 rounded-sm"></div>
-            <span className="text-[10px] sm:text-xs font-medium text-slate-600">Sat (2nd/4th)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-2.5 w-2.5 bg-slate-400 rounded-sm"></div>
-            <span className="text-[10px] sm:text-xs font-medium text-slate-600">Sunday</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="h-2.5 w-2.5 bg-orange-500 rounded-sm"></div>
@@ -708,9 +739,8 @@ export default function Holidays() {
                     <tbody className="divide-y divide-slate-200">
                       {sortedHolidays.map((holiday) => {
                         const holidayDate = parseHolidayDate(holiday.date);
-                        const isWeekend = holidayDate ? (holidayDate.getDay() === 0 || isSecondOrFourthSaturday(holidayDate)) : false;
                         return (
-                          <tr key={holiday.id} className={`${isWeekend ? 'bg-slate-100' : 'hover:bg-slate-50'} transition-colors`}>
+                          <tr key={holiday.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-3 sm:px-4 py-2.5 font-medium text-slate-900 whitespace-nowrap text-[11px] sm:text-sm">
                               {holidayDate
                                 ? holidayDate.toLocaleDateString('en-US', {

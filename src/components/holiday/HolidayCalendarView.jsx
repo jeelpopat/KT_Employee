@@ -39,18 +39,40 @@ export const HolidayCalendarView = () => {
   const fetchHolidays = async (isSilent = false) => {
     if (!isSilent) setIsLoading(true);
     try {
-      const res = await api.get('/api/holiday/all', { skipCache: true });
-      const apiHolidays = res.data?.holidays || res.data?.data || [];
+      const holidaysData = [];
+
+      // 1. Fetch real MongoDB holidays from /current-month (authoritative database collection)
+      try {
+        const cmRes = await api.get('/api/holiday/current-month', { skipCache: true });
+        const cmData = cmRes.data;
+        const list = Array.isArray(cmData) ? cmData : cmData?.holidays || cmData?.data || [];
+        holidaysData.push(...list);
+      } catch (cmErr) {
+        console.warn('current-month fetch failed in calendar view:', cmErr);
+      }
+
+      // 2. Also check /all for any custom non-default items
+      try {
+        const allRes = await api.get('/api/holiday/all', { skipCache: true });
+        const allData = allRes.data;
+        const allList = Array.isArray(allData) ? allData : allData?.holidays || allData?.data || [];
+        for (const item of allList) {
+          if (item && !item.isDefault && (item._id || item.id)) {
+            if (!holidaysData.some(h => (h._id || h.id) === (item._id || item.id))) {
+              holidaysData.push(item);
+            }
+          }
+        }
+      } catch (allErr) {
+        console.warn('all fetch failed in calendar view:', allErr);
+      }
 
       // Filter only real holidays from backend (exclude generated default weekly offs)
-      const realHolidays = apiHolidays.filter((item) => {
+      const realHolidays = holidaysData.filter((item) => {
         if (!item) return false;
         if (item.isDefault === true) return false;
-        const name = (item.holidayName || item.name || item.title || '').trim().toLowerCase();
-        if ((name === 'sunday' || name === '2nd saturday' || name === '4th saturday') && !item._id && !item.id) {
-          return false;
-        }
-        return Boolean(name || item.holidayDate || item.date);
+        const name = (item.holidayName || item.name || item.title || '').trim();
+        return Boolean(name && (item.holidayDate || item.date || item.startDate));
       });
 
       const expanded = [];
@@ -210,8 +232,8 @@ export const HolidayCalendarView = () => {
     const publicHol = matchingHolidays.find((h) => h.type === 'public');
     const holidayName = matchingHolidays[0]?.name || festival?.name || publicHol?.name || '';
 
-    // Count this day towards total holidays if it's Sunday, 2nd/4th Sat, or has a festival/holiday
-    if (isSunday || is2ndOr4thSaturday || hasHoliday) {
+    // Count this day towards total holidays only if a real backend holiday exists
+    if (hasHoliday) {
       holidaysInCurrentMonthCount++;
     }
 
@@ -344,61 +366,12 @@ export const HolidayCalendarView = () => {
                       </span>
                     </div>
 
-                    {/* Holiday Name or Sunday */}
-                    <div className="mt-1">
-                      {holidayName ? (
+                    {/* Holiday Name (if exists in backend) */}
+                    {holidayName && (
+                      <div className="mt-1">
                         <div className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-900 text-[10px] sm:text-[11px] font-bold truncate leading-tight" title={holidayName}>
                           {holidayName}
                         </div>
-                      ) : cell.isSunday ? (
-                        <div className="text-[10px] sm:text-[11px] font-semibold text-slate-600 truncate leading-tight">
-                          Sunday
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // Case 3: Sunday or 2nd/4th Saturday (Weekend)
-            if (cell.isSunday || cell.is2ndOr4thSaturday) {
-              const labelText = cell.isSunday
-                ? 'Sunday'
-                : cell.saturdayIndex === 2
-                ? '2nd Saturday'
-                : '4th Saturday';
-
-              return (
-                <div
-                  key={cell.key}
-                  onClick={() => setSelectedDayInfo(cell)}
-                  className={`${cellHeight} p-1.5 sm:p-2 flex flex-col justify-between cursor-pointer select-none ${borderClasses} ${holidayName ? 'bg-blue-50/60 border-blue-400 border-2 rounded-md' : 'bg-[#f0f4f9]'} hover:bg-[#e8eef6] transition-colors`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs font-bold ${holidayName ? 'text-blue-900' : 'text-slate-800'}`}>
-                      {cell.day}
-                    </span>
-                    {holidayName && (
-                      <span className="bg-blue-100 text-blue-800 text-[8px] font-bold px-1 py-0.2 rounded border border-blue-200">
-                        Holiday
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-1">
-                    {holidayName ? (
-                      <div className="px-1.5 py-1 rounded-md bg-blue-50/95 border border-blue-200/90 shadow-2xs" title={holidayName}>
-                        <p className="text-[10px] sm:text-[11px] font-bold text-blue-900 leading-tight truncate">
-                          {holidayName}
-                        </p>
-                        <p className="text-[8px] sm:text-[9px] text-blue-600 font-semibold leading-none mt-0.5 truncate">
-                          {labelText}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-[10px] sm:text-[11px] text-slate-600 font-semibold truncate leading-tight">
-                        {labelText}
                       </div>
                     )}
                   </div>
@@ -406,7 +379,7 @@ export const HolidayCalendarView = () => {
               );
             }
 
-            // Case 4: Any Holiday on Working Day (Festival, Public, Corporate)
+            // Case 3: Any Holiday from Backend Database (Only real holidays)
             if (holidayName || cell.hasHoliday) {
               return (
                 <div
@@ -433,7 +406,7 @@ export const HolidayCalendarView = () => {
               );
             }
 
-            // Case 5: Regular Working Day (e.g. 1st Sat, 3rd Sat, Weekdays)
+            // Case 4: Regular Day (Non-holiday)
             return (
               <div
                 key={cell.key}
@@ -461,22 +434,6 @@ export const HolidayCalendarView = () => {
               </span>
             </div>
 
-            {/* Sat (2nd/4th) */}
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-[2px] bg-[#dbeafe] inline-block border border-slate-200" />
-              <span className="text-[11px] sm:text-xs text-slate-600 font-medium">
-                Sat (2nd/4th)
-              </span>
-            </div>
-
-            {/* Sunday */}
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-[2px] bg-[#94a3b8] inline-block" />
-              <span className="text-[11px] sm:text-xs text-slate-600 font-medium">
-                Sunday
-              </span>
-            </div>
-
             {/* Today */}
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-[2px] bg-[#f97316] inline-block shadow-2xs" />
@@ -488,7 +445,7 @@ export const HolidayCalendarView = () => {
 
           {/* Right: Total Holidays Count */}
           <div className="text-[11px] sm:text-xs font-semibold text-slate-800">
-            {holidaysInCurrentMonthCount} holidays
+            {holidaysInCurrentMonthCount} holiday{holidaysInCurrentMonthCount === 1 ? '' : 's'}
           </div>
         </div>
 
@@ -523,37 +480,21 @@ export const HolidayCalendarView = () => {
                 </div>
               )}
 
-              {selectedDayInfo.isSunday && (
-                <div className="p-3 rounded-xl bg-slate-50 text-xs space-y-1">
-                  <p className="font-bold text-slate-900">Sunday Weekly Off</p>
-                  <p className="text-slate-500 text-[11px]">Regular non-working company weekend.</p>
-                </div>
-              )}
-
-              {selectedDayInfo.is2ndOr4thSaturday && (
-                <div className="p-3 rounded-xl bg-slate-50 text-xs space-y-1">
-                  <p className="font-bold text-slate-900">
-                    {selectedDayInfo.saturdayIndex === 2 ? '2nd Saturday Off' : '4th Saturday Off'}
-                  </p>
-                  <p className="text-slate-500 text-[11px]">Company alternate Saturday scheduled holiday.</p>
-                </div>
-              )}
-
               {selectedDayInfo.holidays?.map((h, i) => (
-                <div key={i} className="p-3 rounded-xl bg-indigo-50/60 text-xs space-y-1 border border-indigo-100">
-                  <p className="font-bold text-indigo-900 flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-indigo-500" />
+                <div key={i} className="p-3 rounded-xl bg-blue-50 text-xs space-y-1 border border-blue-200">
+                  <p className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-blue-600" />
                     <span>{h.name}</span>
                   </p>
                   <p className="text-slate-600 text-[11px]">
-                    {h.description || 'Official company holiday / festival celebration.'}
+                    {h.description || 'Official company holiday / celebration.'}
                   </p>
                 </div>
               ))}
 
-              {!selectedDayInfo.isSunday && !selectedDayInfo.is2ndOr4thSaturday && (!selectedDayInfo.holidays || selectedDayInfo.holidays.length === 0) && (
+              {(!selectedDayInfo.holidays || selectedDayInfo.holidays.length === 0) && (
                 <div className="p-3 rounded-xl bg-slate-50 text-xs text-slate-600">
-                  Regular working day. No company holidays or off-days scheduled.
+                  Regular working day. No company holidays scheduled.
                 </div>
               )}
             </div>
