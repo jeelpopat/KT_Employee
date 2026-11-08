@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -8,6 +8,13 @@ import {
   Search,
   Filter,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  CalendarDays,
+  CheckCircle2,
+  ArrowLeft,
+  ArrowRight,
   Users,
   AlertCircle,
   ArrowUpDown,
@@ -52,10 +59,21 @@ const AVATAR_COLORS = [
 const WORKDAY_MINUTES = 9 * 60;
 
 /* =========================================================
-   GET TODAY
+   GET TODAY & YESTERDAY
 ========================================================= */
 const getTodayLocal = () => {
   const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+const getYesterdayLocal = () => {
+  const now = new Date();
+  now.setDate(now.getDate() - 1);
 
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -1065,6 +1083,35 @@ export default function AttendanceLogs() {
   const [exportingMonth, setExportingMonth] =
     useState(false);
 
+  const dateInputRef = useRef(null);
+  const [allStaffUsers, setAllStaffUsers] = useState([]);
+  const [viewMode, setViewMode] = useState('daily'); // 'daily' | 'history'
+
+  // Historical Explorer (Old Logs across range) State
+  const [historyFromDate, setHistoryFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [historyToDate, setHistoryToDate] = useState(getTodayLocal());
+  const [historySelectedUser, setHistorySelectedUser] = useState('all');
+  const [historyFilterStatus, setHistoryFilterStatus] = useState('all');
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [historyLogs, setHistoryLogs] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyProgress, setHistoryProgress] = useState(0);
+
+  // Employee-Specific History Modal State
+  const [employeeHistoryModal, setEmployeeHistoryModal] = useState(null);
+  const [employeeHistoryList, setEmployeeHistoryList] = useState([]);
+  const [loadingEmpHistory, setLoadingEmpHistory] = useState(false);
+  const [empHistoryMonth, setEmpHistoryMonth] = useState('all');
+  const [empHistorySearch, setEmpHistorySearch] = useState('');
+  const [empHistoryStatus, setEmpHistoryStatus] = useState('all');
+
   const token =
     typeof window !== 'undefined'
       ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
@@ -1325,6 +1372,8 @@ export default function AttendanceLogs() {
         if (usersRes.ok) {
           const usersData = await usersRes.json();
           const usersList = usersData.users || usersData.data || [];
+          const validUsers = usersList.filter((user) => user && user._id && !isFinanceOrExcludedUser(user) && !isUnknownEmployeeOrUser(user));
+          setAllStaffUsers(validUsers);
           usersList.forEach((user) => {
             if (!user || !user._id || isFinanceOrExcludedUser(user) || isUnknownEmployeeOrUser(user)) return;
 
@@ -1437,15 +1486,19 @@ export default function AttendanceLogs() {
   };
 
   /* =========================================================
-     DATE CHANGE FETCH
+     DATE CHANGE FETCH & OLD LOG AUTO-REFRESH GUARD
   ========================================================= */
   useEffect(() => {
     fetchAttendanceLogs(selectedDate, false);
 
-    // Silent background auto-refresh every 10s for new attendance logs and status changes
-    const interval = setInterval(() => {
-      fetchAttendanceLogs(selectedDate, true);
-    }, 10000);
+    // Silent background auto-refresh every 10s ONLY for today's logs (disabled for historical dates)
+    const isToday = selectedDate === getTodayLocal();
+    let interval = null;
+    if (isToday && viewMode === 'daily') {
+      interval = setInterval(() => {
+        fetchAttendanceLogs(selectedDate, true);
+      }, 10000);
+    }
 
     const handleAdjustmentUpdate = () => {
       fetchAttendanceLogs(selectedDate, true);
@@ -1465,7 +1518,7 @@ export default function AttendanceLogs() {
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
       window.removeEventListener("attendanceAdjusted", handleAdjustmentUpdate);
       window.removeEventListener("attendance_adjusted", handleAdjustmentUpdate);
       window.removeEventListener("attendance_updated", handleAdjustmentUpdate);
@@ -1474,7 +1527,223 @@ export default function AttendanceLogs() {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [selectedDate, viewMode]);
+
+  /* =========================================================
+     OLD LOG DATE NAVIGATION HELPERS
+  ========================================================= */
+  const handlePrevDay = () => {
+    const d = new Date(`${selectedDate}T00:00:00`);
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setSelectedDate(`${y}-${m}-${day}`);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(`${selectedDate}T00:00:00`);
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setSelectedDate(`${y}-${m}-${day}`);
+  };
+
+  const handleJumpToday = () => {
+    setSelectedDate(getTodayLocal());
+  };
+
+  const handleJumpYesterday = () => {
+    setSelectedDate(getYesterdayLocal());
+  };
+
+  const fetchLogs = (date = selectedDate, isSilent = false) => {
+    fetchAttendanceLogs(date, isSilent);
+  };
+
+  /* =========================================================
+     INDIVIDUAL EMPLOYEE OLD LOGS / ATTENDANCE HISTORY
+  ========================================================= */
+  const fetchEmployeeHistory = async (targetUser, month = 'all') => {
+    const uId = targetUser._id || targetUser.employeeId || targetUser.id;
+    if (!uId || !token) return;
+    setLoadingEmpHistory(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      let url = `${BASE_URL}/api/attendance/history/${uId}`;
+      if (month && month !== 'all') {
+        url = `${BASE_URL}/api/attendance/history/month/${uId}/${month}`;
+      }
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const records = data.attendance || data.data || normalizeLogs(data);
+        const mapped = records.map(mapLog);
+        mapped.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        setEmployeeHistoryList(mapped);
+      } else {
+        setEmployeeHistoryList([]);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch employee attendance history:', err);
+      setEmployeeHistoryList([]);
+    } finally {
+      setLoadingEmpHistory(false);
+    }
+  };
+
+  const openEmployeeHistoryModal = (log) => {
+    const userObj = {
+      _id: log.employeeId || log.id,
+      name: log.name,
+      email: log.email,
+      role: log.role || 'employee',
+      department: log.department || 'General',
+      uniqueID: log.uniqueID || log.employeeId || ''
+    };
+    setEmployeeHistoryModal(userObj);
+    setEmpHistoryMonth('all');
+    setEmpHistorySearch('');
+    setEmpHistoryStatus('all');
+    fetchEmployeeHistory(userObj, 'all');
+  };
+
+  /* =========================================================
+     HISTORICAL LOG EXPLORER (MULTI-DATE OLD LOG SEARCH)
+  ========================================================= */
+  const fetchHistoryRangeLogs = async () => {
+    if (!token) return;
+    setLoadingHistory(true);
+    setHistoryLogs([]);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Case A: Specific employee selected
+      if (historySelectedUser && historySelectedUser !== 'all') {
+        const url = `${BASE_URL}/api/attendance/history/${historySelectedUser}`;
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const records = data.attendance || data.data || normalizeLogs(data);
+          const mapped = records
+            .map(mapLog)
+            .filter((r) => {
+              const d = r.date ? (r.date.length >= 10 ? r.date.slice(0, 10) : r.date) : '';
+              return (!historyFromDate || d >= historyFromDate) && (!historyToDate || d <= historyToDate);
+            });
+          mapped.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+          setHistoryLogs(mapped);
+        }
+        return;
+      }
+
+      // Case B: All employees in date range
+      const startDate = new Date(`${historyFromDate}T00:00:00`);
+      const endDate = new Date(`${historyToDate}T00:00:00`);
+      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
+        showToast('Please select a valid date range', 'error');
+        return;
+      }
+
+      const diffDays = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+      const targetDays = Math.min(diffDays, 31);
+      const dateList = [];
+      const cur = new Date(endDate);
+      for (let i = 0; i < targetDays; i++) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, '0');
+        const day = String(cur.getDate()).padStart(2, '0');
+        dateList.push(`${y}-${m}-${day}`);
+        cur.setDate(cur.getDate() - 1);
+      }
+
+      const allFetchedLogs = [];
+      const chunkSize = 5;
+      for (let i = 0; i < dateList.length; i += chunkSize) {
+        const chunk = dateList.slice(i, i + chunkSize);
+        const chunkResults = await Promise.all(
+          chunk.map(async (dStr) => {
+            try {
+              const u = `${ATTENDANCE_URL}?date=${encodeURIComponent(dStr)}`;
+              const resp = await fetch(u, { headers });
+              if (resp.ok) {
+                const j = await resp.json();
+                const dayItems = normalizeLogs(j);
+                return dayItems.map((item) => ({ ...item, date: item.date || dStr }));
+              }
+            } catch (_) { }
+            return [];
+          })
+        );
+        chunkResults.flat().forEach((item) => {
+          if (!item || isFinanceOrExcludedUser(item) || isUnknownEmployeeOrUser(item)) return;
+          allFetchedLogs.push(item);
+        });
+        setHistoryProgress(Math.round(((i + chunk.length) / dateList.length) * 100));
+      }
+
+      const mapped = allFetchedLogs
+        .map(mapLog)
+        .filter((l) => l && l.name && !isUnknownEmployeeOrUser(l.name));
+      mapped.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+      setHistoryLogs(mapped);
+    } catch (err) {
+      console.error('Failed to fetch historical logs:', err);
+      showToast('Error fetching historical logs', 'error');
+    } finally {
+      setLoadingHistory(false);
+      setHistoryProgress(0);
+    }
+  };
+
+  const exportHistoryToExcel = () => {
+    if (!historyLogs || historyLogs.length === 0) {
+      showToast('No historical logs to export', 'warning');
+      return;
+    }
+    const exportData = filteredHistoryLogs.map((log, index) => ({
+      'No.': index + 1,
+      'Date': formatIndianDate(log.date),
+      'Employee Name': log.name,
+      'Employee ID': log.uniqueID || log.employeeId || '—',
+      'Email': log.email || '—',
+      'Check In Time': formatTime(log.checkIn),
+      'Check Out Time': formatTime(log.checkOut),
+      'Total Working Hours': log.totalHours || '0h',
+      'Status': log.status ? log.status.toUpperCase() : 'ABSENT',
+      'Approval Status': log.approvalStatus || 'approved'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance History');
+    XLSX.writeFile(workbook, `Attendance_Historical_Logs_${historyFromDate}_to_${historyToDate}.xlsx`);
+    showToast('Historical logs exported successfully!', 'success');
+  };
+
+  const exportEmpHistoryToExcel = () => {
+    if (!employeeHistoryList || employeeHistoryList.length === 0) {
+      showToast('No history records to export', 'warning');
+      return;
+    }
+    const exportData = filteredEmployeeHistory.map((log, index) => ({
+      'No.': index + 1,
+      'Date': formatIndianDate(log.date),
+      'Check In Time': formatTime(log.checkIn),
+      'Check Out Time': formatTime(log.checkOut),
+      'Total Working Hours': log.totalHours || '0h',
+      'Status': log.status ? log.status.toUpperCase() : 'ABSENT',
+      'Approval Status': log.approvalStatus || 'approved'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance History');
+    const safeName = (employeeHistoryModal?.name || 'Employee').replace(/\s+/g, '_');
+    XLSX.writeFile(workbook, `Attendance_History_${safeName}.xlsx`);
+    showToast('Employee history exported successfully!', 'success');
+  };
 
   useEffect(() => {
     if (!selectedLog) {
@@ -1835,6 +2104,120 @@ export default function AttendanceLogs() {
     return s === 'absent';
   }).length;
 
+  const setRangePreset = (days) => {
+    const today = new Date();
+    const endStr = getTodayLocal();
+    if (days === 'thisMonth') {
+      const y = today.getFullYear();
+      const m = String(today.getMonth() + 1).padStart(2, '0');
+      setHistoryFromDate(`${y}-${m}-01`);
+      setHistoryToDate(endStr);
+      return;
+    }
+    if (days === 'lastMonth') {
+      const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      const fy = firstOfLastMonth.getFullYear();
+      const fm = String(firstOfLastMonth.getMonth() + 1).padStart(2, '0');
+      const ly = lastOfLastMonth.getFullYear();
+      const lm = String(lastOfLastMonth.getMonth() + 1).padStart(2, '0');
+      const ld = String(lastOfLastMonth.getDate()).padStart(2, '0');
+      setHistoryFromDate(`${fy}-${fm}-01`);
+      setHistoryToDate(`${ly}-${lm}-${ld}`);
+      return;
+    }
+    const d = new Date();
+    d.setDate(d.getDate() - (days - 1));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setHistoryFromDate(`${y}-${m}-${day}`);
+    setHistoryToDate(endStr);
+  };
+
+  /* =========================================================
+     HISTORICAL LOG FILTERING & METRICS
+  ========================================================= */
+  const filteredHistoryLogs = historyLogs.filter((log) => {
+    if (!log) return false;
+    const name = String(log.name || '').toLowerCase();
+    const email = String(log.email || '').toLowerCase();
+    const dept = String(log.department || '').toLowerCase();
+    const dateStr = String(log.date || '').toLowerCase();
+    const search = historySearchTerm.toLowerCase().trim();
+
+    const matchesSearch = !search || name.includes(search) || email.includes(search) || dept.includes(search) || dateStr.includes(search);
+
+    const s = normalizeStatus(log);
+    const filter = historyFilterStatus.toLowerCase().trim();
+    let matchesStatus = filter === 'all';
+    if (!matchesStatus) {
+      if (filter === 'on time' || filter === 'present') {
+        matchesStatus = s === 'on time' || s === 'present';
+      } else if (filter === 'half day') {
+        matchesStatus = s === 'half day' || s === 'half-day' || s === 'halfday';
+      } else {
+        matchesStatus = s === filter;
+      }
+    }
+    return matchesSearch && matchesStatus;
+  });
+
+  const historyOnTimeCount = filteredHistoryLogs.filter((l) => {
+    const s = normalizeStatus(l);
+    return s === 'on time' || s === 'present';
+  }).length;
+
+  const historyLateCount = filteredHistoryLogs.filter((l) => normalizeStatus(l) === 'late').length;
+  const historyHalfDayCount = filteredHistoryLogs.filter((l) => {
+    const s = normalizeStatus(l);
+    return s === 'half day' || s === 'half-day' || s === 'halfday';
+  }).length;
+  const historyAbsentCount = filteredHistoryLogs.filter((l) => normalizeStatus(l) === 'absent').length;
+
+  /* =========================================================
+     EMPLOYEE HISTORY FILTERING & METRICS
+  ========================================================= */
+  const filteredEmployeeHistory = employeeHistoryList.filter((log) => {
+    if (!log) return false;
+    // Month filter: e.g. "2026-11"
+    if (empHistoryMonth && empHistoryMonth !== 'all') {
+      const d = String(log.date || '');
+      if (!d.startsWith(empHistoryMonth)) return false;
+    }
+    // Status filter
+    if (empHistoryStatus && empHistoryStatus !== 'all') {
+      const s = normalizeStatus(log);
+      if (empHistoryStatus === 'on time' || empHistoryStatus === 'present') {
+        if (s !== 'on time' && s !== 'present') return false;
+      } else if (empHistoryStatus === 'half day') {
+        if (s !== 'half day' && s !== 'half-day' && s !== 'halfday') return false;
+      } else if (s !== empHistoryStatus) {
+        return false;
+      }
+    }
+    // Search
+    if (empHistorySearch && empHistorySearch.trim()) {
+      const term = empHistorySearch.toLowerCase().trim();
+      const d = String(log.date || '').toLowerCase();
+      const s = String(log.status || '').toLowerCase();
+      const h = String(log.totalHours || '').toLowerCase();
+      if (!d.includes(term) && !s.includes(term) && !h.includes(term)) return false;
+    }
+    return true;
+  });
+
+  const empOnTimeCount = filteredEmployeeHistory.filter((l) => {
+    const s = normalizeStatus(l);
+    return s === 'on time' || s === 'present';
+  }).length;
+  const empLateCount = filteredEmployeeHistory.filter((l) => normalizeStatus(l) === 'late').length;
+  const empHalfDayCount = filteredEmployeeHistory.filter((l) => {
+    const s = normalizeStatus(l);
+    return s === 'half day' || s === 'half-day' || s === 'halfday';
+  }).length;
+  const empAbsentCount = filteredEmployeeHistory.filter((l) => normalizeStatus(l) === 'absent').length;
+
   /* =========================================================
      EXPORT EXCEL
   ========================================================= */
@@ -2029,18 +2412,84 @@ export default function AttendanceLogs() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap font-poppins">
-          {/* DATE PICKER */}
-          <div className="relative flex items-center h-9 bg-white border border-slate-300 rounded-md px-3 shadow-2xs gap-2 font-poppins cursor-pointer hover:bg-slate-50 transition-colors">
-            <Calendar size={14} className="text-slate-700 shrink-0" />
-            <span className="text-xs font-medium text-slate-800 select-none">
-              {formatHeaderDate(selectedDate)}
-            </span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-            />
+          {/* DATE NAVIGATION CONTROLS (FOR DAILY & PAST DATE CHECK) */}
+          <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-lg border border-slate-300/80 shadow-2xs">
+            {/* Previous Day */}
+            <button
+              type="button"
+              onClick={handlePrevDay}
+              title="Previous Day (Check older logs)"
+              className="h-8 w-8 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition cursor-pointer"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            {/* Date Picker Button */}
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  dateInputRef.current?.showPicker();
+                } catch {
+                  dateInputRef.current?.focus();
+                }
+              }}
+              className="relative flex items-center h-8 bg-white border border-slate-300 hover:border-slate-400 rounded-md px-2.5 shadow-2xs gap-1.5 cursor-pointer hover:bg-slate-50 transition"
+              title="Click to select a date from calendar"
+            >
+              <Calendar size={13} className="text-[#034665] shrink-0" />
+              <span className="text-xs font-semibold text-slate-800 select-none whitespace-nowrap">
+                {formatHeaderDate(selectedDate)}
+              </span>
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedDate(e.target.value);
+                  }
+                }}
+                className="absolute inset-0 opacity-0 pointer-events-auto cursor-pointer w-full h-full"
+                aria-label="Select Date"
+              />
+            </button>
+
+            {/* Next Day */}
+            <button
+              type="button"
+              onClick={handleNextDay}
+              title="Next Day"
+              className="h-8 w-8 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition cursor-pointer"
+            >
+              <ChevronRight size={16} />
+            </button>
+
+            {/* Today quick button */}
+            <button
+              type="button"
+              onClick={handleJumpToday}
+              className={`h-8 px-2.5 rounded-md text-xs font-semibold transition cursor-pointer border ${
+                selectedDate === getTodayLocal()
+                  ? 'bg-[#034665] text-white border-[#034665]'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              Today
+            </button>
+
+            {/* Yesterday quick button */}
+            <button
+              type="button"
+              onClick={handleJumpYesterday}
+              className={`h-8 px-2.5 rounded-md text-xs font-semibold transition cursor-pointer border ${
+                selectedDate === getYesterdayLocal()
+                  ? 'bg-[#034665] text-white border-[#034665]'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              Yesterday
+            </button>
           </div>
 
           {/* TOTAL COUNT */}
@@ -2083,6 +2532,73 @@ export default function AttendanceLogs() {
           </button>
         </div>
       </div>
+
+      {/* VIEW MODE TABS: DAILY LOGS vs HISTORICAL LOG EXPLORER (OLD LOGS) */}
+      <div className="flex items-center justify-between border-b border-slate-200 gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('daily')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              viewMode === 'daily'
+                ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
+            }`}
+          >
+            <CalendarDays size={16} />
+            <span>Daily Attendance Logs</span>
+            <span className="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-700 font-bold">
+              {formatIndianDate(selectedDate)}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('history');
+              if (historyLogs.length === 0 && !loadingHistory) {
+                fetchHistoryRangeLogs();
+              }
+            }}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              viewMode === 'history'
+                ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
+            }`}
+          >
+            <History size={16} />
+            <span>Historical Log Explorer (Old Logs)</span>
+            <span className="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 font-bold">
+              Multi-Date Range
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* HISTORICAL DATE NOTICE BANNER */}
+      {viewMode === 'daily' && selectedDate !== getTodayLocal() && (
+        <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <History size={17} className="text-amber-600 shrink-0" />
+            <div>
+              <span className="font-semibold text-amber-900">
+                Viewing Historical Attendance: {formatHeaderDate(selectedDate)}
+              </span>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                Displaying past attendance records. Background auto-refresh is paused. Click any employee row to see day timeline or click &quot;Past Logs&quot; to review full employee history.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleJumpToday}
+            className="self-start sm:self-auto px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-md text-xs shadow-2xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <CheckCircle2 size={13} />
+            <span>Return to Today ({formatIndianDate(getTodayLocal())})</span>
+          </button>
+        </div>
+      )}
 
       {/* POLICY MODAL */}
       {showPolicyModal && (
@@ -2236,8 +2752,11 @@ export default function AttendanceLogs() {
       )}
 
       {/* ==================================================== */}
-      {/* 2. TOP METRICS ROW */}
+      {/* 2. DAILY ATTENDANCE LOGS VIEW */}
       {/* ==================================================== */}
+      {viewMode === 'daily' && (
+        <>
+          {/* TOP METRICS ROW */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
         {[
           { label: "ON TIME", value: onTimeCount },
@@ -2391,6 +2910,7 @@ export default function AttendanceLogs() {
                   <th className="py-3 px-4 text-left font-semibold min-w-[320px]">TimeLine</th>
                   <th className="py-3 px-4 text-left font-semibold whitespace-nowrap">Total Hours</th>
                   <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Status</th>
+                  <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Past Logs</th>
                   <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Adjustment</th>
                 </tr>
               </thead>
@@ -2461,6 +2981,23 @@ export default function AttendanceLogs() {
                         </div>
                       </td>
 
+                      {/* Past Logs (History) */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          aria-label={`Past logs for ${log.name}`}
+                          title={`View all past attendance logs for ${log.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEmployeeHistoryModal(log);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-[#034665] bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-colors cursor-pointer"
+                        >
+                          <History size={13} />
+                          <span className="hidden sm:inline">History</span>
+                        </button>
+                      </td>
+
                       {/* Adjustment */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <button
@@ -2487,6 +3024,571 @@ export default function AttendanceLogs() {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {/* ==================================================== */}
+      {/* HISTORICAL LOG EXPLORER (OLD LOGS SEARCH & RANGE) */}
+      {/* ==================================================== */}
+      {viewMode === 'history' && (
+        <div className="space-y-4 font-poppins">
+          {/* Top Metrics Row for Historical Logs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
+            {[
+              { label: "TOTAL LOGS FOUND", value: filteredHistoryLogs.length },
+              { label: "ON TIME / PRESENT", value: historyOnTimeCount },
+              { label: "LATE", value: historyLateCount },
+              { label: "HALF DAY / ABSENT", value: `${historyHalfDayCount} / ${historyAbsentCount}` }
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="relative flex items-center h-[60px] w-full"
+              >
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+                  style={{ background: "#034665", opacity: 1 }}
+                />
+                <div
+                  className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+                  style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+                >
+                  <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none">
+                    {item.label}
+                  </p>
+                  <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2">
+                    {item.value}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Historical Log Filter & Search Container */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs space-y-3.5 font-poppins">
+            {/* Range Presets & Action Bar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-semibold text-slate-700 mr-1 flex items-center gap-1">
+                  <Clock size={13} className="text-[#034665]" /> Quick Range:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRangePreset(7)}
+                  className="px-2.5 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition cursor-pointer"
+                >
+                  Past 7 Days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRangePreset(14)}
+                  className="px-2.5 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition cursor-pointer"
+                >
+                  Past 14 Days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRangePreset('thisMonth')}
+                  className="px-2.5 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition cursor-pointer"
+                >
+                  This Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRangePreset('lastMonth')}
+                  className="px-2.5 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition cursor-pointer"
+                >
+                  Last Month
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={fetchHistoryRangeLogs}
+                  disabled={loadingHistory}
+                  className="h-8 px-3.5 bg-[#034665] hover:bg-[#02334a] text-white text-xs font-semibold rounded-md shadow-2xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={loadingHistory ? 'animate-spin' : ''} />
+                  <span>{loadingHistory ? 'Loading Old Logs...' : 'Search History'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={exportHistoryToExcel}
+                  disabled={filteredHistoryLogs.length === 0}
+                  className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-md shadow-2xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40"
+                >
+                  <FileSpreadsheet size={13} />
+                  <span>Export ({filteredHistoryLogs.length})</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Inputs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 pt-1">
+              {/* From Date */}
+              <div>
+                <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">From Date</label>
+                <input
+                  type="date"
+                  value={historyFromDate}
+                  onChange={(e) => setHistoryFromDate(e.target.value)}
+                  className="w-full h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0088cc]"
+                />
+              </div>
+
+              {/* To Date */}
+              <div>
+                <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">To Date</label>
+                <input
+                  type="date"
+                  value={historyToDate}
+                  onChange={(e) => setHistoryToDate(e.target.value)}
+                  className="w-full h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0088cc]"
+                />
+              </div>
+
+              {/* Staff Member Selector */}
+              <div>
+                <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">Staff Member</label>
+                <select
+                  value={historySelectedUser}
+                  onChange={(e) => setHistorySelectedUser(e.target.value)}
+                  className="w-full h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0088cc] truncate"
+                >
+                  <option value="all">All Employees ({allStaffUsers.length})</option>
+                  {allStaffUsers.map((u) => (
+                    <option key={u._id} value={u._id}>
+                      {u.name || u.uniqueID || 'User'} ({u.department || u.role || 'Staff'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">Status</label>
+                <select
+                  value={historyFilterStatus}
+                  onChange={(e) => setHistoryFilterStatus(e.target.value)}
+                  className="w-full h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0088cc]"
+                >
+                  <option value="all">All Status</option>
+                  <option value="on time">On Time / Present</option>
+                  <option value="late">Late</option>
+                  <option value="half day">Half Day</option>
+                  <option value="absent">Absent</option>
+                </select>
+              </div>
+
+              {/* Search Bar */}
+              <div className="sm:col-span-2 lg:col-span-1">
+                <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">Search Term</label>
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search name/date..."
+                    value={historySearchTerm}
+                    onChange={(e) => setHistorySearchTerm(e.target.value)}
+                    className="w-full h-8 pl-8 pr-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0088cc]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Progress Bar when loading history across days */}
+            {loadingHistory && (
+              <div className="pt-2">
+                <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={13} className="animate-spin text-[#0088cc]" />
+                    Fetching attendance records across date range...
+                  </span>
+                  <span className="font-semibold text-slate-800">{historyProgress}%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-[#034665] h-1.5 transition-all duration-200"
+                    style={{ width: `${historyProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Historical Logs Results Table */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs font-poppins">
+            {loadingHistory ? (
+              <TableSkeleton rows={7} cols={7} />
+            ) : filteredHistoryLogs.length === 0 ? (
+              <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50 font-poppins">
+                <History size={38} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-sm font-semibold text-slate-700">No historical attendance logs found</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  {historySearchTerm || historyFilterStatus !== 'all' || historySelectedUser !== 'all'
+                    ? 'No records match your selected filters. Try broadening your criteria.'
+                    : 'Click "Search History" above to load past records for the selected date range.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={fetchHistoryRangeLogs}
+                  className="mt-4 px-4 py-2 bg-[#034665] text-white text-xs font-semibold rounded-md shadow-xs hover:bg-[#02334a] transition cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <RefreshCw size={13} />
+                  <span>Load Historical Logs</span>
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
+                <table className="w-full text-left text-xs border-collapse min-w-[800px] sm:min-w-full font-poppins">
+                  <thead>
+                    <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins">
+                      <th className="py-3 px-4 w-12 text-left font-semibold">No.</th>
+                      <th className="py-3 px-4 text-left font-semibold">Date</th>
+                      <th className="py-3 px-4 text-left font-semibold">Employee</th>
+                      <th className="py-3 px-4 text-left font-semibold min-w-[280px]">TimeLine</th>
+                      <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Check In</th>
+                      <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Check Out</th>
+                      <th className="py-3 px-4 text-left font-semibold whitespace-nowrap">Total Hours</th>
+                      <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Status</th>
+                      <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-poppins">
+                    {filteredHistoryLogs.map((log, index) => {
+                      return (
+                        <tr
+                          key={`${log.id || log.employeeId}-${log.date}-${index}`}
+                          className="hover:bg-slate-50/70 transition-colors font-poppins cursor-pointer"
+                          onClick={() => setSelectedLog(log)}
+                        >
+                          <td className="py-3.5 px-4 text-slate-600 font-medium">
+                            {index + 1}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-slate-800 whitespace-nowrap font-medium">
+                            {formatIndianDate(log.date)}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className="w-7 h-7 rounded-full text-white flex items-center justify-center text-[11px] font-semibold shrink-0 shadow-2xs"
+                                style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
+                              >
+                                {getInitials(log.name)}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-semibold text-slate-900 text-xs block truncate">
+                                  {log.name}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-normal block truncate">
+                                  {log.email || log.department || "Employee"}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 min-w-[280px]">
+                            <AttendanceTimeline
+                              checkIn={log.checkIn}
+                              breaks={log.breaks}
+                              checkOut={log.checkOut}
+                              approvalStatus={log.approvalStatus}
+                              status={log.status}
+                              rejectionReason={log.rejectionReason}
+                            />
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                            {formatTime(log.checkIn)}
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                            {formatTime(log.checkOut)}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-slate-800 whitespace-nowrap font-medium">
+                            {log.totalHours || '0h'}
+                          </td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <div
+                              className="flex items-center justify-center"
+                              title={getStatusIconAndColor(log.status).label}
+                            >
+                              {getStatusIconAndColor(log.status).icon}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                title="View Day Timeline Details"
+                                onClick={() => setSelectedLog(log)}
+                                className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition cursor-pointer"
+                              >
+                                Details
+                              </button>
+                              <button
+                                type="button"
+                                title={`View all past attendance logs for ${log.name}`}
+                                onClick={() => openEmployeeHistoryModal(log)}
+                                className="px-2 py-1 rounded bg-sky-50 hover:bg-sky-100 text-[#034665] border border-sky-200 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1"
+                              >
+                                <History size={11} />
+                                <span>History</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* EMPLOYEE COMPLETE ATTENDANCE HISTORY MODAL */}
+      {/* ==================================================== */}
+      {employeeHistoryModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 sm:p-5 font-poppins"
+          role="presentation"
+          onClick={() => setEmployeeHistoryModal(null)}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden font-poppins"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="emp-history-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full text-white flex items-center justify-center text-sm font-bold shadow-xs shrink-0"
+                  style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
+                >
+                  {getInitials(employeeHistoryModal.name)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 id="emp-history-title" className="text-base sm:text-lg font-bold text-slate-900">
+                      {employeeHistoryModal.name}
+                    </h2>
+                    {employeeHistoryModal.uniqueID && (
+                      <span className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-[10px] font-mono font-bold">
+                        {employeeHistoryModal.uniqueID}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {employeeHistoryModal.email} • {employeeHistoryModal.department || 'Employee'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={exportEmpHistoryToExcel}
+                  disabled={filteredEmployeeHistory.length === 0}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-md shadow-2xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                >
+                  <FileSpreadsheet size={13} />
+                  <span>Export History</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEmployeeHistoryModal(null)}
+                  className="p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 rounded-lg transition cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Toolbar & Summary Cards inside Modal */}
+            <div className="p-5 border-b border-slate-200 bg-white space-y-3.5">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-center">
+                  <span className="text-[10px] uppercase font-semibold text-slate-500 block">Total Days</span>
+                  <span className="text-lg font-bold text-slate-900">{filteredEmployeeHistory.length}</span>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-center">
+                  <span className="text-[10px] uppercase font-semibold text-emerald-700 block">On Time</span>
+                  <span className="text-lg font-bold text-emerald-800">{empOnTimeCount}</span>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-center">
+                  <span className="text-[10px] uppercase font-semibold text-amber-700 block">Late</span>
+                  <span className="text-lg font-bold text-amber-800">{empLateCount}</span>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-center">
+                  <span className="text-[10px] uppercase font-semibold text-blue-700 block">Half Day</span>
+                  <span className="text-lg font-bold text-blue-800">{empHalfDayCount}</span>
+                </div>
+                <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-center col-span-2 sm:col-span-1">
+                  <span className="text-[10px] uppercase font-semibold text-rose-700 block">Absent</span>
+                  <span className="text-lg font-bold text-rose-800">{empAbsentCount}</span>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                {/* Month Selector */}
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">Select Month</label>
+                  <select
+                    value={empHistoryMonth}
+                    onChange={(e) => {
+                      const newMonth = e.target.value;
+                      setEmpHistoryMonth(newMonth);
+                      fetchEmployeeHistory(employeeHistoryModal, newMonth);
+                    }}
+                    className="w-full h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0088cc]"
+                  >
+                    <option value="all">All Available Records</option>
+                    {(() => {
+                      const options = [];
+                      const today = new Date();
+                      for (let i = 0; i < 12; i++) {
+                        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                        options.push(<option key={ym} value={ym}>{label}</option>);
+                      }
+                      return options;
+                    })()}
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">Status</label>
+                  <select
+                    value={empHistoryStatus}
+                    onChange={(e) => setEmpHistoryStatus(e.target.value)}
+                    className="w-full h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0088cc]"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="on time">On Time / Present</option>
+                    <option value="late">Late</option>
+                    <option value="half day">Half Day</option>
+                    <option value="absent">Absent</option>
+                  </select>
+                </div>
+
+                {/* Search */}
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">Search Date / Text</label>
+                  <div className="relative">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="e.g. 2026-11 or on time..."
+                      value={empHistorySearch}
+                      onChange={(e) => setEmpHistorySearch(e.target.value)}
+                      className="w-full h-8 pl-8 pr-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0088cc]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Records Table */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {loadingEmpHistory ? (
+                <TableSkeleton rows={6} cols={6} />
+              ) : filteredEmployeeHistory.length === 0 ? (
+                <div className="p-12 text-center border border-slate-200 rounded-lg bg-slate-50/50">
+                  <History size={32} className="text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">No attendance history records found</p>
+                  <p className="text-xs text-slate-400 mt-1">No logs match the chosen month or filters for this employee.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                  <table className="w-full text-left text-xs border-collapse min-w-[650px]">
+                    <thead>
+                      <tr className="bg-[#0346651A] text-[#034665] font-semibold">
+                        <th className="py-2.5 px-3 w-10">No.</th>
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3 min-w-[200px]">TimeLine</th>
+                        <th className="py-2.5 px-3 text-center">Check In</th>
+                        <th className="py-2.5 px-3 text-center">Check Out</th>
+                        <th className="py-2.5 px-3 text-left">Working Hours</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                        <th className="py-2.5 px-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredEmployeeHistory.map((rec, index) => (
+                        <tr
+                          key={`${rec.date}-${index}`}
+                          className="hover:bg-slate-50 cursor-pointer transition"
+                          onClick={() => setSelectedLog(rec)}
+                        >
+                          <td className="py-2.5 px-3 text-slate-600 font-medium">{index + 1}</td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
+                            {formatIndianDate(rec.date)}
+                          </td>
+                          <td className="py-2.5 px-3 min-w-[200px]">
+                            <AttendanceTimeline
+                              checkIn={rec.checkIn}
+                              breaks={rec.breaks}
+                              checkOut={rec.checkOut}
+                              approvalStatus={rec.approvalStatus}
+                              status={rec.status}
+                              rejectionReason={rec.rejectionReason}
+                            />
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                            {formatTime(rec.checkIn)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                            {formatTime(rec.checkOut)}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-800 font-medium whitespace-nowrap">
+                            {rec.totalHours || '0h'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center">
+                              {getStatusIconAndColor(rec.status).icon}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedLog(rec)}
+                              className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition cursor-pointer"
+                            >
+                              Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                Displaying <strong>{filteredEmployeeHistory.length}</strong> historical attendance log(s)
+              </span>
+              <button
+                type="button"
+                onClick={() => setEmployeeHistoryModal(null)}
+                className="px-4 py-1.5 bg-[#034665] text-white text-xs font-semibold rounded-md hover:bg-[#02334a] transition cursor-pointer"
+              >
+                Close History
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedLog && (() => {
         const activeLog = logs.find((l) =>
@@ -2801,6 +3903,21 @@ export default function AttendanceLogs() {
                     No timeline data available
                   </div>
                 )}
+              </div>
+
+              {/* Button to check full attendance history for this employee */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedLog(null);
+                    openEmployeeHistoryModal(activeLog);
+                  }}
+                  className="w-full py-2.5 px-3 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-[#034665] rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs"
+                >
+                  <History size={14} />
+                  <span>Check All Past Attendance Logs for {activeLog.name}</span>
+                </button>
               </div>
             </div>
           </div>
