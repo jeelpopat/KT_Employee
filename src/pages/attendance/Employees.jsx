@@ -1740,7 +1740,7 @@ export default function Employees() {
                       required
                       className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins appearance-none cursor-pointer"
                     >
-                      <option value="">Department</option>
+                      <option value="" disabled>Select category</option>
                       {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
                         <option key={dept} value={dept}>
                           {dept}
@@ -1775,7 +1775,7 @@ export default function Employees() {
                       required
                       className="w-full h-11 px-3.5 pr-10 border border-[#c0d1d8] rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] transition bg-white font-poppins appearance-none cursor-pointer"
                     >
-                      <option value="">Department</option>
+                      <option value="" disabled>Select designation</option>
                       {formData.department && EMPLOYEE_DEPARTMENTS_ROLES[formData.department] ? (
                         EMPLOYEE_DEPARTMENTS_ROLES[formData.department].map((role) => (
                           <option key={role} value={role}>
