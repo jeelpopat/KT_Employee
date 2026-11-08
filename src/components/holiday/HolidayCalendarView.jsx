@@ -11,47 +11,30 @@ export const HolidayCalendarView = () => {
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
-  // Curated official holidays for 2025-2027
-  const defaultHolidayList = [
-    { name: 'New Year Day', date: `${currentYear}-01-01`, type: 'public', description: 'Celebration of the New Year' },
-    { name: 'Makar Sankranti', date: `${currentYear}-01-14`, type: 'festival', description: 'Harvest festival celebrated across India' },
-    { name: 'Republic Day', date: `${currentYear}-01-26`, type: 'public', description: 'National holiday commemorating the Constitution of India' },
-    { name: 'Maha Shivratri', date: `${currentYear}-02-15`, type: 'festival', description: 'Hindu festival celebrated in honor of Lord Shiva' },
-    { name: 'Holi', date: `${currentYear}-03-04`, type: 'festival', description: 'Festival of colors, joy and spring arrival' },
-    { name: 'Eid ul-Fitr', date: `${currentYear}-03-20`, type: 'festival', description: 'Islamic festival marking the end of Ramadan' },
-    { name: 'Good Friday', date: `${currentYear}-04-03`, type: 'public', description: 'Christian holiday commemorating the crucifixion of Jesus' },
-    { name: 'Labor Day', date: `${currentYear}-05-01`, type: 'public', description: 'International Workers Day' },
-    { name: 'Bakrid / Eid al-Adha', date: `${currentYear}-05-27`, type: 'festival', description: 'Feast of the Sacrifice' },
-    { name: 'Muharram', date: `${currentYear}-06-26`, type: 'festival', description: 'First month of Islamic calendar' },
-    { name: 'Independence Day', date: `${currentYear}-08-15`, type: 'public', description: 'National celebration of Indian Independence' },
-    { name: 'Rakshabandhan', date: `${currentYear}-08-28`, type: 'festival', description: 'Celebration of sibling bonds' },
-    { name: 'visarjan', date: `${currentYear}-09-25`, type: 'festival', description: 'Ganesh Visarjan / Anant Chaturdashi' },
-    { name: 'Gandhi Jayanti', date: `${currentYear}-10-02`, type: 'public', description: 'Birthday of Mahatma Gandhi' },
-    { name: 'Dussehra', date: `${currentYear}-10-20`, type: 'festival', description: 'Victory of good over evil' },
-    { name: 'Diwali', date: `${currentYear}-11-08`, type: 'festival', description: 'Festival of lights celebrated worldwide' },
-    { name: 'Bhai Dooj', date: `${currentYear}-11-10`, type: 'festival', description: 'Festival celebrating brother-sister love' },
-    { name: 'Guru Nanak Jayanti', date: `${currentYear}-11-24`, type: 'festival', description: 'Birth anniversary of Guru Nanak Dev Ji' },
-    { name: 'Christmas Day', date: `${currentYear}-12-25`, type: 'festival', description: 'Celebration of the birth of Jesus Christ' }
-  ];
-
-  // Fetch holidays from backend API and combine with defaults
+  // Fetch holidays purely from backend API (dynamic only, no static data)
   const fetchHolidays = async (isSilent = false) => {
     if (!isSilent) setIsLoading(true);
     try {
-      const res = await api.get(`/api/holiday/all?year=${currentYear}`);
+      const res = await api.get('/api/holiday/all', { skipCache: true });
       const apiHolidays = res.data?.holidays || res.data?.data || [];
 
-      const formattedApi = apiHolidays.map((item) => {
+      // Filter only real holidays from backend (exclude generated default weekly offs)
+      const realHolidays = apiHolidays.filter((item) => {
+        if (item.isDefault === true) return false;
+        const name = (item.holidayName || item.name || '').trim().toLowerCase();
+        if ((name === 'sunday' || name === '2nd saturday' || name === '4th saturday') && !item._id) {
+          return false;
+        }
+        return Boolean(item._id || item.id);
+      });
+
+      const formattedApi = realHolidays.map((item) => {
         const dateStr = (item.holidayDate || item.date || '').split('T')[0];
         const rawName = item.holidayName || item.name || 'Holiday';
 
         let derivedType = 'public';
         const lowerName = rawName.toLowerCase();
-        if (lowerName.includes('sunday')) {
-          derivedType = 'sunday';
-        } else if (lowerName.includes('saturday')) {
-          derivedType = 'saturday';
-        } else if (
+        if (
           lowerName.includes('diwali') ||
           lowerName.includes('holi') ||
           lowerName.includes('raksha') ||
@@ -61,7 +44,8 @@ export const HolidayCalendarView = () => {
           lowerName.includes('dussehra') ||
           lowerName.includes('visarjan') ||
           lowerName.includes('ganesh') ||
-          lowerName.includes('sankranti')
+          lowerName.includes('sankranti') ||
+          lowerName.includes('fest')
         ) {
           derivedType = 'festival';
         } else {
@@ -69,30 +53,19 @@ export const HolidayCalendarView = () => {
         }
 
         return {
-          id: item._id || `${dateStr}-${rawName}`,
+          id: item._id || item.id,
           name: rawName,
           date: dateStr,
           type: derivedType,
-          description: item.description || (derivedType === 'festival' ? 'Festival Celebration' : 'Public Holiday'),
+          description: item.description || (derivedType === 'festival' ? 'Official Festival Celebration' : 'Official Public Holiday'),
           isBackend: true
         };
       });
 
-      // Merge: avoid duplicating same date and name
-      const combined = [...defaultHolidayList];
-      formattedApi.forEach((apiItem) => {
-        const exists = combined.some(
-          (c) => c.date === apiItem.date && c.name.toLowerCase() === apiItem.name.toLowerCase()
-        );
-        if (!exists) {
-          combined.push(apiItem);
-        }
-      });
-
-      setHolidays(combined);
+      setHolidays(formattedApi);
     } catch (err) {
-      console.warn('Using default holiday database due to network/api response:', err);
-      setHolidays(defaultHolidayList);
+      console.warn('Error fetching holidays from backend:', err);
+      setHolidays([]);
     } finally {
       if (!isSilent) setIsLoading(false);
     }
