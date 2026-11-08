@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   FileText, Plus, Edit3, Trash2, Search, Filter, RefreshCw, CheckCircle2,
   XCircle, AlertCircle, Shield, ShieldCheck, ShieldAlert, SlidersHorizontal,
   ArrowUpDown, ChevronLeft, ChevronRight, Eye, Check, X, Clock, DollarSign,
   User, Users, Calendar, AlertTriangle, MessageSquare, Download, Lock, Unlock,
-  HelpCircle, ChevronDown, Award, Send, Ban, Info
+  HelpCircle, ChevronDown, Award, Send, Ban, Info, ArrowLeft
 } from 'lucide-react';
 import api from '../../api/axios.js';
 import {
@@ -888,6 +889,513 @@ export const EmployeeDeductionsView = () => {
     }
   };
 
+  // ========================================================
+  // FULL PAGE VIEW: RECORD / EDIT EMPLOYEE DEDUCTION
+  // ========================================================
+  if (isAddModalOpen) {
+    return (
+      <div className="w-full max-w-6xl mx-auto space-y-5 font-poppins animate-fade-in pb-16">
+        {confirmationDialog}
+
+        {/* Top Breadcrumb & Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs">
+          <div>
+            <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setEditingDeductionId(null);
+                }}
+                className="hover:text-indigo-600 transition-colors flex items-center gap-1 cursor-pointer font-medium"
+              >
+                <ArrowLeft size={13} />
+                <span>Employee Deductions</span>
+              </button>
+              <span>/</span>
+              <span className="font-semibold text-slate-800">
+                {editingDeductionId ? 'Edit Deduction Record' : 'Record New Employee Deduction'}
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-2xs">
+                <FileText size={22} />
+              </span>
+              <span>{editingDeductionId ? 'Edit Deduction Record' : 'Record New Employee Deduction'}</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+              Record penalty, asset damage, salary advance recovery, or policy violations with automated reporting-line resolution.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddModalOpen(false);
+              setEditingDeductionId(null);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl shadow-2xs transition-colors cursor-pointer self-start sm:self-auto"
+          >
+            <ArrowLeft size={14} />
+            <span>Back to Deduction List</span>
+          </button>
+        </div>
+
+        {/* Form Container */}
+        <form onSubmit={handleSubmitAddForm} className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Left Column (2 Cols Wide): Core Details */}
+            <div className="lg:col-span-2 space-y-6">
+
+              {/* CARD 1: Employee Selection & Hierarchy */}
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                    <User size={16} className="text-indigo-600" />
+                    <span>Target Employee &amp; Reporting Line</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-rose-500">* Required</span>
+                </div>
+
+                {/* Employee Select */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Select Employee <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={addForm.employeeId}
+                    onChange={(e) => setAddForm({ ...addForm, employeeId: e.target.value })}
+                    disabled={Boolean(editingDeductionId)}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition ${
+                      addFormErrors.employeeId || existingEmployeeDeduction ? 'border-amber-300 bg-amber-50/20' : 'border-slate-300'
+                    }`}
+                  >
+                    <option value="">-- Choose Employee --</option>
+                    {isTL && myTeamMembers.length === 0 ? (
+                      <option value="" disabled>
+                        No assigned team members found in your team roster
+                      </option>
+                    ) : (
+                      (isTL ? myTeamMembers : usersList).map((u) => {
+                        const uRole = getRoleLabel(u);
+                        const code = u.uniqueID || u.employeeID || '';
+                        const uId = String(u._id || u.id).toLowerCase();
+                        const alreadyHasThisDeduction = deductions.some((d) => {
+                          const dEmpId = String(
+                            d.employeeId?._id ||
+                            d.employeeId?.id ||
+                            d.employeeId ||
+                            d.userId?._id ||
+                            d.userId?.id ||
+                            d.userId ||
+                            ''
+                          ).toLowerCase();
+                          const dMasterId = String(
+                            d.deductionMasterId?._id ||
+                            d.deductionMasterId ||
+                            ''
+                          ).toLowerCase();
+                          const dMonth = Number(d.month);
+                          const dYear = Number(d.year);
+                          const dStatus = String(d.status || '').toLowerCase();
+                          return (
+                            dEmpId === uId &&
+                            addForm.deductionMasterId &&
+                            dMasterId === String(addForm.deductionMasterId).toLowerCase() &&
+                            dMonth === Number(addForm.month) &&
+                            dYear === Number(addForm.year) &&
+                            !['cancelled', 'rejected'].includes(dStatus)
+                          );
+                        });
+
+                        return (
+                          <option key={u._id || u.id} value={u._id || u.id}>
+                            {u.name || u.fullName} {code ? `(${code})` : ''} — [{uRole}]
+                            {alreadyHasThisDeduction ? ' ⚠️ (Already Has This Deduction)' : ''}
+                          </option>
+                        );
+                      })
+                    )}
+                  </select>
+                  {addFormErrors.employeeId && (
+                    <p className="mt-1 text-xs text-rose-600 font-medium">
+                      {addFormErrors.employeeId}
+                    </p>
+                  )}
+                  {isTL && myTeamMembers.length === 0 && (
+                    <p className="mt-2 text-xs text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                      ℹ️ You do not currently have any assigned team members in your team. Team Leads can only submit deduction requests for their assigned team members.
+                    </p>
+                  )}
+                </div>
+
+                {/* Existing Deduction Conflict Warning */}
+                {existingEmployeeDeduction && (
+                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3 animate-fade-in">
+                    <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <span className="font-bold block text-amber-900">
+                        Existing Deduction Detected For This Employee
+                      </span>
+                      <span className="text-xs text-amber-800 leading-relaxed block mt-1">
+                        A deduction of type <strong>"{selectedMasterDoc?.name || 'this type'}"</strong> already exists for <strong>{selectedEmpUser?.name || 'this employee'}</strong> for {MONTH_NAMES[existingEmployeeDeduction.month - 1]} {existingEmployeeDeduction.year} (Record ID: <code className="font-mono font-semibold bg-white px-1.5 py-0.5 rounded border border-amber-200">{existingEmployeeDeduction.deductionRecordId}</code>, Status: <strong>{existingEmployeeDeduction.status}</strong>).
+                        <br />
+                        <span className="font-semibold text-amber-950 mt-1 block">
+                          To apply this deduction to another staff member, select a different employee from the dropdown.
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Resolved Hierarchy Details Banner */}
+                {selectedEmpUser && (
+                  <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-400 block font-semibold uppercase text-[10px]">
+                        Employee Role
+                      </span>
+                      <span className="font-bold text-slate-800 text-xs sm:text-sm">
+                        {getRoleLabel(selectedEmpUser)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-semibold uppercase text-[10px]">
+                        Employee Unique ID
+                      </span>
+                      <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm">
+                        {selectedEmpUser.uniqueID || selectedEmpUser.employeeID || '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-semibold uppercase text-[10px]">
+                        Reporting Team Leader
+                      </span>
+                      <span className="font-bold text-indigo-700 text-xs sm:text-sm">
+                        {resolvedReportingTL?.name || 'Self / Department Head'}
+                      </span>
+                      {resolvedReportingTL?.id && (
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          ID: {resolvedReportingTL.id}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* CARD 2: Deduction Category & Financials */}
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                    <DollarSign size={16} className="text-emerald-600" />
+                    <span>Deduction Classification &amp; Amount</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Deduction Type <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={addForm.deductionMasterId}
+                      onChange={(e) => handleMasterChange(e.target.value)}
+                      className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition ${
+                        addFormErrors.deductionMasterId
+                          ? 'border-rose-300 bg-rose-50/20'
+                          : 'border-slate-300'
+                      }`}
+                    >
+                      <option value="">-- Choose Deduction Type --</option>
+                      {masters
+                        .filter((m) => m && m.isActive !== false && String(m.status || '').toLowerCase() !== 'inactive')
+                        .map((m) => {
+                          const title = m.name || m.title || m.deductionTitle || m.code;
+                          const code = m.code || m.deductionCode || '';
+                          const amountLabel =
+                            m.calculationType === 'PERCENTAGE'
+                              ? `${m.percentage || m.defaultAmount || 0}%`
+                              : formatINR(m.defaultAmount ?? m.amount ?? 0);
+                          return (
+                            <option key={m._id || m.id || code} value={m._id || m.id || code}>
+                              {title} {code ? `(${code})` : ''} — {amountLabel}
+                            </option>
+                          );
+                        })}
+                    </select>
+                    {addFormErrors.deductionMasterId && (
+                      <p className="mt-1 text-xs text-rose-600 font-medium">
+                        {addFormErrors.deductionMasterId}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Deduction Amount (₹) <span className="text-rose-500">*</span>
+                      </label>
+                      {addForm.amount && Number(addForm.amount) > 0 && (
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-mono">
+                          {formatINR(addForm.amount)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="any"
+                        value={addForm.amount}
+                        onChange={(e) => setAddForm({ ...addForm, amount: e.target.value })}
+                        placeholder="Enter amount"
+                        className={`w-full pl-8 pr-3.5 py-2.5 border font-mono rounded-xl text-xs sm:text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition ${
+                          addFormErrors.amount ? 'border-rose-300 bg-rose-50/20' : 'border-slate-300'
+                        }`}
+                      />
+                    </div>
+                    {addFormErrors.amount && (
+                      <p className="mt-1 text-xs text-rose-600 font-medium">
+                        {addFormErrors.amount}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Master Policy & Legal Reference Pill */}
+                {selectedMasterDoc && (
+                  <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-indigo-900">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={16} className="text-indigo-600 shrink-0" />
+                      <span>
+                        <strong>{selectedMasterDoc.category?.replace('_', ' ')}</strong> |{' '}
+                        {selectedMasterDoc.legalReference || 'Standard Legal Compliance'}
+                      </span>
+                    </div>
+                    <span className="font-bold text-indigo-700 bg-white/80 px-2.5 py-1 rounded-lg border border-indigo-200/80 self-start sm:self-auto">
+                      Max Statutory Ceiling: {selectedMasterDoc.maxDeductionPercent || 50}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* CARD 3: Reason & Supporting Evidence */}
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                    <FileText size={16} className="text-indigo-600" />
+                    <span>Incident Rationale &amp; Documentation</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-rose-500">* Required</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Reason / Description <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={addForm.reason}
+                    onChange={(e) => setAddForm({ ...addForm, reason: e.target.value })}
+                    placeholder="Detail the specific incident, violation, asset repair, or rationale for this deduction..."
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition ${
+                      addFormErrors.reason ? 'border-rose-300 bg-rose-50/20' : 'border-slate-300'
+                    }`}
+                  />
+                  {addFormErrors.reason && (
+                    <p className="mt-1 text-xs text-rose-600 font-medium">
+                      {addFormErrors.reason}
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Supporting Evidence / Policy Reference (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={addForm.supportingEvidence}
+                      onChange={(e) => setAddForm({ ...addForm, supportingEvidence: e.target.value })}
+                      placeholder="e.g. CCTV log #, email reference, ticket ID, or invoice #"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Internal Remarks (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={addForm.remarks}
+                      onChange={(e) => setAddForm({ ...addForm, remarks: e.target.value })}
+                      placeholder="Additional confidential notes for HR payroll audit"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right Column (1 Col Wide): Timeline, Preview & Compliance */}
+            <div className="space-y-6">
+
+              {/* CARD 4: Incident Timeline & Payroll Period */}
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-4">
+                <div className="flex items-center gap-2 text-slate-900 font-bold text-sm pb-3 border-b border-slate-100">
+                  <Calendar size={16} className="text-indigo-600" />
+                  <span>Timeline &amp; Payroll Schedule</span>
+                </div>
+
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Incident Date <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={addForm.incidentDate}
+                      onChange={(e) => setAddForm({ ...addForm, incidentDate: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
+                    />
+                    {addFormErrors.incidentDate && (
+                      <p className="mt-1 text-xs text-rose-600 font-medium">
+                        {addFormErrors.incidentDate}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Payroll Month <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={addForm.month}
+                      onChange={(e) => setAddForm({ ...addForm, month: Number(e.target.value) })}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
+                    >
+                      {MONTH_NAMES.map((m, idx) => (
+                        <option key={m} value={idx + 1}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Payroll Year <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={addForm.year}
+                      onChange={(e) => setAddForm({ ...addForm, year: Number(e.target.value) })}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
+                    >
+                      <option value={2025}>2025</option>
+                      <option value={2026}>2026</option>
+                      <option value={2027}>2027</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 5: Live Record Summary Preview */}
+              <div className="bg-slate-50 rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-3.5">
+                <div className="flex items-center gap-2 text-slate-800 font-bold text-xs uppercase tracking-wider">
+                  <Clock size={15} className="text-slate-500" />
+                  <span>Deduction Summary Preview</span>
+                </div>
+
+                <div className="space-y-2 text-xs border-t border-slate-200/80 pt-3">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                    <span className="text-slate-500">Employee:</span>
+                    <span className="font-bold text-slate-900 truncate max-w-[150px]">
+                      {selectedEmpUser?.name || 'Not Selected'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                    <span className="text-slate-500">Deduction Type:</span>
+                    <span className="font-bold text-slate-900 truncate max-w-[150px]">
+                      {selectedMasterDoc?.name || 'Not Selected'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                    <span className="text-slate-500">Amount:</span>
+                    <span className="font-mono font-bold text-rose-600 text-sm">
+                      {addForm.amount ? formatINR(addForm.amount) : '₹ 0'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                    <span className="text-slate-500">Period:</span>
+                    <span className="font-semibold text-slate-800">
+                      {MONTH_NAMES[addForm.month - 1]} {addForm.year}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-500">Status On Submit:</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                      Pending Approval
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 6: Statutory Policy Notice */}
+              <div className="p-4 bg-blue-50/80 rounded-2xl border border-blue-200/80 text-xs text-blue-900 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-blue-950">
+                  <Info size={16} className="text-blue-600 shrink-0" />
+                  <span>Statutory Compliance Notice</span>
+                </div>
+                <p className="text-[11px] text-blue-800 leading-relaxed">
+                  All submitted deductions enter <strong>Pending</strong> status and require authorized HR/Admin approval before inclusion in finalized salary pay slips.
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* Sticky Bottom Action Bar */}
+          <div className="sticky bottom-0 z-20 -mx-3 -mb-3 sm:-mx-5 sm:-mb-5 lg:-mx-6 lg:-mb-6 px-6 py-4 bg-white/95 backdrop-blur-md border-t border-slate-200/90 flex items-center justify-between shadow-lg rounded-b-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddModalOpen(false);
+                setEditingDeductionId(null);
+              }}
+              disabled={isSubmittingAdd}
+              className="px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition shadow-2xs"
+            >
+              Cancel &amp; Return
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmittingAdd}
+              className="inline-flex items-center gap-2 px-6 py-2.5 btn-brand-primary text-white rounded-xl text-xs sm:text-sm font-semibold shadow-md cursor-pointer disabled:opacity-60 transition"
+              style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+            >
+              {isSubmittingAdd ? (
+                <RefreshCw size={15} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={16} />
+              )}
+              <span>{editingDeductionId ? 'Update Deduction Record' : 'Submit Deduction Request'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5 animate-fade-in font-poppins">
       {/* Confirmation Dialog Host */}
@@ -1592,378 +2100,10 @@ export const EmployeeDeductionsView = () => {
       </div>
 
       {/* ======================================================== */}
-      {/* MODAL 1: ADD / EDIT EMPLOYEE DEDUCTION                   */}
-      {/* ======================================================== */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
-          <div
-            className="fixed inset-0"
-            onClick={() => !isSubmittingAdd && setIsAddModalOpen(false)}
-          />
-
-          <div className="relative w-full max-w-xl max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,660px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
-            {/* Header - Fixed & Strictly Pinned at Top */}
-            <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  {editingDeductionId ? 'Edit Deduction Record' : 'Record New Employee Deduction'}
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Record penalty, asset damage, recovery, or policy deductions with mandatory reporting line resolution.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                disabled={isSubmittingAdd}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
-              >
-                <XCircle size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitAddForm} className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              {/* Scrollable Form Body - Strictly contained between Header and Footer */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5 text-xs modal-scrollbar">
-                {/* Employee Selection */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Select Employee <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={addForm.employeeId}
-                  onChange={(e) => setAddForm({ ...addForm, employeeId: e.target.value })}
-                  disabled={Boolean(editingDeductionId)}
-                  className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 ${
-                    addFormErrors.employeeId || existingEmployeeDeduction ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
-                  }`}
-                >
-                  <option value="">-- Choose Employee --</option>
-                  {isTL && myTeamMembers.length === 0 ? (
-                    <option value="" disabled>
-                      No assigned team members found in your team roster
-                    </option>
-                  ) : (
-                    (isTL ? myTeamMembers : usersList).map((u) => {
-                      const uRole = getRoleLabel(u);
-                      const code = u.uniqueID || u.employeeID || '';
-                      const uId = String(u._id || u.id).toLowerCase();
-                      const alreadyHasThisDeduction = deductions.some((d) => {
-                        const dEmpId = String(
-                          d.employeeId?._id ||
-                          d.employeeId?.id ||
-                          d.employeeId ||
-                          d.userId?._id ||
-                          d.userId?.id ||
-                          d.userId ||
-                          ''
-                        ).toLowerCase();
-                        const dMasterId = String(
-                          d.deductionMasterId?._id ||
-                          d.deductionMasterId ||
-                          ''
-                        ).toLowerCase();
-                        const dMonth = Number(d.month);
-                        const dYear = Number(d.year);
-                        const dStatus = String(d.status || '').toLowerCase();
-                        return (
-                          dEmpId === uId &&
-                          addForm.deductionMasterId &&
-                          dMasterId === String(addForm.deductionMasterId).toLowerCase() &&
-                          dMonth === Number(addForm.month) &&
-                          dYear === Number(addForm.year) &&
-                          !['cancelled', 'rejected'].includes(dStatus)
-                        );
-                      });
-
-                      return (
-                        <option key={u._id || u.id} value={u._id || u.id}>
-                          {u.name || u.fullName} {code ? `(${code})` : ''} — [{uRole}]
-                          {alreadyHasThisDeduction ? ' ⚠️ (Already Has This Deduction)' : ''}
-                        </option>
-                      );
-                    })
-                  )}
-                </select>
-                {addFormErrors.employeeId && (
-                  <p className="mt-1 text-[11px] text-rose-600 font-medium">
-                    {addFormErrors.employeeId}
-                  </p>
-                )}
-                {isTL && myTeamMembers.length === 0 && (
-                  <p className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                    ℹ️ You do not currently have any assigned team members in your team. Team Leads can only submit deduction requests for their assigned team members.
-                  </p>
-                )}
-              </div>
-
-              {/* Existing Deduction Conflict Warning */}
-              {existingEmployeeDeduction && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5 animate-fade-in">
-                  <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <span className="font-semibold block text-amber-800">
-                      Existing Deduction Detected For This Employee
-                    </span>
-                    <span className="text-[11px] text-amber-700 leading-relaxed block mt-0.5">
-                      A deduction of type <strong>"{selectedMasterDoc?.name || 'this type'}"</strong> already exists for <strong>{selectedEmpUser?.name || 'this employee'}</strong> for {MONTH_NAMES[existingEmployeeDeduction.month - 1]} {existingEmployeeDeduction.year} (Record ID: <code className="font-mono font-semibold">{existingEmployeeDeduction.deductionRecordId}</code>, Status: <strong>{existingEmployeeDeduction.status}</strong>).
-                      <br />
-                      <span className="font-medium text-amber-900">
-                        To apply this deduction to another staff member, select a different employee from the dropdown.
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Resolved Hierarchy Details Banner */}
-              {selectedEmpUser && (
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 grid grid-cols-2 gap-2 text-[11px]">
-                  <div>
-                    <span className="text-slate-400 block font-semibold uppercase text-[10px]">
-                      Employee Role
-                    </span>
-                    <span className="font-semibold text-slate-800">
-                      {getRoleLabel(selectedEmpUser)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block font-semibold uppercase text-[10px]">
-                      Reporting Team Leader
-                    </span>
-                    <span className="font-semibold text-indigo-700">
-                      {resolvedReportingTL?.name || 'Self / Department Head'}
-                    </span>
-                    {resolvedReportingTL?.id && (
-                      <span className="text-[10px] text-slate-400 font-mono block">
-                        ID: {resolvedReportingTL.id}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Deduction Type (From Master) & Amount */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Deduction Type <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={addForm.deductionMasterId}
-                    onChange={(e) => handleMasterChange(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 ${
-                      addFormErrors.deductionMasterId
-                        ? 'border-rose-300 bg-rose-50/20'
-                        : 'border-slate-200'
-                    }`}
-                  >
-                    <option value="">-- Choose Deduction Type --</option>
-                    {masters
-                      .filter((m) => m && m.isActive !== false && String(m.status || '').toLowerCase() !== 'inactive')
-                      .map((m) => {
-                        const title = m.name || m.title || m.deductionTitle || m.code;
-                        const code = m.code || m.deductionCode || '';
-                        const amountLabel =
-                          m.calculationType === 'PERCENTAGE'
-                            ? `${m.percentage || m.defaultAmount || 0}%`
-                            : formatINR(m.defaultAmount ?? m.amount ?? 0);
-                        return (
-                          <option key={m._id || m.id || code} value={m._id || m.id || code}>
-                            {title} {code ? `(${code})` : ''} — {amountLabel}
-                          </option>
-                        );
-                      })}
-                  </select>
-                  {addFormErrors.deductionMasterId && (
-                    <p className="mt-1 text-[11px] text-rose-600 font-medium">
-                      {addFormErrors.deductionMasterId}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Deduction Amount (₹) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="any"
-                    value={addForm.amount}
-                    onChange={(e) => setAddForm({ ...addForm, amount: e.target.value })}
-                    placeholder="Enter amount"
-                    className={`w-full px-3 py-2 border font-mono rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 ${
-                      addFormErrors.amount ? 'border-rose-300 bg-rose-50/20' : 'border-slate-200'
-                    }`}
-                  />
-                  {addFormErrors.amount && (
-                    <p className="mt-1 text-[11px] text-rose-600 font-medium">
-                      {addFormErrors.amount}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Master Policy & Legal Reference Pill */}
-              {selectedMasterDoc && (
-                <div className="p-2.5 bg-indigo-50/60 rounded-lg border border-indigo-100 flex items-center justify-between text-[11px] text-indigo-900">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck size={14} className="text-indigo-600 shrink-0" />
-                    <span>
-                      <strong>{selectedMasterDoc.category?.replace('_', ' ')}</strong> |{' '}
-                      {selectedMasterDoc.legalReference || 'Standard Legal Compliance'}
-                    </span>
-                  </div>
-                  <span className="font-semibold text-indigo-700">
-                    Max Ceiling: {selectedMasterDoc.maxDeductionPercent || 50}%
-                  </span>
-                </div>
-              )}
-
-              {/* Incident Date & Applicable Payroll Month */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Incident Date <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={addForm.incidentDate}
-                    onChange={(e) => setAddForm({ ...addForm, incidentDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
-                  />
-                  {addFormErrors.incidentDate && (
-                    <p className="mt-1 text-[11px] text-rose-600 font-medium">
-                      {addFormErrors.incidentDate}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Payroll Month <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={addForm.month}
-                    onChange={(e) => setAddForm({ ...addForm, month: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
-                  >
-                    {MONTH_NAMES.map((m, idx) => (
-                      <option key={m} value={idx + 1}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Payroll Year <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={addForm.year}
-                    onChange={(e) => setAddForm({ ...addForm, year: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
-                  >
-                    <option value={2025}>2025</option>
-                    <option value={2026}>2026</option>
-                    <option value={2027}>2027</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Reason / Incident Description */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Reason / Description <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={addForm.reason}
-                  onChange={(e) => setAddForm({ ...addForm, reason: e.target.value })}
-                  placeholder="Detail the specific incident, violation, or rationale for this deduction..."
-                  className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 ${
-                    addFormErrors.reason ? 'border-rose-300 bg-rose-50/20' : 'border-slate-200'
-                  }`}
-                />
-                {addFormErrors.reason && (
-                  <p className="mt-1 text-[11px] text-rose-600 font-medium">
-                    {addFormErrors.reason}
-                  </p>
-                )}
-              </div>
-
-              {/* Supporting Evidence / Reference Notes */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Supporting Evidence / Policy Reference (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={addForm.supportingEvidence}
-                  onChange={(e) => setAddForm({ ...addForm, supportingEvidence: e.target.value })}
-                  placeholder="e.g. CCTV log timestamp, incident email reference, or repair invoice #"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
-                />
-              </div>
-
-              {/* Internal Remarks */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Internal Remarks (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={addForm.remarks}
-                  onChange={(e) => setAddForm({ ...addForm, remarks: e.target.value })}
-                  placeholder="Additional notes for HR payroll review"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
-                />
-              </div>
-
-              {/* Submission Notice */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-[11px] text-slate-500 flex items-center gap-2">
-                <Info size={14} className="text-slate-400 shrink-0" />
-                <span>
-                  Submitted deductions enter <strong>Pending</strong> status and will require HR/Admin authorization before application to salary calculation.
-                </span>
-              </div>
-            </div>
-
-            {/* Actions - Fixed & Pinned at bottom */}
-            <div className="px-6 py-3.5 bg-slate-50/90 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                disabled={isSubmittingAdd}
-                className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer transition shadow-2xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmittingAdd}
-                className="inline-flex items-center gap-1.5 px-4 py-2 btn-brand-primary text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-60 transition"
-              >
-                {isSubmittingAdd ? (
-                  <RefreshCw size={13} className="animate-spin" />
-                ) : (
-                  <CheckCircle2 size={14} />
-                )}
-                <span>{editingDeductionId ? 'Update Record' : 'Submit Deduction Request'}</span>
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    )}
-
-      {/* ======================================================== */}
       {/* MODAL 2: REJECT DEDUCTION WITH REASON                    */}
       {/* ======================================================== */}
-      {isRejectModalOpen && selectedDeduction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
+      {isRejectModalOpen && selectedDeduction && typeof document !== 'undefined' && createPortal((
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-y-auto">
           <div
             className="fixed inset-0"
             onClick={() => !isSubmittingRejection && setIsRejectModalOpen(false)}
@@ -2053,13 +2193,13 @@ export const EmployeeDeductionsView = () => {
             </form>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* ======================================================== */}
       {/* MODAL 3: VIEW DEDUCTION DETAILS & AUDIT TRAIL            */}
       {/* ======================================================== */}
-      {isDetailModalOpen && selectedDeduction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
+      {isDetailModalOpen && selectedDeduction && typeof document !== 'undefined' && createPortal((
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-y-auto">
           <div
             className="fixed inset-0"
             onClick={() => setIsDetailModalOpen(false)}
@@ -2213,13 +2353,13 @@ export const EmployeeDeductionsView = () => {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* ======================================================== */}
       {/* MODAL 4: EMPLOYEE DISPUTE / CLARIFICATION                */}
       {/* ======================================================== */}
-      {isDisputeModalOpen && selectedDeduction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
+      {isDisputeModalOpen && selectedDeduction && typeof document !== 'undefined' && createPortal((
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-y-auto">
           <div
             className="fixed inset-0"
             onClick={() => !isSubmittingDispute && setIsDisputeModalOpen(false)}
@@ -2292,7 +2432,7 @@ export const EmployeeDeductionsView = () => {
             </form>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 };
