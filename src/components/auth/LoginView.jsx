@@ -3,6 +3,7 @@ import {
   Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, 
   Sparkles, Shield, User, CheckCircle2, AlertCircle, Phone 
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api, { clearApiCache } from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
 import whiteLogo from '../../assets/white logo.png';
@@ -33,7 +34,7 @@ export const LoginView = ({
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regShowPassword, setRegShowPassword] = useState(false);
-  const [regAgreeTerms, setRegAgreeTerms] = useState(true);
+  const [regAgreeTerms, setRegAgreeTerms] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
 
   // Registration Password Strength Calculation
@@ -198,13 +199,13 @@ export const LoginView = ({
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#FAFCFD] font-poppins selection:bg-[#068DCB] selection:text-white antialiased">
+    <div className="min-h-dvh w-full flex flex-col lg:flex-row lg:h-dvh lg:min-h-0 lg:overflow-hidden bg-[#FAFCFD] font-poppins selection:bg-[#068DCB] selection:text-white antialiased">
       
       {/* ============================================================== */}
       {/* LEFT COLUMN: HERO BRANDING & PRODUCT HIGHLIGHTS (DESKTOP)     */}
       {/* ============================================================== */}
       <div 
-        className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-10 xl:p-14 text-white relative overflow-hidden shrink-0"
+        className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-8 text-white relative overflow-hidden lg:min-h-0 shrink-0"
         style={{
           background: 'linear-gradient(145deg, #022e43 0%, #034665 40%, #055c83 75%, #068DCB 100%)'
         }}
@@ -228,21 +229,21 @@ export const LoginView = ({
         </div>
 
         {/* Center Hero Content */}
-        <div className="relative z-10 my-auto py-8 max-w-lg">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-sky-400/20 to-blue-500/20 border border-sky-300/30 text-sky-200 text-xs font-medium mb-6 backdrop-blur-xs">
+        <div className="relative z-10 my-auto py-4 max-w-lg">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-sky-400/20 to-blue-500/20 border border-sky-300/30 text-sky-200 text-xs font-medium mb-4 backdrop-blur-xs">
             <Sparkles size={14} className="text-sky-300 animate-spin-slow" />
             <span>Intelligent HRMS & Operations Portal</span>
           </div>
 
-          <h1 className="text-3xl xl:text-4xl font-bold tracking-tight text-white leading-tight">
+          <h1 className="text-3xl font-bold tracking-tight text-white leading-tight">
             Manage your team, attendance & payroll in one place
           </h1>
-          <p className="mt-4 text-sm xl:text-base text-sky-100/80 leading-relaxed font-light">
+          <p className="mt-3 text-sm text-sky-100/80 leading-relaxed font-light">
             Empower your workforce with high-precision time tracking, geofenced mobile verification, automated salary disbursements, and itemized deduction management.
           </p>
 
           {/* Interactive Feature Cards */}
-          <div className="mt-8 space-y-3.5">
+          <div className="mt-5 space-y-2.5">
             {[
               {
                 icon: ShieldCheck,
@@ -262,7 +263,7 @@ export const LoginView = ({
             ].map((f, idx) => (
               <div 
                 key={idx}
-                className="flex items-start gap-3.5 p-3.5 rounded-xl bg-white/10 hover:bg-white/15 transition-all border border-white/10 backdrop-blur-md"
+                className="flex items-start gap-3.5 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 transition-all border border-white/10 backdrop-blur-md"
               >
                 <div className="w-8 h-8 rounded-lg bg-sky-400/25 flex items-center justify-center shrink-0 border border-sky-300/30 text-sky-200 mt-0.5">
                   <f.icon size={16} />
@@ -293,7 +294,7 @@ export const LoginView = ({
       {/* ============================================================== */}
       {/* RIGHT COLUMN: INTERACTIVE AUTH PANEL                          */}
       {/* ============================================================== */}
-      <div className="w-full lg:w-7/12 xl:w-1/2 flex flex-col justify-between p-6 sm:p-10 xl:p-14 overflow-y-auto">
+      <div className="w-full lg:w-7/12 xl:w-1/2 flex flex-col justify-between p-6 sm:p-10 xl:px-14 xl:py-8 overflow-y-auto lg:min-h-0">
         
         {/* Mobile Header with Logo */}
         <div className="flex lg:hidden items-center justify-between mb-8 pb-4 border-b border-slate-100">
@@ -653,17 +654,21 @@ export const LoginView = ({
                   </div>
 
                   {/* Terms */}
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-start gap-2 pt-1">
                     <input
                       type="checkbox"
                       id="regTerms"
                       checked={regAgreeTerms}
                       onChange={(e) => setRegAgreeTerms(e.target.checked)}
+                      aria-label="I agree to the Terms of Service and Privacy Policy"
                       className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer"
                     />
-                    <label htmlFor="regTerms" className="text-[11px] text-slate-500 cursor-pointer select-none">
-                      I agree to the <span className="text-[#0088cc] hover:underline font-medium">Terms of Service</span> and <span className="text-[#0088cc] hover:underline font-medium">Privacy Policy</span>.
-                    </label>
+                    <span className="text-[11px] text-slate-500 select-none">
+                      I agree to the{' '}
+                      <Link to="/terms-of-service" className="font-medium text-[#0088cc] hover:underline">Terms of Service</Link>
+                      {' '}and{' '}
+                      <Link to="/privacy" className="font-medium text-[#0088cc] hover:underline">Privacy Policy</Link>.
+                    </span>
                   </div>
 
                   {/* Register CTA */}
@@ -709,9 +714,9 @@ export const LoginView = ({
         <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
           <span>Kevalon Technology HRMS Suite</span>
           <div className="flex items-center gap-4">
-            <span className="hover:text-slate-600 transition cursor-pointer">Security Policy</span>
-            <span className="hover:text-slate-600 transition cursor-pointer">Privacy</span>
-            <span className="hover:text-slate-600 transition cursor-pointer">Support</span>
+            <Link to="/security-policy" className="transition hover:text-slate-600">Security Policy</Link>
+            <Link to="/privacy" className="transition hover:text-slate-600">Privacy</Link>
+            <Link to="/support" className="transition hover:text-slate-600">Support</Link>
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ import {
   User, Mail, Lock, Phone, Shield, Eye, EyeOff, 
   CheckCircle2, AlertCircle, ArrowRight, Sparkles 
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios.js';
 import whiteLogo from '../../assets/white logo.png';
 import colorLogo from '../../assets/Logo.png';
@@ -15,7 +16,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -407,17 +408,21 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
               </div>
 
               {/* Terms Checkbox */}
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-start gap-2 pt-1">
                 <input
                   type="checkbox"
                   id="agreeTerms"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
+                  aria-label="I agree to the Terms of Service and Privacy Policy"
                   className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer"
                 />
-                <label htmlFor="agreeTerms" className="text-[11px] text-slate-500 cursor-pointer select-none">
-                  I agree to the <span className="text-[#0088cc] hover:underline font-medium">Terms of Service</span> and <span className="text-[#0088cc] hover:underline font-medium">Privacy Policy</span>.
-                </label>
+                <span className="text-[11px] text-slate-500 select-none">
+                  I agree to the{' '}
+                  <Link to="/terms-of-service" className="font-medium text-[#0088cc] hover:underline">Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link to="/privacy" className="font-medium text-[#0088cc] hover:underline">Privacy Policy</Link>.
+                </span>
               </div>
 
               {/* Submit CTA */}
@@ -460,9 +465,9 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
         <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
           <span>Kevalon Technology HRMS & Enterprise Suite</span>
           <div className="flex items-center gap-4">
-            <span className="hover:text-slate-600 transition cursor-pointer">Security</span>
-            <span className="hover:text-slate-600 transition cursor-pointer">Privacy</span>
-            <span className="hover:text-slate-600 transition cursor-pointer">Support</span>
+            <Link to="/security-policy" className="transition hover:text-slate-600">Security</Link>
+            <Link to="/privacy" className="transition hover:text-slate-600">Privacy</Link>
+            <Link to="/support" className="transition hover:text-slate-600">Support</Link>
           </div>
         </div>
       </div>

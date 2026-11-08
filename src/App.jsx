@@ -5,6 +5,7 @@ import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/Ap
 import { performAutoCheckout, clearAuth, isTokenExpired, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
 import { BASE_URL } from './api/config.js';
 import { LoginView } from './components/auth/LoginView.jsx';
+import { PublicInfoView } from './components/auth/PublicInfoView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
 import { ToastContainer, showToast } from './components/common/Toast.jsx';
@@ -306,6 +307,8 @@ const MainLayout = ({ handleSignOut }) => {
 };
 
 export default function App() {
+  const location = useLocation();
+
   // Global interceptor for native browser alert() -> clean modern UI Toast
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -451,11 +454,16 @@ export default function App() {
     return <LoadingScreen message="Verifying session..." fullScreen className="bg-slate-50 font-sans" />;
   }
 
+  const publicPages = ['/security-policy', '/privacy', '/support', '/terms-of-service'];
+  const publicPage = publicPages.includes(location.pathname) ? location.pathname : null;
+
   return (
     <AppProvider>
       <ToastContainer />
       {isAuthenticated ? (
         <MainLayout handleSignOut={handleSignOut} />
+      ) : publicPage ? (
+        <PublicInfoView page={publicPage} />
       ) : authView === 'reset_password' ? (
         <Suspense fallback={<LoadingScreen message="Loading password reset..." fullScreen />}>
           <ResetPasswordView onBackToLogin={() => setAuthView('login')} />
