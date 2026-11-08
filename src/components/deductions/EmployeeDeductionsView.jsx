@@ -894,7 +894,7 @@ export const EmployeeDeductionsView = () => {
   // ========================================================
   if (isAddModalOpen) {
     return (
-      <div className="w-full max-w-6xl mx-auto space-y-5 font-poppins animate-fade-in pb-16">
+      <div className="w-full max-w-7xl mx-auto space-y-5 font-poppins animate-fade-in pb-16 min-w-0">
         {confirmationDialog}
 
         {/* Top Breadcrumb & Page Header */}
@@ -942,11 +942,11 @@ export const EmployeeDeductionsView = () => {
         </div>
 
         {/* Form Container */}
-        <form onSubmit={handleSubmitAddForm} className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <form onSubmit={handleSubmitAddForm} className="space-y-5 min-w-0">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-5 xl:gap-6 min-w-0">
 
             {/* Left Column (2 Cols Wide): Core Details */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="xl:col-span-2 space-y-4 sm:space-y-5 xl:space-y-6 min-w-0">
 
               {/* CARD 1: Employee Selection & Hierarchy */}
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-4">
@@ -1246,7 +1246,7 @@ export const EmployeeDeductionsView = () => {
             </div>
 
             {/* Right Column (1 Col Wide): Timeline, Preview & Compliance */}
-            <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4 sm:gap-5 xl:gap-6 min-w-0">
 
               {/* CARD 4: Incident Timeline & Payroll Period */}
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-4">
@@ -1349,7 +1349,7 @@ export const EmployeeDeductionsView = () => {
               </div>
 
               {/* CARD 6: Statutory Policy Notice */}
-              <div className="p-4 bg-blue-50/80 rounded-2xl border border-blue-200/80 text-xs text-blue-900 space-y-1.5">
+              <div className="md:col-span-2 xl:col-span-1 p-4 bg-blue-50/80 rounded-2xl border border-blue-200/80 text-xs text-blue-900 space-y-1.5">
                 <div className="flex items-center gap-2 font-bold text-blue-950">
                   <Info size={16} className="text-blue-600 shrink-0" />
                   <span>Statutory Compliance Notice</span>
@@ -1364,7 +1364,7 @@ export const EmployeeDeductionsView = () => {
           </div>
 
           {/* Sticky Bottom Action Bar */}
-          <div className="sticky bottom-0 z-20 -mx-3 -mb-3 sm:-mx-5 sm:-mb-5 lg:-mx-6 lg:-mb-6 px-6 py-4 bg-white/95 backdrop-blur-md border-t border-slate-200/90 flex items-center justify-between shadow-lg rounded-b-2xl">
+          <div className="sticky bottom-0 z-20 px-4 sm:px-6 py-3.5 bg-white/95 backdrop-blur-md border border-slate-200/90 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4 shadow-lg rounded-2xl">
             <button
               type="button"
               onClick={() => {
@@ -1372,7 +1372,7 @@ export const EmployeeDeductionsView = () => {
                 setEditingDeductionId(null);
               }}
               disabled={isSubmittingAdd}
-              className="px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition shadow-2xs"
+              className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold cursor-pointer transition shadow-2xs"
             >
               Cancel &amp; Return
             </button>
@@ -1380,7 +1380,7 @@ export const EmployeeDeductionsView = () => {
             <button
               type="submit"
               disabled={isSubmittingAdd}
-              className="inline-flex items-center gap-2 px-6 py-2.5 btn-brand-primary text-white rounded-xl text-xs sm:text-sm font-semibold shadow-md cursor-pointer disabled:opacity-60 transition"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 btn-brand-primary text-white rounded-xl text-xs sm:text-sm font-semibold shadow-md cursor-pointer disabled:opacity-60 transition"
               style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
             >
               {isSubmittingAdd ? (
