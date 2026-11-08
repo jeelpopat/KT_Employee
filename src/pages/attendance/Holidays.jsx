@@ -418,12 +418,6 @@ export default function Holidays() {
     return holiday ? holiday.title : '';
   };
 
-  const isSecondOrFourthSaturday = (d) => {
-    if (d.getDay() !== 6) return false;
-    const dateNum = d.getDate();
-    return (dateNum >= 8 && dateNum <= 14) || (dateNum >= 22 && dateNum <= 28);
-  };
-
   const isSunday = (d) => {
     return d.getDay() === 0;
   };
@@ -452,7 +446,6 @@ export default function Holidays() {
         holidayTitle: getHolidayTitle(dateStr),
         isSunday: isSunday(d),
         isSaturday: d.getDay() === 6,
-        isSecondOrFourthSaturday: isSecondOrFourthSaturday(d),
         dateObj: d,
       });
     }
@@ -469,7 +462,6 @@ export default function Holidays() {
         holidayTitle: getHolidayTitle(dateStr),
         isSunday: isSunday(d),
         isSaturday: d.getDay() === 6,
-        isSecondOrFourthSaturday: isSecondOrFourthSaturday(d),
         dateObj: d,
       });
     }
@@ -487,7 +479,6 @@ export default function Holidays() {
         holidayTitle: getHolidayTitle(dateStr),
         isSunday: isSunday(d),
         isSaturday: d.getDay() === 6,
-        isSecondOrFourthSaturday: isSecondOrFourthSaturday(d),
         dateObj: d,
       });
     }

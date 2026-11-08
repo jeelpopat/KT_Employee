@@ -144,17 +144,32 @@ export const LeaveDatePicker = ({
                 day
               );
               const dateKey = formatDateKey(date);
+              const isSunday = date.getDay() === 0;
               const isHoliday = holidayDateSet.has(dateKey);
               const isBeforeMinimum = Boolean(minDate && dateKey < minDate);
               const isSelected = dateKey === value;
+              const isDisabled = isSunday || isHoliday || isBeforeMinimum;
+              const buttonTitle = isSunday
+                ? 'Sunday (Weekly Off)'
+                : isHoliday
+                  ? 'Company holiday'
+                  : isBeforeMinimum
+                    ? 'Date prior to minimum advance notice'
+                    : undefined;
 
               return (
                 <button
                   key={dateKey}
                   type="button"
-                  disabled={isHoliday || isBeforeMinimum}
-                  title={isHoliday ? 'Company holiday' : undefined}
-                  aria-label={isHoliday ? `${day}, company holiday` : dateKey}
+                  disabled={isDisabled}
+                  title={buttonTitle}
+                  aria-label={
+                    isSunday
+                      ? `${day}, Sunday weekly off`
+                      : isHoliday
+                        ? `${day}, company holiday`
+                        : dateKey
+                  }
                   onClick={() => {
                     onChange(dateKey);
                     setIsOpen(false);
@@ -162,11 +177,13 @@ export const LeaveDatePicker = ({
                   className={`h-8 rounded-md text-xs transition-colors ${
                     isSelected
                       ? 'bg-indigo-600 font-semibold text-white'
-                      : isHoliday
-                        ? 'cursor-not-allowed bg-slate-100 text-slate-300 line-through'
-                        : isBeforeMinimum
-                          ? 'cursor-not-allowed text-slate-300'
-                          : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700'
+                      : isSunday
+                        ? 'cursor-not-allowed bg-slate-100/80 text-slate-400'
+                        : isHoliday
+                          ? 'cursor-not-allowed bg-slate-100 text-slate-300 line-through'
+                          : isBeforeMinimum
+                            ? 'cursor-not-allowed text-slate-300'
+                            : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700'
                   }`}
                 >
                   {day}
@@ -175,7 +192,7 @@ export const LeaveDatePicker = ({
             })}
           </div>
           <p className="mt-2 text-[10px] text-slate-500">
-            Company holidays are unavailable for leave.
+            Sundays (weekly off) and company holidays are unavailable for leave. Saturdays are working days unless declared in Holiday Master.
           </p>
         </div>
       )}

@@ -15,26 +15,49 @@ const normalizeDate = (value) => {
 export const expandHolidayDates = (holidays) => {
   if (!Array.isArray(holidays)) return [];
 
-  return holidays.flatMap((holiday) => {
+  const dateSet = new Set();
+  holidays.forEach((holiday) => {
     const start = normalizeDate(
       holiday.startDate || holiday.fromDate || holiday.holidayDate || holiday.date
     );
     const end = normalizeDate(holiday.endDate || holiday.toDate || start);
-    if (!start || !end || start > end) return [];
+    if (!start || !end || start > end) return;
 
     const [startYear, startMonth, startDay] = start.split('-').map(Number);
     const [endYear, endMonth, endDay] = end.split('-').map(Number);
     const current = new Date(Date.UTC(startYear, startMonth - 1, startDay));
     const last = Date.UTC(endYear, endMonth - 1, endDay);
-    const dates = [];
 
     while (current.getTime() <= last) {
-      dates.push(current.toISOString().slice(0, 10));
+      dateSet.add(current.toISOString().slice(0, 10));
       current.setUTCDate(current.getUTCDate() + 1);
     }
-
-    return dates;
   });
+
+  return Array.from(dateSet).sort();
+};
+
+export const isWeeklyOffSunday = (value) => {
+  const norm = normalizeDate(value);
+  if (!norm) return false;
+  const d = new Date(`${norm}T00:00:00`);
+  return d.getDay() === 0;
+};
+
+export const isWorkingDay = (dateValue, holidayDates = []) => {
+  const norm = normalizeDate(dateValue);
+  if (!norm) return false;
+  const d = new Date(`${norm}T00:00:00`);
+  if (d.getDay() === 0) return false; // Sunday is weekly off
+  // All Saturdays are regular working days unless explicitly in holiday list
+  const holidayList = Array.isArray(holidayDates) ? holidayDates : [];
+  const normalizedHolidayStrings = holidayList.map((h) =>
+    typeof h === 'string'
+      ? normalizeDate(h)
+      : normalizeDate(h?.startDate || h?.fromDate || h?.holidayDate || h?.date)
+  );
+  const holidaysSet = new Set(normalizedHolidayStrings.filter(Boolean));
+  return !holidaysSet.has(norm);
 };
 
 export const calculateLeaveDays = (startValue, endValue, holidays = [], isHalfDay = false) => {

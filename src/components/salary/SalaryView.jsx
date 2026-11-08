@@ -152,14 +152,17 @@ const getRoleLabel = (u) => {
 
 // Salary disbursement status badge color mapping
 const getStatusBadgeClass = (status) => {
-  const s = String(status || 'paid').toLowerCase();
+  const s = String(status || 'generated').toLowerCase();
   switch (s) {
     case 'paid':
       return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    case 'pending':
-      return 'bg-amber-50 text-amber-700 border-amber-200';
+    case 'approved':
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    case 'generated':
     case 'processed':
       return 'bg-blue-50 text-blue-700 border-blue-200';
+    case 'pending':
+      return 'bg-amber-50 text-amber-700 border-amber-200';
     case 'unpaid':
       return 'bg-rose-50 text-rose-700 border-rose-200';
     case 'hold':
@@ -479,44 +482,77 @@ export const SalaryView = () => {
 
   const initialStructureForm = {
     userId: '',
+    structureType: 'SIMPLE_FIXED', // 'SIMPLE_FIXED' | 'COMPONENT_BASED'
+    fixedSalary: '',
     basicSalary: '',
     hra: '',
     allowance: '',
+    extraAllowance: '',
+    incentive: '',
+    bonus: '',
     fixedBonus: '',
     fixedDeduction: '',
     tdsPercentage: '',
+    effectiveFrom: new Date().toISOString().slice(0, 10),
+    autoCalculateStatutory: true,
+    isPfApplicable: true,
+    isEsicApplicable: true,
+    isPtApplicable: true,
+    isTdsApplicable: true,
     isActive: true
   };
   const [structureForm, setStructureForm] = useState(initialStructureForm);
 
-  // Auto-calculated fields for Salary Structure modal
-  // Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
-  // net salary = Base Gross - Fixed Monthly Deduction - TDS
+  // Auto-calculated fields for Salary Structure modal supporting SIMPLE_FIXED & COMPONENT_BASED
   const structureCalculations = useMemo(() => {
-    const basic = Number(structureForm.basicSalary) || 0;
-    const hra = Number(structureForm.hra) || 0;
-    const allowance = Number(structureForm.allowance) || 0;
-    const fixedBonus = Number(structureForm.fixedBonus) || 0;
+    const isFixed = structureForm.structureType === 'SIMPLE_FIXED';
+    const fixedSalary = Number(structureForm.fixedSalary) || 0;
+    const basic = isFixed ? fixedSalary : (Number(structureForm.basicSalary) || 0);
+    const hra = isFixed ? 0 : (Number(structureForm.hra) || 0);
+    const allowance = isFixed ? 0 : (Number(structureForm.allowance) || 0);
+    const extraAllowance = Number(structureForm.extraAllowance) || 0;
+    const incentive = Number(structureForm.incentive) || 0;
+    const bonus = Number(structureForm.bonus) || 0;
+    const fixedBonus = isFixed ? 0 : (Number(structureForm.fixedBonus) || 0);
     const fixedDeduction = Number(structureForm.fixedDeduction) || 0;
     const tdsPercentage = Number(structureForm.tdsPercentage) || 0;
 
-    // Formula: Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
-    const baseGross = Math.round((basic + hra + allowance + fixedBonus) * 100) / 100;
-    const grossSalary = baseGross;
-    const tdsAmount = Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
-    const totalDeductions = Math.round((fixedDeduction + tdsAmount) * 100) / 100;
-    const netSalary = Math.max(0, Math.round((baseGross - totalDeductions) * 100) / 100);
+    // Gross Salary = Basic (or Fixed) + HRA + Allowances + Recurring Allowances + Bonuses
+    const grossSalary = Math.round((basic + hra + allowance + extraAllowance + incentive + bonus + fixedBonus) * 100) / 100;
+    const baseGross = grossSalary;
+
+    // Statutory Calculations
+    const basicForPf = basic;
+    const pfDeduction = structureForm.isPfApplicable ? Math.round(basicForPf * 0.12) : 0;
+    const esicDeduction = structureForm.isEsicApplicable ? Math.round(grossSalary * 0.0075) : 0;
+    // PT applies only if Gross > 12000 (standard state slabs)
+    const professionalTax = (structureForm.isPtApplicable && grossSalary > 12000) ? 200 : 0;
+    const tdsAmount = structureForm.isTdsApplicable ? Math.round(((grossSalary * tdsPercentage) / 100) * 100) / 100 : 0;
+
+    const totalStatutory = pfDeduction + esicDeduction + professionalTax;
+    const totalDeductions = Math.round((fixedDeduction + totalStatutory + tdsAmount) * 100) / 100;
+    const netSalary = Math.max(0, Math.round((grossSalary - totalDeductions) * 100) / 100);
     const annualCtc = Math.round(grossSalary * 12 * 100) / 100;
 
     return {
+      isFixed,
+      fixedSalary,
       basic,
       hra,
       allowance,
+      extraAllowance,
+      incentive,
+      bonus,
       fixedBonus,
       fixedDeduction,
       tdsPercentage,
       baseGross,
       grossSalary,
+      basicForPf,
+      pfDeduction,
+      esicDeduction,
+      professionalTax,
+      totalStatutory,
       tdsAmount,
       totalDeductions,
       netSalary,
@@ -543,10 +579,15 @@ export const SalaryView = () => {
     totalDays: currentMonthDays,
     daysPayable: currentMonthDays,
     leaveDays: 0,
+    unauthorizedAbsenceDays: 0,
     lopDays: 0,
+    extraAllowance: '',
+    incentive: '',
+    bonus: '',
     extraBonus: '',
     extraDeduction: '',
-    status: 'processed'
+    status: 'Generated', // Generated by default; do not auto-mark Paid
+    remarks: ''
   };
   const [processForm, setProcessForm] = useState(initialProcessForm);
   const [isFetchingLeaves, setIsFetchingLeaves] = useState(false);
@@ -555,7 +596,7 @@ export const SalaryView = () => {
   const [isLoadingDeductionPreview, setIsLoadingDeductionPreview] = useState(false);
   const [liveDeductionPreview, setLiveDeductionPreview] = useState(null);
 
-  // Live sync employee custom approved deductions from backend
+  // Live sync employee custom approved deductions and preview from backend API
   const syncCustomDeductionsForPayroll = async (targetUserId, targetM, targetY) => {
     if (!targetUserId) {
       setProcessCustomDeductions([]);
@@ -565,16 +606,20 @@ export const SalaryView = () => {
     }
     setIsLoadingDeductionPreview(true);
     try {
+      // Primary backend preview API: POST /api/payroll/preview or GET /api/employee-deductions/preview
       const preview = await previewPayrollWithDeductions({
         employeeId: targetUserId,
+        userId: targetUserId,
         month: targetM,
         year: targetY
       }).catch(() => null);
 
-      if (preview && preview.customDeductions) {
-        setProcessCustomDeductions(preview.customDeductions.approvedAndPermissible || []);
-        setProcessExcludedDeductions(preview.customDeductions.excludedDeductions || []);
+      if (preview) {
         setLiveDeductionPreview(preview);
+        if (preview.customDeductions) {
+          setProcessCustomDeductions(preview.customDeductions.approvedAndPermissible || []);
+          setProcessExcludedDeductions(preview.customDeductions.excludedDeductions || []);
+        }
       } else {
         const approved = await fetchEmployeeDeductions({
           employeeId: targetUserId,
@@ -593,7 +638,7 @@ export const SalaryView = () => {
     }
   };
 
-  // Live sync user leaves from backend API (GET /api/leave/my-leaves/:userId or /api/leave/all filtered by name/id)
+  // Live sync user leaves from backend API
   const syncUserLeavesFromBackend = async (userId, month, year, staffList = companyStaff) => {
     if (!userId) return;
     setIsFetchingLeaves(true);
@@ -605,15 +650,18 @@ export const SalaryView = () => {
       const targetY = Number(year);
       const totalMonthDays = getDaysInMonth(targetM, targetY);
       const leavesInfo = calculateApprovedLeaveDaysForMonth(targetUserObj, targetM, targetY, userLeaves);
-      // Total Payable Days = Total Month Days - Approved Leaves - LOP Days
-      const defaultPayable = Math.max(0, totalMonthDays - (leavesInfo.leaveDays || 0) - (leavesInfo.lopDays || 0));
+      const approvedLeaveDays = leavesInfo.leaveDays || 0;
+      const calculatedLopDays = leavesInfo.lopDays || 0;
+      const unauthorizedDays = Math.max(0, calculatedLopDays - approvedLeaveDays);
+      const defaultPayable = Math.max(0, totalMonthDays - approvedLeaveDays - unauthorizedDays);
 
       setProcessForm((prev) => ({
         ...prev,
         totalDays: totalMonthDays,
         daysPayable: defaultPayable,
-        leaveDays: leavesInfo.leaveDays,
-        lopDays: leavesInfo.lopDays
+        leaveDays: approvedLeaveDays,
+        unauthorizedAbsenceDays: unauthorizedDays,
+        lopDays: calculatedLopDays
       }));
     } catch (err) {
       console.warn('Failed to sync live leave data from backend API:', err);
@@ -658,26 +706,26 @@ export const SalaryView = () => {
     }) || null;
   }, [processForm.userId, allSalaries]);
 
-  // Real-time calculation for Process Payroll modal
-  // Formula 1: Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
-  // Formula 2: net salary = Base Gross + Extra Bonus - Extra Deduction - Fixed Monthly Deduction - TDS - LOP
-  // Formula 3: Total Payable Days = Total Month Days - Approved Leaves - LOP Days
-  // Formula 4: presentDays = Total Payable Days
+  // Real-time calculation for Process Payroll modal: Uses authoritative backend preview API whenever available
   const processCalculations = useMemo(() => {
     const totalDays = Number(processForm.totalDays) || getDaysInMonth(processForm.month, processForm.year);
     const lopDays = Number(processForm.lopDays) || 0;
     const leaveDays = Number(processForm.leaveDays) || 0;
-    // Total Payable Days = Total Month Days - Approved Leaves - LOP Days
-    const daysPayable = Math.max(0, totalDays - leaveDays - lopDays);
+    const unauthorizedAbsenceDays = Number(processForm.unauthorizedAbsenceDays) || Math.max(0, lopDays - leaveDays);
+    const daysPayable = Math.max(0, totalDays - leaveDays - unauthorizedAbsenceDays);
     const presentDays = daysPayable;
 
     if (!selectedUserActiveStructure) {
       return {
         hasStructure: false,
+        contractedSalary: 0,
         basicSalary: 0,
         hra: 0,
         allowance: 0,
         specialAllowance: 0,
+        extraAllowance: 0,
+        incentive: 0,
+        bonus: 0,
         fixedBonus: 0,
         fixedDeduction: 0,
         extraBonus: 0,
@@ -691,67 +739,95 @@ export const SalaryView = () => {
         totalDays,
         daysPayable,
         leaveDays,
+        unauthorizedAbsenceDays,
         lopDays,
         presentDays,
         perDaySalary: 0,
-        lopDeduction: 0
+        lopDeduction: 0,
+        proposedPenaltyDays: 0,
+        proposedPenaltyAmount: 0,
+        customDeductionsSum: 0,
+        isAuthoritativeBackendPreview: false
       };
     }
 
-    const basic = Number(selectedUserActiveStructure.basicSalary) || 0;
+    const contractedSalary = Number(selectedUserActiveStructure.fixedSalary || selectedUserActiveStructure.basicSalary) || 0;
+    const basic = Number(selectedUserActiveStructure.basicSalary) || contractedSalary;
     const hra = Number(selectedUserActiveStructure.hra) || 0;
     const allowance = Number(selectedUserActiveStructure.specialAllowance || selectedUserActiveStructure.allowance) || 0;
     const fixedBonus = Number(selectedUserActiveStructure.fixedBonus) || 0;
     const fixedDeduction = Number(selectedUserActiveStructure.fixedDeduction) || 0;
     const tdsPercentage = Number(selectedUserActiveStructure.tdsPercentage) || 0;
 
-    const extraBonus = Number(processForm.extraBonus) || 0;
+    const extraAllowance = Number(processForm.extraAllowance) || Number(selectedUserActiveStructure.extraAllowance) || 0;
+    const incentive = Number(processForm.incentive) || Number(selectedUserActiveStructure.incentive) || 0;
+    const bonus = Number(processForm.bonus || processForm.extraBonus) || Number(selectedUserActiveStructure.bonus) || 0;
+    const extraBonus = bonus;
     const extraDeduction = Number(processForm.extraDeduction) || 0;
 
-    // Formula 1: Base Gross = Basic Salary + House Rent Allowance + Special Allowance + Fixed Monthly Bonus
-    const baseGross = Math.round((basic + hra + allowance + fixedBonus) * 100) / 100;
-
-    // Per day salary for LOP calculation based on Base Gross
+    // Per day calculation
+    const baseGross = Math.round((basic + hra + allowance + fixedBonus + extraAllowance + incentive + bonus) * 100) / 100;
     const perDaySalary = totalDays > 0 ? Math.round((baseGross / totalDays) * 100) / 100 : 0;
-    // LOP = lopDays * perDaySalary
-    const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
+    const lopDeduction = Math.round((leaveDays + unauthorizedAbsenceDays) * perDaySalary * 100) / 100;
 
-    // TDS = (Base Gross * tdsPercentage) / 100
-    const tdsAmount = Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
+    // Proposed 0.5-day disciplinary penalty for unauthorized absence (separate, NOT deducted from net pay unless authorized)
+    const proposedPenaltyDays = unauthorizedAbsenceDays * 0.5;
+    const proposedPenaltyAmount = Math.round(proposedPenaltyDays * perDaySalary * 100) / 100;
 
-    // Additional Approved Employee Deductions
+    // Approved & permissible custom deductions
     const customDeductionsSum = Math.round(
       processCustomDeductions.reduce((sum, d) => sum + (Number(d.amount) || 0), 0) * 100
     ) / 100;
 
-    // Total deductions = Extra Deduction + Fixed Monthly Deduction + TDS + LOP + Custom Deductions
-    const totalDeduction = Math.round(
-      (extraDeduction + fixedDeduction + tdsAmount + lopDeduction + customDeductionsSum) * 100
-    ) / 100;
+    // Statutory deductions
+    const pfDeduction = liveDeductionPreview?.statutoryDeductions?.pfDeduction ??
+      (selectedUserActiveStructure.isPfApplicable !== false ? Math.round(basic * 0.12) : 0);
+    const esicDeduction = liveDeductionPreview?.statutoryDeductions?.esicDeduction ??
+      (selectedUserActiveStructure.isEsicApplicable !== false ? Math.round(baseGross * 0.0075) : 0);
+    const professionalTax = liveDeductionPreview?.statutoryDeductions?.professionalTax ??
+      ((selectedUserActiveStructure.isPtApplicable !== false && baseGross > 12000) ? 200 : 0);
+    const tdsAmount = liveDeductionPreview?.statutoryDeductions?.tds ??
+      Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
 
-    // Formula 2: net salary = Base Gross + Extra Bonus - Total Deductions
-    const netSalary = Math.max(
-      0,
-      Math.round((baseGross + extraBonus - totalDeduction) * 100) / 100
-    );
+    const totalStatutory = pfDeduction + esicDeduction + professionalTax;
 
-    // Total gross earnings including extra bonus
-    const grossSalary = Math.round((baseGross + extraBonus) * 100) / 100;
+    // Authoritative calculations from backend preview API when available
+    const hasBackendSummary = Boolean(liveDeductionPreview?.summary?.netSalary != null);
+    const grossSalary = hasBackendSummary
+      ? Number(liveDeductionPreview.summary.grossSalary)
+      : baseGross;
+
+    const totalDeduction = hasBackendSummary
+      ? Number(liveDeductionPreview.summary.totalDeductions)
+      : Math.round((extraDeduction + fixedDeduction + totalStatutory + tdsAmount + lopDeduction + customDeductionsSum) * 100) / 100;
+
+    const netSalary = hasBackendSummary
+      ? Number(liveDeductionPreview.summary.netSalary)
+      : Math.max(0, Math.round((grossSalary - totalDeduction) * 100) / 100);
 
     return {
       hasStructure: true,
+      contractedSalary,
       basicSalary: basic,
       hra,
       allowance,
       specialAllowance: allowance,
+      extraAllowance,
+      incentive,
+      bonus,
       fixedBonus,
       fixedDeduction,
       extraBonus,
       extraDeduction,
       customDeductionsSum,
       processCustomDeductions,
+      processExcludedDeductions,
       baseGross,
       grossSalary,
+      pfDeduction,
+      esicDeduction,
+      professionalTax,
+      totalStatutory,
       tdsPercentage,
       tdsAmount,
       totalDeduction,
@@ -759,12 +835,16 @@ export const SalaryView = () => {
       totalDays,
       daysPayable,
       leaveDays,
+      unauthorizedAbsenceDays,
       lopDays,
       presentDays,
       perDaySalary,
-      lopDeduction
+      lopDeduction,
+      proposedPenaltyDays,
+      proposedPenaltyAmount,
+      isAuthoritativeBackendPreview: hasBackendSummary
     };
-  }, [selectedUserActiveStructure, processForm, processCustomDeductions]);
+  }, [selectedUserActiveStructure, processForm, processCustomDeductions, processExcludedDeductions, liveDeductionPreview]);
 
   // ==========================================
   // 1. DATA FETCHING LOGIC
@@ -1103,7 +1183,11 @@ export const SalaryView = () => {
     setStructureFormError('');
     setStructureForm({
       ...initialStructureForm,
-      userId: preselectedUserId || (companyStaff.length > 0 ? String(companyStaff[0]._id || companyStaff[0].id) : '')
+      userId: preselectedUserId || (companyStaff.length > 0 ? String(companyStaff[0]._id || companyStaff[0].id) : ''),
+      structureType: 'SIMPLE_FIXED',
+      fixedSalary: '',
+      basicSalary: '',
+      effectiveFrom: new Date().toISOString().slice(0, 10),
     });
     setIsStructureModalOpen(true);
   };
@@ -1118,14 +1202,33 @@ export const SalaryView = () => {
       ? String(salaryRecord.userId?._id || salaryRecord.userId?.id || '')
       : String(salaryRecord.userId || '');
 
+    const isFixed = salaryRecord.structureType === 'SIMPLE_FIXED' ||
+      (salaryRecord.fixedSalary > 0 && !salaryRecord.hra) ||
+      (salaryRecord.basicSalary && !salaryRecord.hra && !salaryRecord.allowance);
+
+    const effDate = salaryRecord.effectiveFrom
+      ? new Date(salaryRecord.effectiveFrom).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
+
     setStructureForm({
       userId: uId,
+      structureType: isFixed ? 'SIMPLE_FIXED' : 'COMPONENT_BASED',
+      fixedSalary: salaryRecord.fixedSalary != null ? String(salaryRecord.fixedSalary) : (isFixed && salaryRecord.basicSalary != null ? String(salaryRecord.basicSalary) : ''),
       basicSalary: salaryRecord.basicSalary != null ? String(salaryRecord.basicSalary) : '',
       hra: salaryRecord.hra != null ? String(salaryRecord.hra) : '',
       allowance: salaryRecord.allowance != null ? String(salaryRecord.allowance) : '',
+      extraAllowance: salaryRecord.extraAllowance != null ? String(salaryRecord.extraAllowance) : '',
+      incentive: salaryRecord.incentive != null ? String(salaryRecord.incentive) : '',
+      bonus: salaryRecord.bonus != null ? String(salaryRecord.bonus) : '',
       fixedBonus: salaryRecord.fixedBonus != null ? String(salaryRecord.fixedBonus) : '',
       fixedDeduction: salaryRecord.fixedDeduction != null ? String(salaryRecord.fixedDeduction) : '',
       tdsPercentage: salaryRecord.tdsPercentage != null ? String(salaryRecord.tdsPercentage) : '',
+      effectiveFrom: effDate,
+      autoCalculateStatutory: salaryRecord.autoCalculateStatutory !== false,
+      isPfApplicable: salaryRecord.isPfApplicable !== false,
+      isEsicApplicable: salaryRecord.isEsicApplicable !== false,
+      isPtApplicable: salaryRecord.isPtApplicable !== false,
+      isTdsApplicable: salaryRecord.isTdsApplicable !== false,
       isActive: salaryRecord.isActive !== false
     });
     setIsStructureModalOpen(true);
@@ -1137,9 +1240,16 @@ export const SalaryView = () => {
       setStructureFormError('Please select an employee or team lead.');
       return;
     }
-    if (structureForm.basicSalary === '' || Number(structureForm.basicSalary) < 0) {
-      setStructureFormError('Basic Salary is required and must be 0 or greater.');
-      return;
+    if (structureForm.structureType === 'SIMPLE_FIXED') {
+      if (structureForm.fixedSalary === '' || Number(structureForm.fixedSalary) < 0) {
+        setStructureFormError('Monthly Fixed Salary is required and must be 0 or greater.');
+        return;
+      }
+    } else {
+      if (structureForm.basicSalary === '' || Number(structureForm.basicSalary) < 0) {
+        setStructureFormError('Basic Salary is required and must be 0 or greater.');
+        return;
+      }
     }
 
     setIsSubmittingStructure(true);
@@ -1147,12 +1257,25 @@ export const SalaryView = () => {
 
     const payload = {
       userId: structureForm.userId,
+      employeeId: structureForm.userId,
+      structureType: structureForm.structureType,
+      fixedSalary: structureCalculations.fixedSalary,
       basicSalary: structureCalculations.basic,
       hra: structureCalculations.hra,
       allowance: structureCalculations.allowance,
+      specialAllowance: structureCalculations.allowance,
+      extraAllowance: structureCalculations.extraAllowance,
+      incentive: structureCalculations.incentive,
+      bonus: structureCalculations.bonus,
       fixedBonus: structureCalculations.fixedBonus,
       fixedDeduction: structureCalculations.fixedDeduction,
       tdsPercentage: structureCalculations.tdsPercentage,
+      effectiveFrom: structureForm.effectiveFrom || new Date().toISOString().slice(0, 10),
+      autoCalculateStatutory: structureForm.autoCalculateStatutory,
+      isPfApplicable: structureForm.isPfApplicable,
+      isEsicApplicable: structureForm.isEsicApplicable,
+      isPtApplicable: structureForm.isPtApplicable,
+      isTdsApplicable: structureForm.isTdsApplicable,
       grossSalary: structureCalculations.grossSalary,
       netSalary: structureCalculations.netSalary,
       isActive: Boolean(structureForm.isActive)
@@ -1160,15 +1283,21 @@ export const SalaryView = () => {
 
     try {
       if (structureModalMode === 'edit' && editingSalaryId) {
-        // PUT: api/payroll/update-salary/:id
-        await api.put(`/api/payroll/update-salary/${editingSalaryId}`, payload);
+        try {
+          await api.put(`/api/payroll/update-salary/${editingSalaryId}`, payload);
+        } catch (errPut) {
+          await api.put(`/api/salary-structures/${editingSalaryId}`, payload);
+        }
         setNotification({
           type: 'success',
           message: 'Salary structure updated successfully!'
         });
       } else {
-        // POST: api/payroll/salary/create
-        await api.post('/api/payroll/salary/create', payload);
+        try {
+          await api.post('/api/payroll/salary/create', payload);
+        } catch (errPost) {
+          await api.post('/api/salary-structures', payload);
+        }
         setNotification({
           type: 'success',
           message: 'New salary structure created successfully!'
@@ -1206,8 +1335,14 @@ export const SalaryView = () => {
       totalDays: totalMonthDays,
       daysPayable: totalMonthDays,
       leaveDays: 0,
+      unauthorizedAbsenceDays: 0,
       lopDays: 0,
-      status: 'processed'
+      extraAllowance: '',
+      incentive: '',
+      bonus: '',
+      extraBonus: '',
+      extraDeduction: '',
+      status: 'Generated' // Generated by default; do not auto-mark Paid
     });
     setIsProcessModalOpen(true);
 
@@ -1233,68 +1368,23 @@ export const SalaryView = () => {
 
     const parsedMonth = Number(processForm.month);
     const parsedYear = Number(processForm.year);
-    const extraBonusValue = Number(processForm.extraBonus) || 0;
+    const extraAllowanceValue = Number(processForm.extraAllowance) || 0;
+    const incentiveValue = Number(processForm.incentive) || 0;
+    const bonusValue = Number(processForm.bonus || processForm.extraBonus) || 0;
     const extraDeductionValue = Number(processForm.extraDeduction) || 0;
 
-    const selectedStatus = processForm.status || 'paid';
     const targetUserObj = companyStaff.find((s) => String(s._id || s.id) === String(processForm.userId));
-
-    const structureSnapshot = {
-      basicSalary: Number(selectedUserActiveStructure.basicSalary) || 0,
-      hra: Number(selectedUserActiveStructure.hra) || 0,
-      conveyanceAllowance: Number(selectedUserActiveStructure.conveyanceAllowance) || 0,
-      medicalAllowance: Number(selectedUserActiveStructure.medicalAllowance) || 0,
-      specialAllowance: Number(selectedUserActiveStructure.specialAllowance || selectedUserActiveStructure.allowance) || 0,
-      dearnessAllowance: Number(selectedUserActiveStructure.dearnessAllowance) || 0,
-      otherAllowances: Number(selectedUserActiveStructure.otherAllowances) || 0,
-      fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
-      baseGross: processCalculations.baseGross,
-      grossSalary: processCalculations.grossSalary,
-      basicForPf: Number(selectedUserActiveStructure.basicForPf) || 0,
-      fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
-      extraDeduction: extraDeductionValue,
-      totalCustomDeductions: processCalculations.customDeductionsSum || 0,
-      customDeductions: processCustomDeductions,
-      employeeDeductions: processCustomDeductions,
-      pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
-      esicDeduction: Number(selectedUserActiveStructure.esicDeduction) || 0,
-      professionalTax: Number(selectedUserActiveStructure.professionalTax) || 0,
-      otherDeductions: Number(selectedUserActiveStructure.otherDeductions) || 0,
-      lopDeduction: processCalculations.lopDeduction,
-      tdsPercentage: Number(selectedUserActiveStructure.tdsPercentage) || 0,
-      tds: processCalculations.tdsAmount || 0,
-      tdsAmount: processCalculations.tdsAmount || 0,
-      totalDeduction: processCalculations.totalDeduction,
-      netSalary: processCalculations.netSalary,
-      employerContributions: selectedUserActiveStructure.employerContributions || {
-        pf: 0,
-        esic: 0,
-        gratuity: 0,
-        other: 0
-      }
-    };
-
     const monthName = MONTH_NAMES[parsedMonth - 1] || `Month ${parsedMonth}`;
     const formattedSalaryMonth = `${monthName} ${parsedYear}`;
 
     const targetLeaveDays = Number(processForm.leaveDays) || 0;
     const targetLopDays = Number(processForm.lopDays) || 0;
-    const targetTotalDays = processCalculations.totalDays;
-    const targetDaysPayable = processCalculations.daysPayable;
-    const targetPresentDays = processCalculations.presentDays;
-    const targetPerDaySalary = processCalculations.perDaySalary;
-    const targetLopDeduction = processCalculations.lopDeduction;
-    const targetGrossSalary = processCalculations.grossSalary;
-    const targetTotalDeduction = processCalculations.totalDeduction;
-    const targetNetSalary = processCalculations.netSalary;
+    const staffName = targetUserObj?.name || targetUserObj?.fullName || 'Staff Member';
 
-    // Exact backend schema parameters conforming to MonthlySalary mongoose model and controller aliases
+    // Authoritative payload for POST /api/payroll/process (conforming to backend generateMonthlySalary)
     const payload = {
       employeeId: processForm.userId,
       userId: processForm.userId,
-      employeeNameSnapshot: targetUserObj?.name || targetUserObj?.fullName || '',
-      employeeEmailSnapshot: targetUserObj?.email || '',
-      employeeIdentifierSnapshot: targetUserObj?.employeeID || targetUserObj?.uniqueID || '',
       companyId: targetUserObj?.companyId?._id || targetUserObj?.companyId || null,
       branchId: targetUserObj?.branchId?._id || targetUserObj?.branchId || null,
       financialYearId: targetUserObj?.financialYearId || selectedUserActiveStructure.financialYearId || null,
@@ -1302,53 +1392,16 @@ export const SalaryView = () => {
       year: parsedYear,
       salaryMonth: formattedSalaryMonth,
       salaryStructureId: selectedUserActiveStructure._id,
-      salaryStructureSnapshot: structureSnapshot,
       calculationMode: "CALENDAR_DAYS",
-      totalDays: targetTotalDays,
-      workingDays: targetTotalDays,
-      presentDays: targetPresentDays,
-      daysPayable: targetDaysPayable,
-      payableDays: targetDaysPayable,
-      leaveDays: targetLeaveDays,
-      leaves: targetLeaveDays,
-      totalLeaveDays: targetLeaveDays,
-      approvedLeaveDays: targetLeaveDays,
-      approvedLeaves: targetLeaveDays,
       lopDays: targetLopDays,
-      perDaySalary: targetPerDaySalary,
-      lopDeduction: targetLopDeduction,
-      basicSalary: Number(selectedUserActiveStructure.basicSalary) || 0,
-      hra: Number(selectedUserActiveStructure.hra) || 0,
-      conveyanceAllowance: Number(selectedUserActiveStructure.conveyanceAllowance) || 0,
-      medicalAllowance: Number(selectedUserActiveStructure.medicalAllowance) || 0,
-      specialAllowance: Number(selectedUserActiveStructure.specialAllowance || selectedUserActiveStructure.allowance) || 0,
-      allowance: Number(selectedUserActiveStructure.allowance) || 0,
-      dearnessAllowance: Number(selectedUserActiveStructure.dearnessAllowance) || 0,
-      otherAllowances: Number(selectedUserActiveStructure.otherAllowances) || 0,
-      fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
-      extraBonus: extraBonusValue,
-      baseGross: processCalculations.baseGross,
-      grossSalary: targetGrossSalary,
-      basicForPf: Number(selectedUserActiveStructure.basicForPf) || 0,
-      pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
-      esicDeduction: Number(selectedUserActiveStructure.esicDeduction) || 0,
-      professionalTax: Number(selectedUserActiveStructure.professionalTax) || 0,
-      tds: processCalculations.tdsAmount,
-      tdsPercentage: Number(selectedUserActiveStructure.tdsPercentage) || 0,
-      tdsAmount: processCalculations.tdsAmount,
-      fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
+      leaveDays: targetLeaveDays,
+      extraAllowance: extraAllowanceValue,
+      incentive: incentiveValue,
+      bonus: bonusValue,
+      extraBonus: bonusValue,
       extraDeduction: extraDeductionValue,
-      totalCustomDeductions: processCalculations.customDeductionsSum || 0,
-      customDeductions: processCustomDeductions,
-      employeeDeductions: processCustomDeductions,
-      otherDeductions: Number(selectedUserActiveStructure.otherDeductions) || 0,
-      lopDeduction: targetLopDeduction,
-      totalDeduction: targetTotalDeduction,
-      netSalary: targetNetSalary,
-      employerContributions: structureSnapshot.employerContributions,
-      status: selectedStatus === 'paid' ? 'Paid' : 'Processed',
-      paymentMode: "BANK_TRANSFER",
-      remarks: processForm.remarks || `Monthly payroll for ${formattedSalaryMonth}`
+      status: "Generated", // Generated by default (do not automatically mark as Paid)
+      remarks: processForm.remarks || `Generated for ${formattedSalaryMonth}`
     };
 
     try {
@@ -1360,110 +1413,9 @@ export const SalaryView = () => {
         : createdPayroll;
       const createdId = createdRecord?._id || createdRecord?.id;
 
-      // 2. Synchronize leave data directly to backend monthly salary update API
-      const backendSyncPayload = {
-        employeeId: processForm.userId,
-        userId: processForm.userId,
-        employeeNameSnapshot: targetUserObj?.name || targetUserObj?.fullName || '',
-        employeeEmailSnapshot: targetUserObj?.email || '',
-        employeeIdentifierSnapshot: targetUserObj?.employeeID || targetUserObj?.uniqueID || '',
-        month: parsedMonth,
-        year: parsedYear,
-        leaveDays: targetLeaveDays,
-        leaves: targetLeaveDays,
-        totalLeaveDays: targetLeaveDays,
-        approvedLeaveDays: targetLeaveDays,
-        approvedLeaves: targetLeaveDays,
-        lopDays: targetLopDays,
-        daysPayable: targetDaysPayable,
-        payableDays: targetDaysPayable,
-        presentDays: targetPresentDays,
-        totalDays: targetTotalDays,
-        workingDays: targetTotalDays,
-        perDaySalary: targetPerDaySalary,
-        lopDeduction: targetLopDeduction,
-        grossSalary: targetGrossSalary,
-        totalDeduction: targetTotalDeduction,
-        netSalary: targetNetSalary,
-        status: selectedStatus === 'paid' ? 'Paid' : 'Processed',
-        paymentMode: "BANK_TRANSFER",
-        paidAt: new Date().toISOString(),
-        remarks: processForm.remarks || `Monthly payroll for ${formattedSalaryMonth}`
-      };
-
-      try {
-        if (createdId) {
-          await api.put(`/api/salaries/${createdId}/pay`, backendSyncPayload);
-        } else {
-          await api.put(`/api/salaries/${processForm.userId}/pay`, backendSyncPayload);
-        }
-      } catch (errSync1) {
-        try {
-          await api.put(`/api/salaries/${processForm.userId}/pay`, backendSyncPayload);
-        } catch { }
-      }
-
-      // 3. Persist status and leave overrides locally for instant reactivity and perfect sync
-      try {
-        const savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
-        if (createdId) savedOverrides[String(createdId)] = selectedStatus;
-        savedOverrides[`${processForm.userId}_${parsedMonth}_${parsedYear}`] = selectedStatus;
-        localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
-      } catch { }
-
-      /*
-      // 4. Automatically generate official payslip immediately with full attendance details (POST: api/payroll/payslip/generate)
-      const targetPayrollId = createdId || processForm.userId;
-      if (targetPayrollId) {
-        try {
-          await api.post('/api/payroll/payslip/generate', {
-            salaryId: targetPayrollId,
-            id: targetPayrollId,
-            payrollId: targetPayrollId,
-            employeeId: processForm.userId,
-            userId: processForm.userId,
-            month: parsedMonth,
-            year: parsedYear,
-            salaryMonth: formattedSalaryMonth,
-            calculationMode: "CALENDAR_DAYS",
-            totalDays: targetTotalDays,
-            workingDays: targetTotalDays,
-            daysPayable: targetDaysPayable,
-            leaveDays: targetLeaveDays,
-            leaves: targetLeaveDays,
-            totalLeaveDays: targetLeaveDays,
-            lopDays: targetLopDays,
-            presentDays: targetPresentDays,
-            perDaySalary: targetPerDaySalary,
-            lopDeduction: targetLopDeduction,
-            basicSalary: Number(selectedUserActiveStructure.basicSalary) || 0,
-            hra: Number(selectedUserActiveStructure.hra) || 0,
-            allowance: Number(selectedUserActiveStructure.allowance) || 0,
-            fixedBonus: Number(selectedUserActiveStructure.fixedBonus) || 0,
-            extraBonus: extraBonusValue,
-            grossSalary: targetGrossSalary,
-            fixedDeduction: Number(selectedUserActiveStructure.fixedDeduction) || 0,
-            extraDeduction: extraDeductionValue,
-            pfDeduction: Number(selectedUserActiveStructure.pfDeduction) || 0,
-            esicDeduction: Number(selectedUserActiveStructure.esicDeduction) || 0,
-            professionalTax: Number(selectedUserActiveStructure.professionalTax) || 0,
-            otherDeductions: Number(selectedUserActiveStructure.otherDeductions) || 0,
-            salaryStructureSnapshot: structureSnapshot,
-            totalDeduction: targetTotalDeduction,
-            tdsPercentage: Number(selectedUserActiveStructure.tdsPercentage) || 0,
-            tdsAmount: processCalculations.tdsAmount,
-            netSalary: targetNetSalary,
-            status: selectedStatus === 'paid' ? 'Paid' : 'Processed'
-          });
-        } catch (errGen) {
-          console.warn('Auto payslip generation note:', errGen);
-        }
-      }
-      */
-
       setNotification({
         type: 'success',
-        message: `Payroll processed with status '${selectedStatus.toUpperCase()}' & Leave data synchronized for ${formatMonthYear(parsedMonth, parsedYear)}!`
+        message: `Payroll generated successfully in status 'Generated' for ${formattedSalaryMonth}!`
       });
 
       invalidateCache(/payroll/);
@@ -1476,6 +1428,62 @@ export const SalaryView = () => {
       setProcessFormError(err.response?.data?.message || err.message || 'Failed to process payroll.');
     } finally {
       setIsSubmittingProcess(false);
+    }
+  };
+
+  // 3b. APPROVE PAYROLL ACTION (POST /api/payroll/approve)
+  const handleApprovePayroll = async (payroll) => {
+    const salaryId = payroll._id || payroll.id;
+    if (!salaryId) return;
+    try {
+      await api.post('/api/payroll/approve', {
+        salaryId,
+        id: salaryId,
+        remarks: 'Approved by HR/Admin'
+      });
+      setNotification({
+        type: 'success',
+        message: `Payroll for ${payroll.userObj?.name || 'Staff Member'} approved successfully!`
+      });
+      invalidateCache(/payroll/);
+      invalidateCache(/salaries/);
+      invalidateCache(/salary/);
+      await loadData(true);
+    } catch (err) {
+      console.error('Failed to approve payroll:', err);
+      setNotification({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Failed to approve payroll'
+      });
+    }
+  };
+
+  // 3c. MARK PAID ACTION (PUT /api/payroll/pay)
+  const handlePayPayroll = async (payroll) => {
+    const salaryId = payroll._id || payroll.id;
+    if (!salaryId) return;
+    try {
+      await api.put('/api/payroll/pay', {
+        salaryId,
+        id: salaryId,
+        paymentMode: 'BANK_TRANSFER',
+        paidAt: new Date().toISOString(),
+        remarks: 'Disbursed via Bank Transfer'
+      });
+      setNotification({
+        type: 'success',
+        message: `Salary for ${payroll.userObj?.name || 'Staff Member'} marked as Paid!`
+      });
+      invalidateCache(/payroll/);
+      invalidateCache(/salaries/);
+      invalidateCache(/salary/);
+      await loadData(true);
+    } catch (err) {
+      console.error('Failed to mark payroll as paid:', err);
+      setNotification({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Failed to disburse salary'
+      });
     }
   };
 
@@ -2721,76 +2729,81 @@ export const SalaryView = () => {
                             </span>
                           </td>
 
-                          {/* Status - Changeable with live UI & Backend update */}
-                          <td className="py-3.5 px-4">
-                            {(() => {
-                              const isPaid = String(payroll.status || '').toLowerCase() === 'paid';
-                              return (
-                                <div className="relative inline-block">
-                                  <select
-                                    value={isPaid ? 'paid' : 'processed'}
-                                    disabled={isPaid || updatingStatusId === payroll._id}
-                                    onChange={(e) => handleChangeSalaryStatus(payroll, e.target.value)}
-                                    className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition appearance-none capitalize shadow-2xs ${getStatusBadgeClass(payroll.status)} ${isPaid ? 'cursor-not-allowed pr-2.5 opacity-90' : 'cursor-pointer pr-6 hover:shadow-xs'
-                                      }`}
-                                    title={isPaid ? "Status is Paid and cannot be changed back to Processed" : "Click to mark as Paid"}
-                                  >
-                                    {!isPaid && <option value="processed">Processed</option>}
-                                    <option value="paid">Paid</option>
-                                  </select>
-                                  {!isPaid && (
-                                    updatingStatusId === payroll._id ? (
-                                      <RefreshCw size={11} className="absolute right-2 top-1/2 -translate-y-1/2 animate-spin text-slate-500 pointer-events-none" />
-                                    ) : (
-                                      <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
-                                    )
-                                  )}
-                                </div>
-                              );
-                            })()}
+                          {/* Status Badge */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border capitalize shadow-2xs ${getStatusBadgeClass(payroll.status)}`}>
+                              {payroll.status || 'Generated'}
+                            </span>
                           </td>
 
-                          {/* Actions */}
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {isAdmin && (
+                          {/* Actions: Separate Generate, Approve, Mark Paid and Breakdown */}
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                              {/* Approve action if not yet approved or paid */}
+                              {isAdmin && (String(payroll.status || '').toLowerCase() === 'generated' || String(payroll.status || '').toLowerCase() === 'processed' || String(payroll.status || '').toLowerCase() === 'draft') && (
                                 <button
-                                  onClick={() => openUpdatePayrollModal(payroll)}
-                                  className="px-2.5 py-1.5 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
-                                  title="Update Monthly Payroll"
+                                  type="button"
+                                  onClick={() => handleApprovePayroll(payroll)}
+                                  className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                                  title="Approve this monthly payroll (HR / Admin authorization)"
                                 >
-                                  <Edit3 size={14} />
+                                  <CheckCircle2 size={12} className="text-indigo-600" />
+                                  <span>Approve</span>
                                 </button>
                               )}
-                              {/* Payslip buttons commented out as requested */}
-                              {/*
+
+                              {/* Mark Paid action if approved */}
+                              {isAdmin && String(payroll.status || '').toLowerCase() === 'approved' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePayPayroll(payroll)}
+                                  className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                                  title="Disburse / Mark as Paid via Bank Transfer"
+                                >
+                                  <CreditCard size={12} className="text-emerald-600" />
+                                  <span>Mark Paid</span>
+                                </button>
+                              )}
+
+                              {/* Always allow viewing the 13-point detailed Salary Breakdown */}
                               <button
+                                type="button"
                                 onClick={() => handleViewPayslipForPayroll(payroll)}
-                                className="px-2.5 py-1.5 hover:bg-purple-100 text-purple-700 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
-                                title="View Statement"
+                                className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                                title="View Comprehensive 13-Point Salary Breakdown"
                               >
-                                <Eye size={14} />
+                                <FileText size={12} className="text-slate-500" />
+                                <span>Breakdown</span>
                               </button>
-                              <button
-                                onClick={() => handleDownloadPayslipForPayroll(payroll)}
-                                disabled={downloadingSlipId === payroll._id || String(payroll.status || '').toLowerCase() !== 'paid'}
-                                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${String(payroll.status || '').toLowerCase() === 'paid'
-                                  ? 'hover:bg-indigo-100 text-indigo-700 cursor-pointer'
-                                  : 'opacity-40 cursor-not-allowed text-slate-400 bg-slate-50'
-                                  }`}
-                                title={
-                                  String(payroll.status || '').toLowerCase() === 'paid'
-                                    ? "Download Official Payslip"
-                                    : "PDF download is only available when status is Paid"
-                                }
-                              >
-                                {downloadingSlipId === payroll._id ? (
-                                  <RefreshCw size={12} className="animate-spin" />
-                                ) : (
-                                  <Download size={14} />
-                                )}
-                              </button>
-                              */}
+
+                              {/* Download PDF payslip when paid */}
+                              {String(payroll.status || '').toLowerCase() === 'paid' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadPayslipForPayroll(payroll)}
+                                  disabled={downloadingSlipId === payroll._id}
+                                  className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                                  title="Download Official PDF Payslip"
+                                >
+                                  {downloadingSlipId === payroll._id ? (
+                                    <RefreshCw size={12} className="animate-spin" />
+                                  ) : (
+                                    <Download size={12} />
+                                  )}
+                                  <span>PDF</span>
+                                </button>
+                              )}
+
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => openUpdatePayrollModal(payroll)}
+                                  className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded transition cursor-pointer"
+                                  title="Update Payroll Details"
+                                >
+                                  <Edit3 size={13} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -3102,7 +3115,7 @@ export const SalaryView = () => {
                       <th className="py-3 px-4">Deductions & TDS</th>
                       <th className="py-3 px-4">Net Disbursed</th>
                       <th className="py-3 px-4">Status</th>
-                      {isAdmin && <th className="py-3 px-4 text-right">Actions</th>}
+                      <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -3124,50 +3137,49 @@ export const SalaryView = () => {
                         <td className="py-3 px-4 font-mono font-bold text-emerald-600">{formatINR(rec.netSalary)}</td>
                         <td className="py-3 px-4">
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase shadow-2xs ${getStatusBadgeClass(rec.status)}`}>
-                            {String(rec.status || 'processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed'}
+                            {rec.status || 'Generated'}
                           </span>
                         </td>
-                        {isAdmin && (
-                          <td className="py-3 px-4 text-right">
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => openUpdatePayrollModal(rec)}
-                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition cursor-pointer border border-emerald-200"
-                              title="Update Monthly Payroll / Mark as Paid"
-                            >
-                              <CreditCard size={12} />
-                              <span>Update / Pay</span>
-                            </button>
-                          </td>
-                        )}
-                        {/* Payslip buttons commented out as requested */}
-                        {/*
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleDownloadPayslipForPayroll(rec)}
-                              disabled={downloadingSlipId === rec._id || String(rec.status || '').toLowerCase() !== 'paid'}
-                              className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${String(rec.status || '').toLowerCase() === 'paid'
-                                ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs'
-                                : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                                }`}
-                            >
-                              {downloadingSlipId === rec._id ? (
-                                <RefreshCw size={12} className="animate-spin" />
-                              ) : (
-                                <Download size={12} />
-                              )}
-                              <span>Download</span>
-                            </button>
-                            <button
+                              type="button"
                               onClick={() => handleViewPayslipForPayroll(rec)}
-                              className="px-2 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-md text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                              className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition cursor-pointer border border-slate-200"
+                              title="View Detailed Salary Breakdown"
                             >
-                              <Eye size={12} />
-                              <span>View</span>
+                              <FileText size={12} className="text-slate-500" />
+                              <span>Breakdown</span>
                             </button>
+                            {String(rec.status || '').toLowerCase() === 'paid' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadPayslipForPayroll(rec)}
+                                disabled={downloadingSlipId === rec._id}
+                                className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition cursor-pointer border border-purple-200 shadow-2xs"
+                                title="Download Official PDF Payslip"
+                              >
+                                {downloadingSlipId === rec._id ? (
+                                  <RefreshCw size={12} className="animate-spin" />
+                                ) : (
+                                  <Download size={12} />
+                                )}
+                                <span>PDF</span>
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => openUpdatePayrollModal(rec)}
+                                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition cursor-pointer border border-emerald-200"
+                                title="Update Monthly Payroll / Mark as Paid"
+                              >
+                                <CreditCard size={12} />
+                                <span>Update / Pay</span>
+                              </button>
+                            )}
                           </div>
                         </td>
-                        */}
                       </tr>
                     ))}
                   </tbody>
@@ -3792,49 +3804,96 @@ export const SalaryView = () => {
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Extra Bonus / Incentive (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 5000"
-                    value={processForm.extraBonus}
-                    onChange={(e) => setProcessForm({ ...processForm, extraBonus: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
-                  />
+              {/* Earning Components (Backend Supported) */}
+              <div className="space-y-2 pt-1">
+                <span className="text-xs font-bold text-slate-800 block">Earnings & Adjustment Components</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Extra Allowance (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 2000"
+                      value={processForm.extraAllowance || ''}
+                      onChange={(e) => setProcessForm({ ...processForm, extraAllowance: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Incentive (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 3000"
+                      value={processForm.incentive || ''}
+                      onChange={(e) => setProcessForm({ ...processForm, incentive: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Performance Bonus (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 5000"
+                      value={processForm.bonus || processForm.extraBonus || ''}
+                      onChange={(e) => setProcessForm({ ...processForm, bonus: e.target.value, extraBonus: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Extra Deduction (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 1000"
-                    value={processForm.extraDeduction}
-                    onChange={(e) => setProcessForm({ ...processForm, extraDeduction: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Other Extra Deduction (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 1000"
+                      value={processForm.extraDeduction || ''}
+                      onChange={(e) => setProcessForm({ ...processForm, extraDeduction: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Disbursement Lifecycle Status
+                    </label>
+                    <div className="px-3 py-2 text-xs bg-blue-50 border border-blue-200 rounded-lg text-blue-800 font-semibold flex items-center justify-between">
+                      <span>Status: Generated</span>
+                      <span className="text-[10px] font-normal text-blue-600">(Requires HR Approval &rarr; Mark Paid)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Salary Disbursement Status <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={String(processForm.status || 'processed').toLowerCase() === 'paid' ? 'paid' : 'processed'}
-                  onChange={(e) => setProcessForm({ ...processForm, status: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-medium cursor-pointer"
-                >
-                  <option value="processed">Processed (Default)</option>
-                  <option value="paid">Paid (Immediate Disbursal)</option>
-                </select>
-              </div>
+              {/* Proposed Disciplinary Penalty Advisory (0.5d/absence) */}
+              {(Number(processForm.lopDays) || 0) > 0 && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <Info size={14} className="text-amber-600" />
+                    <span>Disciplinary Penalty Advisory (Unauthorized Absence)</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    Policy proposes an additional <strong>0.5-day-equivalent penalty</strong> ({Number(processForm.lopDays) * 0.5} day ≈ {formatINR(processCalculations.proposedPenalty || 0)}) for unauthorized absence.
+                    <br />
+                    <span className="font-semibold text-emerald-800">
+                      ✓ Lawful Safeguard: This proposed penalty is shown for transparency and will NOT reduce net salary unless legally authorized through official disciplinary approval.
+                    </span>
+                  </p>
+                </div>
+              )}
 
               {/* Auto generate payslip note 
               <div className="flex items-center gap-2 pt-1 text-xs text-emerald-600 font-medium">
@@ -3915,7 +3974,7 @@ export const SalaryView = () => {
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
                 >
                   {isSubmittingProcess ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={14} />}
-                  <span>Execute Payroll Process</span>
+                  <span>Generate Payroll (Status: Generated)</span>
                 </button>
               </div>
             </form>
@@ -3992,101 +4051,288 @@ export const SalaryView = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Structure Type Selector (SIMPLE_FIXED vs COMPONENT_BASED) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Salary Structure Model <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setStructureForm({ ...structureForm, structureType: 'SIMPLE_FIXED' })}
+                    className={`py-2 px-3 text-xs font-bold rounded-md transition text-center cursor-pointer ${structureForm.structureType === 'SIMPLE_FIXED'
+                      ? 'bg-white text-indigo-700 shadow-xs border border-indigo-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                  >
+                    Simple Fixed (e.g. ₹6,000/mo)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStructureForm({ ...structureForm, structureType: 'COMPONENT_BASED' })}
+                    className={`py-2 px-3 text-xs font-bold rounded-md transition text-center cursor-pointer ${structureForm.structureType === 'COMPONENT_BASED'
+                      ? 'bg-white text-indigo-700 shadow-xs border border-indigo-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                  >
+                    Component Based (Basic / HRA / Allowances)
+                  </button>
+                </div>
+              </div>
+
+              {/* Effective Date & Recurring Additions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Basic Salary (₹) <span className="text-rose-500">*</span>
+                    Effective From Date
                   </label>
                   <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    required
-                    placeholder="e.g. 50000"
-                    value={structureForm.basicSalary}
-                    onChange={(e) => setStructureForm({ ...structureForm, basicSalary: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                    type="date"
+                    value={structureForm.effectiveFrom || ''}
+                    onChange={(e) => setStructureForm({ ...structureForm, effectiveFrom: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    House Rent Allowance - HRA (₹)
+                    Recurring Extra Allowance (₹)
                   </label>
                   <input
                     type="number"
                     min="0"
-                    step="1"
-                    placeholder="e.g. 20000"
-                    value={structureForm.hra}
-                    onChange={(e) => setStructureForm({ ...structureForm, hra: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Special / Other Allowance (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="e.g. 10000"
-                    value={structureForm.allowance}
-                    onChange={(e) => setStructureForm({ ...structureForm, allowance: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Fixed Monthly Bonus (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="e.g. 5000"
-                    value={structureForm.fixedBonus}
-                    onChange={(e) => setStructureForm({ ...structureForm, fixedBonus: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Fixed Monthly Deduction (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="e.g. 2000"
-                    value={structureForm.fixedDeduction}
-                    onChange={(e) => setStructureForm({ ...structureForm, fixedDeduction: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    TDS Rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    placeholder="e.g. 10"
-                    value={structureForm.tdsPercentage}
-                    onChange={(e) => setStructureForm({ ...structureForm, tdsPercentage: e.target.value })}
+                    placeholder="e.g. 1000"
+                    value={structureForm.extraAllowance || ''}
+                    onChange={(e) => setStructureForm({ ...structureForm, extraAllowance: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
+              {/* Conditional Inputs Based on Structure Type */}
+              {structureForm.structureType === 'SIMPLE_FIXED' ? (
+                /* SIMPLE_FIXED FORM: Fixed Monthly Salary (e.g. ₹6,000) without mandatory Basic/HRA */
+                <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900">
+                    <Sparkles size={14} className="text-indigo-600" />
+                    <span>Simple Fixed Salary Details</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Monthly Fixed Salary (₹) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      placeholder="e.g. 6000"
+                      value={structureForm.fixedSalary}
+                      onChange={(e) => setStructureForm({
+                        ...structureForm,
+                        fixedSalary: e.target.value,
+                        basicSalary: e.target.value // Keep basicSalary in sync for backward-compatible backend validation
+                      })}
+                      className="w-full px-3 py-2.5 text-sm bg-white border border-indigo-200 rounded-lg text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Accepts direct fixed amount (such as ₹6,000) without requiring mandatory Basic or HRA breakdown.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Fixed Monthly Bonus (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 0"
+                        value={structureForm.fixedBonus || ''}
+                        onChange={(e) => setStructureForm({ ...structureForm, fixedBonus: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Fixed Monthly Deduction (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 0"
+                        value={structureForm.fixedDeduction || ''}
+                        onChange={(e) => setStructureForm({ ...structureForm, fixedDeduction: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* COMPONENT_BASED FORM: Full Breakdown */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Basic Salary (₹) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      placeholder="e.g. 50000"
+                      value={structureForm.basicSalary}
+                      onChange={(e) => setStructureForm({ ...structureForm, basicSalary: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      House Rent Allowance - HRA (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 20000"
+                      value={structureForm.hra}
+                      onChange={(e) => setStructureForm({ ...structureForm, hra: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Special / Other Allowance (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 10000"
+                      value={structureForm.allowance}
+                      onChange={(e) => setStructureForm({ ...structureForm, allowance: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Fixed Monthly Bonus (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 5000"
+                      value={structureForm.fixedBonus}
+                      onChange={(e) => setStructureForm({ ...structureForm, fixedBonus: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Fixed Monthly Deduction (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 2000"
+                      value={structureForm.fixedDeduction}
+                      onChange={(e) => setStructureForm({ ...structureForm, fixedDeduction: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      TDS Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      placeholder="e.g. 10"
+                      value={structureForm.tdsPercentage}
+                      onChange={(e) => setStructureForm({ ...structureForm, tdsPercentage: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Statutory Applicability Settings & Backend-Calculated Amounts */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+                <span className="text-xs font-bold text-slate-800 block">Statutory Applicability & Computation</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={structureForm.isPfApplicable}
+                      onChange={(e) => setStructureForm({ ...structureForm, isPfApplicable: e.target.checked })}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span>PF (12%)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={structureForm.isEsicApplicable}
+                      onChange={(e) => setStructureForm({ ...structureForm, isEsicApplicable: e.target.checked })}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span>ESIC (0.75%)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={structureForm.isPtApplicable}
+                      onChange={(e) => setStructureForm({ ...structureForm, isPtApplicable: e.target.checked })}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span>PT (State Slab)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={structureForm.isTdsApplicable}
+                      onChange={(e) => setStructureForm({ ...structureForm, isTdsApplicable: e.target.checked })}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span>TDS Deductions</span>
+                  </label>
+                </div>
+
+                {/* Live Computed Statutory Summary */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Gross Salary:</span>
+                    <span className="font-mono font-bold text-slate-900">{formatINR(structureCalculations.grossSalary)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">PF Amount:</span>
+                    <span className="font-mono font-semibold text-rose-600">
+                      {structureCalculations.pfDeduction > 0 ? `-${formatINR(structureCalculations.pfDeduction)}` : 'Exempt'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Prof. Tax (PT):</span>
+                    <span className="font-mono font-semibold text-rose-600">
+                      {structureCalculations.professionalTax > 0 ? `-${formatINR(structureCalculations.professionalTax)}` : '₹0 (Under Slab)'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Net Payable:</span>
+                    <span className="font-mono font-bold text-emerald-600">{formatINR(structureCalculations.netSalary)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
                   id="structureActiveToggle"
@@ -4123,271 +4369,410 @@ export const SalaryView = () => {
       )}
 
       {/* ==================================================== */}
+      {/* 6. MODAL: SALARY BREAKDOWN & PAYSLIP (ALL 13 ITEMS) */}
       {/* ==================================================== */}
-      {/* 6. MODAL: OFFICIAL PAYSLIP STATEMENT (PRINT & VIEW) - COMMENTED OUT */}
-      {/* ==================================================== */}
-      {/*
-// 
-      // 
-      {viewingPayslipModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
-          onClick={() => setViewingPayslipModal(null)}
-        >
-          <div
-            className="bg-white border border-slate-200 rounded-xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            // 
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg">
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    Official Salary Statement / Payslip
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {formatMonthYear(viewingPayslipModal.month, viewingPayslipModal.year)} • {viewingPayslipModal.userObj?.name || 'Staff Member'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setViewingPayslipModal(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {viewingPayslipModal && (() => {
+        const slip = viewingPayslipModal;
+        const staff = slip.userObj || slip.employeeId || slip.userId || {};
+        const staffName = staff.name || staff.fullName || resolveEmployeeName(staff) || 'Staff Member';
+        const staffEmail = staff.email || slip.employeeEmailSnapshot || '—';
+        const staffId = staff.uniqueID || staff.employeeID || slip.employeeIdentifierSnapshot || '—';
+        const roleTitle = getRoleLabel(staff);
+        const period = formatMonthYear(slip.month, slip.year);
+        const status = slip.status || 'Generated';
+        const isPaid = String(status).toLowerCase() === 'paid';
+        const isApproved = String(status).toLowerCase() === 'approved';
 
-            // 
-            <div id="printable-payslip-content" className="p-6 overflow-y-auto space-y-5 text-xs bg-white">
-              // 
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest block">
-                    Kevalon Technology Pvt. Ltd.
-                  </span>
-                  <h4 className="text-sm font-bold text-slate-900 mt-0.5">
-                    {viewingPayslipModal.userObj?.name || 'Staff Member'}
-                  </h4>
-                  <div className="flex items-center gap-2 text-slate-500 mt-0.5 text-[11px]">
-                    <span>{getRoleLabel(viewingPayslipModal.userObj)}</span>
-                    <span>•</span>
-                    <span>{viewingPayslipModal.userObj?.email || '—'}</span>
+        // 13 REQUIRED CONTRACT & SALARY BREAKDOWN METRICS (Using backend response values)
+        // 1. Monthly Contracted Salary
+        const contractedSalary = Number(
+          slip.monthlySalary ||
+          slip.fixedSalary ||
+          slip.baseGross ||
+          slip.salaryStructureSnapshot?.fixedSalary ||
+          slip.salaryStructureSnapshot?.basicSalary ||
+          slip.basicSalary ||
+          0
+        );
+
+        // 2. Earned Salary
+        const earnedSalary = Number(
+          slip.earnedSalary != null
+            ? slip.earnedSalary
+            : Math.max(0, (Number(slip.grossSalary) || 0) - (Number(slip.extraAllowance) || 0) - (Number(slip.incentive) || 0) - (Number(slip.bonus || slip.extraBonus) || 0))
+        );
+
+        // 3. Extra Allowances
+        const extraAllowances = Number(slip.extraAllowance || 0);
+
+        // 4. Incentives & Bonuses
+        const incentives = Number(slip.incentive || 0);
+        const bonuses = Number(slip.bonus || slip.extraBonus || slip.fixedBonus || 0);
+
+        // 5. Approved Unpaid Leave Days
+        const approvedUnpaidLeaveDays = Number(slip.approvedLeaveDays ?? slip.leaveDays ?? 0);
+
+        // 6. Unauthorized Absence Days
+        const unauthorizedAbsenceDays = Number(slip.unauthorizedAbsenceDays ?? slip.unapprovedLeaveDays ?? slip.lopDays ?? 0);
+
+        // 7. LOP Deduction
+        const lopDeduction = Number(slip.lopDeduction ?? slip.unpaidLeaveDeduction ?? 0);
+
+        // 8. Statutory Deductions
+        const pfVal = Number(slip.pfDeduction || 0);
+        const esicVal = Number(slip.esicDeduction || 0);
+        const ptVal = Number(slip.professionalTax || 0);
+        const tdsVal = Number(slip.tdsAmount || slip.tds || 0);
+        const statutoryDeductions = pfVal + esicVal + ptVal + tdsVal;
+
+        // 9. Other Approved Deductions
+        const otherApprovedDeductions = Number(
+          slip.approvedAndPermissibleDeductions != null
+            ? slip.approvedAndPermissibleDeductions
+            : (slip.customDeductionsSum != null
+              ? slip.customDeductionsSum
+              : (slip.deductionBreakdown?.customDeductionsList?.reduce((s, d) => s + (Number(d.amount) || 0), 0) || Number(slip.fixedDeduction || slip.otherDeductions) || 0))
+        );
+
+        // 10. Proposed Penalty (not applied)
+        const totalDays = Number(slip.totalDays || 30);
+        const perDaySalary = Number(slip.perDaySalary) || (contractedSalary > 0 && totalDays > 0 ? contractedSalary / totalDays : 0);
+        const proposedPenalty = Number(
+          slip.proposedPenalty != null
+            ? slip.proposedPenalty
+            : (slip.unapprovedLeavePenalty != null
+              ? slip.unapprovedLeavePenalty
+              : unauthorizedAbsenceDays * (perDaySalary * 0.5))
+        );
+
+        // 11. Legally Approved Penalty (if applicable)
+        const legallyApprovedPenalty = Number(slip.legallyApprovedPenalties || slip.authorizedPenalty || 0);
+
+        // 12. Total Deductions
+        const totalDeductions = Number(slip.totalDeduction ?? slip.totalDeductions ?? (lopDeduction + statutoryDeductions + otherApprovedDeductions + legallyApprovedPenalty));
+
+        // 13. Net Payable Salary
+        const netPayableSalary = Number(slip.netSalary ?? Math.max(0, (Number(slip.grossSalary) || contractedSalary) - totalDeductions));
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
+            onClick={() => setViewingPayslipModal(null)}
+          >
+            <div
+              className="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/30">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-xs">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <span>Salary Breakdown & Payslip</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase shadow-2xs ${getStatusBadgeClass(status)}`}>
+                        {status}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Period: <strong className="text-slate-800">{period}</strong> • Employee: <strong className="text-slate-800">{staffName}</strong> ({staffId})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setViewingPayslipModal(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Content - 13 Items Breakdown */}
+              <div id="printable-payslip-content" className="p-6 overflow-y-auto space-y-4 text-xs bg-white">
+                {/* Employee & Company Header Bar */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest block">
+                      Kevalon Technology Pvt. Ltd.
+                    </span>
+                    <h4 className="text-sm font-bold text-slate-900 mt-0.5">
+                      {staffName}
+                    </h4>
+                    <div className="flex items-center gap-2 text-slate-500 mt-0.5 text-[11px] flex-wrap">
+                      <span className="font-medium text-slate-700">{roleTitle}</span>
+                      <span>•</span>
+                      <span>ID: {staffId}</span>
+                      <span>•</span>
+                      <span>{staffEmail}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-left sm:text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Calculation Mode
+                    </span>
+                    <span className="font-mono font-bold text-slate-800 text-xs">
+                      CALENDAR_DAYS ({totalDays}d)
+                    </span>
+                    <div className="mt-1">
+                      <span className="text-[11px] text-slate-500">
+                        Payable: <strong className="text-emerald-700">{slip.daysPayable ?? totalDays}d</strong> • Present: <strong className="text-indigo-700">{slip.presentDays != null ? slip.presentDays : (slip.daysPayable ?? totalDays)}d</strong>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="text-left sm:text-right">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Pay Period
-                  </span>
-                  <span className="font-bold text-slate-800 text-sm">
-                    {formatMonthYear(viewingPayslipModal.month, viewingPayslipModal.year)}
-                  </span>
-                  <div className="mt-1">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase shadow-2xs ${getStatusBadgeClass(viewingPayslipModal.status)}`}>
-                      Payment Status: {String(viewingPayslipModal.status || 'processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed'}
+                {/* 13-POINT STATUTORY & EARNINGS BREAKDOWN */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* LEFT: EARNINGS & CONTRACT */}
+                  <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                        1. Contract & Earnings (Credits)
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-400">Backend Response</span>
+                    </div>
+
+                    <div className="space-y-2 text-slate-700">
+                      {/* Item 1: Monthly Contracted Salary */}
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <div>
+                          <span className="font-semibold text-slate-900 block">1. Monthly Contracted Salary</span>
+                          <span className="text-[10px] text-slate-400">Agreed monthly CTC / fixed structure</span>
+                        </div>
+                        <span className="font-mono font-bold text-slate-900 text-xs">{formatINR(contractedSalary)}</span>
+                      </div>
+
+                      {/* Item 2: Earned Salary */}
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <div>
+                          <span className="font-semibold text-slate-900 block">2. Earned Salary</span>
+                          <span className="text-[10px] text-slate-400">Pro-rated earned amount for payable days</span>
+                        </div>
+                        <span className="font-mono font-bold text-emerald-700 text-xs">{formatINR(earnedSalary)}</span>
+                      </div>
+
+                      {/* Item 3: Extra Allowances */}
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <div>
+                          <span className="font-medium text-slate-800 block">3. Extra Allowances</span>
+                          <span className="text-[10px] text-slate-400">Approved recurring / one-time allowances</span>
+                        </div>
+                        <span className="font-mono font-semibold text-emerald-600">+{formatINR(extraAllowances)}</span>
+                      </div>
+
+                      {/* Item 4: Incentives & Bonus */}
+                      <div className="flex justify-between items-center py-1">
+                        <div>
+                          <span className="font-medium text-slate-800 block">4. Incentives & Performance Bonus</span>
+                          <span className="text-[10px] text-slate-400">Incentive: {formatINR(incentives)} • Bonus: {formatINR(bonuses)}</span>
+                        </div>
+                        <span className="font-mono font-semibold text-emerald-600">+{formatINR(incentives + bonuses)}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
+                      <span>Total Gross Earnings:</span>
+                      <span className="font-mono text-indigo-700 text-sm">{formatINR(slip.grossSalary || (earnedSalary + extraAllowances + incentives + bonuses))}</span>
+                    </div>
+                  </div>
+
+                  {/* RIGHT: DEDUCTIONS & LEAVES */}
+                  <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">
+                        2. Leaves & Deductions (Debits)
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-400">Statutory & Lawful</span>
+                    </div>
+
+                    <div className="space-y-2 text-slate-700">
+                      {/* Item 5: Approved Unpaid Leave Days */}
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <div>
+                          <span className="font-medium text-slate-900 block">5. Approved Unpaid Leave Days</span>
+                          <span className="text-[10px] text-amber-700">Authorized unpaid leave per policy</span>
+                        </div>
+                        <span className="font-mono font-bold text-amber-700">{approvedUnpaidLeaveDays} Days</span>
+                      </div>
+
+                      {/* Item 6: Unauthorized Absence Days */}
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <div>
+                          <span className="font-medium text-slate-900 block">6. Unauthorized Absence Days</span>
+                          <span className="text-[10px] text-rose-700">Unapproved absence / leave</span>
+                        </div>
+                        <span className="font-mono font-bold text-rose-700">{unauthorizedAbsenceDays} Days</span>
+                      </div>
+
+                      {/* Item 7: LOP Deduction */}
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <div>
+                          <span className="font-medium text-slate-800 block">7. Loss of Pay (LOP) Deduction</span>
+                          <span className="text-[10px] text-slate-400">Actual unpaid days × per-day salary</span>
+                        </div>
+                        <span className="font-mono font-semibold text-rose-600">-{formatINR(lopDeduction)}</span>
+                      </div>
+
+                      {/* Item 8: Statutory Deductions */}
+                      <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                        <div>
+                          <span className="font-medium text-slate-800 block">8. Statutory Deductions</span>
+                          <span className="text-[10px] text-slate-400">PF: {formatINR(pfVal)} | ESIC: {formatINR(esicVal)} | PT: {formatINR(ptVal)} | TDS: {formatINR(tdsVal)}</span>
+                        </div>
+                        <span className="font-mono font-semibold text-rose-600">-{formatINR(statutoryDeductions)}</span>
+                      </div>
+
+                      {/* Item 9: Other Approved Deductions */}
+                      <div className="flex justify-between items-center py-1">
+                        <div>
+                          <span className="font-medium text-slate-800 block">9. Other Approved Deductions</span>
+                          <span className="text-[10px] text-slate-400">HR/Admin verified permissible deductions</span>
+                        </div>
+                        <span className="font-mono font-semibold text-rose-600">-{formatINR(otherApprovedDeductions)}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-rose-700">
+                      <span>Total Applied Deductions:</span>
+                      <span className="font-mono text-rose-700 text-sm">-{formatINR(totalDeductions)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DISCIPLINARY PENALTY POLICY TRANSPARENCY CARD (ITEMS 10 & 11) */}
+                <div className="p-4 bg-amber-50/70 rounded-xl border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900 text-xs">
+                      <Shield size={14} className="text-amber-700" />
+                      <span>Disciplinary Policy Transparency (Labor Law Compliance)</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-800 uppercase bg-amber-100 px-2 py-0.5 rounded">
+                      Audited
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+                    {/* Item 10: Proposed Penalty (not applied) */}
+                    <div className="p-2.5 bg-white rounded-lg border border-amber-200">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-800">10. Proposed Penalty (Not Applied):</span>
+                        <span className="font-mono font-bold text-amber-700">{formatINR(proposedPenalty)}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Proposed 0.5-day penalty for unauthorized absence ({unauthorizedAbsenceDays}d). <strong>NOT deducted from net salary</strong> per labor compliance.
+                      </p>
+                    </div>
+
+                    {/* Item 11: Legally Approved Penalty */}
+                    <div className="p-2.5 bg-white rounded-lg border border-amber-200">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-800">11. Legally Approved Penalty:</span>
+                        <span className="font-mono font-bold text-rose-700">{legallyApprovedPenalty > 0 ? `-${formatINR(legallyApprovedPenalty)}` : '₹0 (None)'}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Only legally permissible, formally authorized penalties can affect net salary.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* FINAL SUMMARY RECONCILIATION: ITEMS 12 & 13 */}
+                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] text-emerald-800 uppercase font-bold tracking-wider block">
+                      12. Total Lawful Deductions: -{formatINR(totalDeductions)}
+                    </span>
+                    <h4 className="text-xs font-semibold text-slate-600 mt-0.5">
+                      13. Net Payable Salary (Bank Disbursal Amount)
+                    </h4>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono font-black text-2xl text-emerald-600 block">
+                      {formatINR(netPayableSalary)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      Status: {status}
                     </span>
                   </div>
                 </div>
               </div>
 
-              // 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Month Days</span>
-                  <span className="font-mono font-bold text-slate-800">{viewingPayslipModal.totalDays || 30} Days</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-amber-700 uppercase block">Approved Leaves</span>
-                  <span className="font-mono font-bold text-amber-700">{viewingPayslipModal.leaveDays ?? 0} Days</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase block">Total Payable Days</span>
-                  <span className="font-mono font-bold text-emerald-700">{viewingPayslipModal.daysPayable ?? 30} Days</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-indigo-700 uppercase block">Present Days</span>
-                  <span className="font-mono font-bold text-indigo-700">
-                    {viewingPayslipModal.presentDays != null
-                      ? viewingPayslipModal.presentDays
-                      : (viewingPayslipModal.daysPayable != null
-                        ? viewingPayslipModal.daysPayable
-                        : '—')} Days
-                  </span>
-                </div>
-              </div>
-
-              // 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                // 
-                <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/60 space-y-2.5">
-                  <span className="text-[10px] uppercase font-bold text-emerald-700 block pb-1 border-b border-slate-200/60">
-                    Earnings Breakdown (Credits)
-                  </span>
-                  <div className="space-y-1.5 text-slate-700">
-                    <div className="flex justify-between">
-                      <span>Basic Salary:</span>
-                      <span className="font-mono font-semibold">{formatINR(viewingPayslipModal.basicSalary)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>House Rent Allowance (HRA):</span>
-                      <span className="font-mono font-semibold">{formatINR(viewingPayslipModal.hra)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Special Allowance:</span>
-                      <span className="font-mono font-semibold">{formatINR(viewingPayslipModal.allowance)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Fixed Monthly Bonus:</span>
-                      <span className="font-mono font-semibold text-emerald-600">
-                        +{formatINR(viewingPayslipModal.fixedBonus)}
-                      </span>
-                    </div>
-                    {Number(viewingPayslipModal.extraBonus) > 0 && (
-                      <div className="flex justify-between text-emerald-700">
-                        <span>Extra Monthly Incentive:</span>
-                        <span className="font-mono font-semibold">
-                          +{formatINR(viewingPayslipModal.extraBonus)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
-                    <span>Total Gross Earnings:</span>
-                    <span className="font-mono text-indigo-600 text-sm">{formatINR(viewingPayslipModal.grossSalary)}</span>
-                  </div>
-                </div>
-
-                // 
-                <div className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200/60 space-y-2.5">
-                  <span className="text-[10px] uppercase font-bold text-rose-700 block pb-1 border-b border-slate-200/60">
-                    Deductions Breakdown (Debits)
-                  </span>
-                  <div className="space-y-1.5 text-slate-700">
-                    {viewingPayslipModal.deductionBreakdown.components
-                      .filter((item) => (item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount') && !item.isCustom)
-                      .map((item) => (
-                        <div key={item.key} className="flex justify-between">
-                          <span>
-                            {item.label}{item.key === 'tdsAmount' ? ` (${viewingPayslipModal.deductionBreakdown.tdsPercentage}%)` : ''}:
-                          </span>
-                          <span className="font-mono font-semibold text-rose-600">
-                            -{formatINR(item.amount)}
-                          </span>
-                        </div>
-                      ))}
-                    {viewingPayslipModal.deductionBreakdown.customDeductionsList?.length > 0 && (
-                      <div className="pt-2 border-t border-slate-200/60 space-y-1">
-                        <span className="text-[10px] uppercase font-bold text-rose-700 block">
-                          Employee Additional Deductions:
-                        </span>
-                        {viewingPayslipModal.deductionBreakdown.customDeductionsList.map((d, i) => (
-                          <div key={d._id || i} className="flex justify-between text-slate-700 pl-2 border-l border-rose-200">
-                            <span>{d.deductionMasterId?.name || d.name || 'Deduction'}:</span>
-                            <span className="font-mono font-semibold text-rose-600">
-                              -{formatINR(d.amount)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {Math.abs(viewingPayslipModal.deductionBreakdown.reconciliation) >= 0.01 && (
-                      <div className="flex justify-between text-rose-700">
-                        <span>Unitemized Deduction Reconciliation:</span>
-                        <span className="font-mono font-semibold">
-                          {viewingPayslipModal.deductionBreakdown.reconciliation > 0 ? '-' : '+'}
-                          {formatINR(Math.abs(viewingPayslipModal.deductionBreakdown.reconciliation))}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="pt-8 border-t border-slate-200 flex justify-between font-bold text-rose-600">
-                    <span>Total Monthly Deductions:</span>
-                    <span className="font-mono text-sm">-{formatINR(viewingPayslipModal.deductionBreakdown.totalDeduction)}</span>
-                  </div>
-                </div>
-              </div>
-
-              // 
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-emerald-800 uppercase font-bold block">
-                    Net Take-Home Pay
-                  </span>
-                  <span className="text-xs text-slate-500">Credited to employee bank account</span>
-                </div>
-                <span className="font-mono font-black text-2xl text-emerald-600">
-                  {formatINR(viewingPayslipModal.netSalary)}
-                </span>
-              </div>
-            </div>
-
-            // 
-            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleOpenPrintHtml(viewingPayslipModal)}
-                  disabled={String(viewingPayslipModal.status || '').toLowerCase() !== 'paid'}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
-                    ? 'bg-slate-200 hover:bg-slate-300 text-slate-800 cursor-pointer'
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    }`}
-                  title={
-                    String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
-                      ? "Print Statement"
-                      : "Printing is only available when status is Paid"
-                  }
-                >
-                  <Printer size={13} />
-                  <span>Print Statement</span>
-                </button>
-                <button
-                  onClick={() => handleDownloadPayslipForPayroll(viewingPayslipModal)}
-                  disabled={downloadingSlipId === (viewingPayslipModal._id || viewingPayslipModal.id) || String(viewingPayslipModal.status || '').toLowerCase() !== 'paid'}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
-                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    }`}
-                  title={
-                    String(viewingPayslipModal.status || '').toLowerCase() === 'paid'
-                      ? "Download Official PDF Payslip"
-                      : "PDF download is only available when status is Paid"
-                  }
-                >
-                  <Download size={13} />
-                  <span>Download PDF</span>
-                </button>
-                {isAdmin && (
+              {/* Modal Footer Actions */}
+              <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Print */}
                   <button
-                    onClick={() => {
-                      const rec = viewingPayslipModal;
-                      setViewingPayslipModal(null);
-                      openUpdatePayrollModal(rec);
-                    }}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                    title="Update Monthly Payroll / Mark as Paid"
+                    onClick={() => handleOpenPrintHtml(slip)}
+                    disabled={!isPaid}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${isPaid
+                      ? 'bg-slate-200 hover:bg-slate-300 text-slate-800 cursor-pointer'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      }`}
+                    title={isPaid ? "Print official payslip" : "Printing available when status is Paid"}
                   >
-                    <CreditCard size={13} />
-                    <span>Update / Pay</span>
+                    <Printer size={13} />
+                    <span>Print Statement</span>
                   </button>
-                )}
+
+                  {/* Download PDF */}
+                  <button
+                    onClick={() => handleDownloadPayslipForPayroll(slip)}
+                    disabled={downloadingSlipId === (slip._id || slip.id) || !isPaid}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${isPaid
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer shadow-xs'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      }`}
+                    title={isPaid ? "Download PDF payslip" : "PDF download available when status is Paid"}
+                  >
+                    <Download size={13} />
+                    <span>Download PDF</span>
+                  </button>
+
+                  {/* Approve Action in modal if Generated */}
+                  {isAdmin && (String(status).toLowerCase() === 'generated' || String(status).toLowerCase() === 'processed' || String(status).toLowerCase() === 'draft') && (
+                    <button
+                      onClick={async () => {
+                        await handleApprovePayroll(slip);
+                        setViewingPayslipModal(null);
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                      title="Approve this monthly salary"
+                    >
+                      <CheckCircle2 size={13} />
+                      <span>Approve Payroll</span>
+                    </button>
+                  )}
+
+                  {/* Mark Paid Action in modal if Approved */}
+                  {isAdmin && isApproved && (
+                    <button
+                      onClick={async () => {
+                        await handlePayPayroll(slip);
+                        setViewingPayslipModal(null);
+                      }}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                      title="Mark as Paid and disburse"
+                    >
+                      <CreditCard size={13} />
+                      <span>Mark Paid (Disburse)</span>
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setViewingPayslipModal(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-md text-xs font-semibold cursor-pointer ml-auto"
+                >
+                  Close
+                </button>
               </div>
-              <button
-                onClick={() => setViewingPayslipModal(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-md text-xs font-semibold cursor-pointer ml-auto"
-              >
-                Close
-              </button>
             </div>
           </div>
-        </div>
-      )}
-
-      //
-      */}
+        );
+      })()}
 
       {/* 7. MODAL: VIEW BASE SALARY STRUCTURE BREAKDOWN */}
       {/* ==================================================== */}

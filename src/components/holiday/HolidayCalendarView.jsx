@@ -216,9 +216,7 @@ export const HolidayCalendarView = () => {
     const dateObj = new Date(currentYear, currentMonth, day);
     const dayOfWeek = dateObj.getDay(); // 0 = Sun, 6 = Sat
     const isSunday = dayOfWeek === 0;
-
-    const saturdayIndex = dayOfWeek === 6 ? Math.ceil(day / 7) : 0;
-    const is2ndOr4thSaturday = dayOfWeek === 6 && (saturdayIndex === 2 || saturdayIndex === 4);
+    const isSaturday = dayOfWeek === 6;
     const isToday = isCurrentMonthActive && today.getDate() === day;
 
     const paddedM = String(currentMonth + 1).padStart(2, '0');
@@ -243,8 +241,7 @@ export const HolidayCalendarView = () => {
       isOverflow: false,
       isToday,
       isSunday,
-      is2ndOr4thSaturday,
-      saturdayIndex,
+      isSaturday,
       festival,
       publicHol,
       holidayName,

@@ -654,8 +654,8 @@ export const LeaveManagementView = () => {
 
     if (statusStr === 'approved' || hrStatus === 'approved') {
       return (
-        <span className="px-2.5 py-1 rounded-md bg-green-50 text-green-700 border border-green-200 text-xs font-semibold flex items-center gap-1.5 w-fit">
-          <CheckCircle2 size={14} /> Approved
+        <span className="px-2.5 py-1 rounded-md bg-green-50 text-green-700 border border-green-200 text-xs font-semibold flex items-center gap-1.5 w-fit" title="Authorized Unpaid Leave (Final HR Approved)">
+          <CheckCircle2 size={14} /> Authorized Unpaid Leave
         </span>
       );
     }
@@ -721,6 +721,30 @@ export const LeaveManagementView = () => {
                 {hasNoAssignedTL ? 'Apply Blocked (No TL)' : 'Apply Leave'}
               </button>
             </div>
+          </div>
+
+          {/* HRMS Leave & Absence Policy Table Banner */}
+          <div className="p-3.5 rounded-xl border border-blue-200/90 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-start sm:items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700 shrink-0">
+                <FileText size={16} />
+              </div>
+              <div>
+                <p className="font-bold text-slate-900">
+                  Kevalon HRMS Policy: Unpaid Leave & Absence Standard
+                </p>
+                <p className="text-slate-600 text-[11px] mt-0.5">
+                  Approved Full Day = 1d Unpaid • Approved Half Day = 0.5d Unpaid • Unauthorized = Unpaid + Proposed 0.5d Penalty (tracked separately). Final HR approval represents <strong>Authorized Unpaid Leave</strong>.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPolicyModalOpen(true)}
+              className="text-indigo-600 hover:text-indigo-800 font-semibold underline text-xs shrink-0 cursor-pointer self-start sm:self-auto"
+            >
+              View Full Policy Table
+            </button>
           </div>
 
           {/* Warning if employee has no assigned TL */}
@@ -902,6 +926,64 @@ export const LeaveManagementView = () => {
             </div>
             
             <div className="p-6 overflow-y-auto space-y-6">
+              {/* HRMS Leave & Absence Statutory/Policy Matrix */}
+              <div className="p-5 border border-indigo-200 rounded-xl bg-indigo-50/40 shadow-xs space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
+                    <FileText size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-900">Revised HRMS Unpaid Leave Policy</h4>
+                    <p className="text-xs text-slate-500">Standard deduction calculation and disciplinary policy</p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase text-[11px]">
+                      <tr>
+                        <th className="py-2.5 px-3">Scenario</th>
+                        <th className="py-2.5 px-3">Actual Unpaid Leave</th>
+                        <th className="py-2.5 px-3">Proposed Disciplinary Penalty</th>
+                        <th className="py-2.5 px-3">HR Final Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      <tr>
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">Approved Full Day</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">1 day</td>
+                        <td className="py-2.5 px-3 text-slate-400 font-medium">—</td>
+                        <td className="py-2.5 px-3 text-emerald-700 font-semibold">Authorized Unpaid Leave</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">Approved Half Day</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">0.5 day</td>
+                        <td className="py-2.5 px-3 text-slate-400 font-medium">—</td>
+                        <td className="py-2.5 px-3 text-emerald-700 font-semibold">Authorized Unpaid Leave</td>
+                      </tr>
+                      <tr className="bg-amber-50/40">
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">Unauthorized Full Day</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">1 day</td>
+                        <td className="py-2.5 px-3 text-amber-700 font-medium">+0.5 day (Proposed separately)</td>
+                        <td className="py-2.5 px-3 text-amber-800 font-semibold">Requires Legal Authorization</td>
+                      </tr>
+                      <tr className="bg-amber-50/40">
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">Unauthorized Half Day</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">0.5 day</td>
+                        <td className="py-2.5 px-3 text-amber-700 font-medium">+0.5 day (Proposed separately)</td>
+                        <td className="py-2.5 px-3 text-amber-800 font-semibold">Requires Legal Authorization</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-3 bg-white rounded-lg border border-indigo-100 text-[11px] text-slate-600 space-y-1">
+                  <p>• <strong>Authorized Unpaid Leave:</strong> Final HR approval represents Authorized Unpaid Leave (LOP deduction applies, no disciplinary penalty).</p>
+                  <p>• <strong>Unauthorized Absence Penalty:</strong> For unauthorized absence, the proposed additional 0.5-day-equivalent penalty is tracked separately. Only a legally permissible, authorized penalty may affect net salary.</p>
+                  <p>• <strong>Approval Workflow:</strong> Leaves require Team Lead review followed by final HR authorization.</p>
+                </div>
+              </div>
+
               <div className="p-5 border border-slate-200 rounded-xl bg-white shadow-xs">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
