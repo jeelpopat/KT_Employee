@@ -1196,6 +1196,16 @@ export default function AttendanceLogs() {
         }
       } catch {}
 
+      // 1d. Load local persistent approval store (synced from Check-In Requests approvals)
+      let localApproved = [];
+      try {
+        const rawApp = localStorage.getItem('kt_approved_attendance_store');
+        if (rawApp) {
+          localApproved = JSON.parse(rawApp);
+          if (!Array.isArray(localApproved)) localApproved = [];
+        }
+      } catch {}
+
       const isDateMatch = (recordDate, targetDate) => {
         if (!recordDate || !targetDate) return false;
         const rStr = String(recordDate).trim();
@@ -1232,11 +1242,16 @@ export default function AttendanceLogs() {
         return isDateMatch(rej.date, date) || (!rej.date && date === getTodayLocal()) || (rej.rejectedAt && isDateMatch(rej.rejectedAt, date));
       });
 
+      const relevantLocalApproved = localApproved.filter((app) => {
+        if (!app) return false;
+        return isDateMatch(app.date, date) || (!app.date && date === getTodayLocal()) || (app.approvedAt && isDateMatch(app.approvedAt, date));
+      });
+
       // Build quick lookup map by all possible user identifier keys (lowercased)
       const userRequestMap = new Map();
       const registerUserRequest = (userKeys, reqObj) => {
         userKeys.filter(Boolean).map((k) => String(k).toLowerCase().trim()).forEach((k) => {
-          if (!userRequestMap.has(k) || isRecordRejected(reqObj)) {
+          if (!userRequestMap.has(k) || isRecordRejected(reqObj) || isRecordApproved(reqObj)) {
             userRequestMap.set(k, reqObj);
           }
         });
@@ -1267,6 +1282,23 @@ export default function AttendanceLogs() {
           req.attendanceId,
         ];
         registerUserRequest(uKeys, req);
+      });
+
+      relevantLocalApproved.forEach((app) => {
+        const uKeys = [
+          app.userId,
+          app.employeeUserId,
+          app.attendanceId,
+          app.id,
+          app.email,
+          app.name,
+        ];
+        registerUserRequest(uKeys, {
+          ...app,
+          approvalStatus: 'approved',
+          status: app.status || 'present',
+          isApproved: true,
+        });
       });
 
       relevantLocalRejected.forEach((rej) => {
@@ -1336,7 +1368,8 @@ export default function AttendanceLogs() {
         let enhancedItem = item;
         if (matchedReq) {
           const reqIsRej = isRecordRejected(matchedReq) || matchedReq.approvalStatus === 'rejected';
-          const reqIsPend = !reqIsRej && (isRecordPending(matchedReq) || matchedReq.approvalStatus === 'pending');
+          const reqIsApp = !reqIsRej && (isRecordApproved(matchedReq) || matchedReq.approvalStatus === 'approved');
+          const reqIsPend = !reqIsRej && !reqIsApp && (isRecordPending(matchedReq) || matchedReq.approvalStatus === 'pending');
           if (reqIsRej) {
             enhancedItem = {
               ...item,
@@ -1344,6 +1377,15 @@ export default function AttendanceLogs() {
               status: 'rejected',
               isRejected: true,
               rejectionReason: matchedReq.rejectionReason || matchedReq.reason || item.rejectionReason || 'Attendance rejected by admin',
+            };
+          } else if (reqIsApp) {
+            enhancedItem = {
+              ...item,
+              approvalStatus: 'approved',
+              status: matchedReq.status || (item.status && item.status !== 'absent' ? item.status : 'present'),
+              checkInTime: matchedReq.checkInTime || item.checkInTime,
+              checkInTimeDisplay: matchedReq.checkInTimeDisplay || item.checkInTimeDisplay,
+              isApproved: true,
             };
           } else if (reqIsPend && !isRecordApproved(item)) {
             enhancedItem = {
@@ -1388,7 +1430,8 @@ export default function AttendanceLogs() {
 
             const matchedReq = userKeys.reduce((found, k) => found || userRequestMap.get(k), null);
             const reqIsRej = matchedReq && (isRecordRejected(matchedReq) || matchedReq.approvalStatus === 'rejected');
-            const reqIsPend = !reqIsRej && matchedReq && (isRecordPending(matchedReq) || matchedReq.approvalStatus === 'pending');
+            const reqIsApp = !reqIsRej && matchedReq && (isRecordApproved(matchedReq) || matchedReq.approvalStatus === 'approved');
+            const reqIsPend = !reqIsRej && !reqIsApp && matchedReq && (isRecordPending(matchedReq) || matchedReq.approvalStatus === 'pending');
 
             const matchedCanonical = userKeys.reduce((found, k) => found || userLookupMap.get(k), null);
             if (!matchedCanonical || !attendanceMap.has(matchedCanonical)) {
@@ -1412,8 +1455,8 @@ export default function AttendanceLogs() {
                   role: user.role || 'employee',
                 },
                 date,
-                status: reqIsRej ? 'rejected' : (reqIsPend ? 'pending' : 'absent'),
-                approvalStatus: reqIsRej ? 'rejected' : (reqIsPend ? 'pending' : 'not_checked_in'),
+                status: reqIsRej ? 'rejected' : (reqIsApp ? (matchedReq.status || 'present') : (reqIsPend ? 'pending' : 'absent')),
+                approvalStatus: reqIsRej ? 'rejected' : (reqIsApp ? 'approved' : (reqIsPend ? 'pending' : 'not_checked_in')),
                 rejectionReason: reqIsRej ? (matchedReq.rejectionReason || matchedReq.reason || 'Attendance rejected by admin') : '',
                 checkInTime: matchedReq?.checkInTime || matchedReq?.requestedTime || null,
                 checkOutTime: null,
@@ -1431,6 +1474,14 @@ export default function AttendanceLogs() {
                   status: 'rejected',
                   approvalStatus: 'rejected',
                   rejectionReason: matchedReq.rejectionReason || matchedReq.reason || 'Attendance rejected by admin',
+                });
+              } else if (reqIsApp) {
+                attendanceMap.set(matchedCanonical, {
+                  ...existing,
+                  status: matchedReq.status || 'present',
+                  approvalStatus: 'approved',
+                  checkInTime: matchedReq?.checkInTime || existing.checkInTime,
+                  checkInTimeDisplay: matchedReq?.checkInTimeDisplay || existing.checkInTimeDisplay,
                 });
               } else if (reqIsPend && existing.approvalStatus !== 'approved' && existing.approvalStatus !== 'rejected') {
                 attendanceMap.set(matchedCanonical, {

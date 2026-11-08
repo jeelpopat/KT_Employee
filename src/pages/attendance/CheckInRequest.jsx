@@ -226,6 +226,65 @@ const normalizeRequests = (payload) => {
 };
 
 // ============================================================
+// DATE & STORAGE HELPERS FOR APPROVED CHECK-IN REQUESTS
+// ============================================================
+const getTodayLocal = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const getYesterdayLocal = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const getApprovedStore = () => {
+  try {
+    const raw = localStorage.getItem("kt_approved_attendance_store");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveApprovedToStore = (item) => {
+  if (!item) return;
+  try {
+    const store = getApprovedStore();
+    const targetKey = String(item.attendanceId || item.id || item._id || "");
+    const targetUser = String(item.userId || item.employeeUserId || "");
+    const targetDate = item.date;
+
+    const filtered = store.filter((existing) => {
+      const eKey = String(existing.attendanceId || existing.id || existing._id || "");
+      const eUser = String(existing.userId || existing.employeeUserId || "");
+      if (targetKey && eKey && targetKey === eKey) return false;
+      if (targetUser && eUser && targetUser === eUser && targetDate && existing.date === targetDate) return false;
+      return true;
+    });
+
+    filtered.unshift({
+      ...item,
+      approvalStatus: "approved",
+      approvedAt: item.approvedAt || Date.now(),
+    });
+
+    localStorage.setItem("kt_approved_attendance_store", JSON.stringify(filtered.slice(0, 300)));
+  } catch (err) {
+    console.warn("Error saving to approved store:", err);
+  }
+};
+
+// ============================================================
 // FORMAT DATE (Matches UI specification: MM/DD/YYYY, e.g. 10/21/2026)
 // ============================================================
 const formatDate = (value) => {
@@ -805,68 +864,155 @@ export default function CheckInRequest() {
         })
         .map(mapRequest);
 
-      // Query organizational attendance logs from /api/attendance/admin/all so that
-      // approved and rejected check-in records are also available when filtering
-      let additionalRecords = [];
+      // 2. Load locally approved records
+      const localApproved = getApprovedStore().map((item, idx) => ({
+        ...mapRequest(item, idx + 2000),
+        approvalStatus: "approved",
+      }));
+
+      // 3. Load locally rejected records
+      let localRejected = [];
       try {
-        let allRes = await fetch(
-          `${BASE_URL}/api/attendance/admin/all?_t=${Date.now()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Cache-Control": "no-cache, no-store, must-revalidate",
-            },
+        const rawRejected = localStorage.getItem("kt_rejected_attendance_store");
+        if (rawRejected) {
+          const parsed = JSON.parse(rawRejected);
+          if (Array.isArray(parsed)) {
+            localRejected = parsed.map((item, idx) => ({
+              ...mapRequest(item, idx + 3000),
+              approvalStatus: "rejected",
+              rejectionReason: item.reason || item.rejectionReason || "Attendance rejected by admin",
+            }));
           }
-        );
-        if (!allRes.ok) {
-          allRes = await fetch(
-            `${BASE_URL}/api/attendance/admin/all?_t=${Date.now()}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-              },
-            }
-          );
         }
-        if (allRes.ok) {
-          const allData = await allRes.json();
-          const allLogs = normalizeRequests(allData);
-          additionalRecords = allLogs
-            .filter((item) => {
-              if (!item || isExplicitlyExcludedAttendanceRequest(item)) return false;
-              if (isUnknownEmployeeOrUser(item) && !hasStableAttendanceRequestId(item)) return false;
-              return isRecordApproved(item) || isRecordRejected(item);
-            })
-            .map((item, idx) => {
-              const mapped = mapRequest(item, idx + 500);
-              const isRej = isRecordRejected(item);
-              return {
-                ...mapped,
-                approvalStatus: isRej ? "rejected" : "approved",
-              };
-            });
+      } catch {}
+
+      // 4. Collect target dates to fetch approved check-in records from backend
+      const targetDates = new Set([
+        getTodayLocal(),
+        getYesterdayLocal(),
+      ]);
+
+      mappedRequests.forEach((r) => {
+        if (r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date.trim())) {
+          targetDates.add(r.date.trim());
         }
-      } catch (e) {
-        console.warn("Could not fetch /api/attendance/admin/all:", e?.message);
+      });
+
+      localApproved.forEach((r) => {
+        if (r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date.trim())) {
+          targetDates.add(r.date.trim());
+        }
+      });
+
+      // Also query the past 5 days
+      const now = new Date();
+      for (let i = 2; i <= 6; i++) {
+        const pastD = new Date(now);
+        pastD.setDate(pastD.getDate() - i);
+        const py = pastD.getFullYear();
+        const pm = String(pastD.getMonth() + 1).padStart(2, "0");
+        const pd = String(pastD.getDate()).padStart(2, "0");
+        targetDates.add(`${py}-${pm}-${pd}`);
       }
 
-      // Merge pending requests and approved/rejected records
-      const existingIds = new Set(mappedRequests.map((r) => r.id));
-      const combined = [
-        ...mappedRequests,
-        ...additionalRecords.filter((r) => !existingIds.has(r.id)),
-      ];
+      // 5. Query organizational attendance logs from backend in parallel for target dates
+      const queryHeaders = {
+        Authorization: `Bearer ${token}`,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      };
+
+      const dateArray = Array.from(targetDates);
+      let backendRecords = [];
+      await Promise.all(
+        dateArray.map(async (dStr) => {
+          try {
+            const hUrl = `${BASE_URL}/api/attendance/history/date/${encodeURIComponent(dStr)}?_t=${Date.now()}`;
+            const hRes = await fetch(hUrl, { headers: queryHeaders });
+            if (hRes.ok) {
+              const hData = await hRes.json();
+              const hLogs = normalizeRequests(hData);
+              hLogs.forEach((item) => {
+                if (!item || isExplicitlyExcludedAttendanceRequest(item)) return;
+                if (isRecordApproved(item) || isRecordRejected(item)) {
+                  backendRecords.push({ ...item, date: item.date || dStr });
+                }
+              });
+            }
+          } catch (_) {}
+
+          try {
+            const aUrl = `${BASE_URL}/api/attendance/admin/all?date=${encodeURIComponent(dStr)}&_t=${Date.now()}`;
+            const aRes = await fetch(aUrl, { headers: queryHeaders });
+            if (aRes.ok) {
+              const aData = await aRes.json();
+              const aLogs = normalizeRequests(aData);
+              aLogs.forEach((item) => {
+                if (!item || isExplicitlyExcludedAttendanceRequest(item)) return;
+                if (isRecordApproved(item) || isRecordRejected(item)) {
+                  backendRecords.push({ ...item, date: item.date || dStr });
+                }
+              });
+            }
+          } catch (_) {}
+        })
+      );
+
+      const mappedBackendRecords = backendRecords
+        .filter((item) => !isUnknownEmployeeOrUser(item) || hasStableAttendanceRequestId(item))
+        .map((item, idx) => {
+          const isRej = isRecordRejected(item);
+          const mapped = mapRequest(item, idx + 500);
+          return {
+            ...mapped,
+            approvalStatus: isRej ? "rejected" : "approved",
+          };
+        });
+
+      // Sync backend approved records into local store
+      mappedBackendRecords.forEach((rec) => {
+        if (rec.approvalStatus === "approved") {
+          saveApprovedToStore(rec);
+        }
+      });
+
+      // 6. Merge all records with proper status priority:
+      const recordMap = new Map();
+
+      // First add pending requests
+      mappedRequests.forEach((req) => {
+        const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
+        recordMap.set(String(key), req);
+      });
+
+      // Then add locally approved requests (takes precedence over pending)
+      localApproved.forEach((req) => {
+        const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
+        recordMap.set(String(key), { ...(recordMap.get(String(key)) || {}), ...req, approvalStatus: "approved" });
+      });
+
+      // Then add backend approved and rejected records
+      mappedBackendRecords.forEach((req) => {
+        const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
+        recordMap.set(String(key), { ...(recordMap.get(String(key)) || {}), ...req });
+      });
+
+      // Then add local rejections
+      localRejected.forEach((req) => {
+        const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
+        recordMap.set(String(key), { ...(recordMap.get(String(key)) || {}), ...req, approvalStatus: "rejected" });
+      });
+
+      const combined = Array.from(recordMap.values());
 
       setRequests(combined);
 
-      // Set authoritative counts from API response
-      const finalPending = apiPending !== null ? apiPending : mappedRequests.filter((r) => r.approvalStatus === "pending").length;
-      const finalApproved = apiApproved !== null ? apiApproved : combined.filter((r) => r.approvalStatus === "approved").length;
-      const finalRejected = apiRejected !== null ? apiRejected : combined.filter((r) => r.approvalStatus === "rejected").length;
-      const finalTotal = (apiPending !== null && apiApproved !== null && apiRejected !== null)
-        ? (apiPending + apiApproved + apiRejected)
-        : (apiCount !== null && apiCount > 0 ? apiCount : (finalPending + finalApproved + finalRejected));
+      // Set authoritative counts
+      const finalPending = combined.filter((r) => r.approvalStatus === "pending").length;
+      const finalApproved = Math.max(apiApproved || 0, combined.filter((r) => r.approvalStatus === "approved").length);
+      const finalRejected = Math.max(apiRejected || 0, combined.filter((r) => r.approvalStatus === "rejected").length);
+      const finalTotal = combined.length;
 
       setServerCounts({
         pending: finalPending,
@@ -1105,6 +1251,29 @@ export default function CheckInRequest() {
           )
         );
 
+        const empUserId = targetUserId || reqObj.userId || reqObj.employeeUserId || "";
+        const approvedItem = {
+          ...reqObj,
+          id: targetActionId || targetAttendanceId || `${reqObj.date || getTodayLocal()}-${empUserId}`,
+          attendanceId: targetAttendanceId || reqObj.attendanceId || "",
+          userId: empUserId,
+          employeeUserId: empUserId,
+          name: reqObj.name || "Employee",
+          email: reqObj.email || "",
+          role: reqObj.role || "Employee",
+          department: reqObj.department || "",
+          date: reqObj.date || getTodayLocal(),
+          checkInTime: responseData?.data?.checkInTime || reqObj.checkInTime,
+          checkInTimeDisplay: responseData?.data?.checkInTimeDisplay || reqObj.checkInTimeDisplay,
+          checkInTimeFullDisplay: responseData?.data?.checkInTimeFullDisplay || reqObj.checkInTimeFullDisplay,
+          requestedTime: responseData?.data?.checkInTimeDisplay || reqObj.requestedTime,
+          status: responseData?.data?.status || reqObj.status || "present",
+          isLate: responseData?.data?.isLate ?? reqObj.isLate ?? false,
+          approvalStatus: "approved",
+          approvedAt: Date.now(),
+        };
+        saveApprovedToStore(approvedItem);
+
         setServerCounts((prev) => ({
           ...prev,
           pending: Math.max(0, prev.pending - 1),
@@ -1196,6 +1365,16 @@ export default function CheckInRequest() {
             rejectedAt: Date.now(),
           });
           localStorage.setItem('kt_rejected_attendance_store', JSON.stringify(rejectedStore));
+        } catch {}
+
+        try {
+          const rawAppStore = localStorage.getItem('kt_approved_attendance_store') || '[]';
+          const appStore = JSON.parse(rawAppStore);
+          const filteredApp = appStore.filter((r) => {
+            const key = r.attendanceId || r.id;
+            return key !== targetAttendanceId && key !== targetActionId;
+          });
+          localStorage.setItem('kt_approved_attendance_store', JSON.stringify(filteredApp));
         } catch {}
 
         window.dispatchEvent(new Event("attendance_updated"));
@@ -1348,28 +1527,44 @@ export default function CheckInRequest() {
       : (pendingCount + approvedCount + rejectedCount > 0 ? (pendingCount + approvedCount + rejectedCount) : requests.length);
 
   // ============================================================
-  // FILTER (Employee name, email, department, or role)
+  // FILTER (Employee name, email, department, role, or date)
   // ============================================================
-  const filteredRequests = requests.filter((req) => {
-    const name = req.name || "";
-    const role = req.role || "";
-    const email = req.email || "";
-    const department = req.department || "";
-    const term = searchTerm.toLowerCase().trim();
+  const filteredRequests = requests
+    .filter((req) => {
+      const name = req.name || "";
+      const role = req.role || "";
+      const email = req.email || "";
+      const department = req.department || "";
+      const dateStr = String(req.date || "").toLowerCase();
+      const formattedDate = formatDate(req.date).toLowerCase();
+      const term = searchTerm.toLowerCase().trim();
 
-    const matchesSearch =
-      !term ||
-      name.toLowerCase().includes(term) ||
-      role.toLowerCase().includes(term) ||
-      email.toLowerCase().includes(term) ||
-      department.toLowerCase().includes(term);
+      const matchesSearch =
+        !term ||
+        name.toLowerCase().includes(term) ||
+        role.toLowerCase().includes(term) ||
+        email.toLowerCase().includes(term) ||
+        department.toLowerCase().includes(term) ||
+        dateStr.includes(term) ||
+        formattedDate.includes(term);
 
-    const matchesStatus =
-      filterStatus === "all" ||
-      req.approvalStatus === filterStatus;
+      const currentStatus = String(req.approvalStatus || "").toLowerCase().trim();
+      const targetStatus = filterStatus.toLowerCase().trim();
+      const matchesStatus =
+        targetStatus === "all" ||
+        currentStatus === targetStatus;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      if (filterStatus === "all") {
+        if (a.approvalStatus === "pending" && b.approvalStatus !== "pending") return -1;
+        if (b.approvalStatus === "pending" && a.approvalStatus !== "pending") return 1;
+      }
+      const timeA = new Date(a.date || 0).getTime();
+      const timeB = new Date(b.date || 0).getTime();
+      return timeB - timeA;
+    });
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-5 font-poppins text-slate-800">
@@ -1621,8 +1816,19 @@ export default function CheckInRequest() {
                             Reject
                           </button>
                         </div>
+                      ) : String(req.approvalStatus || "").toLowerCase().trim() === "approved" ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-md select-none">
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                          <span>Approved</span>
+                        </span>
                       ) : (
-                        <span className="text-xs text-slate-400 font-medium">—</span>
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200/80 rounded-md select-none"
+                          title={req.rejectionReason || "Attendance rejected by admin"}
+                        >
+                          <XCircle size={13} className="text-rose-600 shrink-0" />
+                          <span>Rejected</span>
+                        </span>
                       )}
                     </td>
                   </tr>
