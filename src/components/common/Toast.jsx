@@ -254,9 +254,9 @@ export const RefreshFeedback = () => {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-3 left-3 z-[9998] inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-medium text-slate-600 shadow-md backdrop-blur"
+      className="pointer-events-none inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-2.5 py-1 text-[10px] font-medium leading-4 text-slate-600 shadow-xs"
     >
-      <RefreshCw size={13} className={isSyncing ? 'animate-spin text-sky-600' : 'text-emerald-600'} />
+      <RefreshCw size={12} className={isSyncing ? 'animate-spin text-sky-600' : 'text-emerald-600'} />
       <span>{isSyncing ? 'Syncing data...' : `Data sync · ${lastSyncedLabel}`}</span>
     </div>
   );

@@ -239,6 +239,9 @@ const MainLayout = ({ handleSignOut }) => {
         </Suspense>
         <div className="lg:pl-60 flex flex-col min-h-screen pt-16 bg-[#F4F4F4]">
           <main className="flex-1 p-3 pt-4 sm:p-5 sm:pt-6 lg:p-6 lg:pt-6 bg-[#F4F4F4]">
+            <div className="mb-2 flex min-h-6 justify-end">
+              <RefreshFeedback />
+            </div>
             <div className="page-content w-full">
               <Suspense fallback={<PageSkeleton />}>
                 {renderActiveTab()}
@@ -463,7 +466,6 @@ export default function App() {
   return (
     <AppProvider>
       <ToastContainer />
-      {isAuthenticated && <RefreshFeedback />}
       {isAuthenticated ? (
         <MainLayout handleSignOut={handleSignOut} />
       ) : publicPage ? (
