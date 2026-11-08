@@ -34,7 +34,7 @@ export const LoginView = ({
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regShowPassword, setRegShowPassword] = useState(false);
-  const [regAgreeTerms, setRegAgreeTerms] = useState(true);
+  const [regAgreeTerms, setRegAgreeTerms] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
 
   // Registration Password Strength Calculation
@@ -654,17 +654,21 @@ export const LoginView = ({
                   </div>
 
                   {/* Terms */}
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-start gap-2 pt-1">
                     <input
                       type="checkbox"
                       id="regTerms"
                       checked={regAgreeTerms}
                       onChange={(e) => setRegAgreeTerms(e.target.checked)}
+                      aria-label="I agree to the Terms of Service and Privacy Policy"
                       className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer"
                     />
-                    <label htmlFor="regTerms" className="text-[11px] text-slate-500 cursor-pointer select-none">
-                      I agree to the <span className="text-[#0088cc] hover:underline font-medium">Terms of Service</span> and <span className="text-[#0088cc] hover:underline font-medium">Privacy Policy</span>.
-                    </label>
+                    <span className="text-[11px] text-slate-500 select-none">
+                      I agree to the{' '}
+                      <Link to="/terms-of-service" className="font-medium text-[#0088cc] hover:underline">Terms of Service</Link>
+                      {' '}and{' '}
+                      <Link to="/privacy" className="font-medium text-[#0088cc] hover:underline">Privacy Policy</Link>.
+                    </span>
                   </div>
 
                   {/* Register CTA */}

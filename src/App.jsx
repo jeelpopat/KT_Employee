@@ -454,7 +454,7 @@ export default function App() {
     return <LoadingScreen message="Verifying session..." fullScreen className="bg-slate-50 font-sans" />;
   }
 
-  const publicPages = ['/security-policy', '/privacy', '/support'];
+  const publicPages = ['/security-policy', '/privacy', '/support', '/terms-of-service'];
   const publicPage = publicPages.includes(location.pathname) ? location.pathname : null;
 
   return (
