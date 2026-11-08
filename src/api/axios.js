@@ -11,7 +11,7 @@ const inFlight = new Map();
 // Pre-defined TTL rules for endpoints (in milliseconds)
 const TTL_CONFIG = [
   { pattern: /\/api\/users\/all/, ttl: 5 * 60 * 1000 },                 // 5 minutes
-  { pattern: /\/api\/holiday\/all/, ttl: 10 * 60 * 1000 },              // 10 minutes
+  { pattern: /\/api\/holiday\/all/, ttl: 30 * 1000 },                   // 30 seconds (fresh sync with backend)
   { pattern: /\/api\/notification\/announcement\/all/, ttl: 5 * 60 * 1000 }, // 5 minutes
   { pattern: /\/api\/role/, ttl: 10 * 60 * 1000 },                      // 10 minutes
   { pattern: /\/api\/projectManage\/project\/all/, ttl: 2 * 60 * 1000 },// 2 minutes
