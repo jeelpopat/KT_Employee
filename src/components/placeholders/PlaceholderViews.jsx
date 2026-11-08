@@ -408,6 +408,33 @@ export const PerformanceView = () => {
 
 // 3. PROJECT VIEW - Exported directly from ../projects/ProjectView.jsx (Live API integration)
 
+const matchesAssignedUser = (assignment, identifiers) => {
+  if (!assignment || !identifiers) return false;
+  if (Array.isArray(assignment)) {
+    return assignment.some((value) => matchesAssignedUser(value, identifiers));
+  }
+  if (typeof assignment !== 'object') {
+    const value = String(assignment).trim().toLowerCase();
+    return identifiers.ids.has(value) || identifiers.emails.has(value);
+  }
+
+  const identityValues = [
+    assignment._id,
+    assignment.id,
+    assignment.userId,
+    assignment.userID,
+    assignment.employeeId,
+    assignment.employeeID,
+    assignment.empId,
+    assignment.email,
+  ];
+
+  return identityValues.some((value) => value && matchesAssignedUser(value, identifiers)) ||
+    ['user', 'employee', 'profile', 'teamLead'].some((key) =>
+      assignment[key] && matchesAssignedUser(assignment[key], identifiers)
+    );
+};
+
 // 4. TEAM MEMBERS VIEW (Employee) - Shows ONLY teammates in the user's assigned project(s)
 export const TeamMembersView = () => {
   const { user } = useApp();
@@ -421,6 +448,12 @@ export const TeamMembersView = () => {
     try {
       const userEmail = (user?.email || user?.user?.email || '').toLowerCase().trim();
       const userId = String(user?._id || user?.id || user?.employee?._id || user?.employeeId || '');
+      const userIdentifiers = getLoggedInUserIdentifiers(user);
+      [
+        user?.employeeID,
+        user?.employee?.employeeID,
+        user?.profile?.employeeID,
+      ].filter(Boolean).forEach((id) => userIdentifiers.ids.add(String(id).trim().toLowerCase()));
 
       // Fetch project data and the Team Lead assignment directory.
       const [projRes, taskRes, teamsRes, usersRes, employeesRes] = await Promise.allSettled([
@@ -463,111 +496,6 @@ export const TeamMembersView = () => {
       // Keep project-based membership while also including direct Team Lead assignments.
       const memberMap = new Map();
       const myProjectsList = [];
-
-      await Promise.all(
-        projects.map(async (p) => {
-          let pMembers = null;
-          const hasEmbeddedMembers = Boolean(
-            p.teamLeadUser || p.teamLeadEmployee ||
-            (Array.isArray(p.employees) && p.employees.length > 0)
-          );
-          if (!hasEmbeddedMembers && p._id) {
-            try {
-              const memRes = await api.get(`/api/projectManage/project/members/${p._id}`);
-              if (memRes.data?.success && memRes.data?.data) {
-                pMembers = memRes.data.data;
-              }
-            } catch (e) {
-              // Ignore failure for individual project
-            }
-          }
-
-          // Check if CURRENT USER is assigned to this project
-          const tlUser = pMembers?.teamLeadUser || p.teamLeadUser;
-          const tlEmp = pMembers?.teamLeadEmployee || p.teamLeadEmployee;
-          const emps = [...(pMembers?.employees || []), ...(p.employees || [])];
-
-          const isUserLead = (
-            (tlUser?.email && tlUser.email.toLowerCase() === userEmail) ||
-            (tlUser?._id && String(tlUser._id) === userId) ||
-            (tlEmp?.email && tlEmp.email.toLowerCase() === userEmail) ||
-            (tlEmp?._id && String(tlEmp._id) === userId) ||
-            (tlEmp?.id && String(tlEmp.id) === userId)
-          );
-
-          const isUserEmp = emps.some(e =>
-            (e?.email && String(e.email).toLowerCase() === userEmail) ||
-            (e?._id && String(e._id) === userId) ||
-            (e?.id && String(e.id) === userId)
-          );
-
-          // Also check if any task in this project is assigned to user
-          const hasTaskInProject = tasks.some(t => {
-            const tPId = typeof t.projectId === 'object' ? t.projectId?._id : t.projectId;
-            if (String(tPId) !== String(p._id)) return false;
-
-            const aEmpId = typeof t.assignedEmployee === 'object' ? t.assignedEmployee?._id : t.assignedEmployee;
-            const aEmpEmail = typeof t.assignedEmployee === 'object' ? t.assignedEmployee?.email : null;
-
-            return (
-              (aEmpId && String(aEmpId) === userId) ||
-              (aEmpEmail && String(aEmpEmail).toLowerCase() === userEmail)
-            );
-          });
-
-          const isUserInThisProject = isUserLead || isUserEmp || hasTaskInProject;
-
-          // ONLY IF the current user is part of this project, collect team members from it!
-          if (isUserInThisProject) {
-            const pTitle = p.projectName || 'Project';
-            if (!myProjectsList.includes(pTitle)) {
-              myProjectsList.push(pTitle);
-            }
-
-            const addMem = (m, role, isLead) => {
-              if (!m) return;
-              const key = (m.email || m._id || m.id || '').toLowerCase().trim();
-              if (!key) return;
-
-              const isMe = (
-                (m.email && String(m.email).toLowerCase() === userEmail) ||
-                (m._id && String(m._id) === userId) ||
-                (m.id && String(m.id) === userId)
-              );
-
-              const existing = memberMap.get(key);
-              if (existing) {
-                if (!existing.projects.includes(pTitle)) {
-                  existing.projects.push(pTitle);
-                }
-              } else {
-                const name = m.fullName || m.name || (m.firstName ? `${m.firstName} ${m.lastName || ''}`.trim() : (m.email ? m.email.split('@')[0] : 'Team Member'));
-                memberMap.set(key, {
-                  id: m._id || m.id || key,
-                  name,
-                  email: m.email || '',
-                  employeeID: m.employeeID || '',
-                  role: isLead ? 'Team Leader' : (role || 'Employee'),
-                  status: 'Online',
-                  isLead,
-                  isMe,
-                  projects: [pTitle]
-                });
-              }
-            };
-
-            // Add Team Leader
-            const leadObj = tlEmp || tlUser;
-            if (leadObj) addMem(leadObj, 'Team Leader', true);
-
-            // Add Employees
-            emps.forEach(e => addMem(e, 'Employee', false));
-          }
-        })
-      );
-
-      const userIdentifiers = getLoggedInUserIdentifiers(user);
-      const myTeams = teams.filter((team) => isTeamOwnedByLead(team, userIdentifiers));
       const directoryById = new Map();
       const indexDirectoryRecord = (record) => {
         if (!record || typeof record !== 'object') return;
@@ -603,6 +531,113 @@ export const TeamMembersView = () => {
       };
       [...users, ...employees].forEach(indexDirectoryRecord);
 
+      await Promise.all(
+        projects.map(async (p) => {
+          let pMembers = null;
+          let hasLiveAssignments = false;
+          if (p._id) {
+            try {
+              const memRes = await api.get(`/api/projectManage/project/members/${p._id}`);
+              if (memRes.data?.success && memRes.data?.data && typeof memRes.data.data === 'object') {
+                pMembers = memRes.data.data;
+                hasLiveAssignments = true;
+              }
+            } catch (e) {
+              console.warn(`Could not load live assignments for project ${p._id}:`, e);
+            }
+          }
+
+          // Prefer the live assignment endpoint so removed leads are not revived from stale project data.
+          const assignmentSource = hasLiveAssignments ? pMembers : p;
+          const leadObj = assignmentSource.teamLeadEmployee ||
+            assignmentSource.teamLeadUser ||
+            assignmentSource.teamLead ||
+            assignmentSource.lead ||
+            assignmentSource.teamLeader ||
+            assignmentSource.assignedTL ||
+            assignmentSource.teamLeadId;
+          const emps = hasLiveAssignments
+            ? (Array.isArray(pMembers.employees) ? pMembers.employees : [])
+            : [
+                ...(Array.isArray(p.employees) ? p.employees : []),
+                ...(Array.isArray(pMembers?.employees) ? pMembers.employees : [])
+              ];
+
+          const isUserLead = matchesAssignedUser(leadObj, userIdentifiers);
+          const isUserEmp = emps.some((employee) => matchesAssignedUser(employee, userIdentifiers));
+
+          // Also check if any task in this project is assigned to user
+          const hasTaskInProject = tasks.some(t => {
+            const tPId = typeof t.projectId === 'object' ? (t.projectId?._id || t.projectId?.id) : t.projectId;
+            if (String(tPId) !== String(p._id)) return false;
+            return matchesAssignedUser(
+              [t.assignedEmployee, t.assignedTeamLeadUser, t.assignedTeamLeadEmployee],
+              userIdentifiers
+            );
+          });
+
+          const isUserInThisProject = isUserLead || isUserEmp || hasTaskInProject;
+
+          // ONLY IF the current user is part of this project, collect team members from it!
+          if (isUserInThisProject) {
+            const pTitle = p.projectName || 'Project';
+            if (!myProjectsList.includes(pTitle)) {
+              myProjectsList.push(pTitle);
+            }
+
+            const addMem = (rawMember, role, isLead) => {
+              if (!rawMember) return;
+              const m = typeof rawMember === 'object'
+                ? rawMember
+                : directoryById.get(String(rawMember).toLowerCase().trim()) || { _id: rawMember };
+              const email = String(m.email || m.user?.email || m.employee?.email || '').toLowerCase().trim();
+              const id = String(m._id || m.id || m.userId || m.employeeId || m.employeeID || rawMember || '').trim();
+              const key = (email || id).toLowerCase();
+              if (!key) return;
+
+              const isMe = matchesAssignedUser(m, userIdentifiers) ||
+                (email && email === userEmail) ||
+                (id && id === userId);
+
+              const existing = memberMap.get(key);
+              if (existing) {
+                if (!existing.projects.includes(pTitle)) {
+                  existing.projects.push(pTitle);
+                }
+                existing.projectRoles[pTitle] = isLead ? 'Team Leader' : (role || 'Employee');
+                if (isLead) {
+                  existing.isLead = true;
+                  existing.role = 'Team Leader';
+                }
+              } else {
+                const name = m.fullName || m.name || m.user?.name || m.employee?.name ||
+                  (m.firstName ? `${m.firstName} ${m.lastName || ''}`.trim() : (email ? email.split('@')[0] : 'Team Member'));
+                memberMap.set(key, {
+                  id: id || key,
+                  name,
+                  email,
+                  employeeID: m.employeeID || m.employee?.employeeID || '',
+                  role: isLead ? 'Team Leader' : (role || 'Employee'),
+                  status: 'Online',
+                  isLead,
+                  isMe,
+                  projects: [pTitle],
+                  projectRoles: { [pTitle]: isLead ? 'Team Leader' : (role || 'Employee') }
+                });
+              }
+            };
+
+            // Add Team Leader
+            if (leadObj) addMem(leadObj, 'Team Leader', true);
+
+            // Add Employees
+            emps.forEach(e => addMem(e, 'Employee', false));
+          }
+        })
+      );
+
+      const myTeams = teams.filter((team) => isTeamOwnedByLead(team, userIdentifiers));
+
       const teamScope = extractAssignedTeamEmployees(myTeams, Object.fromEntries(directoryById));
       const addTeamMember = (rawMember, isLead, teamName) => {
         if (!rawMember) return;
@@ -628,6 +663,7 @@ export const TeamMembersView = () => {
         const existing = memberMap.get(key);
         if (existing) {
           if (teamName && !existing.projects.includes(teamName)) existing.projects.push(teamName);
+          if (teamName) existing.projectRoles[teamName] = isLead ? 'Team Leader' : 'Employee';
           if (isLead) {
             existing.isLead = true;
             existing.role = 'Team Leader';
@@ -645,6 +681,7 @@ export const TeamMembersView = () => {
           isLead,
           isMe,
           projects: teamName ? [teamName] : [],
+          projectRoles: teamName ? { [teamName]: isLead ? 'Team Leader' : 'Employee' } : {},
         });
       };
 
@@ -767,6 +804,14 @@ export const TeamMembersView = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredMembers.map((m, idx) => {
+            const projectRoles = m.projectRoles || {};
+            const roles = [...new Set(Object.values(projectRoles))];
+            const displayRole = roles.length === 1
+              ? roles[0]
+              : roles.length > 1
+                ? 'Multiple Roles'
+                : m.role;
+            const isLead = displayRole === 'Team Leader';
             const initials = m.name
               .split(' ')
               .map(w => w[0])
@@ -781,7 +826,7 @@ export const TeamMembersView = () => {
                 className="bg-white border border-slate-200/80 hover:border-indigo-300 rounded-xl p-4 shadow-xs flex flex-col justify-between space-y-3 transition-all"
               >
                 <div className="flex items-start gap-3">
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${m.isLead
+                  <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${isLead
                     ? 'bg-amber-500'
                     : 'bg-indigo-600'
                     }`}>
@@ -800,11 +845,11 @@ export const TeamMembersView = () => {
                       <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Online" />
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${m.isLead
+                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${isLead
                         ? 'bg-amber-100 text-amber-800 border border-amber-300'
                         : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                         }`}>
-                        {m.role}
+                        {displayRole}
                       </span>
                       {m.employeeID && (
                         <span className="text-[10px] font-mono text-slate-400">ID: {m.employeeID}</span>
@@ -824,7 +869,7 @@ export const TeamMembersView = () => {
                         className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 font-medium truncate max-w-[140px]"
                         title={pr}
                       >
-                        {pr}
+                        {projectRoles[pr] ? `${pr} · ${projectRoles[pr]}` : pr}
                       </span>
                     ))}
                   </div>

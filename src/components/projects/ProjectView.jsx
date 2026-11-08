@@ -19,7 +19,7 @@ import { normalizeTaskStatus, getProgressForStatus } from '../../utils/taskUtils
 import { showToast } from '../common/Toast.jsx';
 
 // Helper to normalize and build assigned member list from project and /members endpoint data
-const buildAssignedMemberList = (proj, membersData) => {
+const buildAssignedMemberList = (proj, membersData, hasLiveAssignments = false) => {
   const list = [];
   const addedIds = new Set();
   const addedEmails = new Set();
@@ -50,24 +50,35 @@ const buildAssignedMemberList = (proj, membersData) => {
   };
 
   // 1. Team Lead Employee & User
-  const tlEmp = membersData?.teamLeadEmployee || proj.teamLeadEmployee;
-  const tlUser = membersData?.teamLeadUser || proj.teamLeadUser;
-  if (tlEmp) {
+  const liveTlEmp = membersData?.teamLeadEmployee;
+  const liveTlUser = membersData?.teamLeadUser;
+  const fallbackTlEmp = proj.teamLeadEmployee;
+  const fallbackTlUser = proj.teamLeadUser;
+  const tlEmp = hasLiveAssignments ? liveTlEmp : liveTlEmp || fallbackTlEmp;
+  const tlUser = hasLiveAssignments ? liveTlUser : liveTlUser || fallbackTlUser;
+  const tl = tlEmp || tlUser || (
+    hasLiveAssignments
+      ? membersData?.teamLead || membersData?.lead || membersData?.teamLeader || membersData?.assignedTL || membersData?.teamLeadId
+      : proj.teamLead || proj.lead || proj.teamLeader || proj.assignedTL || proj.teamLeadId
+  );
+  if (tl) {
     addMember(
-      { ...tlEmp, name: tlEmp.fullName || tlEmp.name || tlUser?.name },
+      typeof tl === 'object'
+        ? { ...tl, name: tl.fullName || tl.name || tlUser?.name }
+        : tl,
       'Team Leader',
       'TL',
       true
     );
-  } else if (tlUser) {
-    addMember(tlUser, 'Team Leader', 'TL', true);
   }
 
   // 2. Assigned Employees from membersData + proj.employees
-  const emps = [
-    ...(Array.isArray(membersData?.employees) ? membersData.employees : []),
-    ...(Array.isArray(proj.employees) ? proj.employees : [])
-  ];
+  const emps = hasLiveAssignments
+    ? (Array.isArray(membersData?.employees) ? membersData.employees : [])
+    : [
+        ...(Array.isArray(membersData?.employees) ? membersData.employees : []),
+        ...(Array.isArray(proj.employees) ? proj.employees : [])
+      ];
   emps.forEach(emp => {
     if (emp) {
       // Find if we have richer name or fields in proj.employees
@@ -155,6 +166,16 @@ export const ProjectView = () => {
   const lastProjectClickTimeRef = useRef(0);
   const [companyStaff, setCompanyStaff] = useState([]);
   const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    if (!selectedProjectModal) return;
+    const refreshedProject = projects.find(
+      project => String(project._id) === String(selectedProjectModal._id)
+    );
+    if (refreshedProject && refreshedProject !== selectedProjectModal) {
+      setSelectedProjectModal(refreshedProject);
+    }
+  }, [projects, selectedProjectModal]);
 
   const initialFormState = {
     projectName: '',
@@ -340,27 +361,25 @@ export const ProjectView = () => {
         baseProjects = Array.from(projectMap.values());
       }
 
-      // 2. For each project, fetch its assigned members via GET /api/projectManage/project/members/:projectId only if needed
+      // 2. Fetch live assignments so embedded project fields cannot keep removed members assigned.
       const projectWithMembersList = await Promise.all(
         baseProjects.map(async (proj) => {
           let membersData = null;
-          const hasEmbeddedMembers = Boolean(
-            proj.teamLeadUser || proj.teamLeadEmployee ||
-            (Array.isArray(proj.employees) && proj.employees.length > 0)
-          );
-          if (!hasEmbeddedMembers && proj._id) {
+          let hasLiveAssignments = false;
+          if (proj._id) {
             try {
               const memRes = await api.get(`/api/projectManage/project/members/${proj._id}`);
               if (memRes.data?.success && memRes.data?.data) {
                 membersData = memRes.data.data;
+                hasLiveAssignments = true;
               }
             } catch (err) {
-              // Silently fall back to member information embedded in project
+              console.warn(`Could not load live assignments for project ${proj._id}:`, err);
             }
           }
 
           // Build unified assigned members list
-          const allAssigned = buildAssignedMemberList(proj, membersData);
+          const allAssigned = buildAssignedMemberList(proj, membersData, hasLiveAssignments);
 
           // Find team lead
           const leadMember = allAssigned.find(m => m.isLead) || null;
@@ -398,7 +417,17 @@ export const ProjectView = () => {
 
           return {
             ...proj,
+            ...(hasLiveAssignments ? {
+              teamLeadUser: membersData.teamLeadUser || null,
+              teamLeadEmployee: membersData.teamLeadEmployee || null,
+              teamLead: membersData.teamLead || null,
+              teamLeadId: membersData.teamLeadId || null,
+              teamLeadName: membersData.teamLeadName || '',
+              assignedTL: membersData.assignedTL || null,
+              employees: Array.isArray(membersData.employees) ? membersData.employees : []
+            } : {}),
             members: membersData,
+            hasLiveAssignments,
             allAssigned,
             leadMember,
             tasks: projectTasks,
@@ -1048,7 +1077,9 @@ export const ProjectView = () => {
                     <span>Assigned Project Members ({selectedProjectModal.allAssigned?.length || 0})</span>
                   </span>
                   <span className="text-[11px] text-slate-400 font-normal">
-                    Fetched from live project assignments
+                    {selectedProjectModal.hasLiveAssignments
+                      ? 'Fetched from live project assignments'
+                      : 'Showing project assignment details'}
                   </span>
                 </h4>
 

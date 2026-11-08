@@ -557,7 +557,9 @@ export const isProjectAssignedToLead = (project, userIdent) => {
         matchId(entity._id) ||
         matchId(entity.id) ||
         matchId(entity.userId) ||
+        matchId(entity.userID) ||
         matchId(entity.employeeId) ||
+        matchId(entity.employeeID) ||
         matchId(entity.empId)
       ) {
         return true;
@@ -595,24 +597,22 @@ export const isProjectAssignedToLead = (project, userIdent) => {
     if (
       matchEntity(project.members.teamLeadUser) ||
       matchEntity(project.members.teamLeadEmployee) ||
-      matchEntity(project.members.teamLead)
-    ) {
-      return true;
+        matchEntity(project.members.teamLead) ||
+        matchEntity(project.members.assignedTL) ||
+        matchEntity(project.members.lead) ||
+        matchEntity(project.members.teamLeader)
+      ) {
+        return true;
+      }
     }
-  }
 
-  // 6. Check allAssigned if present (e.g. from ProjectView)
-  if (Array.isArray(project.allAssigned)) {
+    // 6. Check allAssigned if present (e.g. from ProjectView)
+    if (Array.isArray(project.allAssigned)) {
     const leadMatch = project.allAssigned.some((m) => {
       if (!m || !m.isLead) return false;
       return matchId(m.id) || matchEmail(m.email) || matchName(m.name);
     });
     if (leadMatch) return true;
-  }
-
-  // 7. Check if TL is listed in employees array
-  if (Array.isArray(project.employees)) {
-    if (project.employees.some((e) => matchEntity(e))) return true;
   }
 
   return false;
