@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   Clock, Pause, LogOut, Calendar, Gift,
   Sun, Users, CheckSquare, FileCheck, TrendingUp, Bell, AlertCircle, Map,
-  Umbrella, LogIn, Coffee, ChevronLeft, ChevronRight, Loader2
+  Umbrella, LogIn, Coffee, ChevronLeft, ChevronRight, Loader2,
+  Sparkles, ArrowUpRight, ShieldCheck, CheckCircle2, UserCheck
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api, { BASE_URL } from '../../api/axios.js';
@@ -213,7 +214,14 @@ const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
 };
 
 export const DashboardView = () => {
-  const { user, setAttendanceStatus: setGlobalAttendanceStatus } = useApp();
+  const { user, userRole, setAttendanceStatus: setGlobalAttendanceStatus } = useApp();
+
+  const isTeamLeader = 
+    userRole === 'team_leader' || 
+    userRole === 'teamlead' || 
+    user?.isTeamLeader || 
+    user?.role === 'team_leader' || 
+    user?.role === 'teamlead';
 
   // --- Live Data States ---
   const [actualUserId, setActualUserId] = useState(null); // The true MongoDB _id
@@ -2814,25 +2822,165 @@ export const DashboardView = () => {
   });
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-poppins">
 
-      {/* KPI Cards (4 items) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Today Hours', value: formatHoursAndMinutes(totalWorkTimeDisplay), accent: 'border-l-indigo-600' },
-          { label: 'Tasks To Do', value: tasksStats.todo, accent: 'border-l-slate-400' },
-          { label: 'In Progress', value: tasksStats.inProgress, accent: 'border-l-amber-500' },
-          { label: 'Completed', value: tasksStats.completed, accent: 'border-l-emerald-500' },
-        ].map((item, idx) => (
-          <div key={`kpi-${idx}`} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
-            <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900">
-                {isDataLoading && idx !== 0 ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
-              </p>
+      {/* Modern Welcome Banner */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#034665] via-[#045d86] to-[#068DCB] p-5 sm:p-6 text-white shadow-lg">
+        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-cyan-400/15 blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/15 backdrop-blur-md text-white border border-white/20 tracking-wide uppercase">
+                {isTeamLeader ? (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                    Team Leader Operations Portal
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+                    Employee Workspace
+                  </>
+                )}
+              </span>
+              <span className="text-[11px] text-white/75">
+                • {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              Welcome back, {user?.name || liveFirstName || 'Team Member'} 👋
+            </h1>
+            <p className="text-xs sm:text-sm text-cyan-100/90 mt-0.5 max-w-xl">
+              {isTeamLeader
+                ? 'Supervise shift operations, monitor team presence, and track daily deliverables in real time.'
+                : 'Track your daily shift hours, attendance, breaks, and task progression seamlessly.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 self-start md:self-center shrink-0">
+            {isTeamLeader && (
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/15 border border-white/25 backdrop-blur-md text-xs font-semibold text-white shadow-xs">
+                <Users className="w-3.5 h-3.5 text-amber-300" />
+                <span>Team On Leave: <strong className="text-amber-200">{teamOnLeave.length}</strong></span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white text-[#034665] text-xs font-bold shadow-md">
+              <Clock className="w-3.5 h-3.5 text-[#068DCB]" />
+              <span>Shift: <strong className="text-slate-900">{formatHoursAndMinutes(totalWorkTimeDisplay)}</strong></span>
             </div>
           </div>
-        ))}
+        </div>
+      </div>
+
+      {/* KPI Cards (4 Modern Enterprise Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        {(isTeamLeader ? [
+          {
+            label: 'Shift Time Logged',
+            value: formatHoursAndMinutes(totalWorkTimeDisplay),
+            subtext: 'Today active hours',
+            icon: Clock,
+            iconColor: 'text-[#034665]',
+            iconBg: 'bg-[#edf4f8]',
+            borderHover: 'from-[#034665] to-[#068DCB]',
+          },
+          {
+            label: 'Team On Leave',
+            value: teamOnLeave.length,
+            subtext: teamOnLeave.length > 0 ? 'Members absent today' : 'All members present',
+            icon: Users,
+            iconColor: 'text-amber-600',
+            iconBg: 'bg-amber-50',
+            borderHover: 'from-amber-500 to-rose-400',
+          },
+          {
+            label: 'Tasks In Progress',
+            value: tasksStats.inProgress,
+            subtext: 'Current sprint workload',
+            icon: TrendingUp,
+            iconColor: 'text-blue-600',
+            iconBg: 'bg-blue-50',
+            borderHover: 'from-blue-500 to-cyan-400',
+          },
+          {
+            label: 'Tasks Completed',
+            value: tasksStats.completed,
+            subtext: 'Deliverables verified',
+            icon: CheckCircle2,
+            iconColor: 'text-emerald-600',
+            iconBg: 'bg-emerald-50',
+            borderHover: 'from-emerald-500 to-teal-400',
+          },
+        ] : [
+          {
+            label: 'Today Shift Hours',
+            value: formatHoursAndMinutes(totalWorkTimeDisplay),
+            subtext: 'Shift time recorded',
+            icon: Clock,
+            iconColor: 'text-[#034665]',
+            iconBg: 'bg-[#edf4f8]',
+            borderHover: 'from-[#034665] to-[#068DCB]',
+          },
+          {
+            label: 'Tasks To Do',
+            value: tasksStats.todo,
+            subtext: 'Pending in backlog',
+            icon: CheckSquare,
+            iconColor: 'text-slate-600',
+            iconBg: 'bg-slate-100',
+            borderHover: 'from-slate-500 to-slate-400',
+          },
+          {
+            label: 'In Progress',
+            value: tasksStats.inProgress,
+            subtext: 'Active workload',
+            icon: TrendingUp,
+            iconColor: 'text-amber-600',
+            iconBg: 'bg-amber-50',
+            borderHover: 'from-amber-500 to-yellow-400',
+          },
+          {
+            label: 'Tasks Completed',
+            value: tasksStats.completed,
+            subtext: 'Done deliverables',
+            icon: CheckCircle2,
+            iconColor: 'text-emerald-600',
+            iconBg: 'bg-emerald-50',
+            borderHover: 'from-emerald-500 to-teal-400',
+          },
+        ]).map((item, idx) => {
+          const IconComp = item.icon;
+          return (
+            <div
+              key={`kpi-${idx}`}
+              className="group relative bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden"
+            >
+              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${item.borderHover} opacity-0 group-hover:opacity-100 transition-opacity`} />
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    {item.label}
+                  </p>
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">
+                    {isDataLoading && idx !== 0 && !isTeamLeader ? (
+                      <Loader2 size={20} className="animate-spin text-slate-400 mt-1" />
+                    ) : (
+                      item.value
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {item.subtext}
+                  </p>
+                </div>
+                <div className={`w-11 h-11 rounded-xl ${item.iconBg} ${item.iconColor} flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-xs`}>
+                  <IconComp className={`w-5 h-5 ${item.iconColor}`} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -3100,18 +3248,30 @@ export const DashboardView = () => {
         </div>
 
         {/* TEAM ON LEAVE - HORIZONTAL DESIGN */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs xl:col-span-1 lg:col-span-2">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs xl:col-span-1 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Users size={16} className="text-[#F59E0B]" /> Team On Leave
-              <span className="bg-[#FFFBEB] text-[#F59E0B] px-1.5 py-0.5 rounded-full text-[10px] font-bold">{teamOnLeave.length}</span>
-            </h3>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                <Users size={16} className="text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Team On Leave</h3>
+                <p className="text-[10px] text-slate-500">Supervised team members on approved leave today</p>
+              </div>
+            </div>
+            <span className="bg-amber-50 text-amber-700 border border-amber-200/70 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              {teamOnLeave.length} On Leave
+            </span>
           </div>
+
           <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
             {isDataLoading ? (
               <Loader2 size={20} className="animate-spin text-slate-400 mx-auto" />
             ) : teamOnLeave.length === 0 ? (
-              <p className="text-sm text-slate-500 w-full text-center py-4">Everyone is present today.</p>
+              <div className="w-full text-center py-6 px-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                <p className="text-xs font-semibold text-slate-700">Full attendance today 🎯</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Every team member is present and accounted for.</p>
+              </div>
             ) : (
               teamOnLeave.map((t, i) => {
                 const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name || 'User')}&background=F59E0B&color=fff&bold=true`;
@@ -3126,9 +3286,9 @@ export const DashboardView = () => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src = avatarFallback;
                         }}
-                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 shadow-xs group-hover:scale-105 group-hover:border-amber-500 transition-transform bg-amber-50" 
+                        className="w-13 h-13 rounded-full object-cover border-2 border-amber-400 shadow-xs group-hover:scale-105 group-hover:border-amber-500 transition-transform bg-amber-50" 
                       />
-                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-amber-500 border-2 border-white rounded-full" title="On Leave" />
+                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-amber-500 border-2 border-white rounded-full" title="On Leave" />
                     </div>
                     <p className="text-xs font-bold text-slate-800 truncate w-full px-1">{t.name}</p>
                     <p className="text-[10px] text-slate-500 mt-0.5 font-medium truncate w-full px-1">{t.designation || 'Team Member'}</p>
