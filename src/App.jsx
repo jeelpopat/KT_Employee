@@ -8,7 +8,7 @@ import { LoginView } from './components/auth/LoginView.jsx';
 import { PublicInfoView } from './components/auth/PublicInfoView.jsx';
 import { ForgotPasswordView } from './components/auth/ForgotPasswordView.jsx';
 import { pathToTab } from './utils/navigation.js';
-import { ToastContainer, showToast } from './components/common/Toast.jsx';
+import { RefreshFeedback, ToastContainer, showToast } from './components/common/Toast.jsx';
 import { LoadingScreen, PageSkeleton, TopProgressBar } from './components/common/Loader.jsx';
 import { stopScreenCapture } from './services/monitoringService.js';
 
@@ -463,6 +463,7 @@ export default function App() {
   return (
     <AppProvider>
       <ToastContainer />
+      {isAuthenticated && <RefreshFeedback />}
       {isAuthenticated ? (
         <MainLayout handleSignOut={handleSignOut} />
       ) : publicPage ? (

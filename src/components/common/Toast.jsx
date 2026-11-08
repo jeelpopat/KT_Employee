@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X, RefreshCw } from 'lucide-react';
 
 /**
  * Global helper to trigger UI toasts from anywhere in the application
@@ -152,6 +152,112 @@ export const ToastContainer = () => {
           onClose={handleDismiss}
         />
       ))}
+    </div>
+  );
+};
+
+export const RefreshFeedback = () => {
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const activeRequests = useRef(new Set());
+  const manualRefresh = useRef(null);
+
+  useEffect(() => {
+    const finishManualRefresh = () => {
+      const current = manualRefresh.current;
+      if (!current || (current.started > 0 && current.inFlight > 0)) return;
+
+      clearTimeout(current.completionTimer);
+      current.completionTimer = setTimeout(() => {
+        if (manualRefresh.current !== current) return;
+        if (current.started > 0 && current.inFlight > 0) return;
+        if (current.failed) {
+          showToast('Refresh failed. Please try again.', 'error');
+        } else if (current.fromCache && !current.successful) {
+          showToast('Latest available data loaded.', 'success');
+        } else if (current.successful) {
+          showToast('Data refreshed successfully.', 'success');
+        }
+        clearTimeout(current.timeout);
+        manualRefresh.current = null;
+      }, 500);
+    };
+
+    const handleClick = (event) => {
+      const button = event.target.closest?.('button');
+      if (!button || button.disabled) return;
+      const label = [
+        button.getAttribute('aria-label'),
+        button.getAttribute('title'),
+        button.textContent,
+      ].filter(Boolean).join(' ');
+      if (!/\b(refresh|reload|sync)\b/i.test(label)) return;
+
+      if (manualRefresh.current) {
+        clearTimeout(manualRefresh.current.timeout);
+        clearTimeout(manualRefresh.current.completionTimer);
+      }
+      const current = { started: 0, inFlight: 0, successful: false, failed: false, fromCache: false };
+      current.timeout = setTimeout(() => {
+        if (manualRefresh.current !== current) return;
+        showToast('Refresh is taking longer than expected.', 'warning');
+        manualRefresh.current = null;
+      }, 30000);
+      manualRefresh.current = current;
+      showToast('Refreshing data...', 'info');
+    };
+
+    const handleDataSync = (event) => {
+      const { type, requestId, timestamp } = event.detail || {};
+      if (type === 'start') {
+        activeRequests.current.add(requestId);
+        setIsSyncing(true);
+        if (manualRefresh.current) {
+          manualRefresh.current.started += 1;
+          manualRefresh.current.inFlight += 1;
+        }
+      } else if (type === 'success' || type === 'error') {
+        activeRequests.current.delete(requestId);
+        setIsSyncing(activeRequests.current.size > 0);
+        if (type === 'success') setLastSyncedAt(timestamp || Date.now());
+        const current = manualRefresh.current;
+        if (current) {
+          current.inFlight = Math.max(0, current.inFlight - 1);
+          if (type === 'success') current.successful = true;
+          else current.failed = true;
+          finishManualRefresh();
+        }
+      } else if (type === 'cached' && manualRefresh.current) {
+        manualRefresh.current.fromCache = true;
+        finishManualRefresh();
+      }
+    };
+
+    document.addEventListener('click', handleClick, true);
+    window.addEventListener('app_data_sync', handleDataSync);
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+      window.removeEventListener('app_data_sync', handleDataSync);
+      if (manualRefresh.current) {
+        clearTimeout(manualRefresh.current.timeout);
+        clearTimeout(manualRefresh.current.completionTimer);
+      }
+    };
+  }, []);
+
+  if (!lastSyncedAt && !isSyncing) return null;
+  const lastSyncedLabel = lastSyncedAt
+    ? `Last synced ${new Date(lastSyncedAt).toLocaleTimeString()}`
+    : 'Waiting for first update';
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-3 left-3 z-[9998] inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-medium text-slate-600 shadow-md backdrop-blur"
+    >
+      <RefreshCw size={13} className={isSyncing ? 'animate-spin text-sky-600' : 'text-emerald-600'} />
+      <span>{isSyncing ? 'Syncing data...' : `Data sync · ${lastSyncedLabel}`}</span>
     </div>
   );
 };

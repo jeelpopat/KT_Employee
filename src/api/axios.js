@@ -89,6 +89,25 @@ export const clearApiCache = () => {
 
 const defaultAdapter = axios.getAdapter(axios.defaults.adapter);
 
+const emitDataSyncEvent = (detail) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('app_data_sync', { detail }));
+  }
+};
+
+const requestWithSyncFeedback = async (config) => {
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  emitDataSyncEvent({ type: 'start', requestId });
+  try {
+    const response = await defaultAdapter(config);
+    emitDataSyncEvent({ type: 'success', requestId, timestamp: Date.now() });
+    return response;
+  } catch (error) {
+    emitDataSyncEvent({ type: 'error', requestId, timestamp: Date.now() });
+    throw error;
+  }
+};
+
 const cachingAdapter = async (config) => {
   const method = (config.method || 'get').toLowerCase();
   const url = config.url || '';
@@ -97,8 +116,9 @@ const cachingAdapter = async (config) => {
   if (method !== 'get' || config.skipCache || config.responseType === 'blob' || config.responseType === 'arraybuffer') {
     if (method !== 'get') {
       invalidateOnMutation(url);
+      return defaultAdapter(config);
     }
-    return defaultAdapter(config);
+    return requestWithSyncFeedback(config);
   }
 
   // Generate unique cache key based on method, URL, and query parameters
@@ -109,6 +129,7 @@ const cachingAdapter = async (config) => {
   const now = Date.now();
   const cached = cache.get(cacheKey);
   if (cached && now < cached.expiresAt) {
+    emitDataSyncEvent({ type: 'cached', timestamp: now });
     return {
       data: JSON.parse(JSON.stringify(cached.data)),
       status: cached.status,
@@ -124,6 +145,7 @@ const cachingAdapter = async (config) => {
   if (inFlight.has(cacheKey)) {
     const inFlightPromise = inFlight.get(cacheKey);
     const response = await inFlightPromise;
+    emitDataSyncEvent({ type: 'cached', timestamp: Date.now() });
     return {
       ...response,
       data: JSON.parse(JSON.stringify(response.data)),
@@ -134,7 +156,7 @@ const cachingAdapter = async (config) => {
   // 3. Dispatch fresh request through standard network adapter
   const requestPromise = (async () => {
     try {
-      const response = await defaultAdapter(config);
+      const response = await requestWithSyncFeedback(config);
       const ttl = config.ttl !== undefined ? config.ttl : getCacheTTL(url);
       if (ttl > 0 && response.status >= 200 && response.status < 300) {
         cache.set(cacheKey, {
