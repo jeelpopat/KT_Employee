@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   FileText, Plus, Edit3, Trash2, Search, Filter, RefreshCw, CheckCircle2,
   XCircle, AlertCircle, Shield, ShieldCheck, ShieldAlert, SlidersHorizontal,
@@ -801,18 +802,23 @@ export const DeductionMasterView = () => {
       {/* ======================================================== */}
       {/* MODAL: CREATE / EDIT DEDUCTION MASTER                     */}
       {/* ======================================================== */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
+      {isModalOpen && createPortal((
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="deduction-master-dialog-title"
+        >
           <div
             className="fixed inset-0"
             onClick={() => !isSubmitting && setIsModalOpen(false)}
           />
 
-          <div className="relative w-full max-w-xl max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,660px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
+          <div className="relative w-full max-w-2xl h-[min(92dvh,760px)] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
             {/* Header - Fixed & Pinned at Top */}
             <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 id="deduction-master-dialog-title" className="text-sm font-bold text-slate-900">
                   {editingMaster ? 'Edit Deduction Master' : 'Create New Deduction Master'}
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
@@ -1076,25 +1082,30 @@ export const DeductionMasterView = () => {
           </form>
         </div>
       </div>
-    )}
+    ), document.body)}
 
       {/* ======================================================== */}
       {/* MODAL: VIEW DEDUCTION MASTER DETAILS                     */}
       {/* ======================================================== */}
-      {viewingMaster && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins overflow-hidden">
+      {viewingMaster && createPortal((
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs font-poppins"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="deduction-master-details-title"
+        >
           <div
             className="fixed inset-0"
             onClick={() => setViewingMaster(null)}
           />
 
-          <div className="relative w-full max-w-lg max-h-[calc(100dvh-2rem)] sm:max-h-[min(88vh,660px)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
+          <div className="relative w-full max-w-lg max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-10 overflow-hidden animate-fade-in flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
               <div>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-sky-50 text-[#0088cc] font-bold border border-sky-100">
                   {viewingMaster.code}
                 </span>
-                <h3 className="text-base font-bold text-slate-900 mt-1">
+                <h3 id="deduction-master-details-title" className="text-base font-bold text-slate-900 mt-1">
                   {viewingMaster.name}
                 </h3>
               </div>
@@ -1196,7 +1207,7 @@ export const DeductionMasterView = () => {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 };
