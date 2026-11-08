@@ -527,6 +527,7 @@ export const isLeaveOfAssignedTeam = (leave, teamScope, usersMap = {}) => {
  */
 export const isProjectAssignedToLead = (project, userIdent) => {
   if (!project || !userIdent) return false;
+  if (project.hasLiveAssignments === false) return false;
   const { ids, emails, names } = userIdent;
 
   const matchId = (val) => {

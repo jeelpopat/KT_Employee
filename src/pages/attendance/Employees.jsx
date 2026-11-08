@@ -11,7 +11,6 @@ import {
   Filter,
   ChevronDown,
   Edit,
-  Trash2,
   Crown,
   UserMinus,
   UserPlus,
@@ -39,6 +38,10 @@ import {
   matchesEmployeeRole
 } from "../../utils/employeeRoles";
 import { BASE_URL } from "../../api/config";
+import {
+  createEmployeeEmploymentStatusRequest,
+  isEmployeeInactive
+} from "../../utils/employeeEmployment";
 
 const API_BASE = `${BASE_URL}/api`;
 
@@ -370,8 +373,10 @@ export default function Employees() {
         });
 
       setEmployees(filterOutUnknownUsers([...normalizedUsers, ...unmatchedEmployees]));
+      return true;
     } catch (error) {
       console.error("Fetch employees error:", error);
+      return false;
     } finally {
       if (!isSilent) setLoading(false);
     }
@@ -843,15 +848,15 @@ export default function Employees() {
     }
   };
 
-  // =========================
-  // DELETE EMPLOYEE
-  // DELETE /employee/remove/:id
-  // =========================
-  const handleDeleteEmployee = async (employeeOrId, employeeName) => {
+  const handleEmploymentStatusChange = async (employee, employeeName) => {
+    const isInactive = isEmployeeInactive(employee);
+    const nextIsActive = isInactive;
     const confirmed = await confirm({
-      title: "Delete employee?",
-      message: `Are you sure you want to delete ${employeeName}? This action cannot be undone.`,
-      confirmLabel: "Delete",
+      title: isInactive ? "Reactivate employee?" : "Deactivate employee?",
+      message: isInactive
+        ? `Are you sure you want to reactivate ${employeeName}? Their account access will be restored. Historical records will remain unchanged.`
+        : `Are you sure you want to deactivate ${employeeName}? Their account access will be disabled, while historical records are retained.`,
+      confirmLabel: isInactive ? "Reactivate" : "Deactivate",
     });
 
     if (!confirmed) {
@@ -859,16 +864,17 @@ export default function Employees() {
     }
 
     try {
-      const empObj = typeof employeeOrId === "object" && employeeOrId !== null ? employeeOrId : null;
-      const employeeId = resolveEmployeeRecordId(employeeOrId);
-      const targetUserId = empObj ? (empObj.userId || empObj._id) : employeeId;
+      const employeeId = resolveEmployeeRecordId(employee);
       const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const request = createEmployeeEmploymentStatusRequest(API_BASE, employeeId, nextIsActive, token);
 
       const res = await fetch(
-        `${API_BASE}/employee/delete/${employeeId}`,
+        request.url,
         {
-          method: "DELETE",
+          method: request.options.method,
+          body: request.options.body,
           headers: {
+            ...request.options.headers,
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
@@ -881,7 +887,7 @@ export default function Employees() {
       try {
         data = responseText ? JSON.parse(responseText) : {};
       } catch (parseError) {
-        console.error("Delete employee returned a non-JSON response:", {
+        console.error("Employee status update returned a non-JSON response:", {
           status: res.status,
           url: res.url,
           response: responseText.slice(0, 200),
@@ -892,30 +898,27 @@ export default function Employees() {
         const message =
           data.message ||
           (res.status === 404
-            ? "Delete employee API endpoint was not found. Please check the backend route."
-            : `Failed to delete employee (HTTP ${res.status})`);
+            ? "Employee status API endpoint was not found. Please check the backend route."
+            : `Failed to update employee status (HTTP ${res.status})`);
 
         showToast(message, "error");
         return;
       }
 
       if (data.success) {
-        showToast(data.message || "Employee Deleted Successfully", "success");
-
-        setEmployees((prev) =>
-          prev.filter(
-            (employee) =>
-              employee._id !== targetUserId &&
-              employee._id !== employeeId &&
-              employee.employeeRecordId !== employeeId
-          )
+        const refreshed = await fetchEmployees(true);
+        showToast(
+          refreshed
+            ? data.message || `Employee ${isInactive ? "reactivated" : "deactivated"} successfully.`
+            : `Employee ${isInactive ? "reactivated" : "deactivated"}, but the list could not be refreshed. Please refresh the page.`,
+          refreshed ? "success" : "error"
         );
       } else {
-        showToast(data.message || "Failed to delete employee", "error");
+        showToast(data.message || "Failed to update employee status.", "error");
       }
     } catch (error) {
-      console.error("Delete employee error:", error);
-      showToast("Failed to delete employee", "error");
+      console.error("Employee status update error:", error);
+      showToast(error.message || "Failed to update employee status.", "error");
     }
   };
 
@@ -949,9 +952,14 @@ export default function Employees() {
       rawDept.toLowerCase().includes(search);
 
     const rawStatus = String(emp.employeeStatus || emp.status || (emp.isActive === false ? "Inactive" : "Active")).trim().toLowerCase();
+    const inactive = isEmployeeInactive(emp);
     const matchesStatus =
       filterStatus === "all" ||
-      (filterStatus.toLowerCase() === "active" ? (rawStatus === "active" || !rawStatus) : rawStatus === filterStatus.toLowerCase());
+      (filterStatus.toLowerCase() === "active"
+        ? !inactive && (rawStatus === "active" || !rawStatus)
+        : filterStatus.toLowerCase() === "inactive"
+          ? inactive
+          : rawStatus === filterStatus.toLowerCase());
 
     const empRole = getEmployeeRoleLabel(emp).trim().toLowerCase();
     const desigLower = rawDesig.toLowerCase();
@@ -1287,6 +1295,7 @@ export default function Employees() {
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {filteredEmployees.map((emp, index) => {
                     const displayName = emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "Employee";
+                    const inactive = isEmployeeInactive(emp);
                     const initial = displayName.charAt(0).toUpperCase();
 
                     return (
@@ -1334,7 +1343,7 @@ export default function Employees() {
                         <td className="px-3 py-3 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-poppins select-none whitespace-nowrap border ${
-                              emp.employeeStatus === "Inactive"
+                              inactive
                                 ? "bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]"
                                 : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                   ? "bg-[#FFFBEB] text-[#D97706] border-[#FDE68A]"
@@ -1343,14 +1352,14 @@ export default function Employees() {
                           >
                             <span
                               className={`h-1.5 w-1.5 rounded-full ${
-                                emp.employeeStatus === "Inactive"
+                                inactive
                                   ? "bg-rose-500"
                                   : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                     ? "bg-amber-500"
                                     : "bg-emerald-500"
                               }`}
                             />
-                            {emp.employeeStatus || "Active"}
+                            {inactive ? "Inactive" : emp.employeeStatus || "Active"}
                           </span>
                         </td>
 
@@ -1394,20 +1403,21 @@ export default function Employees() {
 
                             {canDeleteOrAssignTeamLead(emp) && (
                               <>
-                                {/* DELETE */}
+                                {/* DEACTIVATE / REACTIVATE */}
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    handleDeleteEmployee(
-                                      emp,
-                                      displayName
-                                    )
-                                  }
-                                  title="Delete Employee"
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-colors cursor-pointer font-poppins"
+                                  onClick={() => handleEmploymentStatusChange(emp, displayName)}
+                                  title={inactive ? "Reactivate Employee" : "Deactivate Employee"}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer font-poppins ${
+                                    inactive
+                                      ? "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
+                                      : "text-rose-600 hover:text-rose-800 hover:bg-rose-50"
+                                  }`}
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Delete</span>
+                                  {inactive
+                                    ? <UserPlus className="w-3.5 h-3.5" />
+                                    : <UserMinus className="w-3.5 h-3.5" />}
+                                  <span>{inactive ? "Reactivate" : "Deactivate"}</span>
                                 </button>
 
                                 {/* ASSIGN / REMOVE TL */}
@@ -1454,6 +1464,7 @@ export default function Employees() {
             <div className="lg:hidden space-y-3 font-poppins">
               {filteredEmployees.map((emp) => {
                 const displayName = emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "Employee";
+                const inactive = isEmployeeInactive(emp);
                 const initial = displayName.charAt(0).toUpperCase();
 
                 return (
@@ -1481,7 +1492,7 @@ export default function Employees() {
 
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-poppins select-none whitespace-nowrap border shrink-0 ${
-                          emp.employeeStatus === "Inactive"
+                          inactive
                             ? "bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]"
                             : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                               ? "bg-[#FFFBEB] text-[#D97706] border-[#FDE68A]"
@@ -1490,14 +1501,14 @@ export default function Employees() {
                       >
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${
-                            emp.employeeStatus === "Inactive"
+                            inactive
                               ? "bg-rose-500"
                               : emp.employeeStatus === "Leave" || emp.employeeStatus === "On Leave"
                                 ? "bg-amber-500"
                                 : "bg-emerald-500"
                           }`}
                         />
-                        {emp.employeeStatus || "Active"}
+                        {inactive ? "Inactive" : emp.employeeStatus || "Active"}
                       </span>
                     </div>
 
@@ -1561,11 +1572,17 @@ export default function Employees() {
                           <>
                             <button
                               type="button"
-                              onClick={() => handleDeleteEmployee(emp, displayName)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-colors cursor-pointer font-poppins"
+                              onClick={() => handleEmploymentStatusChange(emp, displayName)}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer font-poppins ${
+                                inactive
+                                  ? "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
+                                  : "text-rose-600 hover:text-rose-800 hover:bg-rose-50"
+                              }`}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
+                              {inactive
+                                ? <UserPlus className="w-3.5 h-3.5" />
+                                : <UserMinus className="w-3.5 h-3.5" />}
+                              <span>{inactive ? "Reactivate" : "Deactivate"}</span>
                             </button>
 
                             {canAssignTeamLead(emp) && (

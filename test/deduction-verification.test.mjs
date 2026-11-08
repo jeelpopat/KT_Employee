@@ -14,6 +14,10 @@
  */
 
 import assert from 'node:assert/strict';
+import {
+  createEmployeeEmploymentStatusRequest,
+  isEmployeeInactive
+} from '../src/utils/employeeEmployment.js';
 
 console.log('================================================================');
 console.log('🚀 KEVALON HRMS: EMPLOYEE DEDUCTION MANAGEMENT TEST SUITE');
@@ -391,6 +395,36 @@ test('Computes multi-dimensional deduction report metrics accurately', () => {
   assert.equal(approvedCount, 2);
   assert.equal(appliedCount, 1);
   assert.equal(approvedAmount, 500);
+});
+
+// ============================================================================
+// SUITE 9: Employee Soft Deactivation
+// ============================================================================
+console.log('\n📦 SUITE 9: Employee Soft Deactivation');
+
+test('Builds a status update request without using permanent deletion', () => {
+  const request = createEmployeeEmploymentStatusRequest(
+    'https://api.example.test/api',
+    'employee/123',
+    false,
+    'test-token'
+  );
+
+  assert.equal(request.url, 'https://api.example.test/api/employee/edit/employee%2F123');
+  assert.equal(request.options.method, 'PUT');
+  assert.notEqual(request.options.method, 'DELETE');
+  assert.equal(request.options.headers.Authorization, 'Bearer test-token');
+  assert.deepEqual(JSON.parse(request.options.body), {
+    isActive: false,
+    employeeStatus: 'Inactive',
+    status: 'inactive'
+  });
+});
+
+test('Recognizes inactive employees from the listed employee fields', () => {
+  assert.equal(isEmployeeInactive({ employeeStatus: 'Inactive' }), true);
+  assert.equal(isEmployeeInactive({ employeeRecord: { isActive: false } }), true);
+  assert.equal(isEmployeeInactive({ employeeStatus: 'Active', isActive: true }), false);
 });
 
 console.log('\n================================================================');
