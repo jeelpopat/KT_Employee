@@ -11,11 +11,15 @@ const API_BASE = `${BASE_URL}/api/holiday`;
 const toStandardDateString = (input) => {
   if (!input) return '';
   const str = String(input).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    return str;
+  const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymdMatch) {
+    const [, y, m, d] = ymdMatch;
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
-  if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
-    return str.slice(0, 10);
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
@@ -94,18 +98,48 @@ export default function Holidays() {
 
       // STRICT DYNAMIC FILTER: Keep only real holidays created and stored in the database
       // Exclude auto-generated weekly offs (isDefault === true or missing _id)
-      const realHolidays = holidaysData
-        .filter((holiday) => {
-          if (holiday.isDefault === true) return false;
-          const name = (holiday.holidayName || holiday.name || '').trim().toLowerCase();
-          if ((name === 'sunday' || name === '2nd saturday' || name === '4th saturday') && !holiday._id) {
-            return false;
-          }
-          return Boolean(holiday._id || holiday.id);
-        })
-        .map(normalizeHoliday);
+      const realHolidays = holidaysData.filter((holiday) => {
+        if (!holiday) return false;
+        if (holiday.isDefault === true) return false;
+        const name = (holiday.holidayName || holiday.name || holiday.title || '').trim().toLowerCase();
+        if ((name === 'sunday' || name === '2nd saturday' || name === '4th saturday') && !holiday._id && !holiday.id) {
+          return false;
+        }
+        return Boolean(name || holiday.holidayDate || holiday.date);
+      });
 
-      setHolidays(realHolidays);
+      const expandedHolidays = [];
+      for (const item of realHolidays) {
+        const title = (item.holidayName || item.title || item.name || 'Holiday').trim();
+        const startRaw = item.startDate || item.fromDate || item.holidayDate || item.date;
+        const endRaw = item.endDate || item.toDate || startRaw;
+
+        const startStr = toStandardDateString(startRaw);
+        const endStr = toStandardDateString(endRaw);
+
+        if (startStr && endStr && startStr < endStr) {
+          const rangeDates = expandHolidayDates([{ startDate: startStr, endDate: endStr }]);
+          for (const rDate of rangeDates) {
+            expandedHolidays.push({
+              id: item._id || item.id || `${rDate}-${title}`,
+              dbId: item._id || item.id,
+              date: rDate,
+              title,
+              isDefault: item.isDefault === true,
+            });
+          }
+        } else if (startStr) {
+          expandedHolidays.push({
+            id: item._id || item.id || `${startStr}-${title}`,
+            dbId: item._id || item.id,
+            date: startStr,
+            title,
+            isDefault: item.isDefault === true,
+          });
+        }
+      }
+
+      setHolidays(expandedHolidays);
     } catch (fetchError) {
       console.error('Holiday fetch failed', fetchError);
       setError('Unable to load holidays from server. Please try again.');
@@ -260,7 +294,7 @@ export default function Holidays() {
   };
 
   const handleEdit = (holiday) => {
-    setEditingId(holiday.id);
+    setEditingId(holiday.dbId || holiday.id);
     const stdDate = toStandardDateString(holiday.date);
     setStartDate(stdDate);
     setEndDate(stdDate);
@@ -273,8 +307,10 @@ export default function Holidays() {
   };
 
   const handleDelete = async (id) => {
-    const holidayToDelete = holidays.find((holiday) => holiday.id === id);
+    const holidayToDelete = holidays.find((holiday) => holiday.id === id || holiday.dbId === id);
     if (!holidayToDelete) return;
+
+    const targetDbId = holidayToDelete.dbId || holidayToDelete.id;
 
     const confirmed = await confirm({
       title: 'Delete holiday?',
@@ -286,7 +322,7 @@ export default function Holidays() {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE}/delete/${id}`, {
+      const response = await fetch(`${API_BASE}/delete/${targetDbId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -470,11 +506,11 @@ export default function Holidays() {
               dayBgClass = 'bg-slate-50';
             }
 
-            let borderClass = 'border-transparent';
+            let borderClass = 'border-slate-100';
             if (day.isToday) {
-              borderClass = 'border-orange-500 border-2';
-            } else if (day.hasHoliday && day.isCurrentMonth && !day.isSunday && !day.isSecondOrFourthSaturday) {
-              borderClass = 'border-blue-500 border-2';
+              borderClass = 'border-orange-500 border-2 shadow-xs';
+            } else if (day.hasHoliday && day.isCurrentMonth) {
+              borderClass = 'border-blue-500 border-2 shadow-xs';
             }
 
             return (
@@ -499,39 +535,62 @@ export default function Holidays() {
                     else openAddHolidayModal(day.dateStr);
                   }
                 }}
-                className={`relative min-h-[55px] sm:min-h-[65px] md:min-h-[75px] border ${dayBgClass} ${borderClass} p-1 sm:p-1.5 text-left cursor-pointer hover:bg-slate-100 transition-colors`}
+                className={`relative min-h-[64px] sm:min-h-[74px] md:min-h-[82px] border ${dayBgClass} ${borderClass} p-1 sm:p-1.5 text-left cursor-pointer hover:bg-slate-100 transition-colors flex flex-col justify-between`}
               >
-                <div className="flex items-center justify-between">
-                  <span className={`inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center text-[10px] sm:text-xs font-semibold ${day.isToday ? 'bg-orange-500 text-white rounded-full' : day.isCurrentMonth ? 'text-slate-900' : 'text-slate-400'}`}>
-                    {day.day}
-                  </span>
-                  {day.isToday && (
-                    <span className="hidden sm:inline-block bg-orange-100 px-1.5 py-0.5 text-[8px] font-semibold text-orange-700 border border-orange-200 rounded">
-                      Today
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center text-[10px] sm:text-xs font-bold ${day.isToday ? 'bg-orange-500 text-white rounded-full shadow-2xs' : day.hasHoliday ? 'bg-blue-600 text-white rounded-full shadow-2xs' : day.isCurrentMonth ? 'text-slate-900' : 'text-slate-400'}`}>
+                      {day.day}
                     </span>
-                  )}
+                    {day.isToday && (
+                      <span className="bg-orange-100 px-1.5 py-0.5 text-[8px] font-bold text-orange-700 border border-orange-200 rounded">
+                        Today
+                      </span>
+                    )}
+                    {day.hasHoliday && !day.isToday && (
+                      <span className="bg-blue-100 text-blue-800 text-[8px] font-bold px-1.5 py-0.5 rounded border border-blue-200 leading-none">
+                        Holiday
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Holiday Title / Weekend label */}
+                  <div className="mt-1">
+                    {day.hasHoliday && day.holidayTitle ? (
+                      <div
+                        className="p-1 sm:p-1.5 rounded-md bg-blue-50/95 border border-blue-200/90 shadow-2xs"
+                        title={day.holidayTitle}
+                      >
+                        <p className="text-[10px] sm:text-[11px] font-bold text-blue-900 leading-tight truncate">
+                          {day.holidayTitle}
+                        </p>
+                        {(day.isSunday || day.isSecondOrFourthSaturday) && (
+                          <p className="text-[8px] sm:text-[9px] text-blue-600 font-semibold leading-none mt-0.5 truncate">
+                            {day.isSunday ? 'Sunday' : (day.day >= 8 && day.day <= 14 ? '2nd Saturday' : '4th Saturday')}
+                          </p>
+                        )}
+                      </div>
+                    ) : day.isCurrentMonth && (day.isSunday || day.isSecondOrFourthSaturday) ? (
+                      <div className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 text-[9px] sm:text-[10px] font-semibold leading-tight truncate">
+                        {day.isSunday ? 'Sunday' : (day.day >= 8 && day.day <= 14 ? '2nd Saturday' : '4th Saturday')}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
-                <div className="mt-0.5">
-                  {day.hasHoliday && day.holidayTitle && (
-                    <p className="pr-5 text-[8px] sm:text-[9px] md:text-[10px] font-semibold text-slate-700 leading-tight truncate">
-                      {day.holidayTitle}
-                    </p>
-                  )}
-                </div>
                 {day.hasHoliday && day.isCurrentMonth && (
                   <button
                     type="button"
                     aria-label={`Delete ${day.holidayTitle} holiday on ${day.dateStr}`}
-                    title="Delete holiday"
+                    title={`Delete "${day.holidayTitle}"`}
                     onClick={(event) => {
                       event.stopPropagation();
                       const holiday = holidays.find(item => item.date === day.dateStr);
-                      if (holiday) handleDelete(holiday.id);
+                      if (holiday) handleDelete(holiday.dbId || holiday.id);
                     }}
-                    className="absolute bottom-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded text-rose-600 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                    className="self-end inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/90 border border-rose-200 text-rose-600 hover:bg-rose-50 shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rose-500 cursor-pointer mt-1"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={11} />
                   </button>
                 )}
               </div>

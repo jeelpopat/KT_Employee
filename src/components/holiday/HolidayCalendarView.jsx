@@ -1,6 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, Sparkles, Calendar as CalendarIcon, Info } from 'lucide-react';
 import api from '../../api/axios.js';
+import { expandHolidayDates } from '../../utils/holidayUtils.js';
+
+const toStandardDateString = (input) => {
+  if (!input) return '';
+  const str = String(input).trim();
+  const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymdMatch) {
+    const [, y, m, d] = ymdMatch;
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return str.slice(0, 10);
+};
 
 export const HolidayCalendarView = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -20,17 +44,23 @@ export const HolidayCalendarView = () => {
 
       // Filter only real holidays from backend (exclude generated default weekly offs)
       const realHolidays = apiHolidays.filter((item) => {
+        if (!item) return false;
         if (item.isDefault === true) return false;
-        const name = (item.holidayName || item.name || '').trim().toLowerCase();
-        if ((name === 'sunday' || name === '2nd saturday' || name === '4th saturday') && !item._id) {
+        const name = (item.holidayName || item.name || item.title || '').trim().toLowerCase();
+        if ((name === 'sunday' || name === '2nd saturday' || name === '4th saturday') && !item._id && !item.id) {
           return false;
         }
-        return Boolean(item._id || item.id);
+        return Boolean(name || item.holidayDate || item.date);
       });
 
-      const formattedApi = realHolidays.map((item) => {
-        const dateStr = (item.holidayDate || item.date || '').split('T')[0];
-        const rawName = item.holidayName || item.name || 'Holiday';
+      const expanded = [];
+      for (const item of realHolidays) {
+        const rawName = (item.holidayName || item.name || item.title || 'Holiday').trim();
+        const startRaw = item.startDate || item.fromDate || item.holidayDate || item.date;
+        const endRaw = item.endDate || item.toDate || startRaw;
+
+        const startStr = toStandardDateString(startRaw);
+        const endStr = toStandardDateString(endRaw);
 
         let derivedType = 'public';
         const lowerName = rawName.toLowerCase();
@@ -48,21 +78,35 @@ export const HolidayCalendarView = () => {
           lowerName.includes('fest')
         ) {
           derivedType = 'festival';
-        } else {
-          derivedType = 'public';
         }
 
-        return {
+        const holidayObj = {
           id: item._id || item.id,
           name: rawName,
-          date: dateStr,
           type: derivedType,
           description: item.description || (derivedType === 'festival' ? 'Official Festival Celebration' : 'Official Public Holiday'),
           isBackend: true
         };
-      });
 
-      setHolidays(formattedApi);
+        if (startStr && endStr && startStr < endStr) {
+          const rangeDates = expandHolidayDates([{ startDate: startStr, endDate: endStr }]);
+          for (const rDate of rangeDates) {
+            expanded.push({
+              ...holidayObj,
+              id: item._id || item.id || `${rDate}-${rawName}`,
+              date: rDate
+            });
+          }
+        } else if (startStr) {
+          expanded.push({
+            ...holidayObj,
+            id: item._id || item.id || `${startStr}-${rawName}`,
+            date: startStr
+          });
+        }
+      }
+
+      setHolidays(expanded);
     } catch (err) {
       console.warn('Error fetching holidays from backend:', err);
       setHolidays([]);
@@ -159,13 +203,12 @@ export const HolidayCalendarView = () => {
     const paddedD = String(day).padStart(2, '0');
     const dateStr = `${currentYear}-${paddedM}-${paddedD}`;
 
-    const matchingHolidays = holidays.filter(
-      (h) => h.date === dateStr && h.type !== 'sunday' && h.type !== 'saturday'
-    );
+    const matchingHolidays = holidays.filter((h) => h.date === dateStr);
 
     const hasHoliday = matchingHolidays.length > 0;
     const festival = matchingHolidays.find((h) => h.type === 'festival');
     const publicHol = matchingHolidays.find((h) => h.type === 'public');
+    const holidayName = matchingHolidays[0]?.name || festival?.name || publicHol?.name || '';
 
     // Count this day towards total holidays if it's Sunday, 2nd/4th Sat, or has a festival/holiday
     if (isSunday || is2ndOr4thSaturday || hasHoliday) {
@@ -182,6 +225,8 @@ export const HolidayCalendarView = () => {
       saturdayIndex,
       festival,
       publicHol,
+      holidayName,
+      hasHoliday,
       holidays: matchingHolidays,
       key: `day-${day}`
     });
@@ -259,7 +304,8 @@ export const HolidayCalendarView = () => {
 
             // Dividers
             const borderClasses = `${!isLastCol ? 'border-r' : ''} border-b border-slate-100`;
-            const cellHeight = 'min-h-[58px] sm:min-h-[68px]';
+            const cellHeight = 'min-h-[64px] sm:min-h-[74px] md:min-h-[82px]';
+            const holidayName = cell.holidayName || cell.holidays?.[0]?.name || cell.festival?.name || cell.publicHol?.name || '';
 
             // Case 1: Overflow Day (Prev / Next Month)
             if (cell.isOverflow) {
@@ -271,9 +317,11 @@ export const HolidayCalendarView = () => {
                   <div className="text-xs font-semibold text-slate-400">
                     {cell.day}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-normal leading-tight">
-                    {cell.holidayName}
-                  </div>
+                  {cell.holidayName && (
+                    <div className="text-[9px] sm:text-[10px] text-slate-400 font-semibold truncate leading-tight" title={cell.holidayName}>
+                      {cell.holidayName}
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -286,27 +334,34 @@ export const HolidayCalendarView = () => {
                   onClick={() => setSelectedDayInfo(cell)}
                   className={`${cellHeight} p-1 sm:p-1.5 flex flex-col justify-between cursor-pointer select-none ${borderClasses} bg-white relative`}
                 >
-                  {/* Crisp Orange Box Border as shown in screenshot */}
-                  <div className="w-full h-full border-2 border-orange-500 rounded-md p-1 sm:p-1.5 flex flex-col justify-between">
+                  <div className="w-full h-full border-2 border-orange-500 rounded-md p-1 sm:p-1.5 flex flex-col justify-between shadow-xs">
                     <div className="flex items-center justify-between">
-                      <span className="w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center text-[11px] font-bold shadow-2xs">
+                      <span className="w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center text-[10px] sm:text-[11px] font-bold shadow-2xs">
                         {cell.day}
                       </span>
-                      <span className="bg-orange-100/90 text-orange-600 text-[9px] font-semibold px-1.5 py-0.2 rounded border border-orange-200/60 leading-normal">
+                      <span className="bg-orange-100/90 text-orange-600 text-[9px] font-bold px-1.5 py-0.2 rounded border border-orange-200/60 leading-normal">
                         Today
                       </span>
                     </div>
 
-                    {/* Holiday/Festival text or blank */}
-                    <div className="text-[10px] sm:text-[11px] font-medium text-slate-800 truncate mt-0.5 leading-tight">
-                      {cell.festival?.name || cell.publicHol?.name || (cell.isSunday ? 'Sunday' : '')}
+                    {/* Holiday Name or Sunday */}
+                    <div className="mt-1">
+                      {holidayName ? (
+                        <div className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-900 text-[10px] sm:text-[11px] font-bold truncate leading-tight" title={holidayName}>
+                          {holidayName}
+                        </div>
+                      ) : cell.isSunday ? (
+                        <div className="text-[10px] sm:text-[11px] font-semibold text-slate-600 truncate leading-tight">
+                          Sunday
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
               );
             }
 
-            // Case 3: Sunday or 2nd/4th Saturday (Gray Background)
+            // Case 3: Sunday or 2nd/4th Saturday (Weekend)
             if (cell.isSunday || cell.is2ndOr4thSaturday) {
               const labelText = cell.isSunday
                 ? 'Sunday'
@@ -318,57 +373,67 @@ export const HolidayCalendarView = () => {
                 <div
                   key={cell.key}
                   onClick={() => setSelectedDayInfo(cell)}
-                  className={`${cellHeight} p-1.5 sm:p-2 flex flex-col justify-between cursor-pointer select-none ${borderClasses} bg-[#f0f4f9] hover:bg-[#e8eef6] transition-colors`}
+                  className={`${cellHeight} p-1.5 sm:p-2 flex flex-col justify-between cursor-pointer select-none ${borderClasses} ${holidayName ? 'bg-blue-50/60 border-blue-400 border-2 rounded-md' : 'bg-[#f0f4f9]'} hover:bg-[#e8eef6] transition-colors`}
                 >
-                  <div className="text-xs font-semibold text-slate-800">
-                    {cell.day}
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium truncate leading-tight">
-                    {cell.festival?.name || cell.publicHol?.name || labelText}
-                  </div>
-                </div>
-              );
-            }
-
-            // Case 4: Festival on working day (Indigo border as requested)
-            if (cell.festival) {
-              return (
-                <div
-                  key={cell.key}
-                  onClick={() => setSelectedDayInfo(cell)}
-                  className={`${cellHeight} p-1 sm:p-1.5 flex flex-col justify-between cursor-pointer select-none ${borderClasses} bg-indigo-50/40 hover:bg-indigo-50/70 transition-colors relative`}
-                >
-                  <div className="w-full h-full border-2 border-indigo-500 rounded-md p-1 sm:p-1.5 flex flex-col justify-between">
-                    <div className="text-xs font-bold text-indigo-600">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-bold ${holidayName ? 'text-blue-900' : 'text-slate-800'}`}>
                       {cell.day}
-                    </div>
-                    <div className="text-[10px] sm:text-[11px] font-semibold text-indigo-700 truncate leading-tight">
-                      {cell.festival.name}
-                    </div>
+                    </span>
+                    {holidayName && (
+                      <span className="bg-blue-100 text-blue-800 text-[8px] font-bold px-1 py-0.2 rounded border border-blue-200">
+                        Holiday
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-1">
+                    {holidayName ? (
+                      <div className="px-1.5 py-1 rounded-md bg-blue-50/95 border border-blue-200/90 shadow-2xs" title={holidayName}>
+                        <p className="text-[10px] sm:text-[11px] font-bold text-blue-900 leading-tight truncate">
+                          {holidayName}
+                        </p>
+                        <p className="text-[8px] sm:text-[9px] text-blue-600 font-semibold leading-none mt-0.5 truncate">
+                          {labelText}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] sm:text-[11px] text-slate-600 font-semibold truncate leading-tight">
+                        {labelText}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             }
 
-            // Case 5: Public Holiday on working day
-            if (cell.publicHol) {
+            // Case 4: Any Holiday on Working Day (Festival, Public, Corporate)
+            if (holidayName || cell.hasHoliday) {
               return (
                 <div
                   key={cell.key}
                   onClick={() => setSelectedDayInfo(cell)}
-                  className={`${cellHeight} p-1.5 sm:p-2 flex flex-col justify-between cursor-pointer select-none ${borderClasses} bg-[#f0f4f9] hover:bg-[#e8eef6] transition-colors`}
+                  className={`${cellHeight} p-1 sm:p-1.5 flex flex-col justify-between cursor-pointer select-none ${borderClasses} bg-blue-50/40 hover:bg-blue-50/70 transition-colors relative`}
                 >
-                  <div className="text-xs font-semibold text-slate-800">
-                    {cell.day}
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] text-indigo-600 font-medium truncate leading-tight">
-                    {cell.publicHol.name}
+                  <div className="w-full h-full border-2 border-blue-500 rounded-md p-1 sm:p-1.5 flex flex-col justify-between bg-white/70 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] sm:text-[11px] font-bold shadow-2xs">
+                        {cell.day}
+                      </span>
+                      <span className="bg-blue-100 text-blue-800 text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 leading-none">
+                        Holiday
+                      </span>
+                    </div>
+                    <div className="mt-1 px-1.5 py-0.5 rounded bg-blue-50/90 border border-blue-100">
+                      <p className="text-[10px] sm:text-[11px] font-bold text-blue-900 truncate leading-tight" title={holidayName}>
+                        {holidayName}
+                      </p>
+                    </div>
                   </div>
                 </div>
               );
             }
 
-            // Case 6: Regular Working Day (e.g. 1st Sat, 3rd Sat, Weekdays)
+            // Case 5: Regular Working Day (e.g. 1st Sat, 3rd Sat, Weekdays)
             return (
               <div
                 key={cell.key}
