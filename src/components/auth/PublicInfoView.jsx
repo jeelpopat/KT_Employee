@@ -73,7 +73,7 @@ const publicPages = {
       {
         title: 'Organization-specific notices and contact',
         paragraphs: [
-          'Your organization may provide additional notices that explain its specific use of employee information and applicable procedures. For questions about this policy or the platform, contact support@kevalon.com; for employment-record requests, contact your HR team or workspace administrator.'
+          'Your organization may provide additional notices that explain its specific use of employee information and applicable procedures. For questions about this policy or the platform, contact career@kevalontechnology.in; for employment-record requests, contact your HR team or workspace administrator.'
         ]
       }
     ]
@@ -135,7 +135,7 @@ const publicPages = {
       {
         title: 'Questions',
         paragraphs: [
-          'For help using the platform, contact support@kevalon.com. For organization-specific rules or workplace matters, contact your HR team or workspace administrator. These platform terms do not replace policies or notices provided by your organization.'
+          'For help using the platform, contact career@kevalontechnology.in. For organization-specific rules or workplace matters, contact your HR team or workspace administrator. These platform terms do not replace policies or notices provided by your organization.'
         ]
       }
     ]
@@ -150,7 +150,7 @@ const publicPages = {
       {
         title: 'Contact the support team',
         paragraphs: [
-          'Email support@kevalon.com with a short description of the issue, the page or feature involved, and the steps needed to reproduce it.'
+          'Email career@kevalontechnology.in with a short description of the issue, the page or feature involved, and the steps needed to reproduce it.'
         ],
         email: true
       },
@@ -211,12 +211,11 @@ export const PublicInfoView = ({ page }) => {
                 ))}
                 {section.email && (
                   <a
-                    href="mailto:support@kevalon.com"
+                    href="mailto:career@kevalontechnology.in"
                     className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-50 px-4 py-2.5 text-sm font-semibold text-[#034665] transition hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0088cc]"
                   >
                     <Mail size={16} />
-                    support@kevalon.com
-                  </a>
+career@kevalontechnology.in                  </a>
                 )}
               </section>
             ))}

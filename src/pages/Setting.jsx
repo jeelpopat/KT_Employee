@@ -18,7 +18,7 @@ export default function Setting() {
     } catch {}
     return {
       companyName: "Kevalon Technology",
-      supportEmail: "support@kevalon.com",
+      supportEmail: "career@kevalontechnology.in",
       sessionTimeoutMinutes: 60,
       soundAlertEnabled: true,
       emailNotifications: true,

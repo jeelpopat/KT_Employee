@@ -216,7 +216,7 @@ export const ForgotPasswordView = ({ onBackToLogin }) => {
 
         <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
           <span>Kevalon Technology HRMS Suite</span>
-          <span>Assistance: support@kevalon.com</span>
+          <span>Assistance: career@kevalontechnology.in</span>
         </div>
       </div>
     </div>
