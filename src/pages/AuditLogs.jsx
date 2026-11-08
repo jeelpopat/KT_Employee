@@ -1,11 +1,44 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, History, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import api from '../api/axios.js';
+import { useApp } from '../context/AppContext.jsx';
+import { decodeToken } from '../utils/auth.js';
 
 const PAGE_SIZE = 20;
-const AUDIT_LOGS_ENDPOINT = '/api/audit-logs';
+const AUDIT_LOGS_ENDPOINTS = ['/api/audit-log', '/api/audit-logs'];
 const RECORD_KEYS = ['auditLogs', 'logs', 'items', 'records', 'results', 'data'];
 const ENVELOPE_KEYS = ['data', 'result', 'payload'];
+
+const getId = (value) => {
+  if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
+  if (value && typeof value === 'object') {
+    return String(value._id || value.id || value.companyId || '').trim();
+  }
+  return '';
+};
+
+const getCompanyId = (user) => {
+  let claims = null;
+  try {
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    claims = decodeToken(token);
+  } catch (error) {
+    console.warn('Could not read the authentication token for audit log company scope:', error);
+  }
+  const candidates = [
+    user?.companyId,
+    user?.company?._id,
+    user?.company?.id,
+    user?.employee?.companyId,
+    user?.employee?.company?._id,
+    claims?.companyId,
+    claims?.company?._id,
+    claims?.company?.id,
+    claims?.user?.companyId,
+  ];
+
+  return candidates.map(getId).find(Boolean) || '';
+};
 
 const findAuditRecords = (payload, depth = 0) => {
   if (Array.isArray(payload)) return { records: payload, envelope: {} };
@@ -91,11 +124,49 @@ const getActionStyle = (action) => {
 
 const getErrorMessage = (error) => {
   const status = error.response?.status;
-  if (status === 404) return `Audit log API is not available yet (${AUDIT_LOGS_ENDPOINT}).`;
-  return error.response?.data?.message || error.message || 'Unable to load audit logs. Please try again.';
+  const responseData = error.response?.data;
+  if (status === 404) return `Audit log endpoint was not found (${AUDIT_LOGS_ENDPOINTS.join(' or ')}).`;
+  const validationErrors = responseData?.errors || responseData?.details || responseData?.issues;
+  let validationMessage = '';
+
+  if (Array.isArray(validationErrors)) {
+    validationMessage = validationErrors
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (!item || typeof item !== 'object') return '';
+        const field = item.path || item.param || item.field;
+        const message = item.msg || item.message || item.error;
+        return [field, message].filter(Boolean).join(': ');
+      })
+      .filter(Boolean)
+      .join('; ');
+  } else if (validationErrors && typeof validationErrors === 'object') {
+    validationMessage = Object.entries(validationErrors)
+      .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+      .join('; ');
+  } else if (typeof validationErrors === 'string') {
+    validationMessage = validationErrors;
+  }
+
+  const message = responseData?.message || error.message || 'Unable to load audit logs. Please try again.';
+  return validationMessage ? `${message}: ${validationMessage}` : message;
+};
+
+const fetchAuditLogs = async (params) => {
+  for (let index = 0; index < AUDIT_LOGS_ENDPOINTS.length; index += 1) {
+    try {
+      return await api.get(AUDIT_LOGS_ENDPOINTS[index], { params, skipCache: true });
+    } catch (error) {
+      if (error.response?.status !== 404 || index === AUDIT_LOGS_ENDPOINTS.length - 1) {
+        throw error;
+      }
+    }
+  }
+  throw new Error('No audit log endpoint is configured.');
 };
 
 export default function AuditLogs() {
+  const { user } = useApp();
   const [filters, setFilters] = useState({ actor: '', action: '', entity: '', from: '', to: '' });
   const [draftFilters, setDraftFilters] = useState(filters);
   const [page, setPage] = useState(1);
@@ -105,19 +176,31 @@ export default function AuditLogs() {
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const companyId = getCompanyId(user);
 
   useEffect(() => {
     let active = true;
     const loadAuditLogs = async () => {
       setIsLoading(true);
       setError('');
-      const params = { page, limit: PAGE_SIZE };
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) params[key] = value;
-      });
+      if (!companyId) {
+        setRecords([]);
+        setTotal(0);
+        setTotalPages(1);
+        setError('Your account is missing a company ID. Please sign in again or contact your administrator.');
+        setIsLoading(false);
+        return;
+      }
+
+      const params = { page, limit: PAGE_SIZE, companyId };
+      if (filters.actor) params.actorId = filters.actor;
+      if (filters.action) params.actionType = filters.action;
+      if (filters.entity) params.entityType = filters.entity;
+      if (filters.from) params.startDate = `${filters.from}T00:00:00.000Z`;
+      if (filters.to) params.endDate = `${filters.to}T23:59:59.999Z`;
 
       try {
-        const response = await api.get(AUDIT_LOGS_ENDPOINT, { params, skipCache: true });
+        const response = await fetchAuditLogs(params);
         const result = findAuditRecords(response.data);
         if (!result) throw new Error('The audit log API returned an unsupported response format.');
 
@@ -133,6 +216,7 @@ export default function AuditLogs() {
         const nextTotalPages = Number(
           result.envelope.totalPages ??
           pagination.totalPages ??
+          pagination.pages ??
           (Number.isFinite(nextTotal) ? Math.ceil(nextTotal / Math.max(nextPageSize, 1)) : 1)
         );
 
@@ -159,7 +243,7 @@ export default function AuditLogs() {
     return () => {
       active = false;
     };
-  }, [filters, page, refreshKey]);
+  }, [companyId, filters, page, refreshKey]);
 
   const pageSummary = useMemo(() => {
     if (total === 0) return 'No audit events';
@@ -218,7 +302,7 @@ export default function AuditLogs() {
           <input
             value={draftFilters.actor}
             onChange={(event) => updateDraftFilter('actor', event.target.value)}
-            placeholder="Name, email or ID"
+            placeholder="Actor user ID"
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
           />
         </label>
@@ -282,9 +366,6 @@ export default function AuditLogs() {
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <div>
             <p className="font-semibold">{error}</p>
-            {error.includes('not available yet') && (
-              <p className="mt-1 text-rose-600">Connect the backend audit endpoint to load recorded events.</p>
-            )}
           </div>
         </div>
       )}
@@ -305,7 +386,7 @@ export default function AuditLogs() {
           </div>
         ) : error ? (
           <div className="px-4 py-10 text-center text-xs text-slate-500">
-            Audit events will appear here when the audit API is available.
+            Could not load audit events. Check the error above and try refreshing.
           </div>
         ) : records.length === 0 ? (
           <div className="px-4 py-12 text-center">
