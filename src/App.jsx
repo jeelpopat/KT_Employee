@@ -45,6 +45,7 @@ const AdminPositionsView = lazy(() => import('./pages/Positions.jsx'));
 const AdminPortfolioLeadsView = lazy(() => import('./pages/PortfolioLeads.jsx'));
 const AdminContactsView = lazy(() => import('./pages/Contacts.jsx'));
 const AdminSettingsView = lazy(() => import('./pages/Setting.jsx'));
+const AuditLogsView = lazy(() => import('./pages/AuditLogs.jsx'));
 
 // Lazy-load role & placeholder views
 const SalaryView = lazy(() => import('./components/salary/SalaryView.jsx').then(m => ({ default: m.SalaryView })));
@@ -160,6 +161,8 @@ const MainLayout = ({ handleSignOut }) => {
       case 'admin-positions': return <AdminPositionsView />;
       case 'admin-portfolio-leads': return <AdminPortfolioLeadsView />;
       case 'admin-contacts': return <AdminContactsView />;
+      case 'admin-audit-logs':
+        return (userRole === 'admin' || userRole === 'hr') ? <AuditLogsView /> : <AdminDashboardView />;
 
       // Existing Modules
       case 'dashboard': return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;

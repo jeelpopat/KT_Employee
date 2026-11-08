@@ -248,6 +248,14 @@ const ScreenshotIcon = ({ size = 18, className = "" }) => (
   </svg>
 );
 
+const AuditLogsIcon = ({ size = 18, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 8v4l3 2" />
+    <circle cx="12" cy="12" r="9" />
+    <path d="M5 3 3 5M19 3l2 2" />
+  </svg>
+);
+
 // 15. Applications: ID badge card
 const ApplicationsIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -407,6 +415,7 @@ export const Sidebar = ({ onSignOut }) => {
       'team-tasks': ['team-tasks', 'admin-team-tasks'],
       'admin-holidays': ['holiday', 'admin-holidays'],
       'holiday': ['holiday', 'admin-holidays'],
+      'admin-audit-logs': ['admin-audit-logs'],
       'admin-members': ['team-members', 'admin-members'],
       'team-members': ['team-members', 'admin-members'],
       'admin-employees': ['employees', 'admin-employees'],
@@ -472,6 +481,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "MONITORING AND SECURITY",
       items: [
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
+        { tab: 'admin-audit-logs', label: 'Audit Logs', icon: AuditLogsIcon },
       ]
     },
     // {
@@ -525,6 +535,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "MONITORING AND SECURITY",
       items: [
         { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
+        { tab: 'admin-audit-logs', label: 'Audit Logs', icon: AuditLogsIcon },
       ]
     },
     // {

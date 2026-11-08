@@ -16,6 +16,7 @@ export const pathToTab = {
   '/team-lead': 'admin-team-lead',
   '/attendance/team': 'admin-team-tasks',
   '/attendance/office-settings': 'admin-office-settings',
+  '/admin/audit-logs': 'admin-audit-logs',
   '/applications': 'admin-applications',
   '/positions': 'admin-positions',
   '/portfolio-leads': 'admin-portfolio-leads',
@@ -65,6 +66,7 @@ export const tabToPath = {
   'admin-team-lead': '/team-lead',
   'admin-team-tasks': '/attendance/team',
   'admin-office-settings': '/attendance/office-settings',
+  'admin-audit-logs': '/admin/audit-logs',
   'admin-settings': '/settings',
   'admin-applications': '/applications',
   'admin-positions': '/positions',
@@ -95,4 +97,3 @@ export const tabToPath = {
   'team-deductions': '/team-deductions',
   'my-deductions': '/my-deductions',
 };
-
