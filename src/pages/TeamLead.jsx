@@ -1267,7 +1267,6 @@ const getDesignation = (lead) => {
       // Fetch employees from live backend
       const fetchedEmployees = await fetchEmployees(headers);
 
-      // Extract all employees from database marked as team lead (e.g. Yash Vaghasiya)
       const employeeTeamLeads = (fetchedEmployees || []).filter((emp) => {
         if (!emp) return false;
         if (isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp) || isHrRoleOrUser(emp)) return false;
@@ -1312,7 +1311,6 @@ const getDesignation = (lead) => {
       // 1. Start merged leads with the formatted team leads from api/user/all
       const mergedLeads = [...formattedUserTLs];
 
-      // 2. Merge in any employeeTeamLeads (e.g. Yash Vaghasiya)
       (formattedEmployeeTLs || []).forEach((empLead) => {
         if (!empLead) return;
         if (isFinanceOrExcludedUser(empLead) || isUnknownEmployeeOrUser(empLead)) return;

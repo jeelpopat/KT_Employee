@@ -41,7 +41,7 @@ export const formatDateForInput = (raw) => {
         const day = String(d.getDate()).padStart(2, "0");
         return `${y}-${m}-${day}`;
       }
-    } catch (e) {}
+    } catch (e) { }
     return raw.trim().split("T")[0];
   }
 
@@ -54,7 +54,7 @@ export const formatDateForInput = (raw) => {
       const day = String(d.getDate()).padStart(2, "0");
       return `${y}-${m}-${day}`;
     }
-  } catch (e) {}
+  } catch (e) { }
 
   return "";
 };
@@ -290,7 +290,7 @@ export default function Adjustments() {
 
     if (
       tempSettings.officeEndTime <=
-      tempSettings.absentAfter 
+      tempSettings.absentAfter
     ) {
       showToast("Office End Time must be greater than Absent After time.", "error");
       return;
@@ -399,8 +399,8 @@ export default function Adjustments() {
 
         const headers = token
           ? {
-              Authorization: `Bearer ${token}`,
-            }
+            Authorization: `Bearer ${token}`,
+          }
           : {};
 
         const employeeMap = new Map();
@@ -443,8 +443,8 @@ export default function Adjustments() {
               const userIdKey = emp.userID
                 ? String(emp.userID)
                 : emp._id
-                ? String(emp._id)
-                : null;
+                  ? String(emp._id)
+                  : null;
               if (!userIdKey) return;
 
               const existing = employeeMap.get(userIdKey) || {};
@@ -700,7 +700,7 @@ export default function Adjustments() {
 
         if (
           !updated[
-            sessionIndex
+          sessionIndex
           ]
         ) {
           updated[
@@ -717,7 +717,7 @@ export default function Adjustments() {
           sessionIndex
         ] = {
           ...updated[
-            sessionIndex
+          sessionIndex
           ],
           [field]: checked,
         };
@@ -1356,7 +1356,7 @@ export default function Adjustments() {
               ) => {
                 const checkbox =
                   selectedFields[
-                    sessionIndex
+                  sessionIndex
                   ] || {};
 
                 const cleaned = {};
@@ -1757,7 +1757,7 @@ export default function Adjustments() {
         hours = hours ? hours : 12;
         return `${hours}:${minutes} ${ampm}`;
       }
-    } catch {}
+    } catch { }
     return timeStr;
   };
 
@@ -1799,7 +1799,7 @@ export default function Adjustments() {
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-[#0f172a] font-poppins">
                     Rule Settings
-                  </h2> 
+                  </h2>
 
                   <p className="text-xs text-[#64748b] mt-0.5 font-poppins">
                     Configure office attendance timings and rules
@@ -2392,11 +2392,10 @@ export default function Adjustments() {
                             value={session.checkin}
                             onChange={(e) => handleSessionChange(index, "checkin", e.target.value)}
                             placeholder="--:--"
-                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${
-                              checkbox.checkin
+                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${checkbox.checkin
                                 ? "border-[#068DCB] bg-[#f0f9ff]/40 text-[#0f172a]"
                                 : "border-[#cbd5e1] text-[#475569]"
-                            }`}
+                              }`}
                           />
                         </div>
                       </div>
@@ -2420,11 +2419,10 @@ export default function Adjustments() {
                             value={session.breakStart}
                             onChange={(e) => handleSessionChange(index, "breakStart", e.target.value)}
                             placeholder="--:--"
-                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${
-                              checkbox.breakStart
+                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${checkbox.breakStart
                                 ? "border-[#068DCB] bg-[#f0f9ff]/40 text-[#0f172a]"
                                 : "border-[#cbd5e1] text-[#475569]"
-                            }`}
+                              }`}
                           />
                         </div>
                       </div>
@@ -2448,11 +2446,10 @@ export default function Adjustments() {
                             value={session.breakEnd}
                             onChange={(e) => handleSessionChange(index, "breakEnd", e.target.value)}
                             placeholder="--:--"
-                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${
-                              checkbox.breakEnd
+                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${checkbox.breakEnd
                                 ? "border-[#068DCB] bg-[#f0f9ff]/40 text-[#0f172a]"
                                 : "border-[#cbd5e1] text-[#475569]"
-                            }`}
+                              }`}
                           />
                         </div>
                       </div>
@@ -2476,11 +2473,10 @@ export default function Adjustments() {
                             value={session.checkout}
                             onChange={(e) => handleSessionChange(index, "checkout", e.target.value)}
                             placeholder="--:--"
-                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${
-                              checkbox.checkout
+                            className={`w-full bg-white border px-3 py-2 text-xs sm:text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-[#068DCB] focus:border-[#068DCB] font-poppins transition-colors ${checkbox.checkout
                                 ? "border-[#068DCB] bg-[#f0f9ff]/40 text-[#0f172a]"
                                 : "border-[#cbd5e1] text-[#475569]"
-                            }`}
+                              }`}
                           />
                         </div>
                       </div>
@@ -2541,33 +2537,8 @@ export default function Adjustments() {
                 <Loader2 className="w-5 h-5 animate-spin text-[#068DCB]" />
               </div>
             ) : recentAdjustments.length === 0 ? (
-              /* Fallback sample item matching reference image when no records */
-              <div className="p-4 rounded-xl border border-[#e2e8f0] bg-white text-xs font-poppins shadow-2xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-[#0f172a] text-sm font-poppins">
-                    Yash Vaghasiya
-                  </span>
-                  <span
-                    className="text-[11px] font-medium px-2.5 py-0.5 rounded-md text-white font-poppins"
-                    style={{ background: '#034665' }}
-                  >
-                    Half Day
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-[#64748b] font-medium mt-1.5 font-poppins">
-                  <span>Date: 22 Oct 2026</span>
-                  <span>In- 10:00 AM</span>
-                </div>
-                <div className="text-xs text-[#475569] font-medium mt-2 mb-3.5 font-poppins">
-                  Reason: <span className="text-[#334155]">Late</span>
-                </div>
-                <button
-                  type="button"
-                  className="w-full text-white py-2 rounded-lg text-xs font-medium tracking-wide transition-all font-poppins shadow-xs cursor-pointer hover:opacity-95"
-                  style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
-                >
-                  Edit Attendance
-                </button>
+              <div className="flex items-center justify-center py-8 text-sm font-medium text-[#64748b] font-poppins">
+                No Data Found
               </div>
             ) : (
               recentAdjustments
