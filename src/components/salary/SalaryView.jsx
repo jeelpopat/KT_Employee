@@ -19,7 +19,8 @@ import { previewPayrollWithDeductions } from '../../services/deductionService.js
 // Currency Formatter (Indian Rupee) - strictly formatted with 2 decimal places per specification
 export const formatINR = (val) => {
   if (val == null || val === '') return '—';
-  const num = Number(val) || 0;
+  const num = Number(val);
+  if (!Number.isFinite(num)) return '—';
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
@@ -1527,7 +1528,7 @@ export const SalaryView = () => {
       : '';
 
     const deductionRows = deductionBreakdown.components
-      .filter((item) => (item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount') && !item.isCustom)
+      .filter((item) => (item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount') && !item.isCustom && item.key !== 'appliedPenalty')
       .map((item) => {
         const label = item.key === 'tdsAmount' ? `${item.label} (${deductionBreakdown.tdsPercentage}%)` : item.label;
         return `<tr><td>${label}</td><td class="amount" style="color: #dc2626;">-${formatINR(item.amount)}</td></tr>`;
@@ -1604,7 +1605,7 @@ export const SalaryView = () => {
   <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 16px; margin-top: -14px; margin-bottom: 20px; display: flex; justify-content: space-between; font-size: 11px; flex-wrap: wrap; gap: 8px;">
     <div>Calendar Days: <strong>${previewValues.calendarDays ?? '—'}</strong></div>
     <div>Sundays: <strong>${previewValues.sundays ?? '—'}</strong></div>
-    <div>Configured Holiday Days: <strong>${previewValues.holidayDays ?? '—'}</strong></div>
+    <div>Configured Holiday Days (excluding Sundays; includes Saturday holidays): <strong>${previewValues.holidayDays ?? '—'}</strong></div>
     <div>Working Days / Calculation Divisor: <strong>${previewValues.workingDays ?? '—'}</strong></div>
     <div>Per Day Salary: <strong>${formatINR(previewValues.perDaySalary)}</strong></div>
     <div>Approved Unpaid Leave Days: <strong>${previewValues.approvedLeaveDays ?? '—'}</strong></div>
@@ -1756,7 +1757,7 @@ export const SalaryView = () => {
       esicDeduction: values.esicDeduction,
       professionalTax: values.professionalTax
     };
-  }, [selectedPayrollToUpdate, updatePayrollForm, updatePayrollPreview]);
+  }, [updatePayrollForm, updatePayrollPreview]);
 
   useEffect(() => {
     if (!isUpdatePayrollModalOpen || !selectedPayrollToUpdate) return undefined;
@@ -1778,8 +1779,8 @@ export const SalaryView = () => {
       month: Number(selectedPayrollToUpdate.month),
       year: Number(selectedPayrollToUpdate.year),
       totalDays: updatePayrollForm.totalDays,
-      leaveDays: updatePayrollCalculations.approvedLeaveDays ?? undefined,
-      approvedLeaveDays: updatePayrollCalculations.approvedLeaveDays ?? undefined,
+      leaveDays: updatePayrollForm.leaveDays,
+      approvedLeaveDays: updatePayrollForm.leaveDays,
       unauthorizedFullDays: updatePayrollForm.unauthorizedFullDays,
       unauthorizedHalfDays: updatePayrollForm.unauthorizedHalfDays,
       unauthorizedFullDayCount: updatePayrollForm.unauthorizedFullDays,
@@ -3418,7 +3419,7 @@ export const SalaryView = () => {
                         value={updatePayrollCalculations.lopDays ?? ''}
                         className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-rose-200 rounded-lg text-rose-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                         placeholder="0"
-                        title="Total LOP Days = Approved Leaves + Unauthorized Absence Days"
+                        title="LOP days returned by the backend payroll preview."
                       />
                     </div>
 
@@ -3432,7 +3433,7 @@ export const SalaryView = () => {
                         value={updatePayrollCalculations.daysPayable ?? ''}
                         className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                         placeholder="—"
-                        title="Total Payable Days = Total Month Days - Total LOP Days"
+                        title="Payable days returned by the backend payroll preview."
                       />
                     </div>
                   </div>
@@ -3441,7 +3442,7 @@ export const SalaryView = () => {
                   {updatePayrollPreviewError && <p role="alert" className="text-xs text-rose-700">{updatePayrollPreviewError}</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
                     <div>Sundays: <strong>{updatePayrollCalculations.sundays ?? '—'}</strong></div>
-                    <div>Configured Holiday Days: <strong>{updatePayrollCalculations.holidayDays ?? '—'}</strong></div>
+                    <div>Configured Holiday Days (Saturday included): <strong>{updatePayrollCalculations.holidayDays ?? '—'}</strong></div>
                     <div>Working Days / Calculation Divisor: <strong>{updatePayrollCalculations.workingDays ?? '—'}</strong></div>
                     <div>Per Day Salary: <strong>{formatINR(updatePayrollCalculations.perDaySalary)}</strong></div>
                     <div>Actual Absence Days: <strong>{updatePayrollCalculations.unauthorizedAbsenceDays ?? '—'}</strong></div>
@@ -3922,7 +3923,7 @@ export const SalaryView = () => {
                       value={processCalculations.lopDays ?? ''}
                       className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-rose-200 rounded-lg text-rose-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                       placeholder="0"
-                      title="Total LOP Days = Approved Leaves + Unauthorized Absence Days"
+                      title="LOP days returned by the backend payroll preview."
                     />
                   </div>
 
@@ -3936,7 +3937,7 @@ export const SalaryView = () => {
                       value={processCalculations.daysPayable ?? ''}
                       className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                       placeholder="—"
-                      title="Total Payable Days = Total Month Days - Total LOP Days"
+                      title="Payable days returned by the backend payroll preview."
                     />
                   </div>
                 </div>
@@ -3945,7 +3946,7 @@ export const SalaryView = () => {
                 {processPreviewError && <p role="alert" className="text-xs text-rose-700">{processPreviewError}</p>}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
                   <div>Sundays: <strong>{processCalculations.sundays ?? '—'}</strong></div>
-                  <div>Configured Holiday Days: <strong>{processCalculations.holidayDays ?? '—'}</strong></div>
+                  <div>Configured Holiday Days (Saturday included): <strong>{processCalculations.holidayDays ?? '—'}</strong></div>
                   <div>Working Days / Calculation Divisor: <strong>{processCalculations.workingDays ?? '—'}</strong></div>
                   <div>Per Day Salary: <strong>{formatINR(processCalculations.perDaySalary)}</strong></div>
                   <div>Actual Absence Days: <strong>{processCalculations.unauthorizedAbsenceDays ?? '—'}</strong></div>
@@ -4644,7 +4645,6 @@ export const SalaryView = () => {
             : slip.fixedDeduction ?? slip.otherDeductions ?? null);
 
         // 10. Proposed Penalty (not applied)
-        const totalDays = previewValues.calendarDays;
         const proposedPenalty = previewValues.proposedPenalty;
 
         // 11. Legally Approved Penalty (if applicable)
