@@ -61,11 +61,38 @@ const evaluateUnpaidLeave = (scenario, count = 1) => {
     case 'UNAUTHORIZED_FULL_DAY':
       return { actualUnpaidDays: 1.0 * count, proposedPenaltyDays: 0.5 * count, status: 'Unauthorized Absence' };
     case 'UNAUTHORIZED_HALF_DAY':
-      return { actualUnpaidDays: 0.5 * count, proposedPenaltyDays: 0.25 * count, status: 'Unauthorized Absence' };
+      return { actualUnpaidDays: 0.5 * count, proposedPenaltyDays: 0.5 * count, status: 'Unauthorized Absence' };
     default:
       return { actualUnpaidDays: 0, status: 'Normal' };
   }
 };
+
+// Authoritative Per-Day Salary ₹500 Example Compliance Check:
+// Per Day Salary: ₹500
+// Approved Full Day     → Leave ₹500 + Penalty ₹0   = ₹500
+// Approved Half Day     → Leave ₹250 + Penalty ₹0   = ₹250
+// Unauthorized Full Day → Leave ₹500 + Penalty ₹250 = ₹750
+// Unauthorized Half Day → Leave ₹250 + Penalty ₹250 = ₹500 (NOT ₹375)
+const perDayTest500 = 500;
+const checkAppFull = evaluateUnpaidLeave('APPROVED_FULL_DAY', 1);
+assert.equal(checkAppFull.actualUnpaidDays * perDayTest500, 500, 'Approved Full Day: ₹500 leave + ₹0 penalty = ₹500');
+
+const checkAppHalf = evaluateUnpaidLeave('APPROVED_HALF_DAY', 1);
+assert.equal(checkAppHalf.actualUnpaidDays * perDayTest500, 250, 'Approved Half Day: ₹250 leave + ₹0 penalty = ₹250');
+
+const checkUnauthFull = evaluateUnpaidLeave('UNAUTHORIZED_FULL_DAY', 1);
+const unauthFullLeaveVal = checkUnauthFull.actualUnpaidDays * perDayTest500;
+const unauthFullPenaltyVal = checkUnauthFull.proposedPenaltyDays * perDayTest500;
+assert.equal(unauthFullLeaveVal, 500, 'Unauthorized Full Day Leave: ₹500');
+assert.equal(unauthFullPenaltyVal, 250, 'Unauthorized Full Day Penalty: ₹250');
+assert.equal(unauthFullLeaveVal + unauthFullPenaltyVal, 750, 'Unauthorized Full Day Total: ₹750');
+
+const checkUnauthHalf = evaluateUnpaidLeave('UNAUTHORIZED_HALF_DAY', 1);
+const unauthHalfLeaveVal = checkUnauthHalf.actualUnpaidDays * perDayTest500;
+const unauthHalfPenaltyVal = checkUnauthHalf.proposedPenaltyDays * perDayTest500;
+assert.equal(unauthHalfLeaveVal, 250, 'Unauthorized Half Day Leave: ₹250');
+assert.equal(unauthHalfPenaltyVal, 250, 'Unauthorized Half Day Penalty: ₹250');
+assert.equal(unauthHalfLeaveVal + unauthHalfPenaltyVal, 500, 'Unauthorized Half Day Total: strictly ₹500 (NOT ₹375)');
 
 const fullDayApproved = evaluateUnpaidLeave('APPROVED_FULL_DAY', 1);
 assert.equal(fullDayApproved.actualUnpaidDays, 1.0);

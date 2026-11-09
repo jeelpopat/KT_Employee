@@ -579,6 +579,9 @@ export const SalaryView = () => {
     totalDays: currentMonthDays,
     daysPayable: currentMonthDays,
     leaveDays: 0,
+    approvedLeaveDays: 0,
+    unauthorizedFullDays: 0,
+    unauthorizedHalfDays: 0,
     unauthorizedAbsenceDays: 0,
     lopDays: 0,
     extraAllowance: '',
@@ -600,7 +603,7 @@ export const SalaryView = () => {
   const [liveDeductionPreview, setLiveDeductionPreview] = useState(null);
 
   // Live sync employee custom approved deductions and preview from backend API
-  const syncCustomDeductionsForPayroll = async (targetUserId, targetM, targetY) => {
+  const syncCustomDeductionsForPayroll = async (targetUserId, targetM, targetY, formOverrides = {}) => {
     if (!targetUserId) {
       setProcessCustomDeductions([]);
       setProcessExcludedDeductions([]);
@@ -609,12 +612,27 @@ export const SalaryView = () => {
     }
     setIsLoadingDeductionPreview(true);
     try {
-      // Primary backend preview API: POST /api/payroll/preview or GET /api/employee-deductions/preview
+      // Primary backend preview API: POST /api/deductions/preview or GET /api/employee-deductions/preview
       const preview = await previewPayrollWithDeductions({
         employeeId: targetUserId,
         userId: targetUserId,
         month: targetM,
-        year: targetY
+        year: targetY,
+        totalDays: formOverrides.totalDays !== undefined ? formOverrides.totalDays : processForm.totalDays,
+        leaveDays: formOverrides.leaveDays !== undefined ? formOverrides.leaveDays : processForm.leaveDays,
+        approvedLeaveDays: formOverrides.approvedLeaveDays !== undefined ? formOverrides.approvedLeaveDays : (formOverrides.leaveDays !== undefined ? formOverrides.leaveDays : processForm.leaveDays),
+        unauthorizedFullDays: formOverrides.unauthorizedFullDays !== undefined ? formOverrides.unauthorizedFullDays : processForm.unauthorizedFullDays,
+        unauthorizedHalfDays: formOverrides.unauthorizedHalfDays !== undefined ? formOverrides.unauthorizedHalfDays : processForm.unauthorizedHalfDays,
+        unauthorizedFullDayCount: formOverrides.unauthorizedFullDays !== undefined ? formOverrides.unauthorizedFullDays : processForm.unauthorizedFullDays,
+        unauthorizedHalfDayCount: formOverrides.unauthorizedHalfDays !== undefined ? formOverrides.unauthorizedHalfDays : processForm.unauthorizedHalfDays,
+        lopDays: formOverrides.lopDays !== undefined ? formOverrides.lopDays : processForm.lopDays,
+        extraAllowance: formOverrides.extraAllowance !== undefined ? formOverrides.extraAllowance : processForm.extraAllowance,
+        incentive: formOverrides.incentive !== undefined ? formOverrides.incentive : processForm.incentive,
+        bonus: formOverrides.bonus !== undefined ? formOverrides.bonus : (processForm.bonus || processForm.extraBonus),
+        extraBonus: formOverrides.extraBonus !== undefined ? formOverrides.extraBonus : (processForm.bonus || processForm.extraBonus),
+        extraDeduction: formOverrides.extraDeduction !== undefined ? formOverrides.extraDeduction : processForm.extraDeduction,
+        isPenaltyApproved: formOverrides.applyLegallyApprovedPenalty !== undefined ? formOverrides.applyLegallyApprovedPenalty : processForm.applyLegallyApprovedPenalty,
+        penaltyDate: formOverrides.penaltyDate !== undefined ? formOverrides.penaltyDate : processForm.penaltyDate
       }).catch(() => null);
 
       if (preview) {
@@ -656,6 +674,8 @@ export const SalaryView = () => {
       const approvedLeaveDays = leavesInfo.leaveDays || 0;
       const calculatedLopDays = leavesInfo.lopDays || 0;
       const unauthorizedDays = Math.max(0, calculatedLopDays - approvedLeaveDays);
+      const fullDays = Math.floor(unauthorizedDays);
+      const halfDays = (unauthorizedDays % 1) > 0 ? 1 : 0;
       const defaultPayable = Math.max(0, totalMonthDays - approvedLeaveDays - unauthorizedDays);
 
       setProcessForm((prev) => ({
@@ -663,6 +683,9 @@ export const SalaryView = () => {
         totalDays: totalMonthDays,
         daysPayable: defaultPayable,
         leaveDays: approvedLeaveDays,
+        approvedLeaveDays,
+        unauthorizedFullDays: fullDays,
+        unauthorizedHalfDays: halfDays,
         unauthorizedAbsenceDays: unauthorizedDays,
         lopDays: calculatedLopDays
       }));
@@ -712,10 +735,17 @@ export const SalaryView = () => {
   // Real-time calculation for Process Payroll modal: Uses authoritative backend preview API whenever available
   const processCalculations = useMemo(() => {
     const totalDays = Number(processForm.totalDays) || getDaysInMonth(processForm.month, processForm.year);
-    const lopDays = Number(processForm.lopDays) || 0;
-    const leaveDays = Number(processForm.leaveDays) || 0;
-    const unauthorizedAbsenceDays = Number(processForm.unauthorizedAbsenceDays) || Math.max(0, lopDays - leaveDays);
-    const daysPayable = Math.max(0, totalDays - leaveDays - unauthorizedAbsenceDays);
+    const leaveDays = Number(processForm.leaveDays ?? processForm.approvedLeaveDays ?? 0);
+    const unauthorizedFullDays = Number(processForm.unauthorizedFullDays ?? 0);
+    const unauthorizedHalfDays = Number(processForm.unauthorizedHalfDays ?? 0);
+    const unauthorizedAbsenceDays = liveDeductionPreview?.days?.unapprovedLeaveDays != null
+      ? Number(liveDeductionPreview.days.unapprovedLeaveDays)
+      : (processForm.unauthorizedAbsenceDays != null && processForm.unauthorizedAbsenceDays !== ''
+        ? Number(processForm.unauthorizedAbsenceDays)
+        : Number((unauthorizedFullDays + unauthorizedHalfDays * 0.5).toFixed(2)));
+
+    const lopDays = Number((leaveDays + unauthorizedAbsenceDays).toFixed(2));
+    const daysPayable = Math.max(0, Number((totalDays - leaveDays - unauthorizedAbsenceDays).toFixed(2)));
     const presentDays = daysPayable;
 
     if (!selectedUserActiveStructure) {
@@ -742,11 +772,16 @@ export const SalaryView = () => {
         totalDays,
         daysPayable,
         leaveDays,
+        approvedLeaveDays: leaveDays,
+        unauthorizedFullDays,
+        unauthorizedHalfDays,
         unauthorizedAbsenceDays,
         lopDays,
         presentDays,
         perDaySalary: 0,
         lopDeduction: 0,
+        approvedLeaveDeduction: 0,
+        unauthorizedAbsenceDeduction: 0,
         proposedPenaltyDays: 0,
         proposedPenaltyAmount: 0,
         customDeductionsSum: 0,
@@ -768,29 +803,52 @@ export const SalaryView = () => {
     const extraBonus = bonus;
     const extraDeduction = Number(processForm.extraDeduction) || 0;
 
-    // Per day calculation
-    const baseGross = Math.round((basic + hra + allowance + fixedBonus + extraAllowance + incentive + bonus) * 100) / 100;
-    const perDaySalary = totalDays > 0 ? Math.round((baseGross / totalDays) * 100) / 100 : 0;
-    const lopDeduction = Math.round((leaveDays + unauthorizedAbsenceDays) * perDaySalary * 100) / 100;
+    // Per day salary: Strictly from contracted base monthly salary (or backend perDaySalary), NEVER from gross with extras!
+    const monthlyBaseSalary = (selectedUserActiveStructure.structureType === 'SIMPLE_FIXED' || (contractedSalary > 0 && !hra && !allowance))
+      ? contractedSalary
+      : (basic + hra + allowance + fixedBonus);
+    const perDaySalary = liveDeductionPreview?.perDaySalary != null
+      ? Number(liveDeductionPreview.perDaySalary)
+      : (totalDays > 0 ? Number((monthlyBaseSalary / totalDays).toFixed(2)) : 0);
 
-    // Proposed 0.5-day disciplinary penalty for unauthorized absence (separate, NOT deducted from net pay unless authorized)
-    const proposedPenaltyDays = unauthorizedAbsenceDays * 0.5;
-    const proposedPenaltyAmount = Math.round(proposedPenaltyDays * perDaySalary * 100) / 100;
+    // Leave & Absence deductions: Take authoritative values from backend preview if available
+    const approvedLeaveDeduction = liveDeductionPreview?.leaveDeductions?.approvedLeaveDeduction != null
+      ? Number(liveDeductionPreview.leaveDeductions.approvedLeaveDeduction)
+      : Number((leaveDays * perDaySalary).toFixed(2));
+
+    const unauthorizedAbsenceDeduction = liveDeductionPreview?.leaveDeductions?.unauthorizedAbsenceDeduction != null
+      ? Number(liveDeductionPreview.leaveDeductions.unauthorizedAbsenceDeduction)
+      : Number((unauthorizedAbsenceDays * perDaySalary).toFixed(2));
+
+    const lopDeduction = liveDeductionPreview?.leaveDeductions?.unpaidLeaveDeduction != null
+      ? Number(liveDeductionPreview.leaveDeductions.unpaidLeaveDeduction)
+      : Number((approvedLeaveDeduction + unauthorizedAbsenceDeduction).toFixed(2));
+
+    // Proposed Penalty: Strictly take backend proposed penalty amount, or (unauthorizedFullDays * 0.5 + unauthorizedHalfDays * 0.5) * perDaySalary
+    const proposedPenaltyAmount = liveDeductionPreview?.leaveDeductions?.proposedPenaltyAmount != null
+      ? Number(liveDeductionPreview.leaveDeductions.proposedPenaltyAmount)
+      : (liveDeductionPreview?.leaveDeductions?.proposedPenalty != null
+        ? Number(liveDeductionPreview.leaveDeductions.proposedPenalty)
+        : Number((perDaySalary * ((unauthorizedFullDays * 0.5) + (unauthorizedHalfDays * 0.5))).toFixed(2)));
+
+    const proposedPenaltyDays = perDaySalary > 0 ? Number((proposedPenaltyAmount / perDaySalary).toFixed(2)) : ((unauthorizedFullDays * 0.5) + (unauthorizedHalfDays * 0.5));
 
     // Approved & permissible custom deductions
-    const customDeductionsSum = Math.round(
-      processCustomDeductions.reduce((sum, d) => sum + (Number(d.amount) || 0), 0) * 100
-    ) / 100;
+    const customDeductionsSum = liveDeductionPreview?.customDeductions?.totalApprovedCustomDeductions != null
+      ? Number(liveDeductionPreview.customDeductions.totalApprovedCustomDeductions)
+      : Math.round(
+        processCustomDeductions.reduce((sum, d) => sum + (Number(d.amount) || 0), 0) * 100
+      ) / 100;
 
     // Statutory deductions
     const pfDeduction = liveDeductionPreview?.statutoryDeductions?.pfDeduction ??
       (selectedUserActiveStructure.isPfApplicable !== false ? Math.round(basic * 0.12) : 0);
     const esicDeduction = liveDeductionPreview?.statutoryDeductions?.esicDeduction ??
-      (selectedUserActiveStructure.isEsicApplicable !== false ? Math.round(baseGross * 0.0075) : 0);
+      (selectedUserActiveStructure.isEsicApplicable !== false ? Math.round((monthlyBaseSalary + extraAllowance + incentive + bonus) * 0.0075) : 0);
     const professionalTax = liveDeductionPreview?.statutoryDeductions?.professionalTax ??
-      ((selectedUserActiveStructure.isPtApplicable !== false && baseGross > 12000) ? 200 : 0);
+      ((selectedUserActiveStructure.isPtApplicable !== false && (monthlyBaseSalary + extraAllowance + incentive + bonus) > 12000) ? 200 : 0);
     const tdsAmount = liveDeductionPreview?.statutoryDeductions?.tds ??
-      Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
+      Math.round((((monthlyBaseSalary + extraAllowance + incentive + bonus) * tdsPercentage) / 100) * 100) / 100;
 
     const totalStatutory = pfDeduction + esicDeduction + professionalTax;
 
@@ -798,9 +856,9 @@ export const SalaryView = () => {
     const hasBackendSummary = Boolean(liveDeductionPreview?.summary?.netSalary != null);
     const grossSalary = hasBackendSummary
       ? Number(liveDeductionPreview.summary.grossSalary)
-      : baseGross;
+      : Number((monthlyBaseSalary + extraAllowance + incentive + bonus).toFixed(2));
 
-    // Legally Approved Penalty calculation
+    // Legally Approved Penalty calculation: applied only after formal authorization
     const legallyApprovedPenalty = processForm.applyLegallyApprovedPenalty
       ? (Number(processForm.legallyApprovedPenaltyAmount) || proposedPenaltyAmount)
       : Number(processForm.legallyApprovedPenaltyAmount || 0);
@@ -830,7 +888,7 @@ export const SalaryView = () => {
       customDeductionsSum,
       processCustomDeductions,
       processExcludedDeductions,
-      baseGross,
+      baseGross: grossSalary,
       grossSalary,
       pfDeduction,
       esicDeduction,
@@ -843,10 +901,15 @@ export const SalaryView = () => {
       totalDays,
       daysPayable,
       leaveDays,
+      approvedLeaveDays: leaveDays,
+      unauthorizedFullDays,
+      unauthorizedHalfDays,
       unauthorizedAbsenceDays,
       lopDays,
       presentDays,
       perDaySalary,
+      approvedLeaveDeduction,
+      unauthorizedAbsenceDeduction,
       lopDeduction,
       proposedPenaltyDays,
       proposedPenaltyAmount,
@@ -1403,13 +1466,28 @@ export const SalaryView = () => {
       salaryMonth: formattedSalaryMonth,
       salaryStructureId: selectedUserActiveStructure._id,
       calculationMode: "CALENDAR_DAYS",
-      lopDays: targetLopDays,
+      lopDays: processCalculations.lopDays,
       leaveDays: targetLeaveDays,
+      approvedLeaveDays: targetLeaveDays,
+      unauthorizedFullDays: Number(processForm.unauthorizedFullDays) || 0,
+      unauthorizedHalfDays: Number(processForm.unauthorizedHalfDays) || 0,
+      unauthorizedFullDayCount: Number(processForm.unauthorizedFullDays) || 0,
+      unauthorizedHalfDayCount: Number(processForm.unauthorizedHalfDays) || 0,
+      unauthorizedAbsenceDays: processCalculations.unauthorizedAbsenceDays,
+      unapprovedLeaveDays: processCalculations.unauthorizedAbsenceDays,
+      perDaySalary: processCalculations.perDaySalary,
+      approvedLeaveDeduction: processCalculations.approvedLeaveDeduction,
+      unauthorizedAbsenceDeduction: processCalculations.unauthorizedAbsenceDeduction,
+      lopDeduction: processCalculations.lopDeduction,
+      unpaidLeaveDeduction: processCalculations.lopDeduction,
+      proposedPenalty: processCalculations.proposedPenaltyAmount || 0,
+      proposedPenaltyAmount: processCalculations.proposedPenaltyAmount || 0,
       extraAllowance: extraAllowanceValue,
       incentive: incentiveValue,
       bonus: bonusValue,
       extraBonus: bonusValue,
       extraDeduction: extraDeductionValue,
+      isPenaltyApproved: Boolean(processForm.applyLegallyApprovedPenalty),
       legallyApprovedPenalties: processCalculations.legallyApprovedPenalty || 0,
       authorizedPenalty: processCalculations.legallyApprovedPenalty || 0,
       penaltyDate: processForm.penaltyDate || null,
@@ -1680,6 +1758,22 @@ export const SalaryView = () => {
     const rawStatus = String(payroll.status || 'processed').toLowerCase().trim();
     const currentStatus = rawStatus === 'paid' ? 'Paid' : 'Processed';
 
+    const approvedLeaveDays = payroll.approvedLeaveDays != null
+      ? Number(payroll.approvedLeaveDays)
+      : (payroll.leaveDays != null ? Number(payroll.leaveDays) : 0);
+    const unauthorizedFullDays = payroll.unauthorizedFullDays != null
+      ? Number(payroll.unauthorizedFullDays)
+      : (payroll.unauthorizedFullDayCount != null ? Number(payroll.unauthorizedFullDayCount) : 0);
+    const unauthorizedHalfDays = payroll.unauthorizedHalfDays != null
+      ? Number(payroll.unauthorizedHalfDays)
+      : (payroll.unauthorizedHalfDayCount != null ? Number(payroll.unauthorizedHalfDayCount) : 0);
+    const unauthorizedAbsenceDays = payroll.unapprovedLeaveDays != null
+      ? Number(payroll.unapprovedLeaveDays)
+      : (payroll.unauthorizedAbsenceDays != null ? Number(payroll.unauthorizedAbsenceDays) : (unauthorizedFullDays + unauthorizedHalfDays * 0.5));
+    const lopDays = Number((approvedLeaveDays + unauthorizedAbsenceDays).toFixed(2));
+    const totalMonthDays = payroll.totalDays != null ? Number(payroll.totalDays) : getDaysInMonth(payroll.month, payroll.year);
+    const defaultPayableDays = payroll.daysPayable != null ? Number(payroll.daysPayable) : Math.max(0, totalMonthDays - lopDays);
+
     setUpdatePayrollForm({
       paymentMode: payroll.paymentMode || 'CASH',
       status: currentStatus,
@@ -1687,10 +1781,17 @@ export const SalaryView = () => {
       remarks: payroll.remarks || (payroll.paymentMode === 'CASH' || !payroll.paymentMode ? 'Salary paid in cash' : 'Salary disbursed'),
       extraBonus: payroll.extraBonus != null && Number(payroll.extraBonus) !== 0 ? String(payroll.extraBonus) : '',
       extraDeduction: payroll.extraDeduction != null && Number(payroll.extraDeduction) !== 0 ? String(payroll.extraDeduction) : '',
-      totalDays: payroll.totalDays != null ? Number(payroll.totalDays) : getDaysInMonth(payroll.month, payroll.year),
-      leaveDays: payroll.leaveDays != null ? Number(payroll.leaveDays) : 0,
-      lopDays: payroll.lopDays != null ? Number(payroll.lopDays) : 0,
-      daysPayable: payroll.daysPayable != null ? Number(payroll.daysPayable) : Math.max(0, (payroll.totalDays != null ? Number(payroll.totalDays) : getDaysInMonth(payroll.month, payroll.year)) - (Number(payroll.leaveDays) || 0) - (Number(payroll.lopDays) || 0))
+      totalDays: totalMonthDays,
+      leaveDays: approvedLeaveDays,
+      approvedLeaveDays,
+      unauthorizedFullDays,
+      unauthorizedHalfDays,
+      unauthorizedAbsenceDays,
+      lopDays,
+      daysPayable: defaultPayableDays,
+      applyLegallyApprovedPenalty: Boolean(payroll.isPenaltyApproved),
+      legallyApprovedPenaltyAmount: Number(payroll.legallyApprovedPenalties || 0),
+      penaltyDate: payroll.penaltyDate || ''
     });
 
     setIsUpdatePayrollModalOpen(true);
@@ -1698,7 +1799,29 @@ export const SalaryView = () => {
 
   const updatePayrollCalculations = useMemo(() => {
     if (!selectedPayrollToUpdate) {
-      return { baseGross: 0, grossSalary: 0, totalDeduction: 0, netSalary: 0, totalDays: 30, daysPayable: 30, leaveDays: 0, lopDays: 0, presentDays: 30, perDaySalary: 0, lopDeduction: 0, fixedDeduction: 0, tdsAmount: 0 };
+      return {
+        baseGross: 0,
+        grossSalary: 0,
+        totalDeduction: 0,
+        netSalary: 0,
+        totalDays: 30,
+        daysPayable: 30,
+        leaveDays: 0,
+        approvedLeaveDays: 0,
+        unauthorizedFullDays: 0,
+        unauthorizedHalfDays: 0,
+        unauthorizedAbsenceDays: 0,
+        lopDays: 0,
+        presentDays: 30,
+        perDaySalary: 0,
+        approvedLeaveDeduction: 0,
+        unauthorizedAbsenceDeduction: 0,
+        lopDeduction: 0,
+        proposedPenaltyAmount: 0,
+        legallyApprovedPenalty: 0,
+        fixedDeduction: 0,
+        tdsAmount: 0
+      };
     }
 
     const basic = Number(selectedPayrollToUpdate.basicSalary) || 0;
@@ -1708,36 +1831,66 @@ export const SalaryView = () => {
     const fixedDeduction = Number(selectedPayrollToUpdate.fixedDeduction) || 0;
     const tdsPercentage = Number(selectedPayrollToUpdate.tdsPercentage) || 0;
 
-    const prevExtraBonus = Number(selectedPayrollToUpdate.extraBonus) || 0;
-    const computedBaseGross = (basic || hra || allowance || fixedBonus)
-      ? (basic + hra + allowance + fixedBonus)
-      : Math.max(0, (Number(selectedPayrollToUpdate.grossSalary) || 0) - prevExtraBonus);
-    const baseGross = Math.round(computedBaseGross * 100) / 100;
+    const monthlyBase = (selectedPayrollToUpdate.structureType === 'SIMPLE_FIXED' || (selectedPayrollToUpdate.fixedSalary > 0 && !hra && !allowance))
+      ? Number(selectedPayrollToUpdate.fixedSalary || selectedPayrollToUpdate.monthlySalary || 6000)
+      : (basic + hra + allowance + fixedBonus);
 
     const newExtraBonus = Number(updatePayrollForm.extraBonus) || 0;
     const newExtraDeduction = Number(updatePayrollForm.extraDeduction) || 0;
 
     const totalDays = Number(updatePayrollForm.totalDays) || getDaysInMonth(selectedPayrollToUpdate.month, selectedPayrollToUpdate.year);
-    const lopDays = Number(updatePayrollForm.lopDays) || 0;
-    const leaveDays = Number(updatePayrollForm.leaveDays) || 0;
-    // Total Payable Days = Total Month Days - Approved Leaves - LOP Days
-    const daysPayable = Math.max(0, totalDays - leaveDays - lopDays);
-    const presentDays = daysPayable;
-    const perDaySalary = totalDays > 0 ? Math.round((baseGross / totalDays) * 100) / 100 : 0;
-    const lopDeduction = Math.round(lopDays * perDaySalary * 100) / 100;
-    const tdsAmount = Math.round(((baseGross * tdsPercentage) / 100) * 100) / 100;
+    const leaveDays = Number(updatePayrollForm.leaveDays ?? updatePayrollForm.approvedLeaveDays ?? 0);
+    const unauthorizedFullDays = Number(updatePayrollForm.unauthorizedFullDays ?? 0);
+    const unauthorizedHalfDays = Number(updatePayrollForm.unauthorizedHalfDays ?? 0);
+    const unauthorizedAbsenceDays = Number((unauthorizedFullDays + unauthorizedHalfDays * 0.5).toFixed(2));
+    const lopDays = Number((leaveDays + unauthorizedAbsenceDays).toFixed(2));
 
-    // Formula: net salary = Base Gross + Extra Bonus - Extra Deduction - Fixed Monthly Deduction - TDS - LOP
-    const netSalary = Math.max(
-      0,
-      Math.round((baseGross + newExtraBonus - newExtraDeduction - fixedDeduction - tdsAmount - lopDeduction) * 100) / 100
+    const daysPayable = Math.max(0, Number((totalDays - leaveDays - unauthorizedAbsenceDays).toFixed(2)));
+    const presentDays = daysPayable;
+
+    // Per-day salary: Strictly from backend perDaySalary or monthly base salary / totalDays, NEVER from gross with extras!
+    const perDaySalary = selectedPayrollToUpdate.perDaySalary != null && Number(selectedPayrollToUpdate.perDaySalary) > 0
+      ? Number(selectedPayrollToUpdate.perDaySalary)
+      : (totalDays > 0 ? Number((monthlyBase / totalDays).toFixed(2)) : 0);
+
+    const approvedLeaveDeduction = Number((leaveDays * perDaySalary).toFixed(2));
+    const unauthorizedAbsenceDeduction = Number((unauthorizedAbsenceDays * perDaySalary).toFixed(2));
+    const lopDeduction = Number((approvedLeaveDeduction + unauthorizedAbsenceDeduction).toFixed(2));
+
+    // Disciplinary penalty: (fullDays * 0.5 + halfDays * 0.5) * perDaySalary
+    const proposedPenaltyAmount = Number((perDaySalary * ((unauthorizedFullDays * 0.5) + (unauthorizedHalfDays * 0.5))).toFixed(2));
+    const legallyApprovedPenalty = updatePayrollForm.applyLegallyApprovedPenalty
+      ? (Number(updatePayrollForm.legallyApprovedPenaltyAmount) || proposedPenaltyAmount)
+      : Number(updatePayrollForm.legallyApprovedPenaltyAmount || 0);
+
+    // Statutory deductions preserved from backend
+    const pfDeduction = Number(selectedPayrollToUpdate.pfDeduction || 0);
+    const esicDeduction = Number(selectedPayrollToUpdate.esicDeduction || 0);
+    const professionalTax = Number(selectedPayrollToUpdate.professionalTax || 0);
+    const tdsAmount = Number(selectedPayrollToUpdate.tdsAmount || selectedPayrollToUpdate.tds || 0);
+    const statutoryDeductionsTotal = pfDeduction + esicDeduction + professionalTax + tdsAmount;
+
+    // Custom deductions preserved from backend
+    const customDeductionsAmount = Number(selectedPayrollToUpdate.customDeductions || 0);
+    const otherDeductions = Number(selectedPayrollToUpdate.otherDeductions || 0);
+
+    const grossSalary = Number((monthlyBase + newExtraBonus).toFixed(2));
+    const totalDeduction = Number(
+      (
+        lopDeduction +
+        statutoryDeductionsTotal +
+        fixedDeduction +
+        newExtraDeduction +
+        otherDeductions +
+        customDeductionsAmount +
+        legallyApprovedPenalty
+      ).toFixed(2)
     );
 
-    const totalDeduction = Math.round((newExtraDeduction + fixedDeduction + tdsAmount + lopDeduction) * 100) / 100;
-    const grossSalary = Math.round((baseGross + newExtraBonus) * 100) / 100;
+    const netSalary = Math.max(0, Number((grossSalary - totalDeduction).toFixed(2)));
 
     return {
-      baseGross,
+      baseGross: monthlyBase,
       grossSalary,
       fixedDeduction,
       tdsAmount,
@@ -1746,10 +1899,18 @@ export const SalaryView = () => {
       totalDays,
       daysPayable,
       leaveDays,
+      approvedLeaveDays: leaveDays,
+      unauthorizedFullDays,
+      unauthorizedHalfDays,
+      unauthorizedAbsenceDays,
       lopDays,
       presentDays,
       perDaySalary,
-      lopDeduction
+      approvedLeaveDeduction,
+      unauthorizedAbsenceDeduction,
+      lopDeduction,
+      proposedPenaltyAmount,
+      legallyApprovedPenalty
     };
   }, [selectedPayrollToUpdate, updatePayrollForm]);
 
@@ -1792,14 +1953,30 @@ export const SalaryView = () => {
       leaves: updatePayrollCalculations.leaveDays,
       totalLeaveDays: updatePayrollCalculations.leaveDays,
       approvedLeaveDays: updatePayrollCalculations.leaveDays,
+      unauthorizedFullDays: updatePayrollCalculations.unauthorizedFullDays,
+      unauthorizedHalfDays: updatePayrollCalculations.unauthorizedHalfDays,
+      unauthorizedFullDayCount: updatePayrollCalculations.unauthorizedFullDays,
+      unauthorizedHalfDayCount: updatePayrollCalculations.unauthorizedHalfDays,
+      unauthorizedAbsenceDays: updatePayrollCalculations.unauthorizedAbsenceDays,
+      unapprovedLeaveDays: updatePayrollCalculations.unauthorizedAbsenceDays,
       lopDays: updatePayrollCalculations.lopDays,
+      unpaidLeaveDays: updatePayrollCalculations.lopDays,
       daysPayable: updatePayrollCalculations.daysPayable,
       payableDays: updatePayrollCalculations.daysPayable,
       presentDays: updatePayrollCalculations.presentDays,
       totalDays: updatePayrollCalculations.totalDays,
       workingDays: updatePayrollCalculations.totalDays,
       perDaySalary: updatePayrollCalculations.perDaySalary,
+      approvedLeaveDeduction: updatePayrollCalculations.approvedLeaveDeduction,
+      unauthorizedAbsenceDeduction: updatePayrollCalculations.unauthorizedAbsenceDeduction,
       lopDeduction: updatePayrollCalculations.lopDeduction,
+      unpaidLeaveDeduction: updatePayrollCalculations.lopDeduction,
+      proposedPenalty: updatePayrollCalculations.proposedPenaltyAmount,
+      proposedPenaltyAmount: updatePayrollCalculations.proposedPenaltyAmount,
+      isPenaltyApproved: Boolean(updatePayrollForm.applyLegallyApprovedPenalty),
+      appliedPenalty: updatePayrollCalculations.legallyApprovedPenalty,
+      legallyApprovedPenalties: updatePayrollCalculations.legallyApprovedPenalty,
+      penaltyDate: updatePayrollForm.penaltyDate || null,
       grossSalary: updatePayrollCalculations.grossSalary,
       totalDeduction: updatePayrollCalculations.totalDeduction,
       netSalary: updatePayrollCalculations.netSalary
@@ -3324,7 +3501,7 @@ export const SalaryView = () => {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                         Total Month Days
@@ -3336,11 +3513,11 @@ export const SalaryView = () => {
                         value={updatePayrollForm.totalDays ?? 30}
                         onChange={(e) => {
                           const val = Number(e.target.value) || 0;
-                          setUpdatePayrollForm({
-                            ...updatePayrollForm,
+                          setUpdatePayrollForm((prev) => ({
+                            ...prev,
                             totalDays: val,
-                            daysPayable: Math.max(0, val - (Number(updatePayrollForm.leaveDays) || 0) - (Number(updatePayrollForm.lopDays) || 0))
-                          });
+                            daysPayable: Math.max(0, val - (Number(prev.lopDays) || 0))
+                          }));
                         }}
                         className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:border-indigo-500"
                       />
@@ -3356,29 +3533,79 @@ export const SalaryView = () => {
                         value={updatePayrollForm.leaveDays ?? 0}
                         className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-amber-300 rounded-lg text-amber-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                         placeholder="0"
-                        title="Approved Leaves is fixed"
+                        title="Approved Leaves is fixed (Authorized Unpaid Leave)"
                       />
                     </div>
 
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        LOP Days
+                        Unauthorized Full-Days
                       </label>
                       <input
                         type="number"
                         min="0"
-                        step="0.5"
-                        value={updatePayrollForm.lopDays ?? 0}
+                        step="1"
+                        value={updatePayrollForm.unauthorizedFullDays ?? 0}
                         onChange={(e) => {
-                          const val = Number(e.target.value) || 0;
-                          setUpdatePayrollForm({
-                            ...updatePayrollForm,
-                            lopDays: val,
-                            daysPayable: Math.max(0, (Number(updatePayrollForm.totalDays) || 0) - (Number(updatePayrollForm.leaveDays) || 0) - val)
-                          });
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          const half = Number(updatePayrollForm.unauthorizedHalfDays || 0);
+                          const unauth = val + (half * 0.5);
+                          const leaves = Number(updatePayrollForm.leaveDays || 0);
+                          const totLop = leaves + unauth;
+                          const totDays = Number(updatePayrollForm.totalDays || 30);
+                          setUpdatePayrollForm((prev) => ({
+                            ...prev,
+                            unauthorizedFullDays: val,
+                            unauthorizedAbsenceDays: unauth,
+                            lopDays: totLop,
+                            daysPayable: Math.max(0, totDays - totLop)
+                          }));
                         }}
                         className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
                         placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Unauthorized Half-Days
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={updatePayrollForm.unauthorizedHalfDays ?? 0}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          const full = Number(updatePayrollForm.unauthorizedFullDays || 0);
+                          const unauth = full + (val * 0.5);
+                          const leaves = Number(updatePayrollForm.leaveDays || 0);
+                          const totLop = leaves + unauth;
+                          const totDays = Number(updatePayrollForm.totalDays || 30);
+                          setUpdatePayrollForm((prev) => ({
+                            ...prev,
+                            unauthorizedHalfDays: val,
+                            unauthorizedAbsenceDays: unauth,
+                            lopDays: totLop,
+                            daysPayable: Math.max(0, totDays - totLop)
+                          }));
+                        }}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Total LOP Days
+                      </label>
+                      <input
+                        type="number"
+                        readOnly
+                        value={updatePayrollCalculations.lopDays}
+                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-rose-200 rounded-lg text-rose-700 font-mono font-bold cursor-not-allowed focus:outline-none"
+                        placeholder="0"
+                        title="Total LOP Days = Approved Leaves + Unauthorized Absence Days"
                       />
                     </div>
 
@@ -3392,7 +3619,7 @@ export const SalaryView = () => {
                         value={updatePayrollCalculations.daysPayable}
                         className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                         placeholder="30"
-                        title="Total Payable Days = Total Month Days - Approved Leaves - LOP Days (Fixed)"
+                        title="Total Payable Days = Total Month Days - Total LOP Days"
                       />
                     </div>
                   </div>
@@ -3406,12 +3633,88 @@ export const SalaryView = () => {
                   </div>
                 </div>
 
+                {/* Disciplinary Penalty Advisory & Application in Update Modal */}
+                {(Number(updatePayrollCalculations.unauthorizedAbsenceDays) || 0) > 0 && (
+                  <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 text-xs space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <Info size={14} className="text-amber-600" />
+                        <span>Disciplinary Penalty Advisory (Unauthorized Absence)</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-800 uppercase bg-amber-100 px-2 py-0.5 rounded">
+                        Labor Law Compliance
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-amber-800">
+                      Policy proposes a <strong>0.5-day-equivalent penalty per incident</strong> ({formatINR(updatePayrollCalculations.proposedPenaltyAmount || 0)}) for unauthorized absence ({updatePayrollCalculations.unauthorizedFullDays} full / {updatePayrollCalculations.unauthorizedHalfDays} half = {updatePayrollCalculations.unauthorizedAbsenceDays}d).
+                    </p>
+
+                    <div className="p-3 bg-white rounded-lg border border-amber-300 space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(updatePayrollForm.applyLegallyApprovedPenalty)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setUpdatePayrollForm((prev) => ({
+                              ...prev,
+                              applyLegallyApprovedPenalty: checked,
+                              legallyApprovedPenaltyAmount: checked ? (updatePayrollCalculations.proposedPenaltyAmount || 0) : 0,
+                              penaltyDate: checked && !prev.penaltyDate ? new Date().toISOString().split('T')[0] : prev.penaltyDate
+                            }));
+                          }}
+                          className="w-4 h-4 rounded text-rose-600 border-slate-300 focus:ring-rose-500 cursor-pointer"
+                        />
+                        <span className="font-bold text-xs text-slate-800">
+                          Formally Authorize & Apply Legal Disciplinary Penalty (-{formatINR(updatePayrollCalculations.proposedPenaltyAmount || 0)})
+                        </span>
+                      </label>
+
+                      {updatePayrollForm.applyLegallyApprovedPenalty && (
+                        <div className="pl-6 pt-1 space-y-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                Penalty Incident / Authorized Date <span className="text-rose-500">*</span>
+                              </label>
+                              <input
+                                type="date"
+                                value={updatePayrollForm.penaltyDate || ''}
+                                onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, penaltyDate: e.target.value })}
+                                className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md font-mono text-slate-900 focus:outline-none focus:border-rose-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                Approved Penalty Amount (₹)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={updatePayrollForm.legallyApprovedPenaltyAmount ?? (updatePayrollCalculations.proposedPenaltyAmount || 0)}
+                                onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, legallyApprovedPenaltyAmount: Number(e.target.value) || 0 })}
+                                className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md font-mono text-slate-900 focus:outline-none focus:border-rose-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Live Calculated Financial Summary */}
-                <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
                   <div>
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">Gross Earnings</span>
                     <span className="font-mono font-bold text-slate-800 text-xs">
                       {formatINR(updatePayrollCalculations.grossSalary)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Leave & Absence</span>
+                    <span className="font-mono font-semibold text-rose-600 text-xs">
+                      -{formatINR(updatePayrollCalculations.lopDeduction)}
                     </span>
                   </div>
                   <div>
@@ -3420,9 +3723,9 @@ export const SalaryView = () => {
                       -{formatINR(updatePayrollCalculations.totalDeduction)}
                     </span>
                   </div>
-                  <div className="border-l border-slate-200 pl-2">
-                    <span className="text-[10px] text-emerald-600 uppercase font-bold block">Net Take-Home</span>
-                    <span className="font-mono font-black text-emerald-600 text-sm">
+                  <div className="border-l border-slate-200 pl-2 bg-emerald-50/60 rounded">
+                    <span className="text-[10px] text-emerald-700 uppercase font-bold block">Net Take-Home</span>
+                    <span className="font-mono font-black text-emerald-600 text-xs sm:text-sm">
                       {formatINR(updatePayrollCalculations.netSalary)}
                     </span>
                   </div>
@@ -3709,7 +4012,7 @@ export const SalaryView = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                       Total Month Days
@@ -3721,11 +4024,11 @@ export const SalaryView = () => {
                       value={processForm.totalDays}
                       onChange={(e) => {
                         const val = Number(e.target.value) || 0;
-                        setProcessForm({
-                          ...processForm,
+                        setProcessForm((prev) => ({
+                          ...prev,
                           totalDays: val,
-                          daysPayable: Math.max(0, val - (Number(processForm.leaveDays) || 0) - (Number(processForm.lopDays) || 0))
-                        });
+                          daysPayable: Math.max(0, val - (Number(prev.lopDays) || 0))
+                        }));
                       }}
                       className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold focus:outline-none focus:border-indigo-500"
                     />
@@ -3747,23 +4050,73 @@ export const SalaryView = () => {
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      LOP Days
+                      Unauthorized Full-Days
                     </label>
                     <input
                       type="number"
                       min="0"
-                      step="0.5"
-                      value={processForm.lopDays}
+                      step="1"
+                      value={processForm.unauthorizedFullDays ?? 0}
                       onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
-                        setProcessForm({
-                          ...processForm,
-                          lopDays: val,
-                          daysPayable: Math.max(0, (Number(processForm.totalDays) || 0) - (Number(processForm.leaveDays) || 0) - val)
-                        });
+                        const val = Math.max(0, Number(e.target.value) || 0);
+                        const half = Number(processForm.unauthorizedHalfDays || 0);
+                        const unauth = val + (half * 0.5);
+                        const leaves = Number(processForm.leaveDays || 0);
+                        const totLop = leaves + unauth;
+                        const totDays = Number(processForm.totalDays || 30);
+                        setProcessForm((prev) => ({
+                          ...prev,
+                          unauthorizedFullDays: val,
+                          unauthorizedAbsenceDays: unauth,
+                          lopDays: totLop,
+                          daysPayable: Math.max(0, totDays - totLop)
+                        }));
                       }}
                       className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
                       placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Unauthorized Half-Days
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={processForm.unauthorizedHalfDays ?? 0}
+                      onChange={(e) => {
+                        const val = Math.max(0, Number(e.target.value) || 0);
+                        const full = Number(processForm.unauthorizedFullDays || 0);
+                        const unauth = full + (val * 0.5);
+                        const leaves = Number(processForm.leaveDays || 0);
+                        const totLop = leaves + unauth;
+                        const totDays = Number(processForm.totalDays || 30);
+                        setProcessForm((prev) => ({
+                          ...prev,
+                          unauthorizedHalfDays: val,
+                          unauthorizedAbsenceDays: unauth,
+                          lopDays: totLop,
+                          daysPayable: Math.max(0, totDays - totLop)
+                        }));
+                      }}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Total LOP Days
+                    </label>
+                    <input
+                      type="number"
+                      readOnly
+                      value={processCalculations.lopDays}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-rose-200 rounded-lg text-rose-700 font-mono font-bold cursor-not-allowed focus:outline-none"
+                      placeholder="0"
+                      title="Total LOP Days = Approved Leaves + Unauthorized Absence Days"
                     />
                   </div>
 
@@ -3777,7 +4130,7 @@ export const SalaryView = () => {
                       value={processCalculations.daysPayable}
                       className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
                       placeholder="30"
-                      title="Total Payable Days = Total Month Days - Approved Leaves - LOP Days (Fixed)"
+                      title="Total Payable Days = Total Month Days - Total LOP Days"
                     />
                   </div>
                 </div>
@@ -3894,7 +4247,7 @@ export const SalaryView = () => {
               </div>
 
               {/* Proposed Disciplinary Penalty Advisory (0.5d/absence) */}
-              {(Number(processForm.lopDays) || 0) > 0 && (
+              {(Number(processCalculations.unauthorizedAbsenceDays) || 0) > 0 && (
                 <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 text-xs space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 font-bold">
@@ -3906,7 +4259,7 @@ export const SalaryView = () => {
                     </span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-amber-800">
-                    Policy proposes an additional <strong>0.5-day-equivalent penalty</strong> ({Number(processForm.lopDays) * 0.5} day ≈ {formatINR(processCalculations.proposedPenaltyAmount || 0)}) for unauthorized absence ({processCalculations.unauthorizedAbsenceDays || Number(processForm.lopDays)}d).
+                    Policy proposes a <strong>0.5-day-equivalent penalty per incident</strong> ({formatINR(processCalculations.proposedPenaltyAmount || 0)}) for unauthorized absence ({processCalculations.unauthorizedFullDays} full / {processCalculations.unauthorizedHalfDays} half = {processCalculations.unauthorizedAbsenceDays}d). NOT deducted from net salary per labor compliance until legally authorized.
                   </p>
 
                   {/* Legal Authorization & Application Control */}
@@ -4486,10 +4839,18 @@ export const SalaryView = () => {
         const approvedUnpaidLeaveDays = Number(slip.approvedLeaveDays ?? slip.leaveDays ?? 0);
 
         // 6. Unauthorized Absence Days
-        const unauthorizedAbsenceDays = Number(slip.unauthorizedAbsenceDays ?? slip.unapprovedLeaveDays ?? slip.lopDays ?? 0);
+        const unauthorizedAbsenceDays = Number(
+          slip.unauthorizedAbsenceDays != null
+            ? slip.unauthorizedAbsenceDays
+            : (slip.unapprovedLeaveDays != null
+              ? slip.unapprovedLeaveDays
+              : (slip.unauthorizedFullDays != null || slip.unauthorizedHalfDays != null
+                ? (Number(slip.unauthorizedFullDays || 0) + Number(slip.unauthorizedHalfDays || 0) * 0.5)
+                : 0))
+        );
 
         // 7. LOP Deduction
-        const lopDeduction = Number(slip.lopDeduction ?? slip.unpaidLeaveDeduction ?? 0);
+        const lopDeduction = Number(slip.lopDeduction ?? slip.unpaidLeaveDeduction ?? slip.leaveDeductions?.unpaidLeaveDeduction ?? 0);
 
         // 8. Statutory Deductions
         const pfVal = Number(slip.pfDeduction || 0);
@@ -4515,7 +4876,9 @@ export const SalaryView = () => {
             ? slip.proposedPenalty
             : (slip.unapprovedLeavePenalty != null
               ? slip.unapprovedLeavePenalty
-              : unauthorizedAbsenceDays * (perDaySalary * 0.5))
+              : (slip.leaveDeductions?.proposedPenaltyAmount != null
+                ? slip.leaveDeductions.proposedPenaltyAmount
+                : Number((perDaySalary * 0.5 * (Number(slip.unauthorizedFullDays || 0) + Number(slip.unauthorizedHalfDays || 0))).toFixed(2))))
         );
 
         // 11. Legally Approved Penalty (if applicable)
