@@ -145,6 +145,48 @@ const resolveBankDetails = (profileData, contextUser) => {
   return null;
 };
 
+// Comprehensive prefix mapping for major Indian banks (fallback for offline or unlisted branches)
+const INDIAN_BANK_PREFIXES = {
+  SBIN: 'State Bank of India',
+  HDFC: 'HDFC Bank',
+  ICIC: 'ICICI Bank',
+  UTIB: 'Axis Bank',
+  KKBK: 'Kotak Mahindra Bank',
+  BARB: 'Bank of Baroda',
+  PUNB: 'Punjab National Bank',
+  CNRB: 'Canara Bank',
+  UBIN: 'Union Bank of India',
+  IDIB: 'Indian Bank',
+  IOBA: 'Indian Overseas Bank',
+  CBIN: 'Central Bank of India',
+  BKID: 'Bank of India',
+  MAHB: 'Bank of Maharashtra',
+  PSIB: 'Punjab & Sind Bank',
+  UCOB: 'UCO Bank',
+  YESB: 'Yes Bank',
+  IDFB: 'IDFC First Bank',
+  INDB: 'IndusInd Bank',
+  FDRL: 'Federal Bank',
+  SIBL: 'South Indian Bank',
+  KVBL: 'Karur Vysya Bank',
+  RBLN: 'RBL Bank',
+  CSBK: 'CSB Bank',
+  DCBL: 'DCB Bank',
+  BDBL: 'Bandhan Bank',
+  AUBL: 'AU Small Finance Bank',
+  ESFB: 'Equitas Small Finance Bank',
+  UJVN: 'Ujjivan Small Finance Bank',
+  AIRP: 'Airtel Payments Bank',
+  PYTM: 'Paytm Payments Bank',
+  IPOS: 'India Post Payments Bank',
+  JAKA: 'Jammu & Kashmir Bank',
+  SCBL: 'Standard Chartered Bank',
+  HSBC: 'HSBC Bank',
+  CITI: 'Citibank',
+  DEUT: 'Deutsche Bank',
+  DBSX: 'DBS Bank'
+};
+
 // Deterministically convert any string/id into a 24-char hex string for MongoDB ObjectId
 const toValidObjectId = (id) => {
   if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
@@ -446,6 +488,8 @@ export const ProfileView = () => {
   const [isSavingBank, setIsSavingBank] = useState(false);
   const [bankModalError, setBankModalError] = useState('');
   const [isAccountMasked, setIsAccountMasked] = useState(true);
+  const [isIfscLookingUp, setIsIfscLookingUp] = useState(false);
+  const [ifscLookupStatus, setIfscLookupStatus] = useState({ type: '', message: '' });
   const [bankForm, setBankForm] = useState({
     bankName: '',
     accountHolderName: '',
@@ -1770,6 +1814,11 @@ export const ProfileView = () => {
         bankBranch: currentBank.bankBranch || '',
         upiId: currentBank.upiId || ''
       });
+      setIfscLookupStatus(
+        currentBank.bankName 
+          ? { type: 'success', message: `${currentBank.bankName}${currentBank.bankBranch ? ` • ${currentBank.bankBranch}` : ''}` }
+          : { type: '', message: '' }
+      );
     } else {
       setBankForm({
         bankName: '',
@@ -1780,8 +1829,120 @@ export const ProfileView = () => {
         bankBranch: '',
         upiId: ''
       });
+      setIfscLookupStatus({ type: '', message: '' });
     }
     setIsBankModalOpen(true);
+  };
+
+  // --- IFSC Real-time Lookup & Auto-fill ---
+  const lookupIfsc = async (codeToLookup) => {
+    const clean = String(codeToLookup || '').trim().toUpperCase();
+    if (!clean) {
+      setIfscLookupStatus({ type: '', message: '' });
+      return;
+    }
+    if (clean.length < 4) {
+      setIfscLookupStatus({
+        type: 'warning',
+        message: 'Please enter at least 4 characters of IFSC code.'
+      });
+      return;
+    }
+
+    setIsIfscLookingUp(true);
+    setIfscLookupStatus({ type: 'loading', message: 'Fetching bank and branch details from RBI registry...' });
+
+    try {
+      // 1. Try public Razorpay RBI IFSC directory API (fast, official data, CORS enabled)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+      const res = await fetch(`https://ifsc.razorpay.com/${clean}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const detectedBank = data.BANK || INDIAN_BANK_PREFIXES[clean.slice(0, 4)] || '';
+        const branchParts = [data.BRANCH, data.CITY].filter(Boolean);
+        const detectedBranch = branchParts.join(', ') || data.BRANCH || '';
+
+        setBankForm(prev => ({
+          ...prev,
+          ifscCode: clean,
+          bankName: detectedBank || prev.bankName,
+          bankBranch: detectedBranch || prev.bankBranch
+        }));
+
+        setIfscLookupStatus({
+          type: 'success',
+          message: `${detectedBank}${detectedBranch ? ` • ${detectedBranch}` : ''}`
+        });
+        showToast(`Bank auto-filled: ${detectedBank} (${detectedBranch || 'Verified'})`, 'success');
+        return;
+      }
+
+      // 2. Offline Bank Prefix Fallback
+      const prefix = clean.slice(0, 4);
+      if (INDIAN_BANK_PREFIXES[prefix]) {
+        const fallbackBank = INDIAN_BANK_PREFIXES[prefix];
+        setBankForm(prev => ({
+          ...prev,
+          ifscCode: clean,
+          bankName: fallbackBank || prev.bankName
+        }));
+        setIfscLookupStatus({
+          type: 'info',
+          message: `Bank identified as ${fallbackBank}. Please verify or enter branch manually.`
+        });
+        showToast(`Bank identified: ${fallbackBank}`, 'info');
+        return;
+      }
+
+      setIfscLookupStatus({
+        type: 'error',
+        message: 'IFSC code not found in central registry. You can still enter Bank Name & Branch manually.'
+      });
+    } catch (err) {
+      console.warn('IFSC lookup notice:', err?.message);
+      const prefix = clean.slice(0, 4);
+      if (INDIAN_BANK_PREFIXES[prefix]) {
+        const fallbackBank = INDIAN_BANK_PREFIXES[prefix];
+        setBankForm(prev => ({
+          ...prev,
+          ifscCode: clean,
+          bankName: fallbackBank || prev.bankName
+        }));
+        setIfscLookupStatus({
+          type: 'info',
+          message: `Bank identified as ${fallbackBank}. Please enter branch name manually.`
+        });
+      } else {
+        setIfscLookupStatus({
+          type: 'error',
+          message: 'Unable to connect to IFSC service. Please enter Bank Name & Branch manually.'
+        });
+      }
+    } finally {
+      setIsIfscLookingUp(false);
+    }
+  };
+
+  const handleIfscChange = (e) => {
+    const raw = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    setBankForm(prev => ({ ...prev, ifscCode: raw }));
+
+    if (raw.length === 11) {
+      lookupIfsc(raw);
+    } else if (raw.length === 0) {
+      setIfscLookupStatus({ type: '', message: '' });
+    } else {
+      setIfscLookupStatus({
+        type: 'typing',
+        message: `${raw.length}/11 characters entered (e.g. SBIN0001234)`
+      });
+    }
   };
 
   const handleSaveBankDetails = async (e) => {
@@ -4038,22 +4199,97 @@ export const ProfileView = () => {
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Bank Name */}
+                {/* 1. IFSC Code (Auto-fetches Bank Name & Branch) */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Bank Name <span className="text-rose-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      IFSC Code <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-[#034665] font-semibold flex items-center gap-1">
+                      <Sparkles size={11} className="text-[#068DCB]" /> Auto-fills Bank &amp; Branch
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      maxLength={11}
+                      value={bankForm.ifscCode}
+                      onChange={handleIfscChange}
+                      placeholder="Enter 11-digit IFSC code (e.g. SBIN0001234 or HDFC0000001)"
+                      className="w-full pl-3.5 pr-24 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-bold font-mono uppercase focus:outline-none focus:border-[#034665] transition shadow-2xs tracking-wider"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => lookupIfsc(bankForm.ifscCode)}
+                      disabled={isIfscLookingUp || bankForm.ifscCode.length < 4}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1 bg-sky-50 hover:bg-sky-100 text-[#034665] border border-sky-200 rounded-md text-xs font-bold flex items-center gap-1 transition cursor-pointer disabled:opacity-40"
+                    >
+                      {isIfscLookingUp ? <Loader2 size={12} className="animate-spin text-[#034665]" /> : <Sparkles size={12} className="text-[#068DCB]" />}
+                      <span>{isIfscLookingUp ? 'Fetching...' : 'Fetch'}</span>
+                    </button>
+                  </div>
+
+                  {/* Live Feedback Banner */}
+                  {ifscLookupStatus.message && (
+                    <div className={`mt-1.5 text-xs flex items-center gap-1.5 transition-all ${
+                      ifscLookupStatus.type === 'success' ? 'text-emerald-700 font-semibold' :
+                      ifscLookupStatus.type === 'error' ? 'text-rose-600' :
+                      ifscLookupStatus.type === 'loading' ? 'text-[#034665] font-medium' :
+                      'text-slate-500'
+                    }`}>
+                      {ifscLookupStatus.type === 'success' && <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />}
+                      {ifscLookupStatus.type === 'error' && <AlertCircle size={13} className="text-rose-500 shrink-0" />}
+                      {ifscLookupStatus.type === 'loading' && <Loader2 size={13} className="animate-spin text-[#034665] shrink-0" />}
+                      <span>{ifscLookupStatus.message}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Bank Name (Auto-populated from IFSC) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Bank Name <span className="text-rose-500">*</span>
+                    </label>
+                    {bankForm.bankName && ifscLookupStatus.type === 'success' && (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        Auto-detected
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
                     value={bankForm.bankName}
                     onChange={e => setBankForm(prev => ({ ...prev, bankName: e.target.value }))}
-                    placeholder="e.g. State Bank of India, HDFC Bank, ICICI Bank"
+                    placeholder="e.g. State Bank of India, HDFC Bank"
                     className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
                   />
                 </div>
 
-                {/* Account Holder Name */}
+                {/* 3. Bank Branch (Auto-populated from IFSC) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Bank Branch
+                    </label>
+                    {bankForm.bankBranch && ifscLookupStatus.type === 'success' && (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        Auto-detected
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={bankForm.bankBranch}
+                    onChange={e => setBankForm(prev => ({ ...prev, bankBranch: e.target.value }))}
+                    placeholder="e.g. Solaris Hub Branch, Ahmedabad"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                  />
+                </div>
+
+                {/* 4. Account Holder Name */}
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Account Holder Name <span className="text-rose-500">*</span>
@@ -4068,7 +4304,7 @@ export const ProfileView = () => {
                   />
                 </div>
 
-                {/* Account Number */}
+                {/* 5. Account Number */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Account Number <span className="text-rose-500">*</span>
@@ -4083,7 +4319,7 @@ export const ProfileView = () => {
                   />
                 </div>
 
-                {/* Confirm Account Number */}
+                {/* 6. Confirm Account Number */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Confirm Account Number <span className="text-rose-500">*</span>
@@ -4098,37 +4334,7 @@ export const ProfileView = () => {
                   />
                 </div>
 
-                {/* IFSC Code */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    IFSC Code <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={11}
-                    value={bankForm.ifscCode}
-                    onChange={e => setBankForm(prev => ({ ...prev, ifscCode: e.target.value.toUpperCase() }))}
-                    placeholder="e.g. SBIN0001234"
-                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium font-mono uppercase focus:outline-none focus:border-[#034665] transition shadow-2xs"
-                  />
-                </div>
-
-                {/* Bank Branch */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Bank Branch
-                  </label>
-                  <input
-                    type="text"
-                    value={bankForm.bankBranch}
-                    onChange={e => setBankForm(prev => ({ ...prev, bankBranch: e.target.value }))}
-                    placeholder="e.g. Solaris Hub Branch, Ahmedabad"
-                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
-                  />
-                </div>
-
-                {/* UPI ID (Optional) */}
+                {/* 7. UPI ID (Optional) */}
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     UPI ID <span className="text-slate-400 font-normal normal-case">(Optional)</span>
