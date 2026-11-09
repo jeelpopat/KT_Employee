@@ -38,12 +38,12 @@ const getPreviewNumber = (preview, paths) => {
 
 const getPayrollPreviewValues = (preview) => {
   const values = {
-    calendarDays: getPreviewNumber(preview, ['calendarDays', 'days.calendarDays', 'dayBreakdown.calendarDays', 'salaryCalculation.calendarDays', 'totalDays', 'days.totalDays']),
-    sundays: getPreviewNumber(preview, ['sundays', 'sundayCount', 'days.sundays', 'days.sundayCount', 'dayBreakdown.sundays', 'salaryCalculation.sundays']),
-    holidayDays: getPreviewNumber(preview, ['configuredHolidayDays', 'holidayDays', 'days.configuredHolidayDays', 'days.holidayDays', 'dayBreakdown.configuredHolidayDays', 'salaryCalculation.configuredHolidayDays']),
+    calendarDays: getPreviewNumber(preview, ['calendarDays', 'calendarDayCount', 'days.calendarDays', 'dayBreakdown.calendarDays', 'salaryCalculation.calendarDays', 'totalDays', 'days.totalDays']),
+    sundays: getPreviewNumber(preview, ['sundays', 'sundayCount', 'sundayDays', 'days.sundays', 'days.sundayCount', 'dayBreakdown.sundays', 'salaryCalculation.sundays']),
+    holidayDays: getPreviewNumber(preview, ['configuredHolidayDays', 'configuredHolidays', 'holidayDays', 'days.configuredHolidayDays', 'days.holidayDays', 'dayBreakdown.configuredHolidayDays', 'salaryCalculation.configuredHolidayDays']),
     workingDays: getPreviewNumber(preview, ['workingDays', 'calculationDivisor', 'days.workingDays', 'days.calculationDivisor', 'dayBreakdown.workingDays', 'salaryCalculation.workingDays']),
     perDaySalary: getPreviewNumber(preview, ['perDaySalary', 'summary.perDaySalary', 'salaryCalculation.perDaySalary']),
-    approvedLeaveDays: getPreviewNumber(preview, ['approvedLeaveDays', 'leaveDays', 'days.approvedLeaveDays', 'leaveDeductions.approvedLeaveDays']),
+    approvedLeaveDays: getPreviewNumber(preview, ['approvedUnpaidLeaveDays', 'approvedLeaveDays', 'leaveDays', 'days.approvedLeaveDays', 'leaveDeductions.approvedLeaveDays']),
     unauthorizedFullDays: getPreviewNumber(preview, ['unauthorizedFullDays', 'unauthorizedFullDayCount', 'unauthorizedFullDayIncidentCount', 'days.unauthorizedFullDays']),
     unauthorizedHalfDays: getPreviewNumber(preview, ['unauthorizedHalfDays', 'unauthorizedHalfDayCount', 'unauthorizedHalfDayIncidentCount', 'days.unauthorizedHalfDays']),
     unauthorizedAbsenceDays: getPreviewNumber(preview, ['actualAbsenceDays', 'unauthorizedAbsenceDays', 'unapprovedLeaveDays', 'days.actualAbsenceDays', 'days.unapprovedLeaveDays', 'leaveDeductions.actualAbsenceDays']),
@@ -1375,7 +1375,7 @@ export const SalaryView = () => {
     const monthName = MONTH_NAMES[parsedMonth - 1] || `Month ${parsedMonth}`;
     const formattedSalaryMonth = `${monthName} ${parsedYear}`;
 
-    const targetLeaveDays = Number(processForm.leaveDays) || 0;
+    const targetLeaveDays = processCalculations.approvedLeaveDays;
     const payload = {
       employeeId: processForm.userId,
       userId: processForm.userId,
@@ -1687,7 +1687,7 @@ export const SalaryView = () => {
 
     const approvedLeaveDays = payroll.approvedLeaveDays != null
       ? Number(payroll.approvedLeaveDays)
-      : (payroll.leaveDays != null ? Number(payroll.leaveDays) : 0);
+      : (payroll.leaveDays != null ? Number(payroll.leaveDays) : null);
     const unauthorizedFullDays = payroll.unauthorizedFullDays != null
       ? Number(payroll.unauthorizedFullDays)
       : (payroll.unauthorizedFullDayCount != null ? Number(payroll.unauthorizedFullDayCount) : null);
@@ -1778,8 +1778,8 @@ export const SalaryView = () => {
       month: Number(selectedPayrollToUpdate.month),
       year: Number(selectedPayrollToUpdate.year),
       totalDays: updatePayrollForm.totalDays,
-      leaveDays: updatePayrollForm.leaveDays,
-      approvedLeaveDays: updatePayrollForm.leaveDays,
+      leaveDays: updatePayrollCalculations.approvedLeaveDays ?? undefined,
+      approvedLeaveDays: updatePayrollCalculations.approvedLeaveDays ?? undefined,
       unauthorizedFullDays: updatePayrollForm.unauthorizedFullDays,
       unauthorizedHalfDays: updatePayrollForm.unauthorizedHalfDays,
       unauthorizedFullDayCount: updatePayrollForm.unauthorizedFullDays,
