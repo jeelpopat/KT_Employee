@@ -11,6 +11,12 @@ import {
   Loader2,
   ChevronDown,
   Users,
+  Calendar,
+  X,
+  Building2,
+  Phone,
+  Mail,
+  Shield,
 } from "lucide-react";
 import Modal from "../../components/common/Modal";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
@@ -560,45 +566,93 @@ const hasStableAttendanceRequestId = (item) => Boolean(
 );
 
 // ============================================================
-// MAP BACKEND REQUEST
+// MAP BACKEND REQUEST (ENRICHED WITH BACKEND IST & EMPLOYEE DATA)
 // ============================================================
 const mapRequest = (item, index) => {
   const actualCheckInTime =
     item.checkInTimeDisplay ||
+    item.timeDisplay ||
+    item.checkInTimeIST ||
+    item.istTime ||
+    item.timeIST ||
+    item.formattedTime ||
+    item.time ||
     item.checkInTime ||
     item.requestedTime ||
-    item.time ||
     item.punchInTime ||
     item.attendanceTime ||
     item.checkIn?.time ||
-    (typeof item.checkIn === "string"
-      ? item.checkIn
-      : "") ||
+    (typeof item.checkIn === "string" ? item.checkIn : "") ||
     item.attendance?.checkInTime ||
     item.requestedAt ||
     "N/A";
 
   const attendanceId = extractAttendanceId(item);
   const employeeUserId = extractEmployeeUserId(item);
+
+  // Rich employee name extraction from backend enrichment
   const rawEmployeeName =
     item.employeeName ||
+    (typeof item.employee === "object" ? (item.employee?.name || `${item.employee?.firstName || ""} ${item.employee?.lastName || ""}`.trim()) : (typeof item.employee === "string" && !isValidObjectId(item.employee) ? item.employee : "")) ||
+    (typeof item.user === "object" ? (item.user?.name || `${item.user?.firstName || ""} ${item.user?.lastName || ""}`.trim()) : "") ||
     item.name ||
     item.userId?.name ||
-    item.user?.name ||
-    item.employee?.name ||
     item.employeeId?.name ||
     item.employeeID?.name ||
     item.userID?.name ||
     item.attendance?.employee?.name ||
     item.attendance?.user?.name ||
     "";
+
   const employeeIdentifier = employeeUserId || attendanceId || item._id || item.id;
   const employeeName = rawEmployeeName && !isUnknownEmployeeOrUser(rawEmployeeName)
     ? rawEmployeeName
     : employeeIdentifier
-      ? `Unidentified employee (${String(employeeIdentifier).slice(-6)})`
-      : "Unknown Employee";
+      ? `Employee (${String(employeeIdentifier).slice(-6)})`
+      : "Employee";
 
+  // Rich employee ID extraction
+  const resolvedEmployeeId =
+    (typeof item.employeeId === "string" ? item.employeeId : (item.employeeId?.employeeID || item.employeeId?.uniqueID || item.employeeId?._id)) ||
+    (typeof item.employee === "object" ? (item.employee?.employeeId || item.employee?.uniqueID || item.employee?.employeeID) : null) ||
+    (typeof item.user === "object" ? (item.user?.employeeId || item.user?.uniqueID || item.user?.employeeID) : null) ||
+    item.uniqueID ||
+    item.employeeID ||
+    "";
+
+  // Rich department
+  const resolvedDepartment =
+    item.department ||
+    (typeof item.employee === "object" ? item.employee?.department : null) ||
+    (typeof item.user === "object" ? item.user?.department : null) ||
+    item.userId?.department ||
+    item.employeeId?.department ||
+    "";
+
+  // Rich email
+  const resolvedEmail =
+    item.email ||
+    (typeof item.employee === "object" ? item.employee?.email : null) ||
+    (typeof item.user === "object" ? item.user?.email : null) ||
+    item.userId?.email ||
+    item.employeeId?.email ||
+    "";
+
+  // Rich phone
+  const resolvedPhone =
+    item.phone ||
+    (typeof item.employee === "object" ? item.employee?.phone : null) ||
+    (typeof item.user === "object" ? item.user?.phone : null) ||
+    item.userId?.phone ||
+    item.employeeId?.phone ||
+    "";
+
+  // Timeline events array
+  const resolvedTimeline = Array.isArray(item.timeline)
+    ? item.timeline
+    : (Array.isArray(item.attendance?.timeline) ? item.attendance.timeline : []);
+
+  // Case-insensitive approval status matching (handles pending, Pending, PENDING, approved, rejected)
   const resolvedApprovalStatus = (() => {
     const rawStatus = String(item.approvalStatus || "").toLowerCase().trim();
     if (rawStatus === "approved" || rawStatus === "rejected" || rawStatus === "pending") {
@@ -627,6 +681,7 @@ const mapRequest = (item, index) => {
 
     userId: employeeUserId,
     employeeUserId: employeeUserId,
+    employeeId: resolvedEmployeeId,
 
     name: employeeName,
 
@@ -658,21 +713,13 @@ const mapRequest = (item, index) => {
       item.avatarColor ||
       AVATAR_COLORS[index % AVATAR_COLORS.length],
 
-    email:
-      item.email ||
-      item.userId?.email ||
-      item.user?.email ||
-      item.employee?.email ||
-      item.employeeId?.email ||
-      "",
+    email: resolvedEmail,
 
-    department:
-      item.department ||
-      item.userId?.department ||
-      item.user?.department ||
-      item.employee?.department ||
-      item.employeeId?.department ||
-      "",
+    phone: resolvedPhone,
+
+    department: resolvedDepartment,
+
+    timeline: resolvedTimeline,
 
     isLate:
       item.isLate || false,
@@ -696,7 +743,13 @@ const mapRequest = (item, index) => {
 };
 
 export default function CheckInRequest() {
-  const { user: contextUser } = useApp();
+  const { user: contextUser, userRole } = useApp();
+  const isTeamLead =
+    userRole === 'team_leader' ||
+    userRole === 'team lead' ||
+    contextUser?.role === 'team_leader' ||
+    contextUser?.role === 'team lead';
+
   const [adminApproverId, setAdminApproverId] = useState(() => getLoggedInAdminId(contextUser));
   const [allUsers, setAllUsers] = useState([]);
 
@@ -722,6 +775,8 @@ export default function CheckInRequest() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [filterStatus, setFilterStatus] = useState("all");
+
+  const [selectedDate, setSelectedDate] = useState("");
 
   const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
@@ -779,7 +834,7 @@ export default function CheckInRequest() {
           if (!matched) {
             matched = list.find((u) => {
               const r = String(u.role || "").toLowerCase().trim();
-              return r === "admin" || r === "hr";
+              return r === "admin" || r === "hr" || r === "team_leader" || r === "team lead" || r === "tl";
             });
           }
 
@@ -802,9 +857,13 @@ export default function CheckInRequest() {
   }, [contextUser]);
 
   // ============================================================
-  // FETCH PENDING REQUESTS
+  // FETCH PENDING REQUESTS (SUPPORTS DYNAMIC STATUS, TAB & DATE FILTERING)
   // ============================================================
-  const fetchPendingRequests = async (isSilent = false) => {
+  const fetchPendingRequests = async (
+    statusParam = filterStatus,
+    dateParam = selectedDate,
+    isSilent = false
+  ) => {
     if (!isSilent) {
       setLoading(true);
       setError("");
@@ -816,10 +875,31 @@ export default function CheckInRequest() {
         return;
       }
 
-      // Add cache-busting timestamp to bypass browser/proxy caching
-      const freshUrl = `${PENDING_URL}${PENDING_URL.includes("?") ? "&" : "?"}_t=${Date.now()}`;
+      // Build authoritative query params supported by attendanceController.js
+      const params = new URLSearchParams();
+      const effStatus = String(statusParam || "").toLowerCase().trim();
 
-      const res = await fetch(freshUrl, {
+      if (effStatus && effStatus !== "all") {
+        params.set("status", effStatus);
+        params.set("approvalStatus", effStatus);
+        params.set("tab", effStatus);
+        params.set("filter", effStatus);
+      } else {
+        params.set("status", "all");
+        params.set("approvalStatus", "all");
+        params.set("tab", "all");
+        params.set("filter", "all");
+      }
+
+      const effDate = typeof dateParam === "string" ? dateParam.trim() : "";
+      if (effDate) {
+        params.set("date", effDate);
+      }
+
+      params.set("_t", String(Date.now()));
+      const targetUrl = `${PENDING_URL}?${params.toString()}`;
+
+      const res = await fetch(targetUrl, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -831,9 +911,7 @@ export default function CheckInRequest() {
       });
 
       if (!res.ok) {
-        throw new Error(
-          `Failed to fetch pending requests: ${res.status}`
-        );
+        throw new Error(`Failed to fetch requests: ${res.status}`);
       }
 
       const data = await res.json();
@@ -880,156 +958,64 @@ export default function CheckInRequest() {
             localRejected = parsed.map((item, idx) => ({
               ...mapRequest(item, idx + 3000),
               approvalStatus: "rejected",
-              rejectionReason: item.reason || item.rejectionReason || "Attendance rejected by admin",
+              rejectionReason: item.reason || item.rejectionReason || "Attendance rejected",
             }));
           }
         }
       } catch {}
 
-      // 4. Collect target dates to fetch approved check-in records from backend
-      const targetDates = new Set([
-        getTodayLocal(),
-        getYesterdayLocal(),
-      ]);
-
-      mappedRequests.forEach((r) => {
-        if (r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date.trim())) {
-          targetDates.add(r.date.trim());
-        }
-      });
-
-      localApproved.forEach((r) => {
-        if (r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date.trim())) {
-          targetDates.add(r.date.trim());
-        }
-      });
-
-      // Also query the past 5 days
-      const now = new Date();
-      for (let i = 2; i <= 6; i++) {
-        const pastD = new Date(now);
-        pastD.setDate(pastD.getDate() - i);
-        const py = pastD.getFullYear();
-        const pm = String(pastD.getMonth() + 1).padStart(2, "0");
-        const pd = String(pastD.getDate()).padStart(2, "0");
-        targetDates.add(`${py}-${pm}-${pd}`);
-      }
-
-      // 5. Query organizational attendance logs from backend in parallel for target dates
-      const queryHeaders = {
-        Authorization: `Bearer ${token}`,
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
-      };
-
-      const dateArray = Array.from(targetDates);
-      let backendRecords = [];
-      await Promise.all(
-        dateArray.map(async (dStr) => {
-          try {
-            const hUrl = `${BASE_URL}/api/attendance/history/date/${encodeURIComponent(dStr)}?_t=${Date.now()}`;
-            const hRes = await fetch(hUrl, { headers: queryHeaders });
-            if (hRes.ok) {
-              const hData = await hRes.json();
-              const hLogs = normalizeRequests(hData);
-              hLogs.forEach((item) => {
-                if (!item || isExplicitlyExcludedAttendanceRequest(item)) return;
-                if (isRecordApproved(item) || isRecordRejected(item)) {
-                  backendRecords.push({ ...item, date: item.date || dStr });
-                }
-              });
-            }
-          } catch (_) {}
-
-          try {
-            const aUrl = `${BASE_URL}/api/attendance/admin/all?date=${encodeURIComponent(dStr)}&_t=${Date.now()}`;
-            const aRes = await fetch(aUrl, { headers: queryHeaders });
-            if (aRes.ok) {
-              const aData = await aRes.json();
-              const aLogs = normalizeRequests(aData);
-              aLogs.forEach((item) => {
-                if (!item || isExplicitlyExcludedAttendanceRequest(item)) return;
-                if (isRecordApproved(item) || isRecordRejected(item)) {
-                  backendRecords.push({ ...item, date: item.date || dStr });
-                }
-              });
-            }
-          } catch (_) {}
-        })
-      );
-
-      const mappedBackendRecords = backendRecords
-        .filter((item) => !isUnknownEmployeeOrUser(item) || hasStableAttendanceRequestId(item))
-        .map((item, idx) => {
-          const isRej = isRecordRejected(item);
-          const mapped = mapRequest(item, idx + 500);
-          return {
-            ...mapped,
-            approvalStatus: isRej ? "rejected" : "approved",
-          };
-        });
-
-      // Sync backend approved records into local store
-      mappedBackendRecords.forEach((rec) => {
-        if (rec.approvalStatus === "approved") {
-          saveApprovedToStore(rec);
-        }
-      });
-
-      // 6. Merge all records with proper status priority:
+      // 4. Merge records with proper precedence
       const recordMap = new Map();
 
-      // First add pending requests
+      // Backend records have primary precedence
       mappedRequests.forEach((req) => {
         const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
         recordMap.set(String(key), req);
       });
 
-      // Then add locally approved requests (takes precedence over pending)
-      localApproved.forEach((req) => {
-        const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
-        recordMap.set(String(key), { ...(recordMap.get(String(key)) || {}), ...req, approvalStatus: "approved" });
-      });
+      // Overlay local approved records if viewing all or approved
+      if (effStatus === "all" || effStatus === "approved") {
+        localApproved.forEach((req) => {
+          const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
+          if (!recordMap.has(String(key))) {
+            if (!effDate || req.date === effDate) {
+              recordMap.set(String(key), { ...req, approvalStatus: "approved" });
+            }
+          }
+        });
+      }
 
-      // Then add backend approved and rejected records
-      mappedBackendRecords.forEach((req) => {
-        const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
-        recordMap.set(String(key), { ...(recordMap.get(String(key)) || {}), ...req });
-      });
-
-      // Then add local rejections
-      localRejected.forEach((req) => {
-        const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
-        recordMap.set(String(key), { ...(recordMap.get(String(key)) || {}), ...req, approvalStatus: "rejected" });
-      });
+      // Overlay local rejected records if viewing all or rejected
+      if (effStatus === "all" || effStatus === "rejected") {
+        localRejected.forEach((req) => {
+          const key = req.attendanceId || req.id || `${req.userId || req.name}_${req.date}`;
+          if (!recordMap.has(String(key))) {
+            if (!effDate || req.date === effDate) {
+              recordMap.set(String(key), { ...req, approvalStatus: "rejected" });
+            }
+          }
+        });
+      }
 
       const combined = Array.from(recordMap.values());
-
       setRequests(combined);
 
-      // Set authoritative counts
-      const finalPending = combined.filter((r) => r.approvalStatus === "pending").length;
-      const finalApproved = Math.max(apiApproved || 0, combined.filter((r) => r.approvalStatus === "approved").length);
-      const finalRejected = Math.max(apiRejected || 0, combined.filter((r) => r.approvalStatus === "rejected").length);
-      const finalTotal = combined.length;
+      // Compute counts
+      const finalPending = apiPending !== null ? apiPending : combined.filter((r) => r.approvalStatus === "pending").length;
+      const finalApproved = apiApproved !== null ? apiApproved : combined.filter((r) => r.approvalStatus === "approved").length;
+      const finalRejected = apiRejected !== null ? apiRejected : combined.filter((r) => r.approvalStatus === "rejected").length;
+      const finalTotal = apiCount !== null ? apiCount : (effStatus === "all" ? combined.length : (finalPending + finalApproved + finalRejected));
 
-      setServerCounts({
+      setServerCounts((prev) => ({
         pending: finalPending,
-        approved: finalApproved,
-        rejected: finalRejected,
-        total: finalTotal,
-      });
+        approved: apiApproved !== null ? apiApproved : (effStatus === "approved" ? combined.length : Math.max(prev.approved, finalApproved)),
+        rejected: apiRejected !== null ? apiRejected : (effStatus === "rejected" ? combined.length : Math.max(prev.rejected, finalRejected)),
+        total: finalTotal > 0 ? finalTotal : prev.total,
+      }));
     } catch (err) {
-      console.error(
-        "Fetch Pending Requests Error:",
-        err
-      );
-
+      console.error("Fetch Pending Requests Error:", err);
       if (!isSilent) {
-        setError(
-          "Unable to load pending requests."
-        );
+        setError("Unable to load check-in requests.");
       }
     } finally {
       if (!isSilent) {
@@ -1038,25 +1024,36 @@ export default function CheckInRequest() {
     }
   };
 
+  // Helper filter handlers
+  const handleFilterStatusChange = (newStatus) => {
+    setFilterStatus(newStatus);
+    fetchPendingRequests(newStatus, selectedDate, false);
+  };
+
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    fetchPendingRequests(filterStatus, newDate, false);
+  };
+
   // ============================================================
   // INITIAL LOAD + PROPER SILENT AUTO REFRESH + FOCUS REVALIDATION
   // ============================================================
   useEffect(() => {
-    fetchPendingRequests(false);
+    fetchPendingRequests(filterStatus, selectedDate, false);
 
     // Fast 6-second silent background poll for immediate new requests
     const interval = setInterval(() => {
-      fetchPendingRequests(true);
+      fetchPendingRequests(filterStatus, selectedDate, true);
     }, 6000);
 
-    // Immediately revalidate whenever admin returns to the tab
+    // Immediately revalidate whenever user returns to the tab
     const handleFocus = () => {
-      fetchPendingRequests(true);
+      fetchPendingRequests(filterStatus, selectedDate, true);
     };
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        fetchPendingRequests(true);
+        fetchPendingRequests(filterStatus, selectedDate, true);
       }
     };
 
@@ -1070,7 +1067,7 @@ export default function CheckInRequest() {
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("attendance_updated", handleFocus);
     };
-  }, []);
+  }, [filterStatus, selectedDate]);
 
   // ============================================================
   // APPROVE / REJECT
@@ -1138,7 +1135,7 @@ export default function CheckInRequest() {
               if (!matched) {
                 matched = list.find((u) => {
                   const r = String(u.role || "").toLowerCase().trim();
-                  return r === "admin" || r === "hr";
+                  return r === "admin" || r === "hr" || r === "team_leader" || r === "team lead" || r === "tl";
                 });
               }
               if (matched) {
@@ -1151,7 +1148,7 @@ export default function CheckInRequest() {
       }
 
       if (!effectiveAdminId) {
-        throw new Error("Could not determine dynamic Admin/HR Approver ID. Please sign in again.");
+        throw new Error("Could not determine dynamic Approver ID (Admin/HR/Team Lead). Please sign in again.");
       }
 
       // 2. Resolve target employee user ID (whose check-in is being approved/rejected)
@@ -1400,7 +1397,7 @@ export default function CheckInRequest() {
       // Refresh after action
       // ========================================================
       setTimeout(() => {
-        fetchPendingRequests();
+        fetchPendingRequests(filterStatus, selectedDate, true);
       }, 300);
     } catch (err) {
       console.error(
@@ -1527,7 +1524,7 @@ export default function CheckInRequest() {
       : (pendingCount + approvedCount + rejectedCount > 0 ? (pendingCount + approvedCount + rejectedCount) : requests.length);
 
   // ============================================================
-  // FILTER (Employee name, email, department, role, or date)
+  // FILTER (Employee name, email, department, role, employeeId, phone, or date)
   // ============================================================
   const filteredRequests = requests
     .filter((req) => {
@@ -1535,6 +1532,8 @@ export default function CheckInRequest() {
       const role = req.role || "";
       const email = req.email || "";
       const department = req.department || "";
+      const employeeId = req.employeeId || "";
+      const phone = req.phone || "";
       const dateStr = String(req.date || "").toLowerCase();
       const formattedDate = formatDate(req.date).toLowerCase();
       const term = searchTerm.toLowerCase().trim();
@@ -1545,16 +1544,22 @@ export default function CheckInRequest() {
         role.toLowerCase().includes(term) ||
         email.toLowerCase().includes(term) ||
         department.toLowerCase().includes(term) ||
+        employeeId.toLowerCase().includes(term) ||
+        phone.toLowerCase().includes(term) ||
         dateStr.includes(term) ||
         formattedDate.includes(term);
 
       const currentStatus = String(req.approvalStatus || "").toLowerCase().trim();
-      const targetStatus = filterStatus.toLowerCase().trim();
+      const targetStatus = String(filterStatus || "").toLowerCase().trim();
       const matchesStatus =
         targetStatus === "all" ||
         currentStatus === targetStatus;
 
-      return matchesSearch && matchesStatus;
+      const matchesDate =
+        !selectedDate ||
+        String(req.date || "").startsWith(selectedDate);
+
+      return matchesSearch && matchesStatus && matchesDate;
     })
     .sort((a, b) => {
       if (filterStatus === "all") {
@@ -1578,11 +1583,20 @@ export default function CheckInRequest() {
             <Clock size={18} strokeWidth={2} />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
-              Check-In Requests
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
+                Check-In Requests
+              </h1>
+              {isTeamLead && (
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-sky-50 text-[#034665] border border-sky-200">
+                  Team Lead Scoped
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500 font-normal font-poppins mt-0.5">
-              Review and manage employee punch-in attendance requests and approvals
+              {isTeamLead
+                ? "Review and manage attendance punch-in requests for your assigned team members"
+                : "Review and manage employee punch-in attendance requests and approvals"}
             </p>
           </div>
         </div>
@@ -1598,7 +1612,7 @@ export default function CheckInRequest() {
           {/* Refresh Button */}
           <button
             type="button"
-            onClick={() => fetchPendingRequests(false)}
+            onClick={() => fetchPendingRequests(filterStatus, selectedDate, false)}
             disabled={loading}
             title="Refresh requests"
             aria-label="Refresh requests"
@@ -1624,7 +1638,7 @@ export default function CheckInRequest() {
             <button
               key={item.key}
               type="button"
-              onClick={() => setFilterStatus(filterStatus === item.key ? "all" : item.key)}
+              onClick={() => handleFilterStatusChange(filterStatus === item.key ? "all" : item.key)}
               title={`Click to filter by ${item.label}`}
               className="relative flex items-center h-[60px] w-full text-left cursor-pointer transition-transform hover:scale-[1.01]"
             >
@@ -1660,26 +1674,84 @@ export default function CheckInRequest() {
       ===================================================== */}
       <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 lg:p-6 shadow-xs space-y-4 font-poppins">
 
-        {/* Filter Toolbar: Search on left + Status dropdown on right */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-1 font-poppins">
+        {/* Filter Toolbar: Search on left + Date filter & Status dropdown on right */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-1 font-poppins">
           {/* Search Field */}
-          <div className="relative w-full md:w-[320px] lg:w-[360px]">
+          <div className="relative w-full lg:w-[320px]">
             <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search by employee name, email or department..."
+              placeholder="Search by employee, ID, email, dept..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] font-poppins transition-all"
             />
           </div>
 
-          {/* Status Dropdown */}
-          <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap justify-start sm:justify-end font-poppins">
+          {/* Controls: Date Picker + Quick Presets + Status Filter */}
+          <div className="flex items-center gap-2.5 w-full lg:w-auto flex-wrap justify-start lg:justify-end font-poppins">
+            {/* Date Picker Input */}
+            <div className="relative flex items-center">
+              <Calendar size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+                title="Filter attendance by date"
+                className="h-9 pl-8 pr-7 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] font-poppins cursor-pointer"
+              />
+              {selectedDate && (
+                <button
+                  type="button"
+                  onClick={() => handleDateChange("")}
+                  title="Clear date filter"
+                  className="absolute right-2 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Date Presets */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => handleDateChange(getTodayLocal())}
+                className={`h-9 px-2.5 text-[11px] font-medium rounded-md border transition cursor-pointer select-none ${
+                  selectedDate === getTodayLocal()
+                    ? "bg-[#034665] text-white border-[#034665]"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDateChange(getYesterdayLocal())}
+                className={`h-9 px-2.5 text-[11px] font-medium rounded-md border transition cursor-pointer select-none ${
+                  selectedDate === getYesterdayLocal()
+                    ? "bg-[#034665] text-white border-[#034665]"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                Yesterday
+              </button>
+              {selectedDate && (
+                <button
+                  type="button"
+                  onClick={() => handleDateChange("")}
+                  className="h-9 px-2.5 text-[11px] font-medium rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition cursor-pointer select-none"
+                >
+                  All Dates
+                </button>
+              )}
+            </div>
+
+            {/* Status Dropdown */}
             <div className="relative w-full sm:w-auto">
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={(e) => handleFilterStatusChange(e.target.value)}
                 className="w-full sm:w-auto h-9 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] cursor-pointer appearance-none pr-7 font-poppins font-medium"
               >
                 <option value="all">All Status</option>
@@ -1708,18 +1780,18 @@ export default function CheckInRequest() {
           <div className="p-16 text-center border border-slate-200/80 rounded-lg bg-slate-50/50 font-poppins">
             <Clock size={36} className="text-slate-300 mx-auto mb-3" />
             <p className="text-sm font-semibold text-slate-700">
-              {searchTerm || filterStatus !== "all" ? "No matching check-in requests" : "No check-in requests found"}
+              {searchTerm || filterStatus !== "all" || selectedDate ? "No matching check-in requests" : "No check-in requests found"}
             </p>
             <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto font-poppins">
-              {searchTerm || filterStatus !== "all"
-                ? "Try adjusting your search query or status filter."
+              {searchTerm || filterStatus !== "all" || selectedDate
+                ? "Try adjusting your search query, date filter, or status filter."
                 : "All employee attendance punch-in requests will appear here."}
             </p>
           </div>
         ) : (
           /* Table Container with responsive scroll */
           <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
-            <table className="w-full text-left text-xs border-collapse min-w-[680px] sm:min-w-full font-poppins">
+            <table className="w-full text-left text-xs border-collapse min-w-[760px] sm:min-w-full font-poppins">
               <thead>
                 <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
                   <th className="py-3 px-4 w-12 text-left font-semibold">
@@ -1729,10 +1801,16 @@ export default function CheckInRequest() {
                     Employee
                   </th>
                   <th className="py-3 px-4 text-left font-semibold">
-                    Time
+                    Department
+                  </th>
+                  <th className="py-3 px-4 text-left font-semibold">
+                    Time (IST)
                   </th>
                   <th className="py-3 px-4 text-left font-semibold">
                     Date
+                  </th>
+                  <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">
+                    Timeline
                   </th>
                   <th className="py-3 px-4 text-center font-semibold whitespace-nowrap">
                     Status
@@ -1756,7 +1834,7 @@ export default function CheckInRequest() {
                       {index + 1}
                     </td>
 
-                    {/* Employee (Avatar + Name & Role) */}
+                    {/* Employee (Avatar + Name & Role + ID & Phone) */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         <div
@@ -1766,24 +1844,67 @@ export default function CheckInRequest() {
                           {getEmployeeInitials(req)}
                         </div>
                         <div className="min-w-0">
-                          <span className="font-semibold text-slate-900 text-xs sm:text-[13px] block truncate">
-                            {req.name}
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-normal block truncate">
-                            {req.email || req.role || "Team Lead"}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-slate-900 text-xs sm:text-[13px] truncate">
+                              {req.name}
+                            </span>
+                            {req.employeeId && (
+                              <span className="px-1.5 py-0.2 text-[10px] font-mono bg-slate-100 text-slate-600 rounded border border-slate-200">
+                                {req.employeeId}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-normal truncate mt-0.5">
+                            {req.email && <span>{req.email}</span>}
+                            {req.phone && <span>• {req.phone}</span>}
+                            {!req.email && !req.phone && <span>{req.role || "Employee"}</span>}
+                          </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* Time */}
+                    {/* Department */}
                     <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap font-normal">
-                      {req.requestedTime}
+                      {req.department ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 text-slate-700 border border-slate-200/80 text-[11px] font-medium">
+                          <Building2 size={11} className="text-slate-400" />
+                          {req.department}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+
+                    {/* Time (IST) */}
+                    <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap font-normal">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-slate-800">{req.requestedTime}</span>
+                        {req.isLate && (
+                          <span className="px-1.5 py-0.2 text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded">
+                            Late
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Date */}
                     <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap font-normal">
                       {formatDate(req.date)}
+                    </td>
+
+                    {/* Timeline */}
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      {req.timeline && req.timeline.length > 0 ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-sky-50 text-sky-700 border border-sky-200/80 font-medium"
+                          title={`${req.timeline.length} timeline event(s) recorded`}
+                        >
+                          <Clock size={11} className="text-sky-600" />
+                          <span>{req.timeline.length} events</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">—</span>
+                      )}
                     </td>
 
                     {/* Status */}
@@ -1824,7 +1945,7 @@ export default function CheckInRequest() {
                       ) : (
                         <span
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200/80 rounded-md select-none"
-                          title={req.rejectionReason || "Attendance rejected by admin"}
+                          title={req.rejectionReason || "Attendance rejected"}
                         >
                           <XCircle size={13} className="text-rose-600 shrink-0" />
                           <span>Rejected</span>

@@ -1403,31 +1403,32 @@ export const deriveAttendanceStatus = ({
   }
 
   // FIRST PRIORITY RULE: Working hours rule (applies when checked out or shift completed)
-  // >= 7h 50m (470 mins) -> Present
-  // < 7h 50m (470 mins) & >= 4h (240 mins) -> Half Day
-  // < 4h (240 mins) -> Absent
+  // Work Hours >= presentHours (default 8h = 480 mins) -> "present" (capped to "half-day" if check-in was after the 10:30 AM cutoff or break exceeded).
+  // Work Hours >= halfDayHours (default 4h = 240 mins) and < presentHours -> "half-day".
+  // Work Hours < halfDayHours (default 4h = 240 mins) -> "absent".
+  // (Addresses critical case e.g. 10:14 to 10:17, 3 mins / 0.05h: strictly classifies as "absent", not "half-day")
   if (hasCheckedOut) {
     if (netWorkMins < 240) {
       return {
         status: 'absent',
         label: 'Absent',
-        reason: 'Worked less than 4 hours',
+        reason: `Worked less than 4 hours (${(netWorkMins / 60).toFixed(2)}h / ${netWorkMins}m)`,
         badgeClass: 'text-red-700 bg-red-50 border-red-200',
         dotClass: 'bg-red-500'
       };
     }
 
-    if (netWorkMins < 470) {
+    if (netWorkMins < 480) {
       return {
         status: 'half_day',
         label: 'Half Day',
-        reason: 'Worked less than 7h 50m',
+        reason: `Worked less than 8 hours (${(netWorkMins / 60).toFixed(2)}h)`,
         badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };
     }
 
-    // netWorkMins >= 470 (>= 7h 50m)
+    // netWorkMins >= 480 (>= 8h)
     // Check if break exceeded 70 mins:
     if (isBreakExceeded) {
       return {
@@ -1439,12 +1440,12 @@ export const deriveAttendanceStatus = ({
       };
     }
 
-    // Check-in classification:
+    // Check-in classification (capped to half-day if check-in was after 10:30 AM cutoff):
     if (checkInClassification === 'half_day') {
       return {
         status: 'half_day',
         label: 'Half Day',
-        reason: 'Check-in after 10:30 AM',
+        reason: 'Check-in after 10:30 AM cutoff',
         badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };

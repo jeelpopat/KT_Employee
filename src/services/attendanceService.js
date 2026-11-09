@@ -152,15 +152,20 @@ export const checkOut = (location) => attendanceRequest('post', '/api/attendance
 export const approveAttendance = (id) => api.post('/api/attendance/approve', { id });
 export const rejectAttendance = (id, reason = 'Attendance rejected by admin') => api.post('/api/attendance/reject', { id, reason });
 
+// Management & Preview Endpoints for Daily Finalization & 4:00 PM IST Scheduler
+export const finalizeDailyAttendance = (date) => api.post('/api/attendance/finalize-daily', { date });
+export const previewFinalizeDaily = (date) => api.get('/api/attendance/finalize-daily/preview', { params: { date } });
+export const getSchedulerLogs = (page = 1, limit = 20) => api.get('/api/attendance/scheduler/logs', { params: { page, limit } });
+
 export const ATTENDANCE_LIMITS = {
   MAX_BREAKS_PER_DAY: 2,
   MAX_BREAK_MINUTES: 70, // 1h 10m
-  FULL_DAY_MIN_MINUTES: 470, // 7h 50m
+  FULL_DAY_MIN_MINUTES: 480, // 8h (minimum working-hour threshold)
   HALF_DAY_MIN_MINUTES: 240, // 4h
   CHECKIN_WINDOWS: {
     ON_TIME_END: 610, // 10:10 AM
-    LATE_END: 630,    // 10:30 AM
-    HALF_DAY_END: 900 // 03:00 PM
+    LATE_END: 630,    // 10:30 AM (capped to half-day if check-in after 10:30 AM)
+    HALF_DAY_END: 900 // 03:00 PM (absent after 3:00 PM)
   }
 };
 

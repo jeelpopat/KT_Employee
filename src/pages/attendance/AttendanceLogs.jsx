@@ -30,6 +30,11 @@ import {
   FileText,
   SlidersHorizontal,
   XCircle,
+  ShieldCheck,
+  PlayCircle,
+  AlertTriangle,
+  Info,
+  Check,
 } from 'lucide-react';
 import {
   isFinanceOrExcludedUser,
@@ -37,6 +42,7 @@ import {
   filterOutUnknownUsers
 } from '../../utils/roleFilters';
 import { showToast } from '../../components/common/Toast';
+import { useApp } from '../../context/AppContext';
 import { BASE_URL } from '../../api/config.js';
 
 const ATTENDANCE_URL =
@@ -1046,6 +1052,8 @@ const AttendanceTimeline = ({
 ========================================================= */
 export default function AttendanceLogs() {
   const navigate = useNavigate();
+  const { userRole } = useApp() || {};
+  const canManageFinalization = userRole === 'admin' || userRole === 'hr';
   const [selectedDate, setSelectedDate] =
     useState(getTodayLocal());
 
@@ -1111,6 +1119,112 @@ export default function AttendanceLogs() {
   const [empHistoryMonth, setEmpHistoryMonth] = useState('all');
   const [empHistorySearch, setEmpHistorySearch] = useState('');
   const [empHistoryStatus, setEmpHistoryStatus] = useState('all');
+
+  // Daily Finalization & 4:00 PM IST Scheduler State
+  const [finalizeTargetDate, setFinalizeTargetDate] = useState(() => getTodayLocal());
+  const [finalizePreview, setFinalizePreview] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  const [isExecutingFinalize, setIsExecutingFinalize] = useState(false);
+  const [finalizeResult, setFinalizeResult] = useState(null);
+  const [schedulerLogs, setSchedulerLogs] = useState([]);
+  const [loadingScheduler, setLoadingScheduler] = useState(false);
+  const [schedulerError, setSchedulerError] = useState('');
+  const [schedulerPage, setSchedulerPage] = useState(1);
+  const [schedulerTotalPages, setSchedulerTotalPages] = useState(1);
+  const [schedulerTotalCount, setSchedulerTotalCount] = useState(0);
+
+  const fetchFinalizePreview = async (targetDate = finalizeTargetDate) => {
+    setLoadingPreview(true);
+    setPreviewError('');
+    try {
+      const tok = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      const res = await fetch(`${BASE_URL}/api/attendance/finalize-daily/preview?date=${encodeURIComponent(targetDate)}&_t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${tok}`,
+          'Cache-Control': 'no-cache',
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to preview finalization: ${res.status}`);
+      }
+      const data = await res.json();
+      setFinalizePreview(data);
+    } catch (err) {
+      console.warn('Finalize preview error:', err);
+      setPreviewError(err.message || 'Unable to fetch finalization preview.');
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const handleExecuteFinalize = async (targetDate = finalizeTargetDate) => {
+    setIsExecutingFinalize(true);
+    setFinalizeResult(null);
+    try {
+      const tok = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      const res = await fetch(`${BASE_URL}/api/attendance/finalize-daily`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${tok}`,
+        },
+        body: JSON.stringify({ date: targetDate }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `Finalization failed: ${res.status}`);
+      }
+      setFinalizeResult({
+        type: 'success',
+        message: data?.message || `Daily attendance finalization for ${targetDate} executed successfully!`,
+        data: data?.data || data?.summary || data,
+      });
+      showToast(data?.message || 'Daily attendance finalization completed successfully!', 'success');
+      // Refresh current attendance logs, preview, and scheduler logs
+      fetchAttendanceLogs(selectedDate, true);
+      fetchFinalizePreview(targetDate);
+      fetchSchedulerLogs(1);
+      window.dispatchEvent(new Event('attendance_updated'));
+    } catch (err) {
+      console.error('Finalize execute error:', err);
+      setFinalizeResult({
+        type: 'error',
+        message: err.message || 'Daily finalization failed to execute.',
+      });
+      showToast(err.message || 'Daily finalization failed', 'error');
+    } finally {
+      setIsExecutingFinalize(false);
+    }
+  };
+
+  const fetchSchedulerLogs = async (page = 1) => {
+    setLoadingScheduler(true);
+    setSchedulerError('');
+    try {
+      const tok = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      const res = await fetch(`${BASE_URL}/api/attendance/scheduler/logs?page=${page}&limit=10&_t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${tok}`,
+          'Cache-Control': 'no-cache',
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to fetch scheduler logs: ${res.status}`);
+      }
+      const data = await res.json();
+      const logs = data?.logs || data?.data || data?.records || (Array.isArray(data) ? data : []);
+      setSchedulerLogs(logs);
+      setSchedulerPage(data?.page || data?.currentPage || page);
+      setSchedulerTotalPages(data?.totalPages || Math.ceil((data?.total || logs.length) / 10) || 1);
+      setSchedulerTotalCount(data?.total || data?.totalLogs || data?.count || logs.length);
+    } catch (err) {
+      console.warn('Scheduler logs fetch error:', err);
+      setSchedulerError(err.message || 'Unable to load scheduler execution logs.');
+    } finally {
+      setLoadingScheduler(false);
+    }
+  };
 
   const token =
     typeof window !== 'undefined'
@@ -2571,6 +2685,26 @@ export default function AttendanceLogs() {
             <span className="hidden sm:inline">Leave Policy</span>
           </button>
 
+          {/* DAILY FINALIZATION QUICK TRIGGER */}
+          {canManageFinalization && (
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('scheduler');
+                fetchSchedulerLogs(1);
+                fetchFinalizePreview(finalizeTargetDate || selectedDate || getTodayLocal());
+              }}
+              title="Daily Attendance Finalization & 4:00 PM IST Scheduler"
+              className="h-9 px-3 bg-white border border-[#034665]/30 hover:bg-sky-50 text-[#034665] rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer font-poppins"
+            >
+              <ShieldCheck size={15} className="text-[#034665]" />
+              <span className="hidden md:inline">Daily Finalization</span>
+              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-emerald-100 text-emerald-800">
+                16:00 IST
+              </span>
+            </button>
+          )}
+
           {/* EXPORT EXCEL */}
           <button
             type="button"
@@ -2623,6 +2757,32 @@ export default function AttendanceLogs() {
               Multi-Date Range
             </span>
           </button>
+
+          {canManageFinalization && (
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('scheduler');
+                if (schedulerLogs.length === 0 && !loadingScheduler) {
+                  fetchSchedulerLogs(1);
+                }
+                if (!finalizePreview && !loadingPreview) {
+                  fetchFinalizePreview(finalizeTargetDate || selectedDate || getTodayLocal());
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+                viewMode === 'scheduler'
+                  ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
+              }`}
+            >
+              <ShieldCheck size={16} />
+              <span>Daily Finalization &amp; Scheduler</span>
+              <span className="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                16:00 IST
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -3397,7 +3557,502 @@ export default function AttendanceLogs() {
         </div>
       )}
 
+            {/* ==================================================== */}
+      {/* VIEW MODE 3: DAILY FINALIZATION & 16:00 IST SCHEDULER */}
       {/* ==================================================== */}
+      {viewMode === 'scheduler' && (
+        <div className="space-y-6 animate-fade-in font-poppins">
+          {/* Header & Policy Summary Banner */}
+          <div className="bg-gradient-to-r from-[#034665] to-[#068DCB] rounded-2xl p-5 sm:p-6 text-white shadow-md">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="px-2.5 py-1 bg-white/20 rounded-full text-xs font-semibold backdrop-blur-xs flex items-center gap-1.5">
+                    <Clock size={13} />
+                    <span>Daily 16:00 IST (4:00 PM)</span>
+                  </span>
+                  <span className="px-2.5 py-1 bg-emerald-400/25 border border-emerald-300/40 rounded-full text-xs font-semibold backdrop-blur-xs flex items-center gap-1.5 text-emerald-100">
+                    <ShieldCheck size={13} />
+                    <span>15-Min Watchdog &amp; Safe Catch-Up</span>
+                  </span>
+                  <span className="px-2.5 py-1 bg-white/15 rounded-full text-xs font-semibold backdrop-blur-xs">
+                    Timezone-Safe UTC Shift (toISTDate)
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold mt-2.5 tracking-tight">
+                  Daily Attendance Finalization &amp; Scheduler Engine
+                </h2>
+                <p className="text-xs sm:text-sm text-sky-100 mt-1 max-w-2xl leading-relaxed">
+                  Automated background finalization evaluates active employees, applies working-hour thresholds, skips Sundays and configured holidays, preserves punches and approved leaves, and logs comprehensive audit trails.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchSchedulerLogs(1);
+                    fetchFinalizePreview(finalizeTargetDate);
+                  }}
+                  disabled={loadingScheduler || loadingPreview}
+                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-lg transition flex items-center gap-2 cursor-pointer border border-white/20"
+                >
+                  <RefreshCw size={14} className={loadingScheduler || loadingPreview ? 'animate-spin' : ''} />
+                  <span>Sync Status</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Core Thresholds & Rules Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-5 pt-4 border-t border-white/20 text-xs">
+              <div className="bg-white/10 rounded-xl p-3 backdrop-blur-xs">
+                <div className="flex items-center gap-2 font-semibold text-sky-100">
+                  <CheckCircle2 size={15} className="text-emerald-300 shrink-0" />
+                  <span>Full Day (Present)</span>
+                </div>
+                <p className="text-white text-sm font-bold mt-1">≥ 8h (480 mins)</p>
+                <p className="text-[11px] text-sky-200 mt-0.5">Check-in ≤ 10:30 AM cutoff; else capped to half-day.</p>
+              </div>
+
+              <div className="bg-white/10 rounded-xl p-3 backdrop-blur-xs">
+                <div className="flex items-center gap-2 font-semibold text-sky-100">
+                  <Clock size={15} className="text-amber-300 shrink-0" />
+                  <span>Half Day</span>
+                </div>
+                <p className="text-white text-sm font-bold mt-1">4h to &lt; 8h</p>
+                <p className="text-[11px] text-sky-200 mt-0.5">Between 240 and 479 mins work duration.</p>
+              </div>
+
+              <div className="bg-white/10 rounded-xl p-3 backdrop-blur-xs">
+                <div className="flex items-center gap-2 font-semibold text-sky-100">
+                  <XCircle size={15} className="text-rose-300 shrink-0" />
+                  <span>Strict Absent Rule</span>
+                </div>
+                <p className="text-white text-sm font-bold mt-1">&lt; 4h (e.g. 3m punches)</p>
+                <p className="text-[11px] text-sky-200 mt-0.5">Under 240 mins is strictly absent, not half-day.</p>
+              </div>
+
+              <div className="bg-white/10 rounded-xl p-3 backdrop-blur-xs">
+                <div className="flex items-center gap-2 font-semibold text-sky-100">
+                  <ShieldCheck size={15} className="text-blue-300 shrink-0" />
+                  <span>Idempotent Safeguards</span>
+                </div>
+                <p className="text-white text-sm font-bold mt-1">Zero Overwrite</p>
+                <p className="text-[11px] text-sky-200 mt-0.5">Preserves punches, approved leaves &amp; adjustments.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Card: Target Date Selector, Live Preview & Manual Execution */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-5 sm:p-6 shadow-xs font-poppins">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <PlayCircle size={18} className="text-[#034665]" />
+                  <span>Target Date Finalization &amp; Safe Preview</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Inspect affected attendance records in read-only preview mode before finalizing, or manually trigger execution.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                  <Calendar size={14} className="text-slate-500" />
+                  <input
+                    type="date"
+                    value={finalizeTargetDate}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      setFinalizeTargetDate(newDate);
+                      fetchFinalizePreview(newDate);
+                    }}
+                    className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => fetchFinalizePreview(finalizeTargetDate)}
+                  disabled={loadingPreview}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={loadingPreview ? 'animate-spin' : ''} />
+                  <span>Generate Preview</span>
+                </button>
+
+                {canManageFinalization && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Run daily finalization for target date: ${finalizeTargetDate}? This will evaluate thresholds and upsert idempotent absent logs for non-punching employees.`)) {
+                        handleExecuteFinalize(finalizeTargetDate);
+                      }
+                    }}
+                    disabled={isExecutingFinalize}
+                    className="px-4 py-2 bg-[#034665] hover:bg-[#02334a] text-white text-xs font-semibold rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isExecutingFinalize ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <PlayCircle size={13} />
+                    )}
+                    <span>{isExecutingFinalize ? 'Executing...' : 'Run Daily Finalization'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Execution Result Banner */}
+            {finalizeResult && (
+              <div
+                className={`mt-4 p-3.5 rounded-xl border flex items-start gap-3 text-xs ${
+                  finalizeResult.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}
+              >
+                {finalizeResult.type === 'success' ? (
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1">
+                  <p className="font-semibold">{finalizeResult.message}</p>
+                  {finalizeResult.data && (
+                    <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-slate-600">
+                      {finalizeResult.data.evaluated !== undefined && (
+                        <span>Evaluated: <strong>{finalizeResult.data.evaluated}</strong></span>
+                      )}
+                      {finalizeResult.data.absentMarked !== undefined && (
+                        <span>Absent Marked: <strong>{finalizeResult.data.absentMarked}</strong></span>
+                      )}
+                      {finalizeResult.data.punchesPreserved !== undefined && (
+                        <span>Punches Preserved: <strong>{finalizeResult.data.punchesPreserved}</strong></span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFinalizeResult(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Preview Content Area */}
+            {loadingPreview ? (
+              <div className="py-8">
+                <TableSkeleton rows={4} cols={5} />
+              </div>
+            ) : previewError ? (
+              <div className="mt-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={16} className="text-amber-600 shrink-0" />
+                  <span>{previewError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchFinalizePreview(finalizeTargetDate)}
+                  className="px-3 py-1 bg-amber-600 text-white rounded font-semibold hover:bg-amber-700 transition cursor-pointer text-xs"
+                >
+                  Retry Preview
+                </button>
+              </div>
+            ) : finalizePreview ? (
+              <div className="mt-4 space-y-4">
+                {/* Preview Summary Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-3 text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Evaluated</span>
+                    <span className="text-lg font-bold text-slate-900 mt-0.5 block">
+                      {finalizePreview?.summary?.totalEvaluated ?? finalizePreview?.totalEmployees ?? finalizePreview?.total ?? finalizePreview?.stats?.evaluated ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-200/80 rounded-lg p-3 text-center">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">Preserved Punches</span>
+                    <span className="text-lg font-bold text-emerald-800 mt-0.5 block">
+                      {finalizePreview?.summary?.punchesPreserved ?? finalizePreview?.punchedCount ?? finalizePreview?.stats?.punched ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200/80 rounded-lg p-3 text-center">
+                    <span className="text-[10px] uppercase font-bold text-blue-700 block">Leaves Protected</span>
+                    <span className="text-lg font-bold text-blue-800 mt-0.5 block">
+                      {finalizePreview?.summary?.leavePreserved ?? finalizePreview?.leaveCount ?? finalizePreview?.stats?.leave ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="bg-rose-50 border border-rose-200/80 rounded-lg p-3 text-center">
+                    <span className="text-[10px] uppercase font-bold text-rose-700 block">To Mark Absent</span>
+                    <span className="text-lg font-bold text-rose-800 mt-0.5 block">
+                      {finalizePreview?.summary?.absentToCreate ?? finalizePreview?.absentCount ?? finalizePreview?.stats?.absent ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="bg-purple-50 border border-purple-200/80 rounded-lg p-3 text-center col-span-2 sm:col-span-1">
+                    <span className="text-[10px] uppercase font-bold text-purple-700 block">Holidays / Excluded</span>
+                    <span className="text-lg font-bold text-purple-800 mt-0.5 block">
+                      {finalizePreview?.isHoliday ? 'Holiday Master Match' : finalizePreview?.isSunday ? 'Sunday Weekly Off' : '0 (Active Workday)'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Day Status Notice */}
+                {(finalizePreview.isHoliday || finalizePreview.isSunday) && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center gap-2">
+                    <Info size={15} className="text-amber-600 shrink-0" />
+                    <span>
+                      <strong>Safe Skip Active:</strong> {finalizePreview.holidayReason || (finalizePreview.isSunday ? 'Target date is Sunday weekly off' : 'Holiday declared in master')}. Attendance engine will skip marking absent.
+                    </span>
+                  </div>
+                )}
+
+                {/* Affected Records Preview Table */}
+                {(() => {
+                  const records =
+                    finalizePreview?.affectedRecords ||
+                    finalizePreview?.previewRecords ||
+                    finalizePreview?.toMarkAbsent ||
+                    finalizePreview?.records ||
+                    finalizePreview?.data ||
+                    [];
+                  if (!Array.isArray(records) || records.length === 0) {
+                    return (
+                      <div className="p-8 text-center bg-slate-50 border border-slate-200/70 rounded-lg text-xs text-slate-500">
+                        <CheckCircle2 size={24} className="text-emerald-500 mx-auto mb-1.5" />
+                        <p className="font-semibold text-slate-700">No pending absent entries detected</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          All active eligible employees have punches, approved leaves, or are covered under company holidays.
+                        </p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                            <th className="py-2.5 px-3">No.</th>
+                            <th className="py-2.5 px-3">Employee</th>
+                            <th className="py-2.5 px-3">Department</th>
+                            <th className="py-2.5 px-3">Status Action</th>
+                            <th className="py-2.5 px-3">Protection / Safeguard Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {records.slice(0, 15).map((rec, idx) => (
+                            <tr key={rec._id || rec.userId || idx} className="hover:bg-slate-50/60">
+                              <td className="py-2.5 px-3 text-slate-400">{idx + 1}</td>
+                              <td className="py-2.5 px-3">
+                                <div className="font-semibold text-slate-800">
+                                  {rec.employeeName || rec.name || rec.userName || 'Employee'}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono">
+                                  {rec.employeeId || rec.uniqueID || rec.email || '-'}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-600">
+                                {rec.department || '-'}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  (rec.status || rec.action) === 'leave'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : (rec.status || rec.action) === 'half_day' || (rec.status || rec.action) === 'half-day'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {rec.status || rec.action || 'absent'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-[11px] text-slate-500">
+                                {rec.reason || rec.note || 'No check-in punch found by 16:00 IST cutoff'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {records.length > 15 && (
+                        <div className="p-2 text-center text-[11px] text-slate-400 bg-slate-50 border-t border-slate-200">
+                          Showing first 15 of {records.length} records.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-xs text-slate-400">
+                Click "Generate Preview" to inspect affected records for {finalizeTargetDate}.
+              </div>
+            )}
+          </div>
+
+          {/* Audit History Card: Persistent Job Logs (AttendanceJobLog) */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-5 sm:p-6 shadow-xs font-poppins">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <FileText size={18} className="text-[#034665]" />
+                  <span>Persistent Scheduler Execution Audit Logs</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Audit records stored in AttendanceJobLog tracking daily 16:00 IST runs, catch-ups, and manual executions.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchSchedulerLogs(schedulerPage)}
+                  disabled={loadingScheduler}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={loadingScheduler ? 'animate-spin' : ''} />
+                  <span>Refresh Logs</span>
+                </button>
+              </div>
+            </div>
+
+            {loadingScheduler ? (
+              <div className="py-8">
+                <TableSkeleton rows={5} cols={6} />
+              </div>
+            ) : schedulerError ? (
+              <div className="mt-4 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                  <span>{schedulerError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchSchedulerLogs(1)}
+                  className="px-3 py-1 bg-rose-600 text-white rounded font-semibold hover:bg-rose-700 transition cursor-pointer text-xs"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : schedulerLogs.length === 0 ? (
+              <div className="p-12 text-center bg-slate-50 border border-slate-200/70 rounded-lg text-xs text-slate-500 mt-4">
+                <ShieldCheck size={32} className="text-slate-300 mx-auto mb-2" />
+                <p className="font-semibold text-slate-700">No scheduler execution logs found yet</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Automated logs will record every day at 16:00 IST or upon manual finalization.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                  <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                    <thead>
+                      <tr className="bg-[#0346651A] text-[#034665] font-semibold border-b border-slate-200">
+                        <th className="py-3 px-3.5">Target Date</th>
+                        <th className="py-3 px-3.5">Execution Time (IST)</th>
+                        <th className="py-3 px-3.5">Trigger Type</th>
+                        <th className="py-3 px-3.5 text-center">Status</th>
+                        <th className="py-3 px-3.5 text-center">Evaluated</th>
+                        <th className="py-3 px-3.5 text-center">Absent Marked</th>
+                        <th className="py-3 px-3.5 text-center">Punches Preserved</th>
+                        <th className="py-3 px-3.5">Duration / Note</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {schedulerLogs.map((log, idx) => {
+                        const status = (log.status || (log.success ? 'SUCCESS' : 'FAILED')).toUpperCase();
+                        const trigger = (log.triggerType || log.trigger || log.type || 'SCHEDULED').toUpperCase();
+                        return (
+                          <tr key={log._id || idx} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-3 px-3.5 font-semibold text-slate-900 whitespace-nowrap">
+                              {log.targetDate || log.date ? formatIndianDate(log.targetDate || log.date) : '-'}
+                            </td>
+                            <td className="py-3 px-3.5 text-slate-600 font-mono text-[11px] whitespace-nowrap">
+                              {log.createdAt || log.timestamp
+                                ? new Date(log.createdAt || log.timestamp).toLocaleTimeString('en-IN', {
+                                    timeZone: 'Asia/Kolkata',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                    hour12: true,
+                                  })
+                                : '-'}
+                            </td>
+                            <td className="py-3 px-3.5 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {trigger}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  status === 'SUCCESS'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : status === 'SKIPPED'
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                }`}
+                              >
+                                {status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 text-center font-semibold text-slate-800">
+                              {log.totalEvaluated ?? log.evaluated ?? log.metrics?.evaluated ?? '-'}
+                            </td>
+                            <td className="py-3 px-3.5 text-center font-semibold text-rose-700">
+                              {log.absentMarked ?? log.markedAbsent ?? log.metrics?.absentMarked ?? '-'}
+                            </td>
+                            <td className="py-3 px-3.5 text-center font-semibold text-emerald-700">
+                              {log.punchesPreserved ?? log.preserved ?? log.metrics?.punchesPreserved ?? '-'}
+                            </td>
+                            <td className="py-3 px-3.5 text-[11px] text-slate-500">
+                              {log.durationMs ? `${log.durationMs}ms` : ''}
+                              {log.errorMessage ? ` • ${log.errorMessage}` : ''}
+                              {!log.durationMs && !log.errorMessage ? (log.note || '-') : ''}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                {schedulerTotalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 text-xs text-slate-500">
+                    <div>
+                      Page {schedulerPage} of {schedulerTotalPages} ({schedulerTotalCount} total logs)
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => fetchSchedulerLogs(Math.max(1, schedulerPage - 1))}
+                        disabled={schedulerPage <= 1 || loadingScheduler}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition disabled:opacity-40 cursor-pointer"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fetchSchedulerLogs(Math.min(schedulerTotalPages, schedulerPage + 1))}
+                        disabled={schedulerPage >= schedulerTotalPages || loadingScheduler}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition disabled:opacity-40 cursor-pointer"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+{/* ==================================================== */}
       {/* EMPLOYEE COMPLETE ATTENDANCE HISTORY MODAL */}
       {/* ==================================================== */}
       {employeeHistoryModal && (

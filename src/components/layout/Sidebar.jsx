@@ -337,7 +337,7 @@ export const Sidebar = ({ onSignOut }) => {
   const location = useLocation();
 
   useEffect(() => {
-    if (userRole !== 'admin' && userRole !== 'hr') {
+    if (userRole !== 'admin' && userRole !== 'hr' && userRole !== 'team_leader') {
       return undefined;
     }
 
@@ -424,6 +424,8 @@ export const Sidebar = ({ onSignOut }) => {
       'team-leaves': ['team-leaves', 'admin-leave-requests'],
       'admin-settings': ['settings', 'admin-settings', 'setting'],
       'settings': ['settings', 'admin-settings', 'setting'],
+      'admin-checkin-requests': ['admin-checkin-requests', 'team-checkin-requests', 'checkin-requests'],
+      'team-checkin-requests': ['admin-checkin-requests', 'team-checkin-requests', 'checkin-requests'],
       'employee-deductions': ['employee-deductions', 'deduction-approvals', 'deductions'],
       'team-deductions': ['team-deductions', 'employee-deductions'],
       'my-deductions': ['my-deductions'],
@@ -565,9 +567,10 @@ export const Sidebar = ({ onSignOut }) => {
     {
       title: "TEAM MANAGEMENT",
       items: [
+        { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon, requestCount: requestCounts.checkIn },
         { tab: 'team-tasks', label: 'Task Management', icon: TaskManagementIcon },
-        { tab: 'team-leaves', label: 'Team Leave Requests', icon: LeaveRequestsIcon },
-        { tab: 'team-deductions', label: 'Team Deductions', icon: DeductionIcon },
+        { tab: 'team-leaves', label: 'Team Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
+        { tab: 'team-deductions', label: 'Team Deductions', icon: DeductionIcon, requestCount: requestCounts.deduction },
         { tab: 'daily-follow-up', label: 'Daily Follow-Up', icon: CheckInsIcon },
         { tab: 'team-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'employees', label: 'Employees', icon: EmployeeIcon },

@@ -145,7 +145,9 @@ const MainLayout = ({ handleSignOut }) => {
       case 'admin-dashboard': return <AdminDashboardView />;
       case 'admin-performance': return <AdminPerformanceView />;
       case 'admin-attendance-logs': return <AdminAttendanceLogsView />;
-      case 'admin-checkin-requests': return <AdminCheckInRequestsView />;
+      case 'admin-checkin-requests':
+      case 'team-checkin-requests':
+      case 'checkin-requests': return <AdminCheckInRequestsView />;
       case 'admin-leave-requests': return <AdminLeaveRequestsView />;
       case 'admin-adjustments': return <AdminAdjustmentsView />;
       case 'admin-holidays': return <AdminHolidaysView />;
