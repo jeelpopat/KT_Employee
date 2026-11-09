@@ -19,6 +19,8 @@ import {
   Users,
   ShieldCheck,
   Loader2,
+  Plus,
+  CheckCircle2,
 } from "lucide-react";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
 import {
@@ -336,6 +338,124 @@ export default function LeaveRequest() {
 
   const [currentUser, setCurrentUser] = useState(null);
   const [currentRole, setCurrentRole] = useState("");
+  const loggedRole = normalizeRole(currentRole || currentUser?.role);
+
+  // States for Admin/HR Create Leave Request
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [employeeDirectory, setEmployeeDirectory] = useState([]);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [createFormError, setCreateFormError] = useState("");
+  const [createFormData, setCreateFormData] = useState({
+    employeeId: "",
+    leaveType: "full_day",
+    isHalfDay: false,
+    halfDayType: "first-half",
+    startDate: "",
+    endDate: "",
+    reason: "",
+    directApprove: true,
+  });
+
+  const calculatedCreateDays = useMemo(() => {
+    if (!createFormData.startDate) return 0;
+    const finalEnd = createFormData.isHalfDay
+      ? createFormData.startDate
+      : (createFormData.endDate || createFormData.startDate);
+    return calculateLeaveDays(
+      createFormData.startDate,
+      finalEnd,
+      holidayDatesRef.current || [],
+      createFormData.isHalfDay
+    );
+  }, [createFormData.startDate, createFormData.endDate, createFormData.isHalfDay]);
+
+  const handleOpenCreateModal = () => {
+    setCreateFormData({
+      employeeId: "",
+      leaveType: "full_day",
+      isHalfDay: false,
+      halfDayType: "first-half",
+      startDate: "",
+      endDate: "",
+      reason: "",
+      directApprove: true,
+    });
+    setCreateFormError("");
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateLeaveSubmit = async (e) => {
+    e.preventDefault();
+    setCreateFormError("");
+
+    if (!createFormData.employeeId) {
+      setCreateFormError("Please select an employee.");
+      return;
+    }
+    if (!createFormData.startDate) {
+      setCreateFormError("Please select a start date.");
+      return;
+    }
+    const finalEndDate = createFormData.isHalfDay
+      ? createFormData.startDate
+      : (createFormData.endDate || createFormData.startDate);
+
+    if (!createFormData.isHalfDay && finalEndDate < createFormData.startDate) {
+      setCreateFormError("End date cannot be earlier than start date.");
+      return;
+    }
+
+    if (calculatedCreateDays <= 0) {
+      setCreateFormError("The selected dates fall entirely on Sundays or company holidays.");
+      return;
+    }
+
+    setCreateSubmitting(true);
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
+      const payload = {
+        userId: createFormData.employeeId,
+        employeeId: createFormData.employeeId,
+        leaveType: "full_day",
+        startDate: createFormData.startDate,
+        endDate: finalEndDate,
+        isHalfDay: Boolean(createFormData.isHalfDay),
+        halfDayType: createFormData.isHalfDay ? createFormData.halfDayType : null,
+        totalDays: createFormData.isHalfDay ? 0.5 : Number(calculatedCreateDays),
+        reason: createFormData.reason.trim() || `Leave created by ${loggedRole.toUpperCase()}`,
+        status: createFormData.directApprove ? "approved" : "pending",
+        autoApprove: Boolean(createFormData.directApprove),
+        directApprove: Boolean(createFormData.directApprove),
+      };
+
+      const res = await fetch(`${BASE_URL}/api/leave/apply`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(resData.message || resData.error || "Failed to create leave request.");
+      }
+
+      setSuccess(
+        createFormData.directApprove
+          ? "Leave request created and approved successfully."
+          : "Leave request submitted successfully."
+      );
+      setIsCreateModalOpen(false);
+      fetchLeaves(true);
+    } catch (err) {
+      setCreateFormError(err.message || "Failed to create leave request.");
+    } finally {
+      setCreateSubmitting(false);
+    }
+  };
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -485,6 +605,7 @@ export default function LeaveRequest() {
       }
 
       let uMap = {};
+      const empDirectory = [];
       if (uRes.status === "fulfilled" && uRes.value) {
         const rawUsers = uRes.value?.users || uRes.value?.data || (Array.isArray(uRes.value) ? uRes.value : []);
         if (Array.isArray(rawUsers)) {
@@ -496,10 +617,60 @@ export default function LeaveRequest() {
               uMap[String(id).toLowerCase().trim()] = u;
             });
             if (u.email) uMap[u.email.toLowerCase().trim()] = u;
+
+            if (!isFinanceOrExcludedUser(u) && !isUnknownEmployeeOrUser(u)) {
+              const name = u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Employee';
+              empDirectory.push({
+                id: u._id || u.id,
+                name,
+                employeeId: u.uniqueID || u.employeeID || u.employeeId || '',
+                role: u.role || 'employee',
+                department: u.department || u.dept || '',
+                designation: u.designation || '',
+                email: u.email || '',
+              });
+            }
           });
           setUsersMap(uMap);
         }
       }
+
+      // Complement with /api/employee/list for full metadata
+      try {
+        const empListRes = await fetch(`${BASE_URL}/api/employee/list`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (empListRes.ok) {
+          const empListData = await empListRes.json();
+          const emps = empListData?.employees || empListData?.data || [];
+          emps.forEach(emp => {
+            if (!emp || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp)) return;
+            const empId = emp.userID || emp.userId || emp._id;
+            const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.name;
+            const existingIdx = empDirectory.findIndex(e => String(e.id) === String(empId));
+            const empItem = {
+              id: empId,
+              name: empName || 'Employee',
+              employeeId: emp.uniqueID || emp.employeeID || emp.employeeId || emp.employeeCode || '',
+              role: emp.role || emp.designation || 'employee',
+              department: emp.department || '',
+              designation: emp.designation || '',
+              email: emp.email || '',
+            };
+            if (existingIdx >= 0) {
+              empDirectory[existingIdx] = { ...empDirectory[existingIdx], ...empItem };
+            } else {
+              empDirectory.push(empItem);
+            }
+          });
+        }
+      } catch (_) {}
+
+      empDirectory.sort((a, b) => a.name.localeCompare(b.name));
+      setEmployeeDirectory(empDirectory);
 
       const allTeams = teamsData.status === "fulfilled" && Array.isArray(teamsData.value) ? teamsData.value : [];
       const userIdent = getLoggedInUserIdentifiers(currentUser);
@@ -1650,6 +1821,18 @@ export default function LeaveRequest() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Create Leave Request Button for Admin & HR */}
+          {["admin", "hr"].includes(loggedRole) && (
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-[#034665] hover:bg-[#02334a] text-white rounded-md text-xs sm:text-sm font-medium font-poppins shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus size={15} />
+              <span>Create Leave Request</span>
+            </button>
+          )}
+
           {/* Total Count Badge */}
           <div className="h-9 bg-white border border-slate-300 rounded-md px-3 sm:px-3.5 shadow-2xs text-xs font-medium flex items-center select-none font-poppins text-slate-600 gap-1.5">
             <Users size={14} className="text-slate-600 shrink-0" />
@@ -2497,6 +2680,272 @@ export default function LeaveRequest() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================
+            CREATE LEAVE REQUEST MODAL (Admin & HR)
+      ==================================================== */}
+      {isCreateModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-poppins animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="fixed inset-0"
+            onClick={() => !createSubmitting && setIsCreateModalOpen(false)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] z-10 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#034665]/10 flex items-center justify-center text-[#034665]">
+                  <CalendarDays size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
+                    Create Leave Request
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-normal">
+                    Apply leave on behalf of an employee as {loggedRole ? loggedRole.toUpperCase() : "ADMIN/HR"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !createSubmitting && setIsCreateModalOpen(false)}
+                disabled={createSubmitting}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleCreateLeaveSubmit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto modal-scrollbar p-5 space-y-4 text-xs sm:text-sm">
+                {createFormError && (
+                  <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg p-3 text-xs">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{createFormError}</span>
+                  </div>
+                )}
+
+                {/* Employee Select */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Select Employee <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={createFormData.employeeId}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, employeeId: e.target.value }))}
+                    disabled={createSubmitting}
+                    required
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition cursor-pointer"
+                  >
+                    <option value="">-- Choose Employee --</option>
+                    {employeeDirectory.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} {emp.employeeId ? `(${emp.employeeId})` : ""} - {emp.designation || emp.role || "Employee"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Leave Duration Type (Full Day / Half Day) */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Leave Duration
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCreateFormData(prev => ({ ...prev, isHalfDay: false, endDate: prev.endDate || prev.startDate }))}
+                      className={`h-9 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                        !createFormData.isHalfDay
+                          ? "bg-[#034665] text-white border-[#034665] shadow-xs"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <Calendar size={13} />
+                      <span>Full Day</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreateFormData(prev => ({ ...prev, isHalfDay: true, endDate: prev.startDate }))}
+                      className={`h-9 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                        createFormData.isHalfDay
+                          ? "bg-[#034665] text-white border-[#034665] shadow-xs"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <Clock size={13} />
+                      <span>Half Day</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Half Day Shift Selection */}
+                {createFormData.isHalfDay && (
+                  <div className="bg-sky-50/70 border border-sky-100 rounded-xl p-3 space-y-2">
+                    <label className="block text-xs font-semibold text-sky-950">
+                      Half Day Shift
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition text-xs font-medium ${
+                        createFormData.halfDayType === "first-half"
+                          ? "bg-white border-sky-500 text-sky-950 shadow-2xs font-semibold"
+                          : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                      }`}>
+                        <input
+                          type="radio"
+                          name="createHalfDayType"
+                          value="first-half"
+                          checked={createFormData.halfDayType === "first-half"}
+                          onChange={(e) => setCreateFormData(prev => ({ ...prev, halfDayType: e.target.value }))}
+                          className="accent-[#034665]"
+                        />
+                        <span>First Half (Morning)</span>
+                      </label>
+                      <label className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition text-xs font-medium ${
+                        createFormData.halfDayType === "second-half"
+                          ? "bg-white border-sky-500 text-sky-950 shadow-2xs font-semibold"
+                          : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                      }`}>
+                        <input
+                          type="radio"
+                          name="createHalfDayType"
+                          value="second-half"
+                          checked={createFormData.halfDayType === "second-half"}
+                          onChange={(e) => setCreateFormData(prev => ({ ...prev, halfDayType: e.target.value }))}
+                          className="accent-[#034665]"
+                        />
+                        <span>Second Half (Evening)</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dates Selection */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Start Date <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={createFormData.startDate}
+                      onChange={(e) => {
+                        const newStart = e.target.value;
+                        setCreateFormData(prev => ({
+                          ...prev,
+                          startDate: newStart,
+                          endDate: prev.isHalfDay || !prev.endDate || prev.endDate < newStart ? newStart : prev.endDate
+                        }));
+                      }}
+                      required
+                      disabled={createSubmitting}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      End Date {createFormData.isHalfDay && <span className="text-slate-400 font-normal">(Same Day)</span>}
+                    </label>
+                    <input
+                      type="date"
+                      value={createFormData.isHalfDay ? createFormData.startDate : createFormData.endDate}
+                      onChange={(e) => setCreateFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                      disabled={createFormData.isHalfDay || createSubmitting}
+                      min={createFormData.startDate || undefined}
+                      required={!createFormData.isHalfDay}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition disabled:bg-slate-100 disabled:text-slate-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Calculated Working Days Pill */}
+                {createFormData.startDate && (
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <span>Net Working Days Count:</span>
+                    </div>
+                    <span className="font-bold text-sm text-emerald-950 font-mono">
+                      {createFormData.isHalfDay ? "0.5 Day" : `${calculatedCreateDays} ${calculatedCreateDays === 1 ? "Day" : "Days"}`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Reason / Remarks */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Reason / Description <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={createFormData.reason}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, reason: e.target.value }))}
+                    placeholder="Enter reason for leave..."
+                    required
+                    disabled={createSubmitting}
+                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#034665]/20 focus:border-[#034665] transition placeholder:text-slate-400 font-poppins"
+                  />
+                </div>
+
+                {/* Direct Approve Checkbox */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={createFormData.directApprove}
+                      onChange={(e) => setCreateFormData(prev => ({ ...prev, directApprove: e.target.checked }))}
+                      disabled={createSubmitting}
+                      className="w-4 h-4 mt-0.5 rounded text-[#034665] focus:ring-[#034665] border-slate-300 accent-[#034665] cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">
+                        Directly Approve Leave
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-normal leading-relaxed block mt-0.5">
+                        Immediately mark status as "Approved". Automatically registers approved leave in attendance & payroll without intermediate approval steps.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  disabled={createSubmitting}
+                  className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-medium transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createSubmitting}
+                  className="px-4 py-2 rounded-lg bg-[#034665] hover:bg-[#02334a] text-white text-xs sm:text-sm font-medium transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-60"
+                >
+                  {createSubmitting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} />
+                      <span>{createFormData.directApprove ? "Create & Approve" : "Create Request"}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

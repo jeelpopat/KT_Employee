@@ -506,7 +506,8 @@ export const LeaveManagementView = () => {
       return;
     }
 
-    if (startDate < minAllowedDate) {
+    const isSpecialRole = ['admin', 'hr'].includes(String(userRole || user?.role || '').toLowerCase());
+    if (!isSpecialRole && startDate < minAllowedDate) {
       setFormError(`Policy Notice: Leave must be applied at least 2 days in advance (selectable from ${minAllowedDate} onwards).`);
       return;
     }
