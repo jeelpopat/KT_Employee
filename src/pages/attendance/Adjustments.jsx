@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { LoadingScreen } from "../../components/common/Loader.jsx";
 import { useLocation } from "react-router-dom";
 import Toast, { showToast } from "../../components/common/Toast";
@@ -9,6 +9,9 @@ import {
   RotateCcw,
   Clock,
   Loader2,
+  Copy,
+  Check,
+  ArrowRight,
 } from "lucide-react";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
 import { BASE_URL } from "../../api/config.js";
@@ -153,6 +156,77 @@ export default function Adjustments() {
       checkout: false,
     },
   ]);
+
+  // ============================================================
+  // 12-HOUR TO 24-HOUR TIME CONVERTER STATE & HELPERS
+  // ============================================================
+  const [converter12Time, setConverter12Time] = useState("");
+  const [converterPeriod, setConverterPeriod] = useState("PM");
+  const [converterCopied, setConverterCopied] = useState(false);
+
+  const converted24HourTime = useMemo(() => {
+    if (!converter12Time) return "";
+    const str = String(converter12Time).trim();
+    let period = converterPeriod;
+    const periodMatch = str.match(/(am|pm)/i);
+    if (periodMatch) {
+      period = periodMatch[1].toUpperCase();
+    }
+
+    const timeClean = str.replace(/(am|pm)/i, "").trim();
+    const parts = timeClean.split(/[:.]/);
+    if (!parts[0]) return "";
+
+    let hours = parseInt(parts[0], 10);
+    let minutes = parts[1] !== undefined && parts[1] !== "" ? parseInt(parts[1], 10) : 0;
+
+    if (isNaN(hours) || isNaN(minutes)) return "";
+    if (hours < 1 || hours > 12) return "";
+    if (minutes < 0 || minutes > 59) return "";
+
+    const pUpper = String(period).toUpperCase();
+    if (pUpper === "PM" && hours !== 12) {
+      hours += 12;
+    } else if (pUpper === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    const hh = String(hours).padStart(2, "0");
+    const mm = String(minutes).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }, [converter12Time, converterPeriod]);
+
+  const handleCopy24HourTime = () => {
+    if (!converted24HourTime) return;
+    try {
+      navigator.clipboard?.writeText(converted24HourTime);
+      setConverterCopied(true);
+      showToast(`Copied ${converted24HourTime} to clipboard!`, "success");
+      setTimeout(() => setConverterCopied(false), 2000);
+    } catch {
+      showToast(`24-Hour Time: ${converted24HourTime}`, "info");
+    }
+  };
+
+  const handleApplyConvertedTime = (sessionIndex, fieldKey) => {
+    if (!converted24HourTime) {
+      showToast("Please enter a valid 12-hour time first", "warning");
+      return;
+    }
+    handleSessionChange(sessionIndex, fieldKey, converted24HourTime);
+    handleFieldCheckbox(sessionIndex, fieldKey, true);
+
+    const fieldLabels = {
+      checkin: "Check In",
+      breakStart: "Break Start",
+      breakEnd: "Break End",
+      checkout: "Check Out",
+    };
+    showToast(
+      `Applied ${converted24HourTime} to Session ${sessionIndex + 1} ${fieldLabels[fieldKey] || fieldKey}`,
+      "success"
+    );
+  };
 
   // ============================================================
   // ATTENDANCE SETTINGS
@@ -2344,6 +2418,162 @@ export default function Adjustments() {
                 </div>
               </div>
 
+              {/* 12-Hour to 24-Hour Time Converter Widget */}
+              <div className="bg-gradient-to-r from-sky-50/80 via-blue-50/60 to-slate-50 border border-sky-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3 pb-2.5 border-b border-sky-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-[#068DCB]/15 text-[#068DCB] flex items-center justify-center shrink-0">
+                      <Clock size={15} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[#0f172a] font-poppins flex items-center gap-1.5">
+                        <span>12-Hour ➔ 24-Hour Time Converter</span>
+                        <span className="px-1.5 py-0.2 text-[10px] font-semibold bg-[#068DCB] text-white rounded">
+                          Helper
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-poppins">
+                        Enter 12-hour time (e.g. 02:30 PM) to convert and apply to 24-hour sessions below.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 24-Hour Output Preview */}
+                  {converted24HourTime ? (
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-sky-300 shadow-2xs self-start sm:self-auto">
+                      <span className="text-[11px] text-slate-500 font-poppins">24h Time:</span>
+                      <span className="text-sm font-bold font-mono text-[#068DCB] tracking-wide">
+                        {converted24HourTime}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopy24HourTime}
+                        className="text-slate-400 hover:text-[#068DCB] transition p-1 rounded hover:bg-slate-50 cursor-pointer"
+                        title="Copy 24-Hour Time"
+                      >
+                        {converterCopied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-slate-400 italic">
+                      Enter 12h time to see 24h format
+                    </span>
+                  )}
+                </div>
+
+                {/* Converter Controls Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                  {/* 12h Input Field */}
+                  <div className="sm:col-span-5">
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1 font-poppins">
+                      12-Hour Time (hh:mm)
+                    </label>
+                    <div className="relative">
+                      <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={converter12Time}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setConverter12Time(val);
+                          if (/pm/i.test(val)) setConverterPeriod("PM");
+                          else if (/am/i.test(val)) setConverterPeriod("AM");
+                        }}
+                        placeholder="e.g. 02:30 or 10:15"
+                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#068DCB] focus:ring-1 focus:ring-[#068DCB]/20 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* AM / PM Selector */}
+                  <div className="sm:col-span-3">
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1 font-poppins">
+                      Period (AM / PM)
+                    </label>
+                    <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setConverterPeriod("AM")}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition cursor-pointer font-poppins ${
+                          converterPeriod === "AM"
+                            ? "bg-[#034665] text-white shadow-2xs"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        AM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConverterPeriod("PM")}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition cursor-pointer font-poppins ${
+                          converterPeriod === "PM"
+                            ? "bg-[#068DCB] text-white shadow-2xs"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        PM
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick Preset Buttons */}
+                  <div className="sm:col-span-4">
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1 font-poppins">
+                      Quick Presets
+                    </label>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: "10:00 AM", time: "10:00", p: "AM" },
+                        { label: "01:00 PM", time: "01:00", p: "PM" },
+                        { label: "02:00 PM", time: "02:00", p: "PM" },
+                        { label: "07:00 PM", time: "07:00", p: "PM" },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            setConverter12Time(preset.time);
+                            setConverterPeriod(preset.p);
+                          }}
+                          className="px-2 py-0.5 text-[10px] font-medium rounded border border-slate-200 bg-white hover:bg-sky-50 hover:border-sky-300 text-slate-600 hover:text-[#068DCB] transition cursor-pointer font-poppins"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick 1-Click Apply to Sessions */}
+                {converted24HourTime && (
+                  <div className="mt-2.5 pt-2 border-t border-sky-100/80 flex flex-wrap items-center gap-1.5 text-xs font-poppins">
+                    <span className="text-[11px] font-semibold text-slate-700 mr-1">
+                      Apply ({converted24HourTime}) to:
+                    </span>
+                    {formData.sessions.map((_, sIdx) => (
+                      <div key={sIdx} className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-400 font-medium ml-1">Session {sIdx + 1}:</span>
+                        {[
+                          { key: "checkin", label: "Check In" },
+                          { key: "breakStart", label: "Break S" },
+                          { key: "breakEnd", label: "Break E" },
+                          { key: "checkout", label: "Check Out" },
+                        ].map((field) => (
+                          <button
+                            key={field.key}
+                            type="button"
+                            onClick={() => handleApplyConvertedTime(sIdx, field.key)}
+                            className="px-2 py-0.5 text-[10px] font-semibold rounded bg-white hover:bg-[#068DCB] text-[#034665] hover:text-white border border-sky-200 transition cursor-pointer shadow-2xs"
+                          >
+                            {field.label}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {formData.sessions.map((session, index) => {
                 const checkbox = selectedFields[index] || {
                   checkin: false,
@@ -2397,6 +2627,7 @@ export default function Adjustments() {
                                 : "border-[#cbd5e1] text-[#475569]"
                               }`}
                           />
+                          {session.checkin && (<span className="text-[10px] text-[#068DCB] font-medium mt-0.5 block font-poppins">12h: {format12Hour(session.checkin)}</span>)}
                         </div>
                       </div>
 
@@ -2424,6 +2655,7 @@ export default function Adjustments() {
                                 : "border-[#cbd5e1] text-[#475569]"
                               }`}
                           />
+                          {session.breakStart && (<span className="text-[10px] text-[#068DCB] font-medium mt-0.5 block font-poppins">12h: {format12Hour(session.breakStart)}</span>)}
                         </div>
                       </div>
 
@@ -2451,6 +2683,7 @@ export default function Adjustments() {
                                 : "border-[#cbd5e1] text-[#475569]"
                               }`}
                           />
+                          {session.breakEnd && (<span className="text-[10px] text-[#068DCB] font-medium mt-0.5 block font-poppins">12h: {format12Hour(session.breakEnd)}</span>)}
                         </div>
                       </div>
 
@@ -2478,6 +2711,7 @@ export default function Adjustments() {
                                 : "border-[#cbd5e1] text-[#475569]"
                               }`}
                           />
+                          {session.checkout && (<span className="text-[10px] text-[#068DCB] font-medium mt-0.5 block font-poppins">12h: {format12Hour(session.checkout)}</span>)}
                         </div>
                       </div>
                     </div>
