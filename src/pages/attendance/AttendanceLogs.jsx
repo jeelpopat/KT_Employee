@@ -247,6 +247,22 @@ export const isRecordPending = (item) => {
 const formatTime = (value) => {
   if (!value) return '—';
 
+  const timeMatch = String(value).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+  if (timeMatch) {
+    let hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const period = timeMatch[3]?.toUpperCase();
+    if (hours > 23 || minutes > 59 || (period && (hours < 1 || hours > 12))) return String(value);
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
   const date = new Date(value);
 
   if (!Number.isNaN(date.getTime())) {
@@ -317,7 +333,21 @@ const normalizeStatus = (item) => {
     .trim()
     .toLowerCase();
 
-  if (rawStatus === 'onleave' || rawStatus === 'leave') {
+  if (rawStatus === 'absent') {
+    return 'absent';
+  }
+
+  if (
+    rawStatus === 'half-day' ||
+    rawStatus === 'halfday' ||
+    rawStatus === 'half_day' ||
+    rawStatus === 'half day' ||
+    item?.isHalfDay === true
+  ) {
+    return 'half day';
+  }
+
+  if (rawStatus === 'onleave' || rawStatus === 'leave' || rawStatus === 'on leave') {
     return 'on leave';
   }
 
@@ -404,6 +434,10 @@ const normalizeStatus = (item) => {
    MAP API LOG
 ========================================================= */
 const mapLog = (item, index) => {
+  const sessions = Array.isArray(item?.sessions) ? item.sessions : [];
+  const firstSession = sessions.find((session) => session?.checkin || session?.checkIn) || {};
+  const lastSessionWithCheckout = [...sessions].reverse().find((session) => session?.checkout || session?.checkOut) || firstSession;
+
   const breaks = [
     ...(Array.isArray(item?.breaks)
       ? item.breaks
@@ -418,15 +452,15 @@ const mapLog = (item, index) => {
         },
       ]
       : []),
-    ...(Array.isArray(item?.sessions)
-      ? item.sessions
+    ...(sessions.length
+      ? sessions
         .filter(
           (session) =>
-            session?.breakStart || session?.breakEnd
+            session?.breakStart || session?.breakEnd || session?.breakIn || session?.breakOut
         )
         .map((session) => ({
-          startTime: session.breakStart,
-          endTime: session.breakEnd,
+          startTime: session.breakStart || session.breakIn,
+          endTime: session.breakEnd || session.breakOut,
         }))
       : []),
   ].filter((breakItem, breakIndex, allBreaks) => {
@@ -441,10 +475,6 @@ const mapLog = (item, index) => {
       ) === breakIndex
     );
   });
-
-  const firstSession = Array.isArray(item?.sessions)
-    ? item.sessions[0] || {}
-    : {};
 
   const approvalStatus = getApprovalState(item);
 
@@ -481,6 +511,7 @@ const mapLog = (item, index) => {
     item?.checkInTime ||
     item?.punchIn ||
     firstSession.checkin ||
+    firstSession.checkIn ||
     null;
 
   const hasCheckIn = Boolean(
@@ -496,9 +527,14 @@ const mapLog = (item, index) => {
       approvalStatus === 'approved' ||
       rawStatus === 'approved' ||
       rawStatus === 'accepted' ||
+      rawStatus === 'absent' ||
+      rawStatus === 'half day' ||
+      rawStatus === 'half-day' ||
+      rawStatus === 'halfday' ||
+      rawStatus === 'half_day' ||
       item?.isApproved === true ||
       item?.isApprovedCheckIn === true ||
-      ['present', 'late', 'on time', 'half day', 'half-day', 'working', 'completed', 'checked_out', 'checked out'].includes(rawStatus)
+      ['present', 'late', 'on time', 'working', 'completed', 'checked_out', 'checked out'].includes(rawStatus)
     );
 
   const approvedCheckIn = isApproved ? rawCheckInVal : '';
@@ -506,7 +542,8 @@ const mapLog = (item, index) => {
   const rawCheckOutVal =
     item?.checkOutTime ||
     item?.punchOut ||
-    firstSession.checkout ||
+    lastSessionWithCheckout.checkout ||
+    lastSessionWithCheckout.checkOut ||
     '';
 
   const approvedCheckOut = isApproved ? rawCheckOutVal : '';
@@ -527,7 +564,17 @@ const mapLog = (item, index) => {
       ? 'pending'
       : (hasCheckIn && isApproved
         ? normalizeStatus(item)
-        : (rawStatus === 'on leave' || rawStatus === 'leave' ? 'on leave' : 'absent'));
+        : (rawStatus === 'on leave' || rawStatus === 'leave' || rawStatus === 'onleave'
+          ? 'on leave'
+          : (rawStatus === 'half day' || rawStatus === 'half-day' || rawStatus === 'halfday' || rawStatus === 'half_day'
+            ? 'half day'
+            : 'absent')));
+
+  const rawTotalWorkTime = item?.totalWorkTime;
+  const totalWorkTime = Number(rawTotalWorkTime);
+  const totalWorkTimeDisplay = rawTotalWorkTime !== '' && rawTotalWorkTime !== null && rawTotalWorkTime !== undefined && Number.isFinite(totalWorkTime)
+    ? `${Math.floor(totalWorkTime)}h ${Math.round((totalWorkTime % 1) * 60)}m`
+    : (typeof rawTotalWorkTime === 'string' ? rawTotalWorkTime : '');
 
   return {
     id:
@@ -587,6 +634,7 @@ const mapLog = (item, index) => {
       ? (
         item?.totalWorkTimeDisplay ||
         item?.totalWorkTimeHours ||
+        totalWorkTimeDisplay ||
         item?.totalHours ||
         item?.hours ||
         '0h'
@@ -670,21 +718,15 @@ const parseTimeToMinutes = (timeStr) => {
     return null;
   }
 
-  const date = new Date(timeStr);
-
-  if (!Number.isNaN(date.getTime())) {
-    return date.getHours() * 60 + date.getMinutes();
-  }
-
   try {
-    const timeParts = String(timeStr).match(
-      /(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i
-    );
+    const value = String(timeStr).trim();
+    const timeParts = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
 
     if (timeParts) {
       let hours = parseInt(timeParts[1], 10);
       const minutes = parseInt(timeParts[2], 10);
       const ampm = timeParts[4];
+      if (hours > 23 || minutes > 59 || (ampm && (hours < 1 || hours > 12))) return null;
 
       if (ampm) {
         if (
@@ -704,6 +746,11 @@ const parseTimeToMinutes = (timeStr) => {
 
       return hours * 60 + minutes;
     }
+
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.getHours() * 60 + date.getMinutes();
+    }
   } catch (error) {
     return null;
   }
@@ -712,10 +759,8 @@ const parseTimeToMinutes = (timeStr) => {
 };
 
 const formatMinutes = (minutes) => {
-  return `${String(Math.floor(minutes / 60)).padStart(
-    2,
-    '0'
-  )}:${String(minutes % 60).padStart(2, '0')}`;
+  const clockMinutes = ((minutes % 1440) + 1440) % 1440;
+  return `${String(Math.floor(clockMinutes / 60)).padStart(2, '0')}:${String(clockMinutes % 60).padStart(2, '0')}`;
 };
 
 const formatDuration = (minutes) => {
@@ -738,10 +783,14 @@ const calculateAttendanceProgress = (
   checkOut
 ) => {
   const checkInMinutes = parseTimeToMinutes(checkIn);
-  const checkOutMinutes = parseTimeToMinutes(checkOut);
+  let checkOutMinutes = parseTimeToMinutes(checkOut);
 
   if (checkInMinutes === null) {
     return [];
+  }
+
+  if (checkOutMinutes !== null && checkOutMinutes <= checkInMinutes) {
+    checkOutMinutes += 1440;
   }
 
   const now = new Date();
@@ -775,13 +824,17 @@ const calculateAttendanceProgress = (
         item?.endTimeDisplay
       ),
     }))
-    .filter(
-      (item) =>
-        item.start !== null &&
-        item.end !== null &&
-        item.start >= checkInMinutes &&
-        item.start < activeEnd &&
-        item.end > item.start
+    .map((item) => {
+      if (item.start !== null && item.start < checkInMinutes) item.start += 1440;
+      if (item.end !== null && item.start !== null && item.end <= item.start) item.end += 1440;
+      return item;
+    })
+    .filter((item) =>
+      item.start !== null &&
+      item.end !== null &&
+      item.start >= checkInMinutes &&
+      item.start < activeEnd &&
+      item.end > item.start
     )
     .sort((a, b) => a.start - b.start);
 
@@ -2601,6 +2654,11 @@ export default function AttendanceLogs() {
     return { segments, workingMinutes, breakMinutes };
   };
 
+  const getLogDurationDisplay = (log) => {
+    const { workingMinutes } = getLogDetails(log);
+    return workingMinutes > 0 ? formatDuration(workingMinutes) : (log.totalHours || '0h');
+  };
+
   /* =========================================================
      UI
   ========================================================= */
@@ -3169,6 +3227,7 @@ export default function AttendanceLogs() {
 
               <tbody className="divide-y divide-slate-100 font-poppins">
                 {filteredAndSortedLogs.map((log, index) => {
+                  const totalHours = getLogDurationDisplay(log);
                   return (
                     <tr
                       key={log.id}
@@ -3220,7 +3279,7 @@ export default function AttendanceLogs() {
 
                       {/* Total Hours */}
                       <td className="py-3.5 px-4 text-xs text-slate-800 whitespace-nowrap font-medium font-poppins">
-                        {log.totalHours}
+                        {totalHours}
                       </td>
 
                       {/* Status */}
@@ -4315,7 +4374,7 @@ export default function AttendanceLogs() {
                             {formatTime(rec.checkOut)}
                           </td>
                           <td className="py-2.5 px-3 text-slate-800 font-medium whitespace-nowrap">
-                            {rec.totalHours || '0h'}
+                            {getLogDurationDisplay(rec)}
                           </td>
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
                             <div className="flex items-center justify-center">
@@ -4533,7 +4592,7 @@ export default function AttendanceLogs() {
                   {statusStyle.label}
                 </span>
                 <span className="text-sm sm:text-base text-slate-500 font-normal">
-                  Total: <strong className="font-bold text-slate-900">{formatPopupTotalHours(activeLog.totalHours)}</strong>
+                  Total: <strong className="font-bold text-slate-900">{formatPopupTotalHours(getLogDurationDisplay(activeLog))}</strong>
                 </span>
               </div>
 
