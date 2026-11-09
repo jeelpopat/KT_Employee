@@ -7,114 +7,40 @@ export const invalidateDeductionCaches = () => {
   invalidateCache(/salary/);
 };
 
-// Default standard Deduction Masters for compliance and fallback
-export const DEFAULT_DEDUCTION_MASTERS = [
-  {
-    _id: 'ded_master_idcard',
-    id: 'ded_master_idcard',
-    code: 'DED_IDCARD',
-    name: 'ID Card Not Worn',
-    title: 'ID Card Not Worn',
-    category: 'POLICY_VIOLATION',
-    calculationType: 'FLAT',
-    defaultAmount: 100,
-    amount: 100,
-    isActive: true,
-    isLegallyPermissible: true,
-    legalReference: 'Payment of Wages Act 1936 Sec 7(2)'
-  },
-  {
-    _id: 'ded_master_late',
-    id: 'ded_master_late',
-    code: 'DED_LATE',
-    name: 'Late Attendance Penalty',
-    title: 'Late Attendance Penalty',
-    category: 'ATTENDANCE_PENALTY',
-    calculationType: 'FLAT',
-    defaultAmount: 100,
-    amount: 100,
-    isActive: true,
-    isLegallyPermissible: true,
-    legalReference: 'Payment of Wages Act 1936 Sec 7(2)'
-  },
-  {
-    _id: 'ded_master_uniform',
-    id: 'ded_master_uniform',
-    code: 'DED_UNIFORM',
-    name: 'Uniform / Dress Code Violation',
-    title: 'Uniform / Dress Code Violation',
-    category: 'POLICY_VIOLATION',
-    calculationType: 'FLAT',
-    defaultAmount: 150,
-    amount: 150,
-    isActive: true,
-    isLegallyPermissible: true,
-    legalReference: 'Payment of Wages Act 1936 Sec 7(2)'
-  },
-  {
-    _id: 'ded_master_damage',
-    id: 'ded_master_damage',
-    code: 'DED_DAMAGE',
-    name: 'Asset / Equipment Damage',
-    title: 'Asset / Equipment Damage',
-    category: 'ASSET_DAMAGE',
-    calculationType: 'FLAT',
-    defaultAmount: 500,
-    amount: 500,
-    isActive: true,
-    isLegallyPermissible: true,
-    legalReference: 'Payment of Wages Act 1936 Sec 7(2)(c)'
-  },
-  {
-    _id: 'ded_master_advance',
-    id: 'ded_master_advance',
-    code: 'DED_ADVANCE',
-    name: 'Salary Advance Recovery',
-    title: 'Salary Advance Recovery',
-    category: 'ADVANCE_RECOVERY',
-    calculationType: 'FLAT',
-    defaultAmount: 1000,
-    amount: 1000,
-    isActive: true,
-    isLegallyPermissible: true,
-    legalReference: 'Payment of Wages Act 1936 Sec 7(2)(f)'
-  },
-  {
-    _id: 'ded_master_absence',
-    id: 'ded_master_absence',
-    code: 'DED_ABSENCE',
-    name: 'Unapproved Absence Penalty',
-    title: 'Unapproved Absence Penalty',
-    category: 'POLICY_VIOLATION',
-    calculationType: 'FLAT',
-    defaultAmount: 500,
-    amount: 500,
-    isActive: true,
-    isLegallyPermissible: true,
-    legalReference: 'Payment of Wages Act 1936 Sec 7(2)(b)'
-  }
-];
+// Default empty masters array - strictly no static mock data fallback
+export const DEFAULT_DEDUCTION_MASTERS = [];
 
 const DEDUCTION_MASTERS_STORAGE_KEY = 'kt_deduction_masters';
 
-// Helper to get cached masters from localStorage
+// Helper to get cached masters from localStorage (excluding any legacy mock templates)
 const getCachedDeductionMasters = () => {
   try {
     const raw = localStorage.getItem(DEDUCTION_MASTERS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Filter out any legacy hardcoded mock templates so authentic empty state is respected
+        const realMasters = parsed.filter(m => 
+          !String(m._id || m.id || '').startsWith('ded_master_idcard') &&
+          !String(m._id || m.id || '').startsWith('ded_master_late') &&
+          !String(m._id || m.id || '').startsWith('ded_master_uniform') &&
+          !String(m._id || m.id || '').startsWith('ded_master_damage') &&
+          !String(m._id || m.id || '').startsWith('ded_master_advance') &&
+          !String(m._id || m.id || '').startsWith('ded_master_absence')
+        );
+        return realMasters;
+      }
     }
   } catch (e) {
     console.warn('Could not read cached deduction masters:', e);
   }
-  return DEFAULT_DEDUCTION_MASTERS;
+  return [];
 };
 
 // Helper to save masters to localStorage
 const setCachedDeductionMasters = (list) => {
   try {
-    if (Array.isArray(list) && list.length > 0) {
+    if (Array.isArray(list)) {
       localStorage.setItem(DEDUCTION_MASTERS_STORAGE_KEY, JSON.stringify(list));
     }
   } catch (e) {
@@ -140,7 +66,7 @@ const requestWithFallback = async (primaryCall, fallbackCall) => {
 
 /**
  * Fetch all deduction masters with optional filters
- * Supports backend API and localStorage fallback for roles like Team Leader
+ * Strictly fetches from backend API without injecting static mock data
  * @param {Object} params - { category, isActive, isLegallyPermissible, search }
  */
 export const fetchDeductionMasters = async (params = {}) => {
@@ -151,7 +77,11 @@ export const fetchDeductionMasters = async (params = {}) => {
     );
 
     const list = res.data?.data || res.data?.deductionMasters || res.data || [];
-    if (Array.isArray(list) && list.length > 0) {
+    if (Array.isArray(list)) {
+      if (list.length === 0) {
+        // Backend genuinely returned 0 masters - strictly respect empty data
+        return [];
+      }
       // Normalize masters
       const normalized = list.map((m) => ({
         ...m,
@@ -168,10 +98,11 @@ export const fetchDeductionMasters = async (params = {}) => {
       return normalized;
     }
   } catch (err) {
-    console.warn('API fetch for deduction masters was unavailable, using cached/default masters:', err?.message);
+    console.warn('API fetch for deduction masters was unavailable:', err?.message);
+    return [];
   }
 
-  // Fallback to cached or standard masters
+  // Fallback to real cached masters if available, else empty list
   return getCachedDeductionMasters();
 };
 
@@ -288,6 +219,9 @@ export const fetchEmployeeDeductions = async (params = {}) => {
   ).then((res) => {
     const list = res.data?.data || res.data?.deductions || res.data || [];
     return Array.isArray(list) ? list : [];
+  }).catch((err) => {
+    console.warn('Backend fetch employee deductions fallback:', err?.message);
+    return [];
   });
 };
 
@@ -302,6 +236,9 @@ export const fetchMyDeductions = async (params = {}) => {
   ).then((res) => {
     const list = res.data?.data || res.data?.deductions || res.data || [];
     return Array.isArray(list) ? list : [];
+  }).catch((err) => {
+    console.warn('Backend fetch my deductions fallback:', err?.message);
+    return [];
   });
 };
 

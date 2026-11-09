@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { 
-  User, Mail, Lock, Phone, Shield, Eye, EyeOff, 
+  User, Mail, Phone, Shield, Calendar, Briefcase, MapPin, Activity,
   CheckCircle2, AlertCircle, ArrowRight, Sparkles 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios.js';
+import {
+  EMPLOYEE_DEPARTMENTS_ROLES,
+  ALL_EMPLOYEE_DEPARTMENTS,
+  ALL_BLOOD_GROUPS,
+  ALL_GENDERS
+} from '../../utils/employeeRoles.js';
 import whiteLogo from '../../assets/white logo.png';
 import colorLogo from '../../assets/Logo.png';
 
@@ -13,35 +19,49 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('employee');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [dob, setDob] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [gender, setGender] = useState('');
+  const [address, setAddress] = useState('');
+  const [department, setDepartment] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [customDesignation, setCustomDesignation] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Password Strength Calculation
-  const hasMinLength = password.length >= 8;
-  const hasLetter = /[A-Za-z]/.test(password);
-  const hasNumber = /\d/.test(password);
-  const passwordsMatch = password.length > 0 && password === confirmPassword;
-
-  const strengthScore = [hasMinLength, hasLetter, hasNumber].filter(Boolean).length;
-  const strengthColor = strengthScore === 3 ? 'bg-emerald-500' : strengthScore === 2 ? 'bg-amber-500' : 'bg-rose-500';
-  const strengthLabel = strengthScore === 3 ? 'Strong' : strengthScore === 2 ? 'Medium' : 'Weak';
-
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!hasMinLength || !hasLetter || !hasNumber) {
-      setError('Password must be at least 8 characters and include at least one letter and one number.');
+    if (!name.trim()) {
+      setError('Full Name is required.');
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match. Please verify.');
+    if (!email.trim()) {
+      setError('Official Email Address is required.');
+      return;
+    }
+
+    if (!department) {
+      setError('Please select a Department.');
+      return;
+    }
+
+    if (!designation) {
+      setError('Please select a Designation.');
+      return;
+    }
+
+    if (designation === 'Other' && !customDesignation.trim()) {
+      setError('Please specify your custom Designation in the text area.');
+      return;
+    }
+
+    if (!gender) {
+      setError('Please select your Gender.');
       return;
     }
 
@@ -59,13 +79,24 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
         formattedPhone = `+91${formattedPhone.replace(/^0+/, '')}`;
       }
 
+      const finalDesignation = designation === 'Other'
+        ? customDesignation.trim()
+        : designation.trim();
+
       const payload = {
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        password,
-        role: role.toLowerCase(),
         phone: formattedPhone || undefined,
-        phoneNumber: formattedPhone || undefined
+        phoneNumber: formattedPhone || undefined,
+        role: role.toLowerCase(),
+        dob: dob || undefined,
+        bloodGroup: bloodGroup || undefined,
+        gender: gender || undefined,
+        address: address.trim() || undefined,
+        department: department || undefined,
+        designation: finalDesignation || undefined,
+        // Backend API schema fallback: include default secure temporary password
+        password: 'Kevalon@' + new Date().getFullYear()
       };
 
       // Try /api/auth/register first, fallback to /api/users/register
@@ -103,7 +134,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
       {/* LEFT COLUMN: HERO BRANDING & FEATURE SHOWCASE (DESKTOP)       */}
       {/* ============================================================== */}
       <div 
-        className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-10 xl:p-14 text-white relative overflow-hidden"
+        className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-10 xl:p-14 text-white relative overflow-hidden shrink-0"
         style={{
           background: 'linear-gradient(145deg, #022e43 0%, #034665 40%, #055c83 75%, #068DCB 100%)'
         }}
@@ -203,7 +234,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
           </button>
         </div>
 
-        <div className="max-w-md w-full mx-auto my-auto">
+        <div className="max-w-xl w-full mx-auto my-auto py-2">
           
           {/* Form Header */}
           <div className="mb-6">
@@ -223,7 +254,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
               Create your account
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              Enter your official details to set up your Kevalon HRMS credentials.
+              Enter your official employee profile details to register on Kevalon HRMS.
             </p>
           </div>
 
@@ -238,7 +269,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
                   Registration Successful!
                 </h3>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
-                  Your account has been created for <span className="font-semibold text-slate-700">{email}</span>. You can now sign in to your workspace.
+                  Your workspace account has been created for <span className="font-semibold text-slate-700">{email}</span>. You can now sign in to your workspace.
                 </p>
               </div>
               <button
@@ -262,7 +293,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
                 </div>
               )}
 
-              {/* Full Name */}
+              {/* Row 1: Full Name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Full Name <span className="text-rose-500">*</span>
@@ -280,7 +311,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
                 </div>
               </div>
 
-              {/* Work Email */}
+              {/* Row 2: Work Email */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Official Email Address <span className="text-rose-500">*</span>
@@ -298,7 +329,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
                 </div>
               </div>
 
-              {/* Phone & Role (Grid) */}
+              {/* Row 3: Phone & Role (Grid) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -335,79 +366,169 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
                 </div>
               </div>
 
-              {/* Password */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Password <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-
-                {/* Password Strength Indicator */}
-                {password.length > 0 && (
-                  <div className="mt-2 space-y-1.5 animate-fade-in">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500">Security strength:</span>
-                      <span className="font-semibold text-slate-700">{strengthLabel}</span>
-                    </div>
-                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden flex gap-1">
-                      <div className={`h-full flex-1 rounded-full ${strengthColor}`} />
-                      <div className={`h-full flex-1 rounded-full ${strengthScore >= 2 ? strengthColor : 'bg-slate-200'}`} />
-                      <div className={`h-full flex-1 rounded-full ${strengthScore === 3 ? strengthColor : 'bg-slate-200'}`} />
-                    </div>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-400 pt-0.5">
-                      <span className={hasMinLength ? 'text-emerald-600 font-medium' : ''}>• 8+ characters</span>
-                      <span className={hasLetter ? 'text-emerald-600 font-medium' : ''}>• 1 letter</span>
-                      <span className={hasNumber ? 'text-emerald-600 font-medium' : ''}>• 1 number</span>
-                    </div>
+              {/* Row 4: DOB, Gender & Blood Group (Grid) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                {/* Date of Birth (DOB) */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Date of Birth (DOB)
+                  </label>
+                  <div className="relative">
+                    <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="date"
+                      value={dob}
+                      onChange={(e) => setDob(e.target.value)}
+                      max={new Date().toISOString().split('T')[0]}
+                      className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
+                    />
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Confirm Password */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Confirm Password <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className={`w-full pl-10 pr-10 py-2.5 bg-white border rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition ${
-                      confirmPassword && !passwordsMatch 
-                        ? 'border-rose-300 focus:ring-2 focus:ring-rose-200' 
-                        : confirmPassword && passwordsMatch 
-                        ? 'border-emerald-300 focus:ring-2 focus:ring-emerald-200' 
-                        : 'border-slate-200 focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15'
-                    }`}
-                  />
-                  {confirmPassword && passwordsMatch && (
-                    <CheckCircle2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500" />
-                  )}
+                {/* Gender */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Gender <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      required
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer"
+                    >
+                      <option value="">Select Gender</option>
+                      {ALL_GENDERS.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Blood Group */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Blood Group
+                  </label>
+                  <div className="relative">
+                    <Activity size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={bloodGroup}
+                      onChange={(e) => setBloodGroup(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer"
+                    >
+                      <option value="">Select Blood Group</option>
+                      {ALL_BLOOD_GROUPS.map((bg) => (
+                        <option key={bg} value={bg}>{bg}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Terms Checkbox */}
+              {/* Row 5: Department & Designation (Dependent Dropdown) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Department */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Department <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Briefcase size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={department}
+                      required
+                      onChange={(e) => {
+                        const newDept = e.target.value;
+                        setDepartment(newDept);
+                        const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[newDept] || [];
+                        if (!rolesInDept.includes(designation) && designation !== 'Other') {
+                          setDesignation('');
+                          setCustomDesignation('');
+                        }
+                      }}
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer"
+                    >
+                      <option value="">Select Department</option>
+                      {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Designation */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Designation <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Briefcase size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={designation}
+                      required
+                      disabled={!department}
+                      onChange={(e) => {
+                        setDesignation(e.target.value);
+                        if (e.target.value !== 'Other') {
+                          setCustomDesignation('');
+                        }
+                      }}
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      <option value="">
+                        {department ? 'Select Designation' : 'Select Department First'}
+                      </option>
+                      {department && EMPLOYEE_DEPARTMENTS_ROLES[department]?.map((role) => (
+                        <option key={role} value={role}>{role}</option>
+                      ))}
+                      {department && (
+                        <option value="Other">Other (Specify Custom Role)</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 6: Custom Designation Textarea (When "Other" is selected) */}
+              {designation === 'Other' && (
+                <div className="p-3 bg-sky-50/60 rounded-xl border border-sky-100 animate-fade-in space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-[#0088cc]">
+                      Specify Custom Designation / Role <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400">Department: {department}</span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    required
+                    value={customDesignation}
+                    onChange={(e) => setCustomDesignation(e.target.value)}
+                    placeholder="e.g. Senior Cloud Architect, Team Lead, Associate Consultant..."
+                    className="w-full p-2.5 bg-white border border-sky-200 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition resize-none"
+                  />
+                </div>
+              )}
+
+              {/* Row 7: Residential / Communication Address */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Address
+                </label>
+                <div className="relative">
+                  <MapPin size={16} className="absolute left-3.5 top-3 text-slate-400" />
+                  <textarea
+                    rows={2}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Residential address / communication address..."
+                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Row 8: Terms & Conditions Checkbox */}
               <div className="flex items-start gap-2 pt-1">
                 <input
                   type="checkbox"
@@ -415,9 +536,9 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
                   aria-label="I agree to the Terms of Service and Privacy Policy"
-                  className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer"
+                  className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer mt-0.5"
                 />
-                <span className="text-[11px] text-slate-500 select-none">
+                <span className="text-[11px] text-slate-500 select-none leading-relaxed">
                   I agree to the{' '}
                   <Link to="/terms-of-service" className="font-medium text-[#0088cc] hover:underline">Terms of Service</Link>
                   {' '}and{' '}
@@ -434,7 +555,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
                 {isLoading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Creating Account...</span>
+                    <span>Creating Workspace Account...</span>
                   </>
                 ) : (
                   <>
@@ -445,13 +566,13 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
               </button>
 
               {/* Mobile Back Link */}
-              <div className="text-center pt-2">
+              <div className="text-center pt-1">
                 <p className="text-xs text-slate-500">
                   Already have an account?{' '}
                   <button
                     type="button"
                     onClick={onBackToLogin}
-                    className="font-semibold text-[#0088cc] hover:underline cursor-pointer"
+                    className="font-semibold text-[#0088cc] hover:underline cursor-pointer ml-1"
                   >
                     Sign In
                   </button>

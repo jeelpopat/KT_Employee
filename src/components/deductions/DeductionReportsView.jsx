@@ -1133,7 +1133,7 @@ export const DeductionReportsView = () => {
                 <tr>
                   <td colSpan={10} className="py-16 text-center text-slate-500">
                     <AlertTriangle size={32} className="mx-auto text-amber-500 mb-2 opacity-80" />
-                    <p className="font-bold text-slate-800 text-sm">No report records found</p>
+                    <p className="font-bold text-slate-800 text-sm">Data Not Found</p>
                     <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
                       No deduction records match the specified filters. Try adjusting or resetting your filter criteria.
                     </p>

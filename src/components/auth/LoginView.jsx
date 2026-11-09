@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { 
   Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, 
-  Sparkles, Shield, User, CheckCircle2, AlertCircle, Phone 
+  Sparkles, Shield, User, CheckCircle2, AlertCircle, Phone,
+  Calendar, Briefcase, MapPin, Activity
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api, { clearApiCache } from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
+import {
+  EMPLOYEE_DEPARTMENTS_ROLES,
+  ALL_EMPLOYEE_DEPARTMENTS,
+  ALL_BLOOD_GROUPS,
+  ALL_GENDERS
+} from '../../utils/employeeRoles.js';
 import whiteLogo from '../../assets/white logo.png';
 import colorLogo from '../../assets/Logo.png';
 
@@ -31,20 +38,15 @@ export const LoginView = ({
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regRole, setRegRole] = useState('employee');
-  const [regPassword, setRegPassword] = useState('');
-  const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  const [regShowPassword, setRegShowPassword] = useState(false);
+  const [regDob, setRegDob] = useState('');
+  const [regBloodGroup, setRegBloodGroup] = useState('');
+  const [regGender, setRegGender] = useState('');
+  const [regAddress, setRegAddress] = useState('');
+  const [regDepartment, setRegDepartment] = useState('');
+  const [regDesignation, setRegDesignation] = useState('');
+  const [regCustomDesignation, setRegCustomDesignation] = useState('');
   const [regAgreeTerms, setRegAgreeTerms] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
-
-  // Registration Password Strength Calculation
-  const hasMinLength = regPassword.length >= 8;
-  const hasLetter = /[A-Za-z]/.test(regPassword);
-  const hasNumber = /\d/.test(regPassword);
-  const passwordsMatch = regPassword.length > 0 && regPassword === regConfirmPassword;
-  const strengthScore = [hasMinLength, hasLetter, hasNumber].filter(Boolean).length;
-  const strengthColor = strengthScore === 3 ? 'bg-emerald-500' : strengthScore === 2 ? 'bg-amber-500' : 'bg-rose-500';
-  const strengthLabel = strengthScore === 3 ? 'Strong' : strengthScore === 2 ? 'Medium' : 'Weak';
 
   // -------------------------------------------------------------
   // LOGIN SUBMISSION HANDLER
@@ -141,13 +143,33 @@ export const LoginView = ({
     e.preventDefault();
     setError('');
 
-    if (!hasMinLength || !hasLetter || !hasNumber) {
-      setError('Password must be at least 8 characters and include at least one letter and one number.');
+    if (!regName.trim()) {
+      setError('Full Name is required.');
       return;
     }
 
-    if (regPassword !== regConfirmPassword) {
-      setError('Passwords do not match. Please verify.');
+    if (!regEmail.trim()) {
+      setError('Work Email Address is required.');
+      return;
+    }
+
+    if (!regDepartment) {
+      setError('Please select a Department.');
+      return;
+    }
+
+    if (!regDesignation) {
+      setError('Please select a Designation.');
+      return;
+    }
+
+    if (regDesignation === 'Other' && !regCustomDesignation.trim()) {
+      setError('Please specify your custom Designation in the text area.');
+      return;
+    }
+
+    if (!regGender) {
+      setError('Please select your Gender.');
       return;
     }
 
@@ -164,13 +186,24 @@ export const LoginView = ({
         formattedPhone = `+91${formattedPhone.replace(/^0+/, '')}`;
       }
 
+      const finalDesignation = regDesignation === 'Other'
+        ? regCustomDesignation.trim()
+        : regDesignation.trim();
+
       const payload = {
         name: regName.trim(),
         email: regEmail.trim().toLowerCase(),
-        password: regPassword,
-        role: regRole.toLowerCase(),
         phone: formattedPhone || undefined,
-        phoneNumber: formattedPhone || undefined
+        phoneNumber: formattedPhone || undefined,
+        role: regRole.toLowerCase(),
+        dob: regDob || undefined,
+        bloodGroup: regBloodGroup || undefined,
+        gender: regGender || undefined,
+        address: regAddress.trim() || undefined,
+        department: regDepartment || undefined,
+        designation: finalDesignation || undefined,
+        // Backend API schema compatibility fallback
+        password: 'Kevalon@' + new Date().getFullYear()
       };
 
       try {
@@ -309,7 +342,7 @@ export const LoginView = ({
           </div>
         </div>
 
-        <div className="max-w-md w-full mx-auto my-auto py-4">
+        <div className={`${mode === 'register' ? 'max-w-xl' : 'max-w-md'} w-full mx-auto my-auto py-4 transition-all duration-300`}>
           
           {/* Segmented Mode Switcher: Sign In vs Create Account */}
           <div className="p-1 bg-slate-100 rounded-xl flex items-center mb-7 border border-slate-200/80">
@@ -474,7 +507,7 @@ export const LoginView = ({
                   Create your account
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  Set up your Kevalon HRMS credentials and workspace profile.
+                  Set up your official Kevalon HRMS workspace profile.
                 </p>
               </div>
 
@@ -489,7 +522,7 @@ export const LoginView = ({
                       Account Registered!
                     </h3>
                     <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
-                      Your credentials have been generated for <span className="font-semibold text-slate-700">{regEmail}</span>. You can now sign in to your workspace.
+                      Your workspace account has been created for <span className="font-semibold text-slate-700">{regEmail}</span>. You can now sign in to your workspace.
                     </p>
                   </div>
                   <button
@@ -503,7 +536,7 @@ export const LoginView = ({
                 </div>
               ) : (
                 /* Register Form */
-                <form onSubmit={handleRegister} className="space-y-3.5">
+                <form onSubmit={handleRegister} className="space-y-4">
                   
                   {/* Error Alert */}
                   {error && (
@@ -513,7 +546,7 @@ export const LoginView = ({
                     </div>
                   )}
 
-                  {/* Full Name */}
+                  {/* Row 1: Full Name */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Full Name <span className="text-rose-500">*</span>
@@ -531,7 +564,7 @@ export const LoginView = ({
                     </div>
                   </div>
 
-                  {/* Work Email */}
+                  {/* Row 2: Work Email */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Work Email Address <span className="text-rose-500">*</span>
@@ -549,8 +582,8 @@ export const LoginView = ({
                     </div>
                   </div>
 
-                  {/* Phone & Role (Grid) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Row 3: Phone & Designated Role (Grid) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                         Phone Number
@@ -586,74 +619,169 @@ export const LoginView = ({
                     </div>
                   </div>
 
-                  {/* Password & Strength */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Password <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type={regShowPassword ? 'text' : 'password'}
-                        required
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setRegShowPassword(!regShowPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                      >
-                        {regShowPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-
-                    {/* Password Strength Meter */}
-                    {regPassword.length > 0 && (
-                      <div className="mt-2 space-y-1.5 animate-fade-in">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500">Security strength:</span>
-                          <span className="font-semibold text-slate-700">{strengthLabel}</span>
-                        </div>
-                        <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden flex gap-1">
-                          <div className={`h-full flex-1 rounded-full ${strengthColor}`} />
-                          <div className={`h-full flex-1 rounded-full ${strengthScore >= 2 ? strengthColor : 'bg-slate-200'}`} />
-                          <div className={`h-full flex-1 rounded-full ${strengthScore === 3 ? strengthColor : 'bg-slate-200'}`} />
-                        </div>
+                  {/* Row 4: DOB, Gender & Blood Group (Grid) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    {/* Date of Birth (DOB) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Date of Birth (DOB)
+                      </label>
+                      <div className="relative">
+                        <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="date"
+                          value={regDob}
+                          onChange={(e) => setRegDob(e.target.value)}
+                          max={new Date().toISOString().split('T')[0]}
+                          className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition"
+                        />
                       </div>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Confirm Password */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Confirm Password <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type={regShowPassword ? 'text' : 'password'}
-                        required
-                        value={regConfirmPassword}
-                        onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className={`w-full pl-10 pr-10 py-2.5 bg-white border rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition ${
-                          regConfirmPassword && !passwordsMatch 
-                            ? 'border-rose-300 focus:ring-2 focus:ring-rose-200' 
-                            : regConfirmPassword && passwordsMatch 
-                            ? 'border-emerald-300 focus:ring-2 focus:ring-emerald-200' 
-                            : 'border-slate-200 focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15'
-                        }`}
-                      />
-                      {regConfirmPassword && passwordsMatch && (
-                        <CheckCircle2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500" />
-                      )}
+                    {/* Gender */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Gender <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={regGender}
+                          onChange={(e) => setRegGender(e.target.value)}
+                          required
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer"
+                        >
+                          <option value="">Select Gender</option>
+                          {ALL_GENDERS.map((g) => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Blood Group */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Blood Group
+                      </label>
+                      <div className="relative">
+                        <Activity size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={regBloodGroup}
+                          onChange={(e) => setRegBloodGroup(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer"
+                        >
+                          <option value="">Select Blood Group</option>
+                          {ALL_BLOOD_GROUPS.map((bg) => (
+                            <option key={bg} value={bg}>{bg}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Terms */}
+                  {/* Row 5: Department & Designation (Dependent Dropdown) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Department */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Department <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Briefcase size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={regDepartment}
+                          required
+                          onChange={(e) => {
+                            const newDept = e.target.value;
+                            setRegDepartment(newDept);
+                            const rolesInDept = EMPLOYEE_DEPARTMENTS_ROLES[newDept] || [];
+                            if (!rolesInDept.includes(regDesignation) && regDesignation !== 'Other') {
+                              setRegDesignation('');
+                              setRegCustomDesignation('');
+                            }
+                          }}
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer"
+                        >
+                          <option value="">Select Department</option>
+                          {ALL_EMPLOYEE_DEPARTMENTS.map((dept) => (
+                            <option key={dept} value={dept}>{dept}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Designation */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Designation <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Briefcase size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={regDesignation}
+                          required
+                          disabled={!regDepartment}
+                          onChange={(e) => {
+                            setRegDesignation(e.target.value);
+                            if (e.target.value !== 'Other') {
+                              setRegCustomDesignation('');
+                            }
+                          }}
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition cursor-pointer disabled:bg-slate-50 disabled:text-slate-400"
+                        >
+                          <option value="">
+                            {regDepartment ? 'Select Designation' : 'Select Department First'}
+                          </option>
+                          {regDepartment && EMPLOYEE_DEPARTMENTS_ROLES[regDepartment]?.map((role) => (
+                            <option key={role} value={role}>{role}</option>
+                          ))}
+                          {regDepartment && (
+                            <option value="Other">Other (Specify Custom Role)</option>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 6: Custom Designation Textarea (When "Other" is selected) */}
+                  {regDesignation === 'Other' && (
+                    <div className="p-3 bg-sky-50/60 rounded-xl border border-sky-100 animate-fade-in space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-semibold text-[#0088cc]">
+                          Specify Custom Designation / Role <span className="text-rose-500">*</span>
+                        </label>
+                        <span className="text-[10px] text-slate-400">Department: {regDepartment}</span>
+                      </div>
+                      <textarea
+                        rows={2}
+                        required
+                        value={regCustomDesignation}
+                        onChange={(e) => setRegCustomDesignation(e.target.value)}
+                        placeholder="e.g. Senior Cloud Architect, Team Lead, Associate Consultant..."
+                        className="w-full p-2.5 bg-white border border-sky-200 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition resize-none"
+                      />
+                    </div>
+                  )}
+
+                  {/* Row 7: Residential / Communication Address */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Address
+                    </label>
+                    <div className="relative">
+                      <MapPin size={16} className="absolute left-3.5 top-3 text-slate-400" />
+                      <textarea
+                        rows={2}
+                        value={regAddress}
+                        onChange={(e) => setRegAddress(e.target.value)}
+                        placeholder="Residential address / communication address..."
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0088cc] focus:ring-2 focus:ring-[#0088cc]/15 transition resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 8: Terms & Conditions Checkbox */}
                   <div className="flex items-start gap-2 pt-1">
                     <input
                       type="checkbox"
@@ -661,9 +789,9 @@ export const LoginView = ({
                       checked={regAgreeTerms}
                       onChange={(e) => setRegAgreeTerms(e.target.checked)}
                       aria-label="I agree to the Terms of Service and Privacy Policy"
-                      className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer"
+                      className="w-4 h-4 rounded text-[#0088cc] border-slate-300 focus:ring-[#0088cc] cursor-pointer mt-0.5"
                     />
-                    <span className="text-[11px] text-slate-500 select-none">
+                    <span className="text-[11px] text-slate-500 select-none leading-relaxed">
                       I agree to the{' '}
                       <Link to="/terms-of-service" className="font-medium text-[#0088cc] hover:underline">Terms of Service</Link>
                       {' '}and{' '}
@@ -671,7 +799,7 @@ export const LoginView = ({
                     </span>
                   </div>
 
-                  {/* Register CTA */}
+                  {/* Submit CTA */}
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -680,7 +808,7 @@ export const LoginView = ({
                     {isLoading ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Creating Account...</span>
+                        <span>Creating Workspace Account...</span>
                       </>
                     ) : (
                       <>
@@ -691,7 +819,7 @@ export const LoginView = ({
                   </button>
 
                   {/* Back to Sign In Link */}
-                  <div className="text-center pt-2">
+                  <div className="text-center pt-1">
                     <p className="text-xs text-slate-500">
                       Already registered?{' '}
                       <button

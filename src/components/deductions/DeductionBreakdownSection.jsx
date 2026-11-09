@@ -175,7 +175,8 @@ export const DeductionBreakdownSection = ({
             </div>
           ) : (
             <div className="text-center py-4 text-slate-400 bg-slate-50/50 rounded-lg border border-slate-100">
-              No additional employee deductions logged for this payroll month.
+              <p className="font-bold text-slate-700 text-xs">Data Not Found</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">No additional employee deductions logged for this payroll month.</p>
             </div>
           )}
 

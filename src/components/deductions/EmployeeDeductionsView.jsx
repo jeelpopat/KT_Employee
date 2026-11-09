@@ -2036,7 +2036,7 @@ export const EmployeeDeductionsView = () => {
                   >
                     <div className="max-w-xs mx-auto space-y-2">
                       <FileText size={32} className="mx-auto text-slate-300" />
-                      <p className="font-semibold text-slate-700">No deduction records found</p>
+                      <p className="font-bold text-slate-800 text-sm">Data Not Found</p>
                       <p className="text-xs text-slate-400">
                         {searchQuery || filterMonth !== 'ALL' || filterStatus !== 'ALL'
                           ? 'Try adjusting your search query or filters.'

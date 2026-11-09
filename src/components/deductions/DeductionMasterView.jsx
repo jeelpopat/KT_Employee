@@ -736,7 +736,7 @@ export const DeductionMasterView = () => {
                   <td colSpan={7} className="py-10 text-center text-slate-500">
                     <div className="max-w-xs mx-auto space-y-2">
                       <Layers size={32} className="mx-auto text-slate-300" />
-                      <p className="font-semibold text-slate-700">No deduction masters found</p>
+                      <p className="font-bold text-slate-800 text-sm">Data Not Found</p>
                       <p className="text-xs text-slate-400">
                         {searchQuery || categoryFilter !== 'ALL' || statusFilter !== 'ALL'
                           ? 'Try adjusting your search criteria or filters.'
