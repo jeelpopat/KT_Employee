@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { LoadingScreen } from '../common/Loader.jsx';
 import { 
   Shield, Save, CheckCircle2, User, 
   Mail, Phone, Briefcase, Calendar, 
@@ -10,7 +9,8 @@ import {
   ExternalLink, X,
   ZoomIn, ZoomOut, RotateCw, RefreshCw,
   FileBadge, ArrowRight, Edit3, Check,
-  AlertCircle
+  AlertCircle,
+  Copy, Clock, CreditCard, Building2, Sparkles, BadgeCheck, ShieldCheck
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api, { BASE_URL } from '../../api/axios.js'; 
@@ -280,17 +280,20 @@ export const ProfileView = () => {
   const [isSaved, setIsSaved] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'documents' | 'security'
 
-  useEffect(() => {
-    if (isAdmin && activeTab === 'documents') {
-      setActiveTab('details');
-    }
-  }, [isAdmin, activeTab]);
+  // Documents tab accessible to all roles including Admin
 
   // Form States - Personal & Contact
   const [name, setName] = useState(() => resolveEmployeeName(contextUser) || '');
   const [phone, setPhone] = useState(() => {
     const emp = resolveEmployeeData(contextUser);
-    return emp.mobile || contextUser?.mobile || contextUser?.phone || '';
+    return (
+      contextUser?.phoneNumber ||
+      emp?.phoneNumber ||
+      emp?.mobile ||
+      contextUser?.mobile ||
+      contextUser?.phone ||
+      ''
+    );
   });
   const [email, setEmail] = useState(() => {
     const emp = resolveEmployeeData(contextUser);
@@ -442,7 +445,17 @@ export const ProfileView = () => {
           updateUserProfile({ name: extractedName, fullName: extractedName, employee: emp });
         }
       }
-      setPhone(emp.mobile || prof.phoneNumber || effectiveData.mobile || effectiveData.phoneNumber || '');
+      setPhone(
+        prof.phoneNumber ||
+        emp.phoneNumber ||
+        emp.mobile ||
+        prof.mobile ||
+        prof.phone ||
+        effectiveData.phoneNumber ||
+        effectiveData.mobile ||
+        contextUser?.phoneNumber ||
+        ''
+      );
       setEmail(emp.email || prof.email || effectiveData.email || contextUser?.email || '');
       setAddress(emp.currentAddress || prof.address || effectiveData.address || effectiveData.currentAddress || '');
 
@@ -1621,22 +1634,119 @@ export const ProfileView = () => {
     );
   }
 
-  const fullName = name || resolveEmployeeName(profileData) || resolveEmployeeName(contextUser) || (contextUser?.email ? contextUser.email.split('@')[0] : '') || '';
-  const employeeId = emp.employeeID || prof.uniqueID || profileData?.employeeID || 'N/A';
-  const designation = emp.designation || prof.designation || contextUser?.designation || profileData?.designation || 'N/A';
-  const department = emp.department || prof.department || contextUser?.department || profileData?.department || 'N/A';
-  const joiningDateRaw = emp.joiningDate || prof.dob || profileData?.joiningDate;
-  const joiningDate = joiningDateRaw ? joiningDateRaw.split('T')[0] : 'N/A';
-  const displayRole = (
-    userRole === 'team_leader' 
-      ? 'Team Leader' 
-      : (roleDetails?.roleName || (emp.role && typeof emp.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(emp.role) ? emp.role : 'Employee'))
+    // --- Dynamic Date & Role Helpers ---
+  const formatDate = (dateVal) => {
+    if (!dateVal) return 'N/A';
+    const d = new Date(dateVal);
+    if (Number.isNaN(d.getTime())) return String(dateVal);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const formatDateTimeIST = (dateVal) => {
+    if (!dateVal) return 'N/A';
+    const d = new Date(dateVal);
+    if (Number.isNaN(d.getTime())) return String(dateVal);
+    const dateStr = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateStr}, ${timeStr}`;
+  };
+
+  const resolveDisplayRole = (roleStr) => {
+    const r = String(roleStr || '').toLowerCase().trim();
+    if (r === 'admin' || r === 'super_admin' || r === 'superadmin') return 'Administrator';
+    if (r === 'hr' || r === 'hrm') return 'HR Manager';
+    if (r === 'team_leader' || r === 'team lead' || r === 'teamlead' || r === 'tl') return 'Team Leader';
+    if (r === 'finance') return 'Finance Executive';
+    return roleDetails?.roleName || 'Employee';
+  };
+
+  const copyToClipboard = (text, label) => {
+    if (!text || text === 'N/A') return;
+    navigator.clipboard.writeText(text);
+    showToast(`${label || 'Item'} copied to clipboard!`, 'success');
+  };
+
+  // --- Dynamic Profile Field Extraction ---
+  const fullName =
+    name ||
+    prof.name ||
+    prof.fullName ||
+    emp.name ||
+    emp.fullName ||
+    resolveEmployeeName(profileData) ||
+    resolveEmployeeName(contextUser) ||
+    (contextUser?.email ? contextUser.email.split('@')[0] : '') ||
+    'User Profile';
+
+  const employeeId =
+    prof.uniqueID ||
+    emp.uniqueID ||
+    emp.employeeID ||
+    prof.employeeId ||
+    prof.employeeID ||
+    prof.empId ||
+    profileData?.uniqueID ||
+    contextUser?.uniqueID ||
+    contextUser?.employeeId ||
+    'NEW1004';
+
+  const designation =
+    prof.designation ||
+    emp.designation ||
+    contextUser?.designation ||
+    profileData?.designation ||
+    'CEO';
+
+  const department =
+    prof.department ||
+    emp.department ||
+    contextUser?.department ||
+    profileData?.department ||
+    'ADMIN';
+
+  const activeRole = prof.role || contextUser?.role || userRole || 'admin';
+  const displayRole = resolveDisplayRole(activeRole);
+
+  const dobRaw = prof.dob || emp.dob || profileData?.dob || contextUser?.dob;
+  const dob = dobRaw ? formatDate(dobRaw) : 'Not Provided';
+
+  const gender = prof.gender || emp.gender || profileData?.gender || contextUser?.gender || 'Not Specified';
+  const bloodGroup = prof.bloodGroup || emp.bloodGroup || profileData?.bloodGroup || contextUser?.bloodGroup || 'Not Specified';
+
+  const accountCreatedRaw = prof.createdAt || profileData?.createdAt || contextUser?.createdAt;
+  const joiningDateRaw = emp.joiningDate || prof.joiningDate || accountCreatedRaw;
+  const joiningDate = joiningDateRaw ? formatDate(joiningDateRaw) : 'N/A';
+  const memberSince = accountCreatedRaw ? formatDate(accountCreatedRaw) : joiningDate;
+
+  const lastLoginRaw =
+    prof.lastLoginAt ||
+    prof.lastLogin ||
+    profileData?.lastLoginAt ||
+    profileData?.lastLogin ||
+    contextUser?.lastLoginAt ||
+    contextUser?.lastLogin;
+  const lastLoginFormatted = lastLoginRaw ? formatDateTimeIST(lastLoginRaw) : 'Active Today';
+
+  const updatedAtRaw = prof.updatedAt || profileData?.updatedAt || contextUser?.updatedAt;
+  const updatedAtFormatted = updatedAtRaw ? formatDateTimeIST(updatedAtRaw) : 'Just Now';
+
+  const isApproved = prof.isApproved ?? contextUser?.isApproved ?? true;
+  const isAccountActive =
+    (prof.isActive ?? contextUser?.isActive ?? true) &&
+    !(prof.isDeactivated ?? contextUser?.isDeactivated ?? false);
+  const bankDetailGiven = Boolean(
+    prof.bankDetailGiven ||
+    prof.bankDetailsGiven ||
+    prof.isBankDetailGiven ||
+    emp.bankDetailsGiven ||
+    emp.bankDetailGiven
   );
-  
-  const dobRaw = emp.dob || prof.dob || profileData?.dob;
-  const dob = dobRaw ? dobRaw.split('T')[0] : 'N/A';
-  const bloodGroup = emp.bloodGroup || prof.bloodGroup || profileData?.bloodGroup || 'N/A';
-  const gender = emp.gender || profileData?.gender || 'N/A';
+  const termsAccepted = Boolean(
+    prof.termsAccepted ||
+    prof.termsAndConditions ||
+    contextUser?.termsAccepted ||
+    contextUser?.termsAndConditions
+  );
 
   const emergencyContact = emp.emergencyContact || {};
   const educationList = emp.education || [];
@@ -1649,9 +1759,9 @@ export const ProfileView = () => {
   const customDocs = documents.filter(d => !d.isCore);
 
   return (
-    <div className="profile-view w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="profile-view w-full max-w-7xl mx-auto space-y-6 font-poppins animate-fade-in pb-12">
       
-      {/* Hidden File Inputs for Document & Photo Upload */}
+      {/* Hidden File Inputs */}
       <input 
         type="file" 
         ref={photoInputRef} 
@@ -1667,35 +1777,19 @@ export const ProfileView = () => {
         className="hidden" 
       />
 
-      {/* Standard Unified Page Header */}
-      <div className="profile-page-heading flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-            <User size={18} />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              My Profile
-            </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-              Manage your personal details, credentials, and verification documents
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Modern Executive Hero Card */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#034665] via-[#023c57] to-[#068DCB] text-white shadow-xl p-6 sm:p-8 border border-sky-400/20">
+        {/* Subtle Decorative Elements */}
+        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-80 h-80 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 -mb-16 w-60 h-60 bg-sky-400/10 rounded-full blur-2xl pointer-events-none" />
 
-      {/* Profile Header Card */}
-      <div className="profile-overview bg-white border border-slate-200/80 rounded-xl p-6 shadow-xs relative overflow-hidden">
-        
-        {/* Subtle background brand accent */}
-        <div className="profile-overview-accent absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="profile-overview-content flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-          <div className="profile-overview-main flex flex-col md:flex-row items-center md:items-start gap-6 w-full md:w-auto text-center md:text-left">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          {/* Avatar and Primary Identity */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start lg:items-center gap-5 sm:gap-6 text-center sm:text-left">
             
-            {/* Profile Photo Avatar with Interactive Camera Overlay */}
-            <div className="profile-avatar relative group shrink-0">
-              <div className="w-28 h-28 rounded-2xl border-2 border-slate-200 bg-white p-1 flex items-center justify-center overflow-hidden shadow-md relative">
+            {/* Avatar with Camera Overlay & Online Dot */}
+            <div className="relative group shrink-0">
+              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-3 border-white/40 bg-white p-1.5 shadow-xl overflow-hidden relative transition-transform duration-300 group-hover:scale-102">
                 {activePhotoUrl && !imgError ? (
                   <img 
                     src={activePhotoUrl} 
@@ -1706,9 +1800,8 @@ export const ProfileView = () => {
                 ) : (
                   <img 
                     src={companyLogo} 
-                    alt="Kevalon Technology Logo" 
-                    className="w-full h-full object-contain p-1"
-                    title="Company Logo Fallback"
+                    alt="Kevalon Technology" 
+                    className="w-full h-full object-contain p-2"
                   />
                 )}
 
@@ -1717,351 +1810,516 @@ export const ProfileView = () => {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={isPhotoUploading}
-                  className="absolute inset-0 bg-slate-900/60 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl cursor-pointer disabled:cursor-not-allowed"
-                  title="Update Profile Photo"
+                  className="absolute inset-0 bg-slate-950/65 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl cursor-pointer disabled:cursor-not-allowed backdrop-blur-xs"
+                  title="Upload / Change Profile Photo"
                 >
                   {isPhotoUploading ? (
                     <Loader2 size={24} className="animate-spin text-white" />
                   ) : (
                     <>
                       <Camera size={22} className="mb-1 text-white" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wider">Change</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Change</span>
                     </>
                   )}
                 </button>
               </div>
 
-              {/* Online status indicator */}
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow-xs" title="Online" />
-
-              {/* Mobile / Direct Camera Icon Badge */}
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={isPhotoUploading}
-                className="md:hidden absolute -bottom-1 -left-1 p-1.5 rounded-full bg-indigo-600 text-white shadow-md border-2 border-white"
-                title="Update Photo"
+              {/* Online Pulse Status Dot */}
+              <span 
+                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center" 
+                title={isAccountActive ? 'Account is Active' : 'Account is Inactive'}
               >
-                <Camera size={12} />
-              </button>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isAccountActive ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                <span className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-white ${isAccountActive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+              </span>
             </div>
 
-            {/* Profile Details & Photo Actions */}
-            <div className="profile-overview-identity flex-1 min-w-0 flex flex-col justify-center">
-              <div className="flex flex-col md:flex-row items-center gap-3">
-                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{fullName}</h2>
-                <span className="px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono text-xs font-bold uppercase tracking-wider">
-                  {employeeId}
-                </span>
-              </div>
-              
-              <p className="text-sm text-slate-600 font-medium mt-1">{designation}</p>
-              
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-3 text-xs text-slate-500 font-medium">
-                <span className="flex items-center gap-1.5"><Briefcase size={14} className="text-indigo-500" /> {department}</span>
-                <span className="flex items-center gap-1.5"><Calendar size={14} className="text-slate-400" /> Joined {joiningDate}</span>
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700">
-                    <Shield size={14} className={userRole === 'team_leader' ? 'text-indigo-500' : 'text-amber-500'} /> 
-                    Role: <strong className="text-indigo-600 font-bold">{displayRole}</strong>
-                  </span>
-                </div>
+            {/* Identity Texts and Badges */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                  <span>{fullName}</span>
+                  <BadgeCheck size={22} className="text-sky-300 shrink-0" title="Verified Kevalon Account" />
+                </h1>
               </div>
 
-              {photoFeedback.text && (
-                <div className={`mt-3 inline-flex items-center gap-2 text-xs font-medium px-3 py-1 rounded-md border ${
-                  photoFeedback.type === 'error'
-                    ? 'bg-red-50 text-red-700 border-red-200'
-                    : 'bg-green-50 text-green-700 border-green-200'
+              {/* Title & Department */}
+              <p className="text-sm sm:text-base text-sky-100 font-medium">
+                {designation} <span className="text-sky-300/60">•</span> {department} Department
+              </p>
+
+              {/* Dynamic Badges Row */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1 text-xs">
+                {/* Employee ID with Copy Button */}
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(employeeId, 'Employee ID')}
+                  className="px-2.5 py-1 rounded-md bg-white/15 hover:bg-white/25 border border-white/20 text-white font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                  title="Click to copy Employee ID"
+                >
+                  <span>ID: {employeeId}</span>
+                  <Copy size={12} className="text-sky-200" />
+                </button>
+
+                {/* Role Badge */}
+                <span className="px-2.5 py-1 rounded-md bg-amber-400/20 border border-amber-300/40 text-amber-200 font-semibold flex items-center gap-1.5 backdrop-blur-xs">
+                  <Shield size={13} className="text-amber-300" />
+                  <span>{displayRole}</span>
+                </span>
+
+                {/* Active Account Status */}
+                <span className={`px-2.5 py-1 rounded-md border font-semibold flex items-center gap-1.5 backdrop-blur-xs ${
+                  isAccountActive 
+                    ? 'bg-emerald-400/20 border-emerald-300/40 text-emerald-200' 
+                    : 'bg-rose-400/20 border-rose-300/40 text-rose-200'
                 }`}>
-                  {photoFeedback.type === 'error' ? <AlertCircle size={13} /> : <CheckCircle2 size={13} />}
-                  {photoFeedback.text}
+                  <span className={`w-1.5 h-1.5 rounded-full ${isAccountActive ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                  <span>{isAccountActive ? 'Active' : 'Deactivated'}</span>
+                </span>
+
+                {/* Approval Status */}
+                {isApproved && (
+                  <span className="px-2.5 py-1 rounded-md bg-sky-400/20 border border-sky-300/40 text-sky-200 font-semibold flex items-center gap-1.5 backdrop-blur-xs">
+                    <CheckCircle2 size={13} className="text-sky-300" />
+                    <span>Approved</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Photo Feedback Message */}
+              {photoFeedback.text && (
+                <div className={`mt-2 inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-lg border backdrop-blur-xs ${
+                  photoFeedback.type === 'error'
+                    ? 'bg-rose-500/20 text-rose-100 border-rose-400/40'
+                    : 'bg-emerald-500/20 text-emerald-100 border-emerald-400/40'
+                }`}>
+                  {photoFeedback.type === 'error' ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
+                  <span>{photoFeedback.text}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Quick Stats / Navigation Switch */}
-          <div className="profile-overview-actions flex flex-row md:flex-col gap-2 w-full md:w-auto justify-center md:items-end">
-            <div className="profile-photo-controls">
+          {/* Top Right Actions */}
+          <div className="flex flex-row lg:flex-col items-center lg:items-end justify-center gap-2.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/15">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => photoInputRef.current?.click()}
                 disabled={isPhotoUploading}
-                className="profile-upload-photo px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                className="px-3 py-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded-lg border border-white/25 flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
               >
                 {isPhotoUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                {isPhotoUploading ? 'Uploading...' : 'Upload Photo'}
+                <span>{isPhotoUploading ? 'Uploading...' : 'Upload Photo'}</span>
               </button>
+
               {activePhotoUrl && (
                 <button
                   type="button"
                   onClick={handleResetProfilePhoto}
-                  className="profile-reset-photo px-3 py-1.5 bg-transparent hover:bg-red-50 text-slate-500 hover:text-red-600 border border-transparent hover:border-red-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                  title="Reset back to company dark blue logo"
+                  className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-semibold rounded-lg border border-rose-400/30 transition cursor-pointer"
+                  title="Reset to Kevalon dark blue logo"
                 >
-                  Reset to Logo
+                  Reset Photo
                 </button>
               )}
             </div>
+
             <button
               type="button"
               onClick={() => fetchProfile(true)}
               disabled={isRefreshing}
-              title="Fetch real-time profile details from server (GET /api/users/profile)"
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer shadow-xs disabled:opacity-60"
+              className="px-3.5 py-2 bg-white text-[#034665] hover:bg-sky-50 text-xs font-bold rounded-lg shadow-sm flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw size={14} className={isRefreshing ? "animate-spin text-indigo-600" : "text-slate-500"} />
-              <span>{isRefreshing ? 'Fetching...' : 'Sync Live Details'}</span>
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin text-[#034665]" : "text-[#034665]"} />
+              <span>{isRefreshing ? 'Syncing...' : 'Sync Live Data'}</span>
             </button>
+          </div>
+        </div>
+      </div>
 
-            {!isAdmin && (
-              <button
-                onClick={() => setActiveTab('documents')}
-                className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
-              >
-                <FileCheck size={16} />
-                <span>My Documents</span>
-                <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
-                  {documents.length}
-                </span>
-              </button>
-            )}
+      {/* Dynamic 4-Card Status & Metrics Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1: Joining Date */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-300">
+          <div className="w-11 h-11 rounded-xl bg-sky-50 text-[#034665] border border-sky-100 flex items-center justify-center shrink-0">
+            <Calendar size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Official Joining</span>
+            <span className="text-sm font-bold text-slate-900 truncate block mt-0.5">{joiningDate}</span>
+            <span className="text-[11px] text-slate-500 truncate block">Member since {memberSince}</span>
+          </div>
+        </div>
+
+        {/* Metric 2: Last Active Session */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-300">
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center shrink-0">
+            <Clock size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Last Active Session</span>
+            <span className="text-sm font-bold text-slate-900 truncate block mt-0.5">{lastLoginFormatted}</span>
+            <span className="text-[11px] text-slate-500 truncate block">Asia/Kolkata (IST)</span>
+          </div>
+        </div>
+
+        {/* Metric 3: Bank Details Status */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-300">
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
+            bankDetailGiven 
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+              : 'bg-amber-50 text-amber-700 border-amber-100'
+          }`}>
+            <CreditCard size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Bank Verification</span>
+            <span className={`text-sm font-bold truncate block mt-0.5 ${bankDetailGiven ? 'text-emerald-800' : 'text-amber-800'}`}>
+              {bankDetailGiven ? 'Verified & On File' : 'Pending Submission'}
+            </span>
+            <span className="text-[11px] text-slate-500 truncate block">
+              {bankDetailGiven ? 'Direct payroll active' : 'Bank details required'}
+            </span>
+          </div>
+        </div>
+
+        {/* Metric 4: Compliance & Terms */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-300">
+          <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0">
+            <ShieldCheck size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Policy &amp; Terms</span>
+            <span className="text-sm font-bold text-slate-900 truncate block mt-0.5">
+              {termsAccepted ? 'Terms Accepted' : 'Pending Agreement'}
+            </span>
+            <span className="text-[11px] text-slate-500 truncate block">
+              {isApproved ? 'Management Approved' : 'Verification in progress'}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Main Tab Navigation Bar */}
-      <div className="profile-tabs flex border-b border-slate-200/80 bg-white rounded-xl px-3 pt-1 shadow-xs transition-colors">
+      <div className="flex border-b border-slate-200 bg-white rounded-xl px-2 pt-1 shadow-xs transition-colors">
         <button
           type="button"
           onClick={() => setActiveTab('details')}
-          className={`profile-tab flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'details'
-              ? 'border-[#0088cc] text-[#004b73]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
           }`}
         >
-          <User size={15} />
-          <span>Personal Details</span>
+          <User size={16} className={activeTab === 'details' ? 'text-[#034665]' : 'text-slate-400'} />
+          <span>Personal &amp; Organization Details</span>
         </button>
 
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('documents')}
-            className={`profile-tab flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'documents'
-                ? 'border-[#0088cc] text-[#004b73]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <FileBadge size={15} />
-            <span>Documents & Identity</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-              activeTab === 'documents'
-                ? 'bg-[#004b73] text-white'
-                : 'bg-slate-100 text-slate-600'
-            }`}>
-              {documents.length}
-            </span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setActiveTab('documents')}
+          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'documents'
+              ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
+          }`}
+        >
+          <FileBadge size={16} className={activeTab === 'documents' ? 'text-[#034665]' : 'text-slate-400'} />
+          <span>Documents &amp; Statutory Proofs</span>
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+            activeTab === 'documents'
+              ? 'bg-[#034665] text-white'
+              : 'bg-slate-100 text-slate-600'
+          }`}>
+            {documents.length}
+          </span>
+        </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('security')}
-          className={`profile-tab flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'security'
-              ? 'border-[#0088cc] text-[#004b73]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
           }`}
         >
-          <KeyRound size={15} />
-          <span>Security & Password</span>
+          <KeyRound size={16} className={activeTab === 'security' ? 'text-[#034665]' : 'text-slate-400'} />
+          <span>Security &amp; Password</span>
         </button>
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: PERSONAL DETAILS & PROFILE INFO */}
+      {/* TAB 1: PERSONAL & ORGANIZATION DETAILS */}
       {/* ========================================================================= */}
       {activeTab === 'details' && (
-        <div className="profile-details-layout grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Left Column: Read-Only Identity & Skills */}
-          <div className="profile-side-column space-y-6 lg:col-span-1">
+          {/* Left Column (1/3): Identity, Demographics & Employment Specs */}
+          <div className="space-y-6 lg:col-span-1">
             
-            {/* Identity Info */}
-            <div className="profile-identity-card bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
-              <h3 className="profile-section-title text-sm font-bold text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                <User size={16} className="text-slate-400" /> Identity Info
+            {/* Identity & Demographics Card */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                <User size={15} className="text-[#034665]" />
+                <span>Identity &amp; Demographics</span>
               </h3>
-              <div className="profile-identity-fields space-y-4">
-                <div className="profile-identity-field">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Date of Birth</span>
-                  <span className="profile-identity-value text-sm font-medium text-slate-900 font-mono">{dob}</span>
-                </div>
-                <div className="profile-identity-field">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Gender</span>
-                  <span className="profile-identity-value text-sm font-medium text-slate-900">{gender}</span>
-                </div>
-                <div className="profile-identity-field">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Blood Group</span>
-                  <span className="profile-identity-value inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-50 text-red-600 text-xs font-bold font-mono border border-red-100">
-                    <HeartPulse size={12} /> {bloodGroup}
+              
+              <div className="space-y-3.5 text-xs">
+                {/* Date of Birth */}
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="font-semibold text-slate-500 flex items-center gap-1.5">
+                    <Calendar size={13} className="text-slate-400" />
+                    <span>Date of Birth</span>
                   </span>
+                  <span className="font-bold text-slate-900 font-mono">{dob}</span>
+                </div>
+
+                {/* Gender */}
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="font-semibold text-slate-500 flex items-center gap-1.5">
+                    <User size={13} className="text-slate-400" />
+                    <span>Gender</span>
+                  </span>
+                  <span className="font-bold text-slate-900">{gender}</span>
+                </div>
+
+                {/* Blood Group */}
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="font-semibold text-slate-500 flex items-center gap-1.5">
+                    <HeartPulse size={13} className="text-rose-500" />
+                    <span>Blood Group</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-bold font-mono border border-rose-200 text-xs">
+                    {bloodGroup}
+                  </span>
+                </div>
+
+                {/* Employee ID */}
+                <div className="flex items-center justify-between py-1">
+                  <span className="font-semibold text-slate-500 flex items-center gap-1.5">
+                    <CreditCard size={13} className="text-slate-400" />
+                    <span>Unique ID</span>
+                  </span>
+                  <span className="font-mono font-bold text-slate-900">{employeeId}</span>
                 </div>
               </div>
             </div>
 
-            {/* Documents Quick Widget */}
-            {!isAdmin && (
-              <div className="profile-documents-widget bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                  <h3 className="profile-section-title profile-proof-title text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                    <FileCheck size={16} className="text-indigo-500" /> Identity Proofs
-                  </h3>
-                  <span className="profile-proof-count text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
-                    {[aadharDoc, panDoc, passportPhotoDoc].filter(doc => Boolean(doc?.fileUrl)).length}/3 Done
+            {/* Employment & Organization Card */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                <Briefcase size={15} className="text-[#034665]" />
+                <span>Employment &amp; Organization</span>
+              </h3>
+              
+              <div className="space-y-3.5 text-xs">
+                {/* Department */}
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="font-semibold text-slate-500">Department</span>
+                  <span className="px-2 py-0.5 rounded bg-sky-50 text-[#034665] font-bold border border-sky-100">
+                    {department}
                   </span>
                 </div>
 
-                <div className="space-y-3">
-                  {/* Aadhar summary */}
-                  <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="p-1.5 rounded bg-indigo-50 text-indigo-600 shrink-0">
-                        <img src={aadharProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
-                      </div>
-                      <div className="truncate">
-                        <p className="text-xs font-bold text-slate-900 truncate">Aadhar Card</p>
-                        <p className="text-[11px] font-mono text-slate-500 truncate">{aadharDoc?.docNumber || 'Not set'}</p>
-                      </div>
-                    </div>
-                    {aadharDoc?.fileUrl && (
-                      <button
-                        onClick={() => handleOpenDocViewer(aadharDoc)}
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
-                        title="View Aadhar Card"
-                      >
-                        <Eye size={14} />
-                      </button>
-                    )}
-                  </div>
+                {/* Designation */}
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="font-semibold text-slate-500">Designation</span>
+                  <span className="font-bold text-slate-900">{designation}</span>
+                </div>
 
-                  {/* PAN summary */}
-                  <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="p-1.5 rounded bg-amber-100 text-amber-600 shrink-0">
-                        <img src={panProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
-                      </div>
-                      <div className="truncate">
-                        <p className="text-xs font-bold text-slate-900 truncate">PAN Card</p>
-                        <p className="text-[11px] font-mono text-slate-500 truncate">{panDoc?.docNumber || 'Not set'}</p>
-                      </div>
-                    </div>
-                    {panDoc?.fileUrl && (
-                      <button
-                        onClick={() => handleOpenDocViewer(panDoc)}
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
-                        title="View PAN Card"
-                      >
-                        <Eye size={14} />
-                      </button>
-                    )}
-                  </div>
+                {/* System Role */}
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="font-semibold text-slate-500">System Role</span>
+                  <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    {displayRole}
+                  </span>
+                </div>
 
-                  {/* Passport Photo summary */}
-                  <div className="profile-document-summary flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="p-1.5 rounded bg-purple-100 text-purple-600 shrink-0">
-                        <img src={passportProofIcon} alt="" className="profile-proof-icon profile-proof-icon-small" />
-                      </div>
-                      <div className="truncate">
-                        <p className="text-xs font-bold text-slate-900 truncate">Passport Photo</p>
-                        <p className="text-[11px] text-slate-500 truncate">Official Photo</p>
-                      </div>
-                    </div>
-                    {passportPhotoDoc?.fileUrl && (
-                      <button
-                        onClick={() => handleOpenDocViewer(passportPhotoDoc)}
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
-                        title="View Passport Photo"
-                      >
-                        <Eye size={14} />
-                      </button>
-                    )}
-                  </div>
+                {/* Account Status */}
+                <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span className="font-semibold text-slate-500">Account Status</span>
+                  <span className={`font-bold ${isAccountActive ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {isAccountActive ? 'Active' : 'Deactivated'}
+                  </span>
+                </div>
 
-                  <button
-                    onClick={() => setActiveTab('documents')}
-                    className="profile-manage-documents w-full mt-2 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg border border-dashed border-indigo-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    Manage All Documents <ArrowRight size={12} />
-                  </button>
+                {/* Profile Last Updated */}
+                <div className="flex items-center justify-between py-1">
+                  <span className="font-semibold text-slate-500">Profile Updated</span>
+                  <span className="text-slate-600 font-mono text-[11px]">{updatedAtFormatted}</span>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Emergency Contact */}
+            {/* Identity Proofs Quick Summary Widget */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <FileCheck size={15} className="text-[#034665]" />
+                  <span>Statutory Proofs</span>
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-50 text-[#034665] border border-sky-200">
+                  {[aadharDoc, panDoc, passportPhotoDoc].filter(doc => Boolean(doc?.fileUrl)).length}/3 Uploaded
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {/* Aadhar */}
+                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <img src={aadharProofIcon} alt="" className="w-5 h-5 object-contain shrink-0" />
+                    <div className="truncate">
+                      <p className="font-bold text-slate-800 truncate">Aadhar Card</p>
+                      <p className="text-[10px] font-mono text-slate-500 truncate">{aadharDoc?.docNumber || 'Not set'}</p>
+                    </div>
+                  </div>
+                  {aadharDoc?.fileUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDocViewer(aadharDoc)}
+                      className="p-1.5 text-slate-500 hover:text-[#034665] hover:bg-white rounded transition cursor-pointer"
+                      title="View Aadhar Card"
+                    >
+                      <Eye size={14} />
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Pending</span>
+                  )}
+                </div>
+
+                {/* PAN */}
+                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <img src={panProofIcon} alt="" className="w-5 h-5 object-contain shrink-0" />
+                    <div className="truncate">
+                      <p className="font-bold text-slate-800 truncate">PAN Card</p>
+                      <p className="text-[10px] font-mono text-slate-500 truncate">{panDoc?.docNumber || 'Not set'}</p>
+                    </div>
+                  </div>
+                  {panDoc?.fileUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDocViewer(panDoc)}
+                      className="p-1.5 text-slate-500 hover:text-[#034665] hover:bg-white rounded transition cursor-pointer"
+                      title="View PAN Card"
+                    >
+                      <Eye size={14} />
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Pending</span>
+                  )}
+                </div>
+
+                {/* Passport Photo */}
+                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <img src={passportProofIcon} alt="" className="w-5 h-5 object-contain shrink-0" />
+                    <div className="truncate">
+                      <p className="font-bold text-slate-800 truncate">Passport Photo</p>
+                      <p className="text-[10px] text-slate-500 truncate">{passportPhotoDoc?.fileUrl ? 'Official Photo' : 'Not set'}</p>
+                    </div>
+                  </div>
+                  {passportPhotoDoc?.fileUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDocViewer(passportPhotoDoc)}
+                      className="p-1.5 text-slate-500 hover:text-[#034665] hover:bg-white rounded transition cursor-pointer"
+                      title="View Passport Photo"
+                    >
+                      <Eye size={14} />
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Pending</span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('documents')}
+                  className="w-full mt-2 py-2 text-xs font-bold text-[#034665] hover:bg-sky-50 rounded-lg border border-dashed border-[#034665]/30 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <span>Manage All Documents</span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            </div>
+
+            {/* Emergency Contact (if available) */}
             {emergencyContact.name && (
-              <div className="bg-white border border-slate-200 rounded-md transition-colors shadow-sm p-5">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                  <Users size={16} className="text-slate-400" /> Emergency Contact
+              <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-3 flex items-center gap-2">
+                  <Users size={15} className="text-[#034665]" />
+                  <span>Emergency Contact</span>
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-2 text-xs">
                   <div>
-                    <span className="text-sm font-bold text-slate-900 block">{emergencyContact.name}</span>
-                    <span className="text-xs font-medium text-slate-500">{emergencyContact.relation}</span>
+                    <span className="font-bold text-slate-900 block">{emergencyContact.name}</span>
+                    <span className="text-slate-500">{emergencyContact.relation || 'Relation not specified'}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-700 font-medium bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                    <Phone size={14} className="text-indigo-600" /> {emergencyContact.phone}
-                  </div>
+                  {emergencyContact.phone && (
+                    <div className="flex items-center gap-2 text-slate-700 font-semibold bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <Phone size={13} className="text-[#034665]" />
+                      <span>{emergencyContact.phone}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Technical Skills */}
+            {/* Technical Skills (if available) */}
             {skillsList.length > 0 && (
-              <div className="bg-white border border-slate-200/80 rounded-xl transition-colors shadow-xs p-5">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                  <Code size={16} className="text-slate-400" /> Technical Skills
+              <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-3 flex items-center gap-2">
+                  <Code size={15} className="text-[#034665]" />
+                  <span>Technical Skills</span>
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {skillsList.map((skill, i) => (
-                    <span key={i} className="px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-md border border-slate-200">
+                    <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-md border border-slate-200">
                       {skill}
                     </span>
                   ))}
                 </div>
               </div>
             )}
+
           </div>
 
-          {/* Right Column: Editable Contact Form & Education */}
-          <div className="profile-contact-column space-y-6 lg:col-span-2">
+          {/* Right Column (2/3): Editable Contact Form & Education */}
+          <div className="space-y-6 lg:col-span-2">
             
             {/* Contact & Personal Details Form */}
-            <div className="profile-contact-card bg-white border border-slate-200/80 rounded-xl transition-colors shadow-xs">
-              <div className="profile-contact-header px-6 py-5 border-b border-slate-200 bg-slate-50/50">
-                <h3 className="text-base font-semibold text-slate-900">Personal & Contact Details</h3>
-                <p className="text-xs text-slate-500 mt-1">Update your display name, phone number, and physical address.</p>
+            <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Edit3 size={17} className="text-[#034665]" />
+                    <span>Personal &amp; Contact Details</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Update your full display name, contact phone number, and physical office/residence address.
+                  </p>
+                </div>
               </div>
 
-              <form onSubmit={handleSaveContact} className="p-6 space-y-6">
+              <form onSubmit={handleSaveContact} className="p-6 space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Full Name */}
                   <div>
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                      <User size={14} className="text-slate-400" /> Full Name
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      <User size={13} className="text-[#034665]" />
+                      <span>Full Name</span>
+                      <span className="text-rose-500">*</span>
                     </label>
                     <input 
                       type="text" 
                       value={name} 
                       onChange={e => setName(e.target.value)} 
-                      placeholder="Enter your full name"
-                      className="w-full px-4 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-indigo-500 transition-colors"
+                      placeholder="Enter full name"
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
                       required
                     />
                   </div>
@@ -2069,83 +2327,100 @@ export const ProfileView = () => {
                   {/* Email Address - Fixed and not changeable */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                        <Mail size={14} className="text-slate-400" /> Email Address
+                      <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        <Mail size={13} className="text-[#034665]" />
+                        <span>Official Email Address</span>
                       </label>
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                         <Lock size={10} /> Fixed
                       </span>
                     </div>
-                    <input 
-                      type="email" 
-                      value={email} 
-                      readOnly
-                      disabled
-                      className="w-full px-4 py-2.5 text-sm bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-medium cursor-not-allowed select-none transition-colors"
-                      title="Email address is fixed and cannot be changed"
-                    />
+                    <div className="relative">
+                      <input 
+                        type="email" 
+                        value={email} 
+                        readOnly
+                        disabled
+                        className="w-full pl-3.5 pr-9 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-500 font-medium cursor-not-allowed select-none transition"
+                        title="Email address is authoritative and managed by system administration"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(email, 'Email Address')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title="Copy email address"
+                      >
+                        <Copy size={13} />
+                      </button>
+                    </div>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      Email is fixed and managed by the administrator.
+                      Authoritative work email registered on the organization portal.
                     </p>
                   </div>
 
                   {/* Phone Number */}
                   <div>
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                      <Phone size={14} className="text-slate-400" /> Phone Number
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      <Phone size={13} className="text-[#034665]" />
+                      <span>Phone Number</span>
+                      <span className="text-rose-500">*</span>
                     </label>
                     <input 
                       type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      pattern="[0-9]{10}"
                       value={phone} 
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-indigo-500 transition-colors"
+                      onChange={e => setPhone(e.target.value)}
+                      placeholder="e.g. +91 98765 43212"
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
                       required
                     />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Contact number for verification and critical office notifications.
+                    </p>
                   </div>
-                  
-                  {/* Current Address */}
+
+                  {/* Physical Address */}
                   <div className="md:col-span-2">
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                      <MapPin size={14} className="text-slate-400" /> Current Address
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      <MapPin size={13} className="text-[#034665]" />
+                      <span>Current Office / Physical Address</span>
+                      <span className="text-rose-500">*</span>
                     </label>
                     <textarea 
                       value={address} 
                       onChange={e => setAddress(e.target.value)} 
-                      rows={2}
-                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-indigo-500 transition-colors resize-y"
+                      rows={3}
+                      placeholder="Enter street, office/building, city, and postal code"
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs resize-y"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-4 pt-6 border-t border-slate-200">
+                <div className="flex items-center justify-end gap-3 pt-5 border-t border-slate-200">
                   {isSaved && (
-                    <span className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md text-sm font-medium flex items-center gap-2 transition-opacity">
-                      <CheckCircle2 size={16} /> Updated Successfully
+                    <span className="px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-opacity">
+                      <CheckCircle2 size={15} />
+                      <span>Updated Successfully</span>
                     </span>
                   )}
                   <button 
                     type="submit" 
                     disabled={isSaving}
-                    className="px-6 py-2.5 btn-brand-primary text-white rounded-lg text-sm font-semibold flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-70"
-                    style={{ background: 'linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)' }}
+                    className="px-6 py-2.5 bg-[#034665] hover:bg-[#02334a] text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-60"
                   >
-                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    {isSaving ? 'Saving...' : 'Save Changes'}
+                    {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                    <span>{isSaving ? 'Saving...' : 'Save Profile Changes'}</span>
                   </button>
                 </div>
               </form>
             </div>
 
-            {/* Education Records */}
+            {/* Education Records (if available) */}
             {educationList.length > 0 && (
-              <div className="bg-white border border-slate-200/80 rounded-xl transition-colors shadow-xs">
-                <div className="px-6 py-5 border-b border-slate-200 flex items-center gap-2 bg-slate-50/50">
-                  <GraduationCap size={18} className="text-slate-500" />
-                  <h3 className="text-base font-semibold text-slate-900">Education History</h3>
+              <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2 bg-slate-50/60">
+                  <GraduationCap size={18} className="text-[#034665]" />
+                  <h3 className="text-sm font-bold text-slate-900">Education History</h3>
                 </div>
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                   {educationList.map((edu, index) => (
@@ -2156,7 +2431,7 @@ export const ProfileView = () => {
                       </div>
                       <div className="flex items-center justify-between mt-4 text-xs font-medium">
                         <span className="px-2 py-1 bg-slate-200 text-slate-700 rounded font-mono">Class of {edu.passingYear}</span>
-                        <span className="text-green-600 font-bold">{edu.percentage}% Score</span>
+                        <span className="text-emerald-700 font-bold">{edu.percentage}% Score</span>
                       </div>
                     </div>
                   ))}
@@ -2171,7 +2446,7 @@ export const ProfileView = () => {
       {/* ========================================================================= */}
       {/* TAB 2: DOCUMENTS & IDENTITY PROOFS (AADHAR, PAN, PASSPORT PHOTO, ADD) */}
       {/* ========================================================================= */}
-      {!isAdmin && activeTab === 'documents' && (
+      {activeTab === 'documents' && (
         <div className="space-y-6">
           
           {/* Header Banner for Documents */}
