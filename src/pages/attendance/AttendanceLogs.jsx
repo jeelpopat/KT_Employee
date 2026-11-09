@@ -1213,13 +1213,54 @@ export default function AttendanceLogs() {
         throw new Error(`Failed to fetch scheduler logs: ${res.status}`);
       }
       const data = await res.json();
-      const logs = data?.logs || data?.data || data?.records || (Array.isArray(data) ? data : []);
-      setSchedulerLogs(logs);
-      setSchedulerPage(data?.page || data?.currentPage || page);
-      setSchedulerTotalPages(data?.totalPages || Math.ceil((data?.total || logs.length) / 10) || 1);
-      setSchedulerTotalCount(data?.total || data?.totalLogs || data?.count || logs.length);
+      
+      const extractLogs = (payload) => {
+        if (Array.isArray(payload)) return payload;
+        if (!payload || typeof payload !== 'object') return [];
+        if (Array.isArray(payload.logs)) return payload.logs;
+        if (Array.isArray(payload.records)) return payload.records;
+        if (Array.isArray(payload.items)) return payload.items;
+        if (Array.isArray(payload.data)) return payload.data;
+        if (payload.data && typeof payload.data === 'object') {
+          if (Array.isArray(payload.data.logs)) return payload.data.logs;
+          if (Array.isArray(payload.data.records)) return payload.data.records;
+          if (Array.isArray(payload.data.items)) return payload.data.items;
+          if (Array.isArray(payload.data.data)) return payload.data.data;
+        }
+        return [];
+      };
+
+      const logs = extractLogs(data);
+      const safeLogs = Array.isArray(logs) ? logs : [];
+      setSchedulerLogs(safeLogs);
+
+      const total =
+        data?.total ??
+        data?.totalLogs ??
+        data?.count ??
+        data?.data?.total ??
+        data?.data?.totalLogs ??
+        data?.data?.count ??
+        safeLogs.length;
+
+      const totalPages =
+        data?.totalPages ??
+        data?.data?.totalPages ??
+        Math.max(1, Math.ceil(total / 10));
+
+      const currentPage =
+        data?.page ??
+        data?.currentPage ??
+        data?.data?.page ??
+        data?.data?.currentPage ??
+        page;
+
+      setSchedulerPage(currentPage);
+      setSchedulerTotalPages(totalPages);
+      setSchedulerTotalCount(total);
     } catch (err) {
       console.warn('Scheduler logs fetch error:', err);
+      setSchedulerLogs([]);
       setSchedulerError(err.message || 'Unable to load scheduler execution logs.');
     } finally {
       setLoadingScheduler(false);
@@ -3814,13 +3855,26 @@ export default function AttendanceLogs() {
 
                 {/* Affected Records Preview Table */}
                 {(() => {
-                  const records =
-                    finalizePreview?.affectedRecords ||
-                    finalizePreview?.previewRecords ||
-                    finalizePreview?.toMarkAbsent ||
-                    finalizePreview?.records ||
-                    finalizePreview?.data ||
-                    [];
+                  const extractRecords = (data) => {
+                    if (Array.isArray(data)) return data;
+                    if (!data || typeof data !== 'object') return [];
+                    if (Array.isArray(data.affectedRecords)) return data.affectedRecords;
+                    if (Array.isArray(data.previewRecords)) return data.previewRecords;
+                    if (Array.isArray(data.toMarkAbsent)) return data.toMarkAbsent;
+                    if (Array.isArray(data.records)) return data.records;
+                    if (Array.isArray(data.affected)) return data.affected;
+                    if (Array.isArray(data.data)) return data.data;
+                    if (data.data && typeof data.data === 'object') {
+                      if (Array.isArray(data.data.affectedRecords)) return data.data.affectedRecords;
+                      if (Array.isArray(data.data.previewRecords)) return data.data.previewRecords;
+                      if (Array.isArray(data.data.toMarkAbsent)) return data.data.toMarkAbsent;
+                      if (Array.isArray(data.data.records)) return data.data.records;
+                      if (Array.isArray(data.data.affected)) return data.data.affected;
+                      if (Array.isArray(data.data.data)) return data.data.data;
+                    }
+                    return [];
+                  };
+                  const records = extractRecords(finalizePreview);
                   if (!Array.isArray(records) || records.length === 0) {
                     return (
                       <div className="p-8 text-center bg-slate-50 border border-slate-200/70 rounded-lg text-xs text-slate-500">
@@ -3937,32 +3991,37 @@ export default function AttendanceLogs() {
                   Retry
                 </button>
               </div>
-            ) : schedulerLogs.length === 0 ? (
-              <div className="p-12 text-center bg-slate-50 border border-slate-200/70 rounded-lg text-xs text-slate-500 mt-4">
-                <ShieldCheck size={32} className="text-slate-300 mx-auto mb-2" />
-                <p className="font-semibold text-slate-700">No scheduler execution logs found yet</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Automated logs will record every day at 16:00 IST or upon manual finalization.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                  <table className="w-full text-left text-xs border-collapse min-w-[700px]">
-                    <thead>
-                      <tr className="bg-[#0346651A] text-[#034665] font-semibold border-b border-slate-200">
-                        <th className="py-3 px-3.5">Target Date</th>
-                        <th className="py-3 px-3.5">Execution Time (IST)</th>
-                        <th className="py-3 px-3.5">Trigger Type</th>
-                        <th className="py-3 px-3.5 text-center">Status</th>
-                        <th className="py-3 px-3.5 text-center">Evaluated</th>
-                        <th className="py-3 px-3.5 text-center">Absent Marked</th>
-                        <th className="py-3 px-3.5 text-center">Punches Preserved</th>
-                        <th className="py-3 px-3.5">Duration / Note</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {schedulerLogs.map((log, idx) => {
+            ) : (() => {
+              const safeLogs = Array.isArray(schedulerLogs) ? schedulerLogs : [];
+              if (safeLogs.length === 0) {
+                return (
+                  <div className="p-12 text-center bg-slate-50 border border-slate-200/70 rounded-lg text-xs text-slate-500 mt-4">
+                    <ShieldCheck size={32} className="text-slate-300 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">No scheduler execution logs found yet</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Automated logs will record every day at 16:00 IST or upon manual finalization.
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <div className="mt-4 space-y-3">
+                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="bg-[#0346651A] text-[#034665] font-semibold border-b border-slate-200">
+                          <th className="py-3 px-3.5">Target Date</th>
+                          <th className="py-3 px-3.5">Execution Time (IST)</th>
+                          <th className="py-3 px-3.5">Trigger Type</th>
+                          <th className="py-3 px-3.5 text-center">Status</th>
+                          <th className="py-3 px-3.5 text-center">Evaluated</th>
+                          <th className="py-3 px-3.5 text-center">Absent Marked</th>
+                          <th className="py-3 px-3.5 text-center">Punches Preserved</th>
+                          <th className="py-3 px-3.5">Duration / Note</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {safeLogs.map((log, idx) => {
                         const status = (log.status || (log.success ? 'SUCCESS' : 'FAILED')).toUpperCase();
                         const trigger = (log.triggerType || log.trigger || log.type || 'SCHEDULED').toUpperCase();
                         return (
@@ -4016,9 +4075,9 @@ export default function AttendanceLogs() {
                           </tr>
                         );
                       })}
-                    </tbody>
-                  </table>
-                </div>
+                      </tbody>
+                    </table>
+                  </div>
 
                 {/* Pagination Controls */}
                 {schedulerTotalPages > 1 && (
@@ -4047,7 +4106,8 @@ export default function AttendanceLogs() {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
