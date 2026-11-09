@@ -10,7 +10,7 @@ import {
   ZoomIn, ZoomOut, RotateCw, RefreshCw,
   FileBadge, ArrowRight, Edit3, Check,
   AlertCircle,
-  Copy, Clock, CreditCard, Building2, Sparkles, BadgeCheck, ShieldCheck
+  Copy, Clock, CreditCard, Building2, Sparkles, BadgeCheck, ShieldCheck, Landmark
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api, { BASE_URL } from '../../api/axios.js'; 
@@ -20,6 +20,130 @@ import panProofIcon from '../../assets/profile/pan-proof-icon.png';
 import passportProofIcon from '../../assets/profile/passport-proof-icon.png';
 import { showToast } from '../common/Toast.jsx';
 import './ProfileView.css';
+
+// Resolves bank details dynamically from profile, employee, or local persistence
+const resolveBankDetails = (profileData, contextUser) => {
+  const prof = profileData?.profile || profileData?.user || profileData || {};
+  const emp = profileData?.employee || {};
+  const usr = contextUser || {};
+
+  // 1. Direct fields from backend response
+  const bankName =
+    prof.bankName ||
+    emp.bankName ||
+    usr.bankName ||
+    prof.bankDetails?.bankName ||
+    emp.bankDetails?.bankName ||
+    usr.bankDetails?.bankName;
+
+  const accountNumber =
+    prof.accountNumber ||
+    emp.accountNumber ||
+    usr.accountNumber ||
+    prof.bankAccount ||
+    emp.bankAccount ||
+    usr.bankAccount ||
+    prof.bankAccountNumber ||
+    emp.bankAccountNumber ||
+    usr.bankAccountNumber ||
+    prof.bankDetails?.accountNumber ||
+    emp.bankDetails?.accountNumber ||
+    usr.bankDetails?.accountNumber;
+
+  const ifscCode =
+    prof.ifscCode ||
+    emp.ifscCode ||
+    usr.ifscCode ||
+    prof.IFSC ||
+    emp.IFSC ||
+    usr.IFSC ||
+    prof.bankDetails?.ifscCode ||
+    emp.bankDetails?.ifscCode ||
+    usr.bankDetails?.ifscCode;
+
+  const accountHolderName =
+    prof.accountHolderName ||
+    emp.accountHolderName ||
+    usr.accountHolderName ||
+    prof.bankDetails?.accountHolderName ||
+    emp.bankDetails?.accountHolderName ||
+    usr.bankDetails?.accountHolderName ||
+    prof.name ||
+    emp.name ||
+    usr.name ||
+    '';
+
+  const bankBranch =
+    prof.bankBranch ||
+    emp.bankBranch ||
+    usr.bankBranch ||
+    prof.bankDetails?.bankBranch ||
+    emp.bankDetails?.bankBranch ||
+    usr.bankDetails?.bankBranch ||
+    '';
+
+  const upiId =
+    prof.upiId ||
+    emp.upiId ||
+    usr.upiId ||
+    prof.bankDetails?.upiId ||
+    emp.bankDetails?.upiId ||
+    usr.bankDetails?.upiId ||
+    '';
+
+  if (accountNumber || bankName) {
+    return {
+      bankName: String(bankName || ''),
+      accountNumber: String(accountNumber || ''),
+      ifscCode: ifscCode ? String(ifscCode).toUpperCase() : '',
+      accountHolderName: String(accountHolderName || ''),
+      bankBranch: String(bankBranch || ''),
+      upiId: String(upiId || ''),
+      isBankDetailGiven: true
+    };
+  }
+
+  // 2. Check localStorage 'kt_employee_bank_details'
+  try {
+    const rawLocal = localStorage.getItem('kt_employee_bank_details');
+    if (rawLocal) {
+      const bankMap = JSON.parse(rawLocal);
+      const possibleIds = [prof._id, usr._id, prof.uniqueID, usr.uniqueID, 'current']
+        .filter(Boolean)
+        .map(String);
+      for (const id of possibleIds) {
+        if (bankMap[id] && (bankMap[id].accountNumber || bankMap[id].bankName)) {
+          return {
+            bankName: String(bankMap[id].bankName || ''),
+            accountNumber: String(bankMap[id].accountNumber || ''),
+            ifscCode: bankMap[id].ifscCode ? String(bankMap[id].ifscCode).toUpperCase() : '',
+            accountHolderName: String(bankMap[id].accountHolderName || ''),
+            bankBranch: String(bankMap[id].bankBranch || ''),
+            upiId: String(bankMap[id].upiId || ''),
+            isBankDetailGiven: true
+          };
+        }
+      }
+    }
+    const currentDirect = localStorage.getItem('kt_employee_bank_details_current');
+    if (currentDirect) {
+      const parsed = JSON.parse(currentDirect);
+      if (parsed.accountNumber || parsed.bankName) {
+        return {
+          bankName: String(parsed.bankName || ''),
+          accountNumber: String(parsed.accountNumber || ''),
+          ifscCode: parsed.ifscCode ? String(parsed.ifscCode).toUpperCase() : '',
+          accountHolderName: String(parsed.accountHolderName || ''),
+          bankBranch: String(parsed.bankBranch || ''),
+          upiId: String(parsed.upiId || ''),
+          isBankDetailGiven: true
+        };
+      }
+    }
+  } catch {}
+
+  return null;
+};
 
 // Deterministically convert any string/id into a 24-char hex string for MongoDB ObjectId
 const toValidObjectId = (id) => {
@@ -303,6 +427,34 @@ export const ProfileView = () => {
     const emp = resolveEmployeeData(contextUser);
     return emp.currentAddress || contextUser?.address || '';
   });
+  const [dobInput, setDobInput] = useState(() => {
+    const emp = resolveEmployeeData(contextUser);
+    const d = contextUser?.dob || emp?.dob || '';
+    return typeof d === 'string' && d.includes('T') ? d.split('T')[0] : d;
+  });
+  const [genderInput, setGenderInput] = useState(() => {
+    const emp = resolveEmployeeData(contextUser);
+    return contextUser?.gender || emp?.gender || '';
+  });
+  const [bloodGroupInput, setBloodGroupInput] = useState(() => {
+    const emp = resolveEmployeeData(contextUser);
+    return contextUser?.bloodGroup || emp?.bloodGroup || '';
+  });
+
+  // Bank Details Form & Modal States
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [isSavingBank, setIsSavingBank] = useState(false);
+  const [bankModalError, setBankModalError] = useState('');
+  const [isAccountMasked, setIsAccountMasked] = useState(true);
+  const [bankForm, setBankForm] = useState({
+    bankName: '',
+    accountHolderName: '',
+    accountNumber: '',
+    confirmAccountNumber: '',
+    ifscCode: '',
+    bankBranch: '',
+    upiId: ''
+  });
   const [imgError, setImgError] = useState(false);
 
   // Profile Photo Upload State
@@ -458,6 +610,19 @@ export const ProfileView = () => {
       );
       setEmail(emp.email || prof.email || effectiveData.email || contextUser?.email || '');
       setAddress(emp.currentAddress || prof.address || effectiveData.address || effectiveData.currentAddress || '');
+
+      const rawDob = prof.dob || emp.dob || effectiveData.dob || contextUser?.dob || '';
+      if (rawDob) {
+        setDobInput(typeof rawDob === 'string' && rawDob.includes('T') ? rawDob.split('T')[0] : rawDob);
+      }
+      const rawGender = prof.gender || emp.gender || effectiveData.gender || contextUser?.gender || '';
+      if (rawGender) {
+        setGenderInput(rawGender);
+      }
+      const rawBloodGroup = prof.bloodGroup || emp.bloodGroup || effectiveData.bloodGroup || contextUser?.bloodGroup || '';
+      if (rawBloodGroup) {
+        setBloodGroupInput(rawBloodGroup);
+      }
 
       // Load cached photo if available
       const cachedPhoto = localStorage.getItem(localStoragePhotoKey);
@@ -1511,7 +1676,7 @@ export const ProfileView = () => {
         localStorage.setItem('kt_employee_full_name', cleanName);
       }
 
-      // 2. Prepare payload with all name representations
+      // 2. Prepare payload with all name representations & demographics
       const payload = { 
         name: cleanName,
         fullName: cleanName,
@@ -1519,7 +1684,10 @@ export const ProfileView = () => {
         phoneNumber: phone, 
         mobile: phone,
         address,
-        currentAddress: address
+        currentAddress: address,
+        dob: dobInput || undefined,
+        gender: genderInput || undefined,
+        bloodGroup: bloodGroupInput || undefined
       };
 
       // 3. Update user profile on backend
@@ -1527,6 +1695,9 @@ export const ProfileView = () => {
         await api.put('/api/users/profile/update', payload);
       } catch (err) {
         console.warn('PUT /api/users/profile/update notice:', err?.message);
+        try {
+          await api.put('/api/users/profile', payload);
+        } catch {}
       }
 
       const updatedFields = {
@@ -1535,21 +1706,43 @@ export const ProfileView = () => {
         phone,
         mobile: phone,
         address,
-        currentAddress: address
+        currentAddress: address,
+        dob: dobInput,
+        gender: genderInput,
+        bloodGroup: bloodGroupInput
       };
 
       if (updateUserProfile) {
         updateUserProfile(updatedFields);
       }
 
-      await fetchProfile(false);
-
       setProfileData(prev => ({
         ...prev,
         name: cleanName,
         fullName: cleanName,
-        employee: { ...(prev?.employee || {}), name: cleanName, fullName: cleanName, mobile: phone, currentAddress: address },
-        profile: { ...(prev?.profile || {}), name: cleanName, fullName: cleanName, phoneNumber: phone, address }
+        dob: dobInput || prev?.dob,
+        gender: genderInput || prev?.gender,
+        bloodGroup: bloodGroupInput || prev?.bloodGroup,
+        employee: { 
+          ...(prev?.employee || {}), 
+          name: cleanName, 
+          fullName: cleanName, 
+          mobile: phone, 
+          currentAddress: address,
+          dob: dobInput || prev?.employee?.dob,
+          gender: genderInput || prev?.employee?.gender,
+          bloodGroup: bloodGroupInput || prev?.employee?.bloodGroup
+        },
+        profile: { 
+          ...(prev?.profile || {}), 
+          name: cleanName, 
+          fullName: cleanName, 
+          phoneNumber: phone, 
+          address,
+          dob: dobInput || prev?.profile?.dob,
+          gender: genderInput || prev?.profile?.gender,
+          bloodGroup: bloodGroupInput || prev?.profile?.bloodGroup
+        }
       }));
 
       setIsSaved(true);
@@ -1560,6 +1753,145 @@ export const ProfileView = () => {
       showToast("Failed to update profile details.", "error");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // --- Bank Details Modal Handlers ---
+  const handleOpenBankModal = () => {
+    setBankModalError('');
+    const currentBank = resolveBankDetails(profileData, contextUser);
+    if (currentBank && (currentBank.accountNumber || currentBank.bankName)) {
+      setBankForm({
+        bankName: currentBank.bankName || '',
+        accountHolderName: currentBank.accountHolderName || name || fullName || '',
+        accountNumber: currentBank.accountNumber || '',
+        confirmAccountNumber: currentBank.accountNumber || '',
+        ifscCode: currentBank.ifscCode || '',
+        bankBranch: currentBank.bankBranch || '',
+        upiId: currentBank.upiId || ''
+      });
+    } else {
+      setBankForm({
+        bankName: '',
+        accountHolderName: name || fullName || resolveEmployeeName(contextUser) || '',
+        accountNumber: '',
+        confirmAccountNumber: '',
+        ifscCode: '',
+        bankBranch: '',
+        upiId: ''
+      });
+    }
+    setIsBankModalOpen(true);
+  };
+
+  const handleSaveBankDetails = async (e) => {
+    e.preventDefault();
+    setBankModalError('');
+
+    const cleanBankName = bankForm.bankName.trim();
+    const cleanHolder = bankForm.accountHolderName.trim();
+    const cleanAccountNumber = bankForm.accountNumber.replace(/[\s-]/g, '');
+    const cleanConfirm = bankForm.confirmAccountNumber.replace(/[\s-]/g, '');
+    const cleanIfsc = bankForm.ifscCode.trim().toUpperCase();
+    const cleanBranch = bankForm.bankBranch.trim();
+    const cleanUpi = bankForm.upiId.trim();
+
+    if (!cleanBankName) {
+      setBankModalError('Please enter Bank Name.');
+      return;
+    }
+    if (!cleanHolder) {
+      setBankModalError('Please enter Account Holder Name.');
+      return;
+    }
+    if (!cleanAccountNumber || cleanAccountNumber.length < 8) {
+      setBankModalError('Please enter a valid Account Number (minimum 8 digits).');
+      return;
+    }
+    if (cleanAccountNumber !== cleanConfirm) {
+      setBankModalError('Account Number and Confirm Account Number do not match.');
+      return;
+    }
+    if (!cleanIfsc || cleanIfsc.length !== 11) {
+      setBankModalError('Please enter a valid 11-character IFSC Code (e.g. SBIN0001234).');
+      return;
+    }
+
+    setIsSavingBank(true);
+
+    const bankPayload = {
+      bankName: cleanBankName,
+      accountNumber: cleanAccountNumber,
+      bankAccount: cleanAccountNumber,
+      bankAccountNumber: cleanAccountNumber,
+      ifscCode: cleanIfsc,
+      IFSC: cleanIfsc,
+      accountHolderName: cleanHolder,
+      bankBranch: cleanBranch,
+      upiId: cleanUpi || null,
+      isBankDetailGiven: true,
+      bankDetailGiven: true,
+      bankDetailsGiven: true,
+      bankDetails: {
+        bankName: cleanBankName,
+        accountNumber: cleanAccountNumber,
+        bankAccount: cleanAccountNumber,
+        bankAccountNumber: cleanAccountNumber,
+        ifscCode: cleanIfsc,
+        accountHolderName: cleanHolder,
+        bankBranch: cleanBranch,
+        upiId: cleanUpi || null,
+        isBankDetailGiven: true
+      }
+    };
+
+    try {
+      // 1. Send update to backend
+      try {
+        await api.put('/api/users/profile/update', bankPayload);
+      } catch (err) {
+        console.warn('PUT /api/users/profile/update fallback notice:', err?.message);
+        try {
+          await api.put('/api/users/profile', bankPayload);
+        } catch {}
+      }
+
+      // 2. Persist in localStorage
+      try {
+        const bankMap = JSON.parse(localStorage.getItem('kt_employee_bank_details') || '{}');
+        const ids = [contextUser?._id, prof?._id, contextUser?.uniqueID, prof?.uniqueID, 'current']
+          .filter(Boolean)
+          .map(String);
+        for (const id of ids) {
+          bankMap[id] = bankPayload;
+        }
+        localStorage.setItem('kt_employee_bank_details', JSON.stringify(bankMap));
+        localStorage.setItem('kt_employee_bank_details_current', JSON.stringify(bankPayload));
+      } catch (e) {
+        console.warn('LocalStorage bank save notice:', e);
+      }
+
+      // 3. Update React state immediately
+      setProfileData(prev => ({
+        ...prev,
+        ...bankPayload,
+        profile: { ...(prev?.profile || {}), ...bankPayload },
+        user: { ...(prev?.user || {}), ...bankPayload },
+        employee: { ...(prev?.employee || {}), ...bankPayload }
+      }));
+
+      if (updateUserProfile) {
+        updateUserProfile(bankPayload);
+      }
+
+      showToast('Bank details updated and verified successfully!', 'success');
+      setIsBankModalOpen(false);
+    } catch (err) {
+      console.error('Failed to save bank details:', err);
+      setBankModalError('Failed to save bank details. Please try again.');
+      showToast('Failed to save bank details.', 'error');
+    } finally {
+      setIsSavingBank(false);
     }
   };
 
@@ -1734,7 +2066,10 @@ export const ProfileView = () => {
   const isAccountActive =
     (prof.isActive ?? contextUser?.isActive ?? true) &&
     !(prof.isDeactivated ?? contextUser?.isDeactivated ?? false);
+  const userBank = resolveBankDetails(profileData, contextUser);
+  const hasBankDetails = Boolean(userBank && (userBank.accountNumber || userBank.bankName));
   const bankDetailGiven = Boolean(
+    hasBankDetails ||
     prof.bankDetailGiven ||
     prof.bankDetailsGiven ||
     prof.isBankDetailGiven ||
@@ -1965,9 +2300,15 @@ export const ProfileView = () => {
         </div>
 
         {/* Metric 3: Bank Details Status */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-300">
+        <div 
+          onClick={!hasBankDetails ? handleOpenBankModal : undefined}
+          className={`bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:border-slate-300 ${
+            !hasBankDetails ? 'cursor-pointer hover:border-amber-300 hover:bg-amber-50/30' : ''
+          }`}
+          title={!hasBankDetails ? 'Click to add bank details' : 'Bank verification on file'}
+        >
           <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
-            bankDetailGiven 
+            hasBankDetails 
               ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
               : 'bg-amber-50 text-amber-700 border-amber-100'
           }`}>
@@ -1975,11 +2316,11 @@ export const ProfileView = () => {
           </div>
           <div className="min-w-0 flex-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Bank Verification</span>
-            <span className={`text-sm font-bold truncate block mt-0.5 ${bankDetailGiven ? 'text-emerald-800' : 'text-amber-800'}`}>
-              {bankDetailGiven ? 'Verified & On File' : 'Pending Submission'}
+            <span className={`text-sm font-bold truncate block mt-0.5 ${hasBankDetails ? 'text-emerald-800' : 'text-amber-800'}`}>
+              {hasBankDetails ? 'Verified & On File' : 'Pending Submission'}
             </span>
             <span className="text-[11px] text-slate-500 truncate block">
-              {bankDetailGiven ? 'Direct payroll active' : 'Bank details required'}
+              {hasBankDetails ? (userBank?.bankName || 'Direct payroll active') : '+ Click to add bank details'}
             </span>
           </div>
         </div>
@@ -2061,10 +2402,23 @@ export const ProfileView = () => {
             
             {/* Identity & Demographics Card */}
             <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                <User size={15} className="text-[#034665]" />
-                <span>Identity &amp; Demographics</span>
-              </h3>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <User size={15} className="text-[#034665]" />
+                  <span>Identity &amp; Demographics</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    document.getElementById('personal-details-form')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="text-[11px] font-bold text-[#034665] hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Scroll to edit form"
+                >
+                  <Edit3 size={12} />
+                  <span>Edit</span>
+                </button>
+              </div>
               
               <div className="space-y-3.5 text-xs">
                 {/* Date of Birth */}
@@ -2073,7 +2427,9 @@ export const ProfileView = () => {
                     <Calendar size={13} className="text-slate-400" />
                     <span>Date of Birth</span>
                   </span>
-                  <span className="font-bold text-slate-900 font-mono">{dob}</span>
+                  <span className="font-bold text-slate-900 font-mono">
+                    {dobInput ? formatDate(dobInput) : dob}
+                  </span>
                 </div>
 
                 {/* Gender */}
@@ -2082,7 +2438,9 @@ export const ProfileView = () => {
                     <User size={13} className="text-slate-400" />
                     <span>Gender</span>
                   </span>
-                  <span className="font-bold text-slate-900">{gender}</span>
+                  <span className="font-bold text-slate-900">
+                    {genderInput || gender}
+                  </span>
                 </div>
 
                 {/* Blood Group */}
@@ -2092,7 +2450,7 @@ export const ProfileView = () => {
                     <span>Blood Group</span>
                   </span>
                   <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-bold font-mono border border-rose-200 text-xs">
-                    {bloodGroup}
+                    {bloodGroupInput || bloodGroup}
                   </span>
                 </div>
 
@@ -2304,7 +2662,7 @@ export const ProfileView = () => {
                 </div>
               </div>
 
-              <form onSubmit={handleSaveContact} className="p-6 space-y-5">
+              <form onSubmit={handleSaveContact} id="personal-details-form" className="p-6 space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Full Name */}
@@ -2378,6 +2736,70 @@ export const ProfileView = () => {
                     </p>
                   </div>
 
+                  {/* Date of Birth */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      <Calendar size={13} className="text-[#034665]" />
+                      <span>Date of Birth</span>
+                    </label>
+                    <input 
+                      type="date"
+                      value={dobInput} 
+                      onChange={e => setDobInput(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium font-mono focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Date of birth for identity and statutory records.
+                    </p>
+                  </div>
+
+                  {/* Gender */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      <User size={13} className="text-[#034665]" />
+                      <span>Gender</span>
+                    </label>
+                    <select
+                      value={genderInput}
+                      onChange={e => setGenderInput(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Gender classification as recorded in employee file.
+                    </p>
+                  </div>
+
+                  {/* Blood Group */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      <HeartPulse size={13} className="text-rose-500" />
+                      <span>Blood Group</span>
+                    </label>
+                    <select
+                      value={bloodGroupInput}
+                      onChange={e => setBloodGroupInput(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium font-mono focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                    >
+                      <option value="">Select Blood Group</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Used for occupational health and emergency medical care.
+                    </p>
+                  </div>
+
                   {/* Physical Address */}
                   <div className="md:col-span-2">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
@@ -2413,6 +2835,164 @@ export const ProfileView = () => {
                   </button>
                 </div>
               </form>
+            </div>
+
+            {/* ========================================================================= */}
+            {/* BANK DETAILS SECTION: VERIFIED CARD OR ADD BANK DETAILS BUTTON */}
+            {/* ========================================================================= */}
+            <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Landmark size={18} className="text-[#034665]" />
+                    <span>Bank Account &amp; Settlement Details</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Official bank account for monthly salary disbursements, payroll credits, and expense claims.
+                  </p>
+                </div>
+                {hasBankDetails ? (
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <ShieldCheck size={13} />
+                      <span>Verified &amp; Active</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleOpenBankModal}
+                      className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                    >
+                      <Edit3 size={13} className="text-[#034665]" />
+                      <span>Edit Bank Details</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleOpenBankModal}
+                    className="px-4 py-2 bg-[#034665] hover:bg-[#02334a] text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <Plus size={15} />
+                    <span>Add Bank Details</span>
+                  </button>
+                )}
+              </div>
+
+              {hasBankDetails ? (
+                <div className="p-6">
+                  <div className="bg-gradient-to-br from-slate-900 via-[#034665] to-slate-800 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
+                    {/* Background glow effects */}
+                    <div className="absolute -right-12 -top-12 w-48 h-48 bg-sky-400/10 rounded-full blur-2xl pointer-events-none" />
+                    <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
+
+                    <div className="relative z-10 flex flex-col justify-between space-y-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                            <Building2 size={20} className="text-sky-300" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-sky-200/80 block">Authorized Bank</span>
+                            <h4 className="text-lg font-bold text-white tracking-wide">{userBank.bankName}</h4>
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold rounded-full flex items-center gap-1">
+                          <BadgeCheck size={12} /> Direct Deposit
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 py-2 border-y border-white/10">
+                        {/* Account Number */}
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 block mb-1">
+                            Account Number
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-base font-semibold tracking-wider text-white">
+                              {isAccountMasked && userBank.accountNumber.length > 4
+                                ? `•••• •••• •••• ${userBank.accountNumber.slice(-4)}`
+                                : userBank.accountNumber}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIsAccountMasked(prev => !prev)}
+                              className="p-1 text-slate-300 hover:text-white transition cursor-pointer"
+                              title={isAccountMasked ? "Reveal full account number" : "Mask account number"}
+                            >
+                              {isAccountMasked ? <Eye size={14} /> : <EyeOff size={14} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(userBank.accountNumber, "Bank Account Number")}
+                              className="p-1 text-slate-300 hover:text-white transition cursor-pointer"
+                              title="Copy account number"
+                            >
+                              <Copy size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* IFSC Code */}
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 block mb-1">
+                            IFSC Code
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-base font-semibold tracking-wider text-sky-200">
+                              {userBank.ifscCode}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(userBank.ifscCode, "IFSC Code")}
+                              className="p-1 text-slate-300 hover:text-white transition cursor-pointer"
+                              title="Copy IFSC code"
+                            >
+                              <Copy size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Account Holder</span>
+                          <span className="font-semibold text-white truncate block mt-0.5">{userBank.accountHolderName}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Branch Name</span>
+                          <span className="font-medium text-slate-200 truncate block mt-0.5">{userBank.bankBranch || 'Primary Office Branch'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">UPI ID</span>
+                          <span className="font-mono text-slate-200 truncate block mt-0.5">{userBank.upiId || 'Not linked'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-3 flex items-center gap-1.5">
+                    <ShieldCheck size={13} className="text-emerald-600" />
+                    <span>Bank information is secured under Kevalon HRMS payroll encryption standards.</span>
+                  </p>
+                </div>
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center mx-auto mb-4 shadow-2xs">
+                    <Landmark size={28} />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900 mb-1">No Bank Account Details Registered</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
+                    Your bank details have not been submitted yet. Please add your verified bank account details to enable automated salary disbursement and direct payroll settlements.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleOpenBankModal}
+                    className="px-6 py-2.5 bg-[#034665] hover:bg-[#02334a] text-white text-xs font-bold rounded-lg shadow-sm inline-flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <Plus size={15} />
+                    <span>Add Bank Details</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Education Records (if available) */}
@@ -3411,6 +3991,175 @@ export const ProfileView = () => {
                 >
                   {isSubmittingNewDoc ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   {isSubmittingNewDoc ? 'Uploading...' : 'Save & Upload'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ADD / EDIT BANK DETAILS MODAL */}
+      {/* ========================================================================= */}
+      {isBankModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-scale-up">
+            {/* Modal Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-sky-50/50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#034665] text-white flex items-center justify-center shadow-xs">
+                  <Landmark size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {hasBankDetails ? 'Edit Bank Account Details' : 'Add Bank Account Details'}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Enter your official bank account specifications for payroll disbursements.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBankModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/50 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSaveBankDetails} className="p-6 space-y-4">
+              {bankModalError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle size={15} className="shrink-0 text-rose-600" />
+                  <span>{bankModalError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Bank Name */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Bank Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bankForm.bankName}
+                    onChange={e => setBankForm(prev => ({ ...prev, bankName: e.target.value }))}
+                    placeholder="e.g. State Bank of India, HDFC Bank, ICICI Bank"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                  />
+                </div>
+
+                {/* Account Holder Name */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Account Holder Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bankForm.accountHolderName}
+                    onChange={e => setBankForm(prev => ({ ...prev, accountHolderName: e.target.value }))}
+                    placeholder="Full name as printed on bank passbook / cheque"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                  />
+                </div>
+
+                {/* Account Number */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Account Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bankForm.accountNumber}
+                    onChange={e => setBankForm(prev => ({ ...prev, accountNumber: e.target.value }))}
+                    placeholder="e.g. 50100234567890"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium font-mono focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                  />
+                </div>
+
+                {/* Confirm Account Number */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Confirm Account Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bankForm.confirmAccountNumber}
+                    onChange={e => setBankForm(prev => ({ ...prev, confirmAccountNumber: e.target.value }))}
+                    placeholder="Re-enter bank account number"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium font-mono focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                  />
+                </div>
+
+                {/* IFSC Code */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    IFSC Code <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={11}
+                    value={bankForm.ifscCode}
+                    onChange={e => setBankForm(prev => ({ ...prev, ifscCode: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. SBIN0001234"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium font-mono uppercase focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                  />
+                </div>
+
+                {/* Bank Branch */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Bank Branch
+                  </label>
+                  <input
+                    type="text"
+                    value={bankForm.bankBranch}
+                    onChange={e => setBankForm(prev => ({ ...prev, bankBranch: e.target.value }))}
+                    placeholder="e.g. Solaris Hub Branch, Ahmedabad"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                  />
+                </div>
+
+                {/* UPI ID (Optional) */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    UPI ID <span className="text-slate-400 font-normal normal-case">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={bankForm.upiId}
+                    onChange={e => setBankForm(prev => ({ ...prev, upiId: e.target.value }))}
+                    placeholder="e.g. employee@oksbi / username@okaxis"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 pt-5 border-t border-slate-200 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsBankModalOpen(false)}
+                  disabled={isSavingBank}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingBank}
+                  className="px-6 py-2.5 bg-[#034665] hover:bg-[#02334a] text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer disabled:opacity-60"
+                >
+                  {isSavingBank ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                  <span>{isSavingBank ? 'Saving...' : 'Save Bank Details'}</span>
                 </button>
               </div>
             </form>

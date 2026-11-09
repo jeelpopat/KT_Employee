@@ -20,6 +20,21 @@
   animation: fadeIn 0.25s ease-out forwards;
 }
 
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.2s ease-out forwards;
+}
+
 /* Modal and Document Scrollbars */
 .profile-modal-scrollbar::-webkit-scrollbar {
   width: 6px;
