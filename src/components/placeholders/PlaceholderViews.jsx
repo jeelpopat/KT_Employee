@@ -13,6 +13,7 @@ import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
 import { ProjectView } from '../projects/ProjectView.jsx';
 import { calculateLeaveDays, expandHolidayDates } from '../../utils/holidayUtils.js';
+import { getHalfDayType, isHalfDayLeave } from '../../utils/leaveUtils.js';
 import {
   getLoggedInUserIdentifiers,
   fetchTeamsList,
@@ -2956,14 +2957,13 @@ export const TeamLeaveManagementView = () => {
             const tlStatus = getTlStatus(l);
             const isPending = tlStatus === 'pending';
             const tlRemark = l.teamLeadRemark || l.adminRemark || l.hrRemark || l.remark;
+            const isHalfDay = isHalfDayLeave(l);
+            const halfDayType = getHalfDayType(l);
             const totalDays = calculateLeaveDays(
               l.startDate,
               l.endDate,
               holidayDates,
-              l.isHalfDay === true ||
-                l.leaveType === 'half_day' ||
-                Number(l.totalDays) === 0.5 ||
-                ['first-half', 'second-half'].includes(String(l.halfDayType || '').toLowerCase())
+              isHalfDay
             );
 
             return (
@@ -3001,11 +3001,11 @@ export const TeamLeaveManagementView = () => {
                       </span>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${(l.leaveType === 'half_day' || l.isHalfDay)
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isHalfDay
                         ? 'bg-amber-100 text-amber-700'
                         : 'bg-indigo-100 text-indigo-700'
                       }`}>
-                      {(l.leaveType === 'half_day' || l.isHalfDay) ? 'Half Day Leave' : 'Full Day Leave'}
+                      {isHalfDay ? 'Half Day Leave' : 'Full Day Leave'}
                     </span>
 
                     {/* Status Badge */}
@@ -3029,9 +3029,13 @@ export const TeamLeaveManagementView = () => {
                       </span>
                       <span className="ml-2 text-slate-500">
                         ({totalDays} {totalDays === 1 || totalDays === 0.5 ? 'Day' : 'Days'})
-                        {l.isHalfDay && (
+                        {isHalfDay && (
                           <span className="ml-1 text-slate-500">
-                            • {l.halfDayType === 'second-half' ? 'Second Half' : 'First Half'}
+                            • {halfDayType === 'second-half'
+                              ? 'Second Half'
+                              : halfDayType === 'first-half'
+                                ? 'First Half'
+                                : 'Half Day'}
                           </span>
                         )}
                       </span>
@@ -3127,12 +3131,17 @@ export const TeamLeaveManagementView = () => {
                     actionModal.leave?.startDate,
                     actionModal.leave?.endDate,
                     holidayDates,
-                    actionModal.leave?.isHalfDay === true ||
-                      actionModal.leave?.leaveType === 'half_day' ||
-                      Number(actionModal.leave?.totalDays) === 0.5 ||
-                      ['first-half', 'second-half'].includes(String(actionModal.leave?.halfDayType || '').toLowerCase())
-                  )
-                } Days)
+                    isHalfDayLeave(actionModal.leave)
+                  )} {isHalfDayLeave(actionModal.leave) ? 'Day' : 'Days'}
+                {isHalfDayLeave(actionModal.leave) && (
+                  <span className="ml-1">
+                    • {getHalfDayType(actionModal.leave) === 'second-half'
+                      ? 'Second Half'
+                      : getHalfDayType(actionModal.leave) === 'first-half'
+                        ? 'First Half'
+                        : 'Half Day'}
+                  </span>
+                )})
               </p>
               <p className="text-slate-600 italic">
                 "{actionModal.leave?.reason}"

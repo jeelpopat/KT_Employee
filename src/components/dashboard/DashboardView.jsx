@@ -26,6 +26,7 @@ import {
   alignBreakRecordsToShift
 } from '../../utils/timelineUtils.js';
 import { filterOutFinanceUsers, filterOutUnknownUsers } from '../../utils/roleFilters.js';
+import { getHalfDayType, isHalfDayLeave } from '../../utils/leaveUtils.js';
 
 const parseBirthdayDate = (value) => {
   if (!value) return null;
@@ -1750,9 +1751,10 @@ export const DashboardView = () => {
             photo = cleanPhotoUrl(l.profilePhoto || l.photoUrl || '');
           }
 
-          const isHalf = Boolean(l.isHalfDay || l.leaveType === 'half_day');
+          const isHalf = isHalfDayLeave(l);
+          const halfDayType = getHalfDayType(l);
           const leaveDisplay = isHalf
-            ? `Half Day${l.halfDayType === 'second-half' ? ' (2nd Half)' : l.halfDayType === 'first-half' ? ' (1st Half)' : ''}`
+            ? `Half Day${halfDayType === 'second-half' ? ' (2nd Half)' : halfDayType === 'first-half' ? ' (1st Half)' : ''}`
             : 'Full Day';
           return {
             _id: l._id || idStr,

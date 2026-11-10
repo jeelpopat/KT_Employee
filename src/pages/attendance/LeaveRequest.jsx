@@ -32,6 +32,12 @@ import {
 } from "../../utils/teamLeadUtils";
 import { BASE_URL } from "../../api/config";
 import { calculateLeaveDays, expandHolidayDates } from "../../utils/holidayUtils.js";
+import {
+  getHalfDayType,
+  getLeaveDurationPayload,
+  isHalfDayLeave,
+  normalizeHalfDayType,
+} from "../../utils/leaveUtils.js";
 
 const LEAVE_BASE_URL = `${BASE_URL}/api/leave`;
 
@@ -151,12 +157,7 @@ const formatLeaveType = (type) =>
 
 const getCanonicalLeaveType = (type, leave) => {
   const rawLeave = leave?.rawLeave || leave || {};
-  const totalDays = Number(rawLeave.totalDays ?? leave?.totalDays);
-  const halfDayType = String(rawLeave.halfDayType || leave?.halfDayType || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s]+/g, "-");
-  const isHalfDay = isHalfDayLeave(rawLeave, leave, totalDays, halfDayType);
+  const isHalfDay = isHalfDayLeave(rawLeave) || isHalfDayLeave(leave);
 
   if (isHalfDay || String(type || "").toLowerCase().includes("half")) {
     return "Half Day";
@@ -175,11 +176,8 @@ const formatDuration = (leave) => {
 
   const rawLeave = leave?.rawLeave || leave || {};
   const totalDays = Number(rawLeave?.totalDays ?? leave?.totalDays ?? 0);
-  const halfType = String(rawLeave?.halfDayType || leave?.halfDayType || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s]+/g, "-");
-  const isHalf = isHalfDayLeave(rawLeave, leave, totalDays, halfType);
+  const halfType = getHalfDayType({ ...leave, ...rawLeave });
+  const isHalf = isHalfDayLeave(rawLeave) || isHalfDayLeave(leave);
 
   if (isHalf) {
     if (halfType === "first-half") return "0.5 Day (First Half)";
@@ -201,11 +199,8 @@ const renderDuration = (leave) => {
 
   const rawLeave = leave?.rawLeave || leave || {};
   const totalDays = Number(rawLeave?.totalDays ?? leave?.totalDays ?? 0);
-  const halfType = String(rawLeave?.halfDayType || leave?.halfDayType || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s]+/g, "-");
-  const isHalf = isHalfDayLeave(rawLeave, leave, totalDays, halfType);
+  const halfType = getHalfDayType({ ...leave, ...rawLeave });
+  const isHalf = isHalfDayLeave(rawLeave) || isHalfDayLeave(leave);
 
   if (isHalf) {
     const shiftLabel =
@@ -233,13 +228,6 @@ const renderDuration = (leave) => {
     </span>
   );
 };
-
-const isHalfDayLeave = (rawLeave, leave, totalDays, halfDayType) =>
-  rawLeave?.isHalfDay === true ||
-  leave?.isHalfDay === true ||
-  totalDays === 0.5 ||
-  halfDayType === "first-half" ||
-  halfDayType === "second-half";
 
 const getLeaveDateIssue = (startDate, endDate) => {
   const parseLeaveDate = (value) => {
@@ -413,15 +401,17 @@ export default function LeaveRequest() {
     setCreateSubmitting(true);
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
+      const durationPayload = getLeaveDurationPayload(
+        createFormData.isHalfDay,
+        normalizeHalfDayType(createFormData.halfDayType),
+        calculatedCreateDays
+      );
       const payload = {
         userId: createFormData.employeeId,
         employeeId: createFormData.employeeId,
-        leaveType: "full_day",
+        ...durationPayload,
         startDate: createFormData.startDate,
         endDate: finalEndDate,
-        isHalfDay: Boolean(createFormData.isHalfDay),
-        halfDayType: createFormData.isHalfDay ? createFormData.halfDayType : null,
-        totalDays: createFormData.isHalfDay ? 0.5 : Number(calculatedCreateDays),
         reason: createFormData.reason.trim() || `Leave created by ${loggedRole.toUpperCase()}`,
         status: createFormData.directApprove ? "approved" : "pending",
         autoApprove: Boolean(createFormData.directApprove),
@@ -820,11 +810,9 @@ export default function LeaveRequest() {
               leave
             ),
 
-            isHalfDay: leave?.isHalfDay === true ||
-              Number(leave?.totalDays) === 0.5 ||
-              ["first-half", "second-half"].includes(String(leave?.halfDayType || "").trim().toLowerCase().replace(/[_\s]+/g, "-")),
+            isHalfDay: isHalfDayLeave(leave),
 
-            halfDayType: leave?.halfDayType || "",
+            halfDayType: getHalfDayType(leave),
 
             startDate:
               leave?.startDate ||
@@ -845,12 +833,7 @@ export default function LeaveRequest() {
               leave?.startDate || leave?.fromDate,
               leave?.endDate || leave?.toDate,
               currentHolidayDates,
-              leave?.isHalfDay === true ||
-                leave?.leaveType === "half_day" ||
-                Number(leave?.totalDays) === 0.5 ||
-                ["first-half", "second-half"].includes(
-                  String(leave?.halfDayType || "").trim().toLowerCase().replace(/[_\s]+/g, "-")
-                )
+              isHalfDayLeave(leave)
             ),
 
             reason: leave?.reason || "",
@@ -3015,13 +2998,15 @@ export default function LeaveRequest() {
                     {actionModal.leave.name}
                   </p>
                   <p className="text-slate-500 font-poppins mt-0.5">
-                    {formatRole(actionModal.leave.role)} • {formatLeaveType(actionModal.leave.leaveType)}
+                    {formatRole(actionModal.leave.role)} • {getCanonicalLeaveType(
+                      formatLeaveType(actionModal.leave.leaveType),
+                      actionModal.leave
+                    )}
                   </p>
                 </div>
                 <div className="text-right">
                   <span className="inline-block px-2.5 py-0.5 rounded-full bg-white border border-slate-200 font-bold text-slate-800 text-xs font-poppins">
-                    {actionModal.leave.totalDays}{" "}
-                    {actionModal.leave.totalDays === 1 ? "Day" : "Days"}
+                    {formatDuration(actionModal.leave)}
                   </span>
                   <p className="text-[11px] text-slate-500 font-poppins mt-1">
                     {formatDate(actionModal.leave.startDate)} -{" "}
