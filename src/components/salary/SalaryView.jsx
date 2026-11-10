@@ -1497,168 +1497,175 @@ export const SalaryView = () => {
   // 4. GENERATE PAYSLIP HTML HELPER FOR PRINT & PDF
   // ==========================================
 
-  const generatePayslipHtml = (slip) => {
-    const staffName = slip.userObj?.name || 'Staff Member';
-    const staffEmail = slip.userObj?.email || '—';
-    const roleTitle = getRoleLabel(slip.userObj);
+  const generatePayslipHtml = (slip, autoPrint = true) => {
+    const staff = slip.userObj || slip.employeeId || slip.userId || {};
+    const staffName = staff.name || staff.fullName || resolveEmployeeName(staff);
     const period = formatMonthYear(slip.month, slip.year);
-    const issueDate = formatDate(slip.createdAt || new Date());
     const previewValues = getPayrollPreviewValues(slip);
-    const grossVal = previewValues.grossSalary;
-    const netVal = previewValues.netSalary;
-    const earnedBaseSalary = previewValues.earnedBaseSalary;
-    const basicVal = slip.basicSalary;
-    const hraVal = slip.hra;
-    const allowVal = slip.allowance;
-    const fixBonusVal = slip.fixedBonus;
-    const extBonusVal = slip.extraBonus;
     const deductionBreakdown = getPayrollDeductionBreakdown(slip);
-    const customDeductionsHtml = deductionBreakdown.customDeductionsList && deductionBreakdown.customDeductionsList.length > 0
-      ? `
-      <div style="margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
-        <div class="col-title deductions-title" style="font-size: 10px; color: #991b1b; border-color: #fca5a5;">Additional Employee Deductions</div>
-        <table>
-          <tbody>
-            ${deductionBreakdown.customDeductionsList.map((d) => `<tr><td>${d.deductionMasterId?.name || d.name || 'Employee Deduction'} <span style="font-size: 10px; color: #64748b;">(${formatDate(d.incidentDate || d.date || d.createdAt)})</span></td><td class="amount" style="color: #dc2626;">-${formatINR(d.amount)}</td></tr>`).join('')}
-            <tr class="total-row" style="font-size: 11px; border-top: 1px solid #cbd5e1;"><td>Employee Deduction Total</td><td class="amount" style="color: #dc2626;">-${formatINR(deductionBreakdown.customDeductionTotal)}</td></tr>
-          </tbody>
-        </table>
-      </div>
-      `
-      : '';
-
-    const deductionRows = deductionBreakdown.components
-      .filter((item) => (item.amount > 0 || item.key === 'fixedDeduction' || item.key === 'tdsAmount') && !item.isCustom && item.key !== 'appliedPenalty')
-      .map((item) => {
-        const label = item.key === 'tdsAmount' ? `${item.label} (${deductionBreakdown.tdsPercentage}%)` : item.label;
-        return `<tr><td>${label}</td><td class="amount" style="color: #dc2626;">-${formatINR(item.amount)}</td></tr>`;
-      })
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[character]);
+    const displayValue = (value) => {
+      if (!value || typeof value !== 'object') return value;
+      return value.designationName || value.departmentName || value.name || value.title || value.displayName || '';
+    };
+    const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== '';
+    const positiveAmount = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
+    const amountRows = (items) => items
+      .filter((item) => hasValue(item.value) && positiveAmount(item.value))
+      .map((item) => `<tr><td>${escapeHtml(item.label)}</td><td class="amount">${escapeHtml(formatINR(item.value))}</td></tr>`)
       .join('');
-    const reconciliationRow = Math.abs(deductionBreakdown.reconciliation) >= 0.01
-      ? `<tr><td>Unitemized Deduction Reconciliation</td><td class="amount" style="color: #dc2626;">${deductionBreakdown.reconciliation > 0 ? '-' : '+'}${formatINR(Math.abs(deductionBreakdown.reconciliation))}</td></tr>`
-      : '';
-    const penaltyVal = previewValues.appliedPenalty;
-    const penaltyDateVal = slip.penaltyDate || slip.incidentDate || null;
-    const penaltyHtmlRow = penaltyVal != null ? `<tr><td>Applied Penalty ${penaltyDateVal ? `(${formatDate(penaltyDateVal)})` : ''}</td><td class="amount" style="color: #dc2626;">-${formatINR(penaltyVal)}</td></tr>` : '';
-    const proposedPenaltyHtmlRow = previewValues.proposedPenalty != null
-      ? `<tr><td>Proposed Penalty (not applied)</td><td class="amount">${formatINR(previewValues.proposedPenalty)}</td></tr>`
-      : '';
-    const totDedVal = deductionBreakdown.totalDeduction;
+    const infoFields = [
+      ['Employee Name', staffName],
+      ['Employee ID', staff.uniqueID || staff.employeeID || staff.employeeCode || slip.employeeIdentifierSnapshot],
+      ['Department', displayValue(staff.department || slip.department)],
+      ['Designation', displayValue(staff.designation || staff.role)],
+      ['Email', staff.email || slip.employeeEmailSnapshot],
+      ['Month & Year', period],
+      ['Voucher No.', slip.voucherNumber || slip.payslipNumber || slip.slipNumber],
+      ['Date', slip.paidAt || slip.createdAt ? formatDate(slip.paidAt || slip.createdAt) : null],
+      ['Status', slip.status],
+    ].filter(([, value]) => hasValue(value));
+    const fieldHtml = infoFields
+      .map(([label, value]) => `<div class="info-field"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
+      .join('');
 
-    const slipStatus = String(slip?.status || 'processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed';
+    const earnings = [
+      { label: 'Basic Salary', value: slip.basicSalary },
+      { label: 'HRA', value: slip.hra },
+      { label: 'Conveyance Allowance', value: slip.conveyanceAllowance },
+      { label: 'Medical Allowance', value: slip.medicalAllowance },
+      { label: 'Special Allowance', value: slip.specialAllowance ?? slip.allowance },
+      { label: 'Dearness Allowance', value: slip.dearnessAllowance },
+      { label: 'Other Allowance', value: slip.otherAllowances },
+    ];
+    if (!earnings.some((item) => positiveAmount(item.value))) {
+      earnings.push({
+        label: 'Salary',
+        value: previewValues.monthlySalary ?? previewValues.grossSalary,
+      });
+    }
+    const deductions = deductionBreakdown.components
+      .filter((item) => !item.isCustom && item.key !== 'appliedPenalty')
+      .map((item) => ({
+        label: item.key === 'tdsAmount' && positiveAmount(deductionBreakdown.tdsPercentage)
+          ? `${item.label} (${deductionBreakdown.tdsPercentage}%)`
+          : item.label,
+        value: item.amount,
+      }));
+    if (positiveAmount(previewValues.appliedPenalty)) {
+      deductions.push({ label: 'Applied Penalty', value: previewValues.appliedPenalty });
+    }
+    deductions.push(...(deductionBreakdown.customDeductionsList || []).map((item) => ({
+      label: item.deductionMasterId?.name || item.name || 'Employee Deduction',
+      value: item.amount,
+    })));
+    const extras = [
+      { label: 'Extra Allowance', value: slip.extraAllowance },
+      { label: 'Overtime', value: slip.overtime },
+      { label: 'Bonus', value: slip.fixedBonus ?? slip.extraBonus ?? slip.bonus },
+      { label: 'Incentive', value: slip.incentive },
+      { label: 'Arrears', value: slip.arrears },
+    ].filter((item) => positiveAmount(item.value));
+    if (extras.length === 0 && positiveAmount(slip.extraEarnings)) {
+      extras.push({ label: 'Other Extra', value: slip.extraEarnings });
+    }
+    const rowHtml = (items, totalLabel, totalValue) => {
+      const rows = amountRows(items);
+      const totalRow = hasValue(totalValue)
+        ? `<tr class="total-row"><td>${escapeHtml(totalLabel)}</td><td class="amount">${escapeHtml(formatINR(totalValue))}</td></tr>`
+        : '';
+      return `${rows}${totalRow}`;
+    };
+    const paymentFields = [
+      ['Payment Mode', slip.paymentMode],
+      ['Bank Name', staff.bankName || slip.bankName],
+      ['Payment Reference / UTR', slip.utrNumber || slip.transactionReference || slip.paymentReference],
+      ['Payment Date', slip.paidAt ? formatDate(slip.paidAt) : null],
+      ['Remarks', slip.remarks],
+    ].filter(([, value]) => hasValue(value));
+    const paymentHtml = paymentFields.length
+      ? `<section class="payment"><h2>D. Payment Details</h2><div class="payment-grid">${paymentFields.map(([label, value]) => `<div class="info-field"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</div></section>`
+      : '';
+    const netAmount = positiveAmount(previewValues.netSalary) ? formatINR(previewValues.netSalary) : '';
+    const title = ['Salary Payment Voucher', period, staffName].filter(hasValue).map(escapeHtml).join(' - ');
+    const printScript = autoPrint ? '<script>window.onload = function() { window.print(); };</script>' : '';
+    const salaryTotal = earnings.reduce((sum, item) => sum + (positiveAmount(item.value) ? Number(item.value) : 0), 0);
+    const extraTotal = extras.reduce((sum, item) => sum + (positiveAmount(item.value) ? Number(item.value) : 0), 0);
+    const tablePanels = [
+      { className: 'earnings', title: 'A. SALARY DETAILS', items: earnings, totalLabel: 'TOTAL SALARY (A)', total: salaryTotal },
+      { className: 'deductions', title: 'B. DEDUCTION DETAILS', items: deductions, totalLabel: 'TOTAL DEDUCTION (B)', total: deductionBreakdown.totalDeduction },
+      { className: 'extras', title: 'C. EXTRA / ADDITIONAL PAYMENT', items: extras, totalLabel: 'TOTAL EXTRA (C)', total: extraTotal },
+    ].filter((panel) => panel.items.some((item) => positiveAmount(item.value)) || positiveAmount(panel.total));
+    const tablesHtml = tablePanels.map((panel) => `
+      <div class="panel ${panel.className}">
+        <h2>${escapeHtml(panel.title)}</h2>
+        <table><thead><tr><th>PARTICULARS</th><th class="amount">AMOUNT (₹)</th></tr></thead>
+          <tbody>${rowHtml(panel.items, panel.totalLabel, positiveAmount(panel.total) ? panel.total : null)}</tbody>
+        </table>
+      </div>`).join('');
 
     return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Payslip_${period.replace(/\\s+/g, '_')}_${staffName.replace(/\\s+/g, '_')}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title}</title>
   <style>
-    @page { size: A4; margin: 15mm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 20px; font-size: 13px; line-height: 1.5; background: #fff; }
-    .header { border-bottom: 2px solid #4f46e5; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-    .company-title { font-size: 22px; font-weight: 800; color: #4338ca; letter-spacing: -0.5px; }
-    .sub-title { font-size: 13px; color: #64748b; font-weight: 500; margin-top: 2px; }
-    .status-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #dcfce7; color: #15803d; font-weight: 700; font-size: 11px; text-transform: uppercase; border: 1px solid #bbf7d0; }
-    .info-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; }
-    .info-group h4 { margin: 0; font-size: 15px; font-weight: 700; color: #1e293b; }
-    .info-group p { margin: 3px 0 0 0; color: #64748b; font-size: 12px; }
-    .table-grid { display: flex; gap: 20px; margin-bottom: 24px; }
-    .table-col { flex: 1; }
-    .col-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 8px; border-bottom: 2px solid #cbd5e1; margin-bottom: 8px; }
-    .earnings-title { color: #166534; border-color: #86efac; }
-    .deductions-title { color: #991b1b; border-color: #fca5a5; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    td { padding: 8px 4px; border-bottom: 1px solid #f1f5f9; }
-    td.amount { text-align: right; font-family: monospace; font-weight: 600; }
-    .total-row { border-top: 2px solid #e2e8f0; font-weight: 700; font-size: 13px; }
-    .total-row td { padding-top: 10px; }
-    .net-box { background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 10px; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
-    .net-label { font-size: 12px; font-weight: 700; color: #065f46; text-transform: uppercase; }
-    .net-amount { font-size: 26px; font-weight: 900; color: #047857; font-family: monospace; }
-    .footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 11px; }
-    @media print { body { padding: 0; } }
+    * { box-sizing: border-box; }
+    @page { size: A4; margin: 9mm; }
+    body { margin: 0; padding: 20px; background: #eaf0f6; color: #163047; font: 12px/1.4 Arial, Helvetica, sans-serif; }
+    .voucher { max-width: 1000px; margin: 0 auto; padding: 18px; border: 1px solid #93aec2; background: white; }
+    .brand { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 8px 12px 14px; border-bottom: 2px solid #0a557d; }
+    .brand-name { color: #075985; font-size: 18px; font-weight: 800; letter-spacing: .04em; }
+    .brand-sub { color: #557386; font-size: 10px; }
+    .voucher-title { padding: 9px 18px; background: linear-gradient(110deg, #064c73, #0d709e); color: white; text-align: center; font-size: 20px; font-weight: 800; letter-spacing: .04em; }
+    .info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 12px 0; padding: 10px 12px; border: 1px solid #bdd4e5; background: #f1f8fd; }
+    .info-field { display: flex; min-width: 0; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid #d5e4ef; }
+    .info-field span { color: #466277; }
+    .info-field strong { overflow-wrap: anywhere; color: #14324a; text-align: right; }
+    .tables { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .panel { overflow: hidden; border: 1px solid #aac2d4; }
+    .panel h2 { margin: 0; padding: 8px 9px; color: white; font-size: 11px; letter-spacing: .04em; }
+    .earnings h2 { background: #075985; }
+    .deductions h2 { background: #be3155; }
+    .extras h2 { background: #138557; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 6px; background: #e9f1f7; color: #28465c; font-size: 9px; text-align: left; }
+    td { padding: 7px 6px; border-top: 1px solid #dce7ee; font-size: 10px; }
+    td.amount { text-align: right; white-space: nowrap; font-weight: 700; }
+    .total-row td { background: #f0f7fb; font-weight: 800; }
+    .deductions .total-row td { background: #fff0f3; }
+    .extras .total-row td { background: #effbf5; }
+    .net { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; padding: 12px 16px; border: 1px solid #78a8c7; background: linear-gradient(110deg, #064c73, #eaf6ff 55%); }
+    .net-label { color: white; font-size: 14px; font-weight: 800; }
+    .net-amount { color: #073f62; font-size: 22px; font-weight: 900; }
+    .payment { margin-top: 12px; border: 1px solid #c8d6e5; }
+    .payment h2 { margin: 0; padding: 8px 10px; background: #eef0ff; color: #273f88; font-size: 11px; }
+    .payment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; padding: 4px 10px; }
+    .digital-note { padding-top: 10px; color: #607789; font-size: 9px; text-align: center; }
+    @media (max-width: 640px) { body { padding: 8px; } .voucher { padding: 10px; } .tables { grid-template-columns: 1fr; } .info, .payment-grid { grid-template-columns: 1fr; } .net-label { font-size: 11px; } .net-amount { font-size: 18px; } }
+    @media print { body { padding: 0; background: white; } .voucher { max-width: none; padding: 0; border: 0; } .panel, .info, .payment, .net { break-inside: avoid; } }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div>
-      <div class="company-title">Kevalon Technology Pvt. Ltd.</div>
-      <div class="sub-title">Monthly Employee Compensation Statement</div>
-    </div>
-    <div style="text-align: right;">
-      <div style="font-size: 14px; font-weight: 700;">${period}</div>
-      <div style="margin-top: 4px;"><span class="status-badge" style="${slipStatus === 'Paid' ? 'background: #dcfce7; color: #15803d; border-color: #bbf7d0;' : 'background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe;'}">Status: ${slipStatus}</span></div>
-    </div>
-  </div>
-
-  <div class="info-card">
-    <div class="info-group">
-      <h4>${staffName}</h4>
-      <p>Role: ${roleTitle} • Email: ${staffEmail}</p>
-    </div>
-    <div class="info-group" style="text-align: right;">
-      <p style="margin: 0;">Disbursement Date: <strong>${issueDate}</strong></p>
-      <p>Payment Mode: <strong>Direct Bank Transfer</strong></p>
-    </div>
-  </div>
-
-  <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 16px; margin-top: -14px; margin-bottom: 20px; display: flex; justify-content: space-between; font-size: 11px; flex-wrap: wrap; gap: 8px;">
-    <div>Calendar Days: <strong>${previewValues.calendarDays ?? '—'}</strong></div>
-    <div>Sundays: <strong>${previewValues.sundays ?? '—'}</strong></div>
-    <div>Configured Holiday Days (excluding Sundays; includes Saturday holidays): <strong>${previewValues.holidayDays ?? '—'}</strong></div>
-    <div>Working Days / Calculation Divisor: <strong>${previewValues.workingDays ?? '—'}</strong></div>
-    <div>Per Day Salary: <strong>${formatINR(previewValues.perDaySalary)}</strong></div>
-    <div>Approved Unpaid Leave Days: <strong>${previewValues.approvedLeaveDays ?? '—'}</strong></div>
-    <div>Unauthorized Full-Day Incidents: <strong>${previewValues.unauthorizedFullDays ?? '—'}</strong></div>
-    <div>Unauthorized Half-Day Incidents: <strong>${previewValues.unauthorizedHalfDays ?? '—'}</strong></div>
-    <div>Actual Absence Days: <strong>${previewValues.unauthorizedAbsenceDays ?? '—'}</strong></div>
-    <div>Payable Days: <strong>${previewValues.daysPayable ?? '—'}</strong></div>
-  </div>
-
-  <div class="table-grid">
-    <div class="table-col">
-      <div class="col-title earnings-title">Earnings (Credits)</div>
-      <table>
-        <tbody>
-          <tr><td>Monthly Contracted Salary</td><td class="amount">${formatINR(previewValues.monthlySalary)}</td></tr>
-          <tr><td>Earned Base Salary (informational)</td><td class="amount">${formatINR(earnedBaseSalary)}</td></tr>
-          <tr><td>Basic Pay</td><td class="amount">${formatINR(basicVal)}</td></tr>
-          <tr><td>House Rent Allowance (HRA)</td><td class="amount">${formatINR(hraVal)}</td></tr>
-          <tr><td>Special Allowance</td><td class="amount">${formatINR(allowVal)}</td></tr>
-          <tr><td>Fixed Monthly Bonus</td><td class="amount">${formatINR(fixBonusVal)}</td></tr>
-          ${extBonusVal > 0 ? `<tr><td>Extra Incentive</td><td class="amount">+${formatINR(extBonusVal)}</td></tr>` : ''}
-          <tr class="total-row"><td>Gross Earnings</td><td class="amount" style="color: #4338ca;">${formatINR(grossVal)}</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="table-col">
-      <div class="col-title deductions-title">Deductions (Debits)</div>
-      <table>
-        <tbody>
-          ${deductionRows}${proposedPenaltyHtmlRow}${penaltyHtmlRow}${reconciliationRow}
-          <tr class="total-row"><td>Total Deductions</td><td class="amount" style="color: #dc2626;">${totDedVal == null ? '—' : `-${formatINR(totDedVal)}`}</td></tr>
-        </tbody>
-      </table>
-      ${customDeductionsHtml}
-    </div>
-  </div>
-
-  <div class="net-box">
-    <div>
-      <div class="net-label">Net Take-Home Salary</div>
-      <div style="font-size: 11px; color: #047857; margin-top: 2px;">Credited to employee bank account</div>
-    </div>
-    <div class="net-amount">${formatINR(netVal)}</div>
-  </div>
-
-  <div class="footer">
-    This is an officially verified computer-generated payslip statement issued by Kevalon Technology Pvt. Ltd. and requires no physical signature.
-  </div>
-
-  <script>
-    window.onload = function() { window.print(); };
-  </script>
+  <main class="voucher">
+    <header class="brand">
+      <div><div class="brand-name">KEVALON</div><div class="brand-sub">TECHNOLOGY</div></div>
+      <div class="voucher-title">EMPLOYEE SALARY PAYMENT VOUCHER</div>
+    </header>
+    ${fieldHtml ? `<section class="info">${fieldHtml}</section>` : ''}
+    ${tablesHtml ? `<section class="tables">${tablesHtml}</section>` : ''}
+    ${netAmount ? `<section class="net"><div class="net-label">NET PAYABLE AMOUNT</div><div class="net-amount">${escapeHtml(netAmount)}</div></section>` : ''}
+    ${paymentHtml}
+    <footer class="digital-note">This is a digitally generated salary slip. No signature is required.</footer>
+  </main>
+  ${printScript}
 </body>
 </html>`;
   };
@@ -2095,17 +2102,6 @@ export const SalaryView = () => {
         } catch (errGen) {
           console.warn('Auto payslip generate notice on download:', errGen);
         }
-      }
-
-      // Check if slip returned a direct hosted PDF URL
-      const directPdfUrl = slip?.pdfUrl || slip?.pdf || slip?.fileUrl || slip?.downloadUrl || slip?.file;
-      if (directPdfUrl && typeof directPdfUrl === 'string' && directPdfUrl.startsWith('http')) {
-        window.open(directPdfUrl, '_blank');
-        setNotification({
-          type: 'success',
-          message: 'Official backend PDF opened for download.'
-        });
-        return;
       }
 
       // 3. Download the official backend PDF binary format
@@ -4676,7 +4672,7 @@ export const SalaryView = () => {
             onClick={() => setViewingPayslipModal(null)}
           >
             <div
-              className="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
+              className="bg-white border border-slate-200 rounded-2xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
@@ -4705,8 +4701,12 @@ export const SalaryView = () => {
                 </button>
               </div>
 
-              {/* Modal Content - 13 Items Breakdown */}
-              <div id="printable-payslip-content" className="p-6 overflow-y-auto space-y-4 text-xs bg-white">
+              <iframe
+                title="Salary payment voucher preview"
+                srcDoc={generatePayslipHtml(slip, false)}
+                className="min-h-[65vh] w-full flex-1 bg-slate-100"
+              />
+              <div id="printable-payslip-content" className="hidden">
                 {/* Employee & Company Header Bar */}
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
