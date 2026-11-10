@@ -538,17 +538,21 @@ export const LeaveManagementView = () => {
 
     const finalHalfDayType = isHalfDayActive ? (halfDayType || 'first-half') : null;
 
+    // Determine the leaveType value to send:
+    //   Full Day            → 'full_day'
+    //   Half Day, 1st half  → '1st half'
+    //   Half Day, 2nd half  → '2nd half'
+    const resolvedLeaveType = isHalfDayActive
+      ? (finalHalfDayType === 'second-half' ? '2nd half' : '1st half')
+      : 'full_day';
+
     try {
-      // Sending exact payload mapped strictly to Mongoose Leave Schema
-      // Note: Backend LeaveSchema requires leaveType: 'full_day' (enum validation accepts 'full_day').
-      // When leaveType was 'half_day', backend fell back to invalid enum 'casual'.
-      // Half-day leave is properly signaled by isHalfDay: true, halfDayType, and totalDays: 0.5.
       const payload = {
         applicantRole: resolveApplicantRole(),
-        leaveType: 'full_day',
-        leaveCategory: 'full_day',
-        category: 'full_day',
-        type: 'full_day',
+        leaveType: resolvedLeaveType,
+        leaveCategory: resolvedLeaveType,
+        category: resolvedLeaveType,
+        type: resolvedLeaveType,
         startDate: startDate,
         endDate: finalEndDate,
         isHalfDay: isHalfDayActive,
