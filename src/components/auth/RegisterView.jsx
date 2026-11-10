@@ -103,7 +103,7 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
 
       // Try /api/auth/register first, fallback to /api/users/register
       try {
-        await api.post('/api/users/register', payload);
+        await api.post('/api/auth/register', payload);
       } catch (authErr) {
         if (authErr.response?.status === 404) {
           await api.post('/api/users/register', payload);
