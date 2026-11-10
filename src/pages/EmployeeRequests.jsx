@@ -2065,7 +2065,7 @@ const EmployeeRequests = () => {
     });
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-7 pb-6">
       {/* Floating Success Toast */}
       {successNotification && (
         <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg border text-xs sm:text-sm font-medium bg-emerald-50 text-emerald-800 border-emerald-200 animate-in fade-in slide-in-from-top-4">
@@ -2074,93 +2074,128 @@ const EmployeeRequests = () => {
         </div>
       )}
 
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#e0f2fe] text-[#004b73] flex items-center justify-center shrink-0">
-            <UserCheck size={18} />
+      {/* Page heading */}
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-sky-50 px-5 py-5 shadow-sm sm:px-7 sm:py-6">
+        <div className="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-sky-100/70 blur-3xl" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#075985] to-[#0284c7] text-white shadow-lg shadow-sky-900/15 sm:h-14 sm:w-14">
+              <UserCheck size={24} />
+            </div>
+            <div className="min-w-0">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">People management</span>
+                {stats.pending > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                    {stats.pending} awaiting review
+                  </span>
+                )}
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Employee Requests</h1>
+              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm">
+                Review new staff accounts, assign team leads, and confirm organization details.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Employee Requests
-            </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-              Review, authorize, and assign company & branch details for new staff accounts
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 shadow-xs border border-slate-200/80">
-            <Users className="h-4 w-4 text-slate-400" />
-            <span className="text-xs sm:text-sm text-slate-500">Total:</span>
-            <span className="text-xs sm:text-sm font-bold text-slate-900">
-              {stats.total}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 shadow-xs border border-slate-200/80">
-            <Clock className="h-4 w-4 text-slate-400" />
-            <span className="text-xs sm:text-sm text-slate-500">Pending:</span>
-            <span className="text-xs sm:text-sm font-bold text-slate-900">
-              {stats.pending}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 shadow-xs border border-slate-200/80">
-            <CheckCircle className="h-4 w-4 text-slate-400" />
-            <span className="text-xs sm:text-sm text-slate-500">Approved:</span>
-            <span className="text-xs sm:text-sm font-bold text-slate-900">
-              {stats.approved}
-            </span>
+          <div className="flex shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200/80 bg-white/80 px-3.5 py-2.5 shadow-sm sm:self-center">
+            <Users className="h-4 w-4 text-sky-700" />
+            <span className="text-xs font-medium text-slate-500">All requests</span>
+            <span className="text-sm font-bold tabular-nums text-slate-900">{stats.total}</span>
           </div>
         </div>
       </div>
 
-      {/* 3 METRIC CARDS (UI Standard Design, Clickable to Filter) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+      {/* Request metrics */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         {[
-          { key: 'all', label: 'TOTAL REQUESTS', value: stats.total },
-          { key: 'pending', label: 'PENDING', value: stats.pending },
-          { key: 'approved', label: 'APPROVED', value: stats.approved },
+          {
+            key: 'all',
+            label: 'Total requests',
+            caption: 'All employee accounts',
+            value: stats.total,
+            Icon: Users,
+            activeClass: 'border-sky-300 bg-sky-50/70 ring-2 ring-sky-100',
+            iconClass: 'bg-sky-100 text-sky-700',
+            valueClass: 'text-slate-950',
+          },
+          {
+            key: 'pending',
+            label: 'Pending review',
+            caption: 'Require your attention',
+            value: stats.pending,
+            Icon: Clock,
+            activeClass: 'border-amber-300 bg-amber-50/70 ring-2 ring-amber-100',
+            iconClass: 'bg-amber-100 text-amber-700',
+            valueClass: 'text-amber-700',
+          },
+          {
+            key: 'approved',
+            label: 'Approved',
+            caption: 'Cleared to get started',
+            value: stats.approved,
+            Icon: CheckCircle,
+            activeClass: 'border-emerald-300 bg-emerald-50/70 ring-2 ring-emerald-100',
+            iconClass: 'bg-emerald-100 text-emerald-700',
+            valueClass: 'text-emerald-700',
+          },
         ].map((item) => {
           const isSelected = filterStatus === item.key;
           return (
-            <div
+            <button
+              type="button"
               key={item.key}
               onClick={() => setFilterStatus(filterStatus === item.key && item.key !== 'all' ? 'all' : item.key)}
-              title={`Click to filter by ${item.label}`}
-              className={`bg-white rounded-xl shadow-xs border p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
+              aria-pressed={isSelected}
+              className={`group flex w-full items-center justify-between rounded-2xl border bg-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 sm:p-5 ${
                 isSelected
-                  ? 'border-[#0088cc] ring-2 ring-[#0088cc]/20 shadow-xs'
-                  : 'border-slate-100 hover:border-slate-300'
+                  ? item.activeClass
+                  : 'border-slate-200 hover:border-slate-300'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-1.5 h-7 rounded-full ${isSelected ? 'bg-[#0088cc]' : 'bg-[#004b73]'}`} />
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
+              <div className="flex min-w-0 items-center gap-3.5">
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${item.iconClass}`}>
+                  <item.Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-800">{item.label}</p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">{item.caption}</p>
+                </div>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-slate-900">{item.value}</p>
-            </div>
+              <span className={`ml-3 text-2xl font-bold tabular-nums sm:text-3xl ${item.valueClass}`}>{item.value}</span>
+            </button>
           );
         })}
       </div>
 
-      {/* Search and Filter Card */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-3.5 sm:p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      {/* Search and filters */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Find a request</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Search by employee details or adjust the list view.</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-slate-600">
+            {filteredUsers.length} {filteredUsers.length === 1 ? 'result' : 'results'}
+          </span>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search by name, email, or department..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all text-slate-900 placeholder:text-slate-400"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-500/10"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 sm:shrink-0">
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="h-10 px-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all text-slate-700"
+              aria-label="Filter requests by status"
+              className="h-11 min-w-32 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition focus:border-sky-500 focus:outline-none focus:ring-4 focus:ring-sky-500/10"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -2169,7 +2204,8 @@ const EmployeeRequests = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="h-10 px-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all text-slate-700"
+              aria-label="Sort requests"
+              className="h-11 min-w-36 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition focus:border-sky-500 focus:outline-none focus:ring-4 focus:ring-sky-500/10"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -2180,14 +2216,26 @@ const EmployeeRequests = () => {
                 fetchApprovalMetadata();
               }}
               title="Refresh"
-              className="h-10 px-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 transition flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+              className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
             >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+              <span>Refresh</span>
             </button>
           </div>
         </div>
       </div>
+
+      {!loading && !error && filteredUsers.length > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Requests</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Select a request to review the employee profile and take action.</p>
+          </div>
+          <span className="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 sm:inline-flex">
+            {filterStatus === 'all' ? 'All statuses' : `${filterStatus.charAt(0).toUpperCase()}${filterStatus.slice(1)} requests`}
+          </span>
+        </div>
+      )}
 
       {/* Loading State */}
       {loading && (
