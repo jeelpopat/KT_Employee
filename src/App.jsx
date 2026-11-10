@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
-import { performAutoCheckout, clearAuth, isTokenExpired, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
+import { performAutoCheckout, clearAuth, isTokenExpired, validateUserSession, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
 import { BASE_URL } from './api/config.js';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { PublicInfoView } from './components/auth/PublicInfoView.jsx';
@@ -400,9 +400,27 @@ export default function App() {
         return;
       }
 
-      if (isMounted) {
+      try {
+        const session = await validateUserSession();
+        if (!isMounted) return;
+
+        if (!session.isValid) {
+          clearAuth();
+          setIsAuthenticated(false);
+          setAuthView('login');
+          return;
+        }
+
         setIsAuthenticated(true);
-        setIsCheckingAuth(false);
+      } catch (error) {
+        console.error('Could not verify the current user session:', error);
+        if (isMounted) {
+          clearAuth();
+          setIsAuthenticated(false);
+          setAuthView('login');
+        }
+      } finally {
+        if (isMounted) setIsCheckingAuth(false);
       }
     };
 

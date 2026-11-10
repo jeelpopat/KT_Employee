@@ -370,13 +370,33 @@ export const validateUserSession = async () => {
       return { isValid: true };
     }
 
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      console.warn("Profile validation failed: backend returned an unreadable user record.", parseError);
+      await performAutoCheckout(token);
+      clearAuth();
+      return { isValid: false, shouldLogout: true, reason: "User record could not be verified" };
+    }
     const raw = result.data || result;
     const userObj = raw?.user || result?.user || raw?.profile || result?.profile || raw;
 
-    if (!userObj || (!userObj._id && !userObj.id && !userObj.email)) {
-      // Body did not contain expected user object; do not logout if local token is present
-      return { isValid: true };
+    const hasUserIdentity = Boolean(
+      userObj?._id ||
+      userObj?.id ||
+      userObj?.userId ||
+      userObj?.employeeId ||
+      userObj?.email ||
+      userObj?.employee?._id ||
+      userObj?.employee?.id ||
+      userObj?.employee?.email
+    );
+    if (!userObj || !hasUserIdentity) {
+      console.warn("Profile validation failed: backend returned no user record. Triggering auto-checkout.");
+      await performAutoCheckout(token);
+      clearAuth();
+      return { isValid: false, shouldLogout: true, reason: "User record not found" };
     }
 
     // 3. Check if user is ACTIVE (not inactive, not blocked, not terminated)
