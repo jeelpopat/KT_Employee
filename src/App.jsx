@@ -342,14 +342,7 @@ export default function App() {
     }
   }, []);
 
-  const [isCheckingAuth, setIsCheckingAuth] = useState(() => {
-    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-    if (!token || isTokenExpired(token)) {
-      clearAuth();
-      return false;
-    }
-    return true;
-  });
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
@@ -383,6 +376,7 @@ export default function App() {
     const verifySessionOnMount = async () => {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       if (!token) {
+        clearAuth();
         if (isMounted) {
           setIsAuthenticated(false);
           setIsCheckingAuth(false);
@@ -434,6 +428,7 @@ export default function App() {
   // Global auth logout listener
   useEffect(() => {
     const handleAuthLogout = () => {
+      clearAuth();
       setIsAuthenticated(false);
       setIsCheckingAuth(false);
     };
@@ -444,7 +439,6 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('dark');
-    localStorage.setItem('theme', 'light');
   }, []);
 
   const handleLoginSuccess = () => {

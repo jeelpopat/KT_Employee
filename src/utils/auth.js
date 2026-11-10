@@ -52,14 +52,7 @@ export const clearAuth = () => {
   } catch (error) {
     console.warn("Could not clear screen capture session state:", error);
   }
-  localStorage.removeItem("token");
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("user");
-  localStorage.removeItem("auth_user");
-  localStorage.removeItem("isAuthenticated");
-  localStorage.removeItem("active_role");
-  localStorage.removeItem("user_role");
-  localStorage.removeItem("kt_employee_full_name");
+  localStorage.clear();
 };
 
 /**

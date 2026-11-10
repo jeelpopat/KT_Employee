@@ -7,6 +7,7 @@ import {
 import { Link } from 'react-router-dom';
 import api, { clearApiCache } from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
+import { clearAuth } from '../../utils/auth.js';
 import {
   EMPLOYEE_DEPARTMENTS_ROLES,
   ALL_EMPLOYEE_DEPARTMENTS,
@@ -60,14 +61,7 @@ export const LoginView = ({
     if (typeof clearApiCache === 'function') {
       clearApiCache();
     }
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('active_role');
-    localStorage.removeItem('token');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth_user');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('kt_employee_full_name');
+    clearAuth();
 
     try {
       let response;
