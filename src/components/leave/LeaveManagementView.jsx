@@ -338,7 +338,7 @@ export const LeaveManagementView = () => {
         curr.endDate || curr.toDate,
         holidaysList,
         curr.isHalfDay === true ||
-          curr.leaveType === 'half_day' ||
+          ['half_day', 'half_day_1', 'half_day_2'].includes(String(curr.leaveType || '').toLowerCase()) ||
           Number(curr.totalDays) === 0.5 ||
           ['first-half', 'second-half'].includes(String(curr.halfDayType || '').toLowerCase())
       ), 0);
@@ -440,7 +440,7 @@ export const LeaveManagementView = () => {
       leave.endDate || leave.toDate,
       holidaysList,
       leave.isHalfDay === true ||
-        leave.leaveType === 'half_day' ||
+        ['half_day', 'half_day_1', 'half_day_2'].includes(String(leave.leaveType || '').toLowerCase()) ||
         Number(leave.totalDays) === 0.5 ||
         ['first-half', 'second-half'].includes(String(leave.halfDayType || '').toLowerCase())
     ), 0);
@@ -540,10 +540,10 @@ export const LeaveManagementView = () => {
 
     // Determine the leaveType value to send:
     //   Full Day            → 'full_day'
-    //   Half Day, 1st half  → '1st half'
-    //   Half Day, 2nd half  → '2nd half'
+    //   Half Day, 1st half  → 'half_day_1'
+    //   Half Day, 2nd half  → 'half_day_2'
     const resolvedLeaveType = isHalfDayActive
-      ? (finalHalfDayType === 'second-half' ? '2nd half' : '1st half')
+      ? (finalHalfDayType === 'second-half' ? 'half_day_2' : 'half_day_1')
       : 'full_day';
 
     try {
@@ -625,8 +625,26 @@ export const LeaveManagementView = () => {
 
   // Human-readable leave category badge
   const renderLeaveCategoryBadge = (type, isHalf, halfType) => {
-    const isHalfDayActive = Boolean(isHalf || type === 'half_day');
+    const typeStr = String(type || '').toLowerCase();
+    const isHalfDayActive = Boolean(
+      isHalf ||
+      typeStr === 'half_day' ||
+      typeStr === 'half_day_1' ||
+      typeStr === 'half_day_2'
+    );
     const displayTitle = isHalfDayActive ? 'Half Day Leave' : 'Full Day Leave';
+
+    // Resolve shift label: prefer halfDayType, fall back to leaveType enum
+    let shiftLabel = '';
+    if (isHalfDayActive) {
+      if (halfType === 'first-half' || typeStr === 'half_day_1') {
+        shiftLabel = '1st Half';
+      } else if (halfType === 'second-half' || typeStr === 'half_day_2') {
+        shiftLabel = '2nd Half';
+      } else {
+        shiftLabel = 'Half Day';
+      }
+    }
 
     return (
       <div>
@@ -643,7 +661,7 @@ export const LeaveManagementView = () => {
           </span>
           {isHalfDayActive && (
             <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm border bg-indigo-50 text-indigo-700 border-indigo-200">
-              {halfType === 'first-half' ? '1st Half' : halfType === 'second-half' ? '2nd Half' : 'Half Day'}
+              {shiftLabel}
             </span>
           )}
         </div>
@@ -856,15 +874,24 @@ export const LeaveManagementView = () => {
                 ) : (
                   filteredLeaves.map((l, index) => {
                     const activeRemarks = l.adminRemark || l.hrRemark || l.teamLeadRemark || l.remark;
+                    const lTypeStr = String(l.leaveType || '').toLowerCase();
+                    const lIsHalf = l.isHalfDay === true ||
+                      ['half_day', 'half_day_1', 'half_day_2'].includes(lTypeStr) ||
+                      Number(l.totalDays) === 0.5 ||
+                      ['first-half', 'second-half'].includes(String(l.halfDayType || '').toLowerCase());
                     const currentTotalDays = calculateLeaveDays(
                       l.startDate || l.fromDate,
                       l.endDate || l.toDate,
                       holidaysList,
-                      l.isHalfDay === true ||
-                        l.leaveType === 'half_day' ||
-                        Number(l.totalDays) === 0.5 ||
-                        ['first-half', 'second-half'].includes(String(l.halfDayType || '').toLowerCase())
+                      lIsHalf
                     );
+                    // Resolve shift label
+                    let halfLabel = '';
+                    if (lIsHalf) {
+                      if (l.halfDayType === 'first-half' || lTypeStr === 'half_day_1') halfLabel = '1st Half';
+                      else if (l.halfDayType === 'second-half' || lTypeStr === 'half_day_2') halfLabel = '2nd Half';
+                      else halfLabel = 'Half Day';
+                    }
                     return (
                       <tr key={l._id || index} className="hover:bg-slate-50 transition-colors">
                         <td className="px-5 py-4">
@@ -875,7 +902,7 @@ export const LeaveManagementView = () => {
                             {formatDate(l.startDate)} {l.startDate !== l.endDate ? `to ${formatDate(l.endDate)}` : ''}
                           </span>
                           <span className="text-xs text-indigo-600 font-semibold mt-1 block">
-                            {currentTotalDays} {currentTotalDays === 1 || currentTotalDays === 0.5 ? 'Day' : 'Days'} {l.isHalfDay ? `(${l.halfDayType === 'first-half' ? '1st Half' : l.halfDayType === 'second-half' ? '2nd Half' : 'Half Day'})` : ''}
+                            {currentTotalDays} {currentTotalDays === 1 || currentTotalDays === 0.5 ? 'Day' : 'Days'} {lIsHalf ? `(${halfLabel})` : ''}
                           </span>
                         </td>
                         <td className="px-5 py-4 text-slate-600 max-w-xs">
