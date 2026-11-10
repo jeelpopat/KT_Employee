@@ -4,7 +4,9 @@ import {
   CheckCircle2, AlertCircle, ArrowRight, Sparkles 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import api from '../../api/axios.js';
+import api, { clearApiCache } from '../../api/axios.js';
+import { clearAuth } from '../../utils/auth.js';
+import { showToast } from '../common/Toast.jsx';
 import {
   EMPLOYEE_DEPARTMENTS_ROLES,
   ALL_EMPLOYEE_DEPARTMENTS,
@@ -110,10 +112,19 @@ export const RegisterView = ({ onBackToLogin, onRegisterSuccess }) => {
         }
       }
 
-      setSuccess(true);
+      clearAuth();
+      if (typeof clearApiCache === 'function') {
+        clearApiCache();
+      }
       if (onRegisterSuccess) {
         onRegisterSuccess(payload);
       }
+      if (onBackToLogin) {
+        onBackToLogin();
+      } else {
+        setSuccess(true);
+      }
+      showToast('Registration successful. Please sign in to continue.', 'success');
     } catch (err) {
       console.error('Registration error:', err);
       const errorMessage =

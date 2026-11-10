@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import api, { clearApiCache } from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
 import { clearAuth } from '../../utils/auth.js';
+import { showToast } from '../common/Toast.jsx';
 import {
   EMPLOYEE_DEPARTMENTS_ROLES,
   ALL_EMPLOYEE_DEPARTMENTS,
@@ -210,8 +211,14 @@ export const LoginView = ({
         }
       }
 
-      setRegSuccess(true);
+      clearAuth();
+      if (typeof clearApiCache === 'function') {
+        clearApiCache();
+      }
       setEmail(regEmail.trim());
+      setRegSuccess(false);
+      setMode('login');
+      showToast('Registration successful. Please sign in to continue.', 'success');
     } catch (err) {
       console.error('Registration error:', err);
       const errorMessage =
