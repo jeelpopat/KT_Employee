@@ -70,14 +70,16 @@ export const LoginView = ({
         response = await api.post('/api/users/login', {
           login: email.trim(),
           email: email.trim(),
-          password: password
+          password: password,
+          clientPlatform: 'web',
         });
       } catch (postErr) {
         if (postErr.response?.status === 404) {
           response = await api.post('/api/auth/login', {
             login: email.trim(),
             email: email.trim(),
-            password: password
+            password: password,
+            clientPlatform: 'web',
           });
         } else {
           throw postErr;

@@ -88,6 +88,28 @@ const isHrOrAdminRole = (role) => {
     normalizedRole === "admin" || normalizedRole === "administrator";
 };
 
+const getLoginSourceLabel = (source) => {
+  const normalized = String(source || "").toLowerCase();
+  if (normalized === "web") return "Web";
+  if (normalized === "android_app") return "Android App";
+  if (normalized === "ios_app") return "iOS App";
+  return "Unknown";
+};
+
+const formatLastLogin = (value) => {
+  if (!value) return "Never";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Unknown"
+    : date.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+};
+
 export default function Employees() {
   const { confirm, confirmationDialog } = useConfirm();
   const [employees, setEmployees] = useState([]);
@@ -243,6 +265,23 @@ export default function Employees() {
         console.warn("Could not resolve employee roles:", roleError?.message);
       }
 
+      const loginActivityByUserId = new Map();
+      try {
+        const activityRes = await fetch(`${API_BASE}/users/login-activity`, {
+          headers: {
+            ...(token ? { Authorization: "Bearer " + token } : {}),
+          },
+        });
+        if (!activityRes.ok) throw new Error(`Failed to fetch login activity (HTTP ${activityRes.status})`);
+        const activityData = await activityRes.json();
+        const activities = activityData.data || [];
+        activities.forEach((activity) => {
+          if (activity.userId) loginActivityByUserId.set(String(activity.userId).toLowerCase(), activity);
+        });
+      } catch (activityError) {
+        console.warn("Could not load employee login activity:", activityError?.message);
+      }
+
       const normalizedUsers = users.map((user) => {
         const nestedUser = user?.userID || user?.userId || user?.user;
         const record = nestedUser && typeof nestedUser === "object"
@@ -253,6 +292,7 @@ export default function Employees() {
           return String(identity || "").trim().toLowerCase();
         };
         const userId = normalizeIdentity(record?._id || record?.id || record?.userID || record?.userId);
+        const loginActivity = loginActivityByUserId.get(userId);
         const employeeId = normalizeIdentity(record?.employeeID || record?.employeeId || record?.uniqueID || record?.employeeCode);
         const email = normalizeIdentity(record?.email || record?.employeeEmail);
         const employeeRecord = employeeRecords.find((employee) => {
@@ -319,6 +359,8 @@ export default function Employees() {
           designation,
           department,
           employeeStatus: getEmploymentStatus(employeeRecord, record),
+          lastLoginAt: loginActivity?.lastLoginAt || record?.lastLoginAt || record?.lastLogin || null,
+          lastLoginSource: loginActivity?.source || "unknown",
         };
       });
 
@@ -354,6 +396,8 @@ export default function Employees() {
           const name = empRec?.name || empRec?.fullName ||
             `${empRec?.firstName || ""} ${empRec?.lastName || ""}`.trim();
           const code = empRec?.employeeID || empRec?.employeeCode || empRec?.employeeId || "";
+          const employeeUserId = normalizeIdentity(empRec.userID || empRec.userId);
+          const loginActivity = loginActivityByUserId.get(employeeUserId);
 
           return {
             ...empRec,
@@ -369,6 +413,8 @@ export default function Employees() {
             designation,
             department,
             employeeStatus: getEmploymentStatus(empRec, empRec),
+            lastLoginAt: loginActivity?.lastLoginAt || null,
+            lastLoginSource: loginActivity?.source || "unknown",
           };
         });
 
@@ -1286,6 +1332,9 @@ export default function Employees() {
                     <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[120px]">
                       ROLE
                     </th>
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[175px]">
+                      LAST LOGIN
+                    </th>
                     <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[170px]">
                       ACTION
                     </th>
@@ -1385,6 +1434,16 @@ export default function Employees() {
                               </span>
                             );
                           })()}
+                        </td>
+
+                        {/* LAST LOGIN */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <p className="text-xs font-medium text-slate-700">
+                            {formatLastLogin(emp.lastLoginAt || emp.lastLogin)}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">
+                            Via {getLoginSourceLabel(emp.lastLoginSource)}
+                          </p>
                         </td>
 
                         {/* ACTION */}
@@ -1530,6 +1589,17 @@ export default function Employees() {
                         </p>
                         <p className="text-slate-700 text-xs mt-0.5 font-poppins truncate">
                           {emp.department?.departmentName || emp.departmentName || "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-poppins">
+                          Last Login
+                        </p>
+                        <p className="text-slate-700 text-xs mt-0.5 font-poppins">
+                          {formatLastLogin(emp.lastLoginAt || emp.lastLogin)}
+                        </p>
+                        <p className="text-slate-500 text-[11px] mt-0.5 font-poppins">
+                          Via {getLoginSourceLabel(emp.lastLoginSource)}
                         </p>
                       </div>
                     </div>
