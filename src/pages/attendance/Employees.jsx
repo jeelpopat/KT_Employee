@@ -18,6 +18,7 @@ import {
   User,
   ShieldCheck,
   GraduationCap,
+  KeyRound,
   Loader2,
   RefreshCw,
 } from "lucide-react";
@@ -110,6 +111,33 @@ const formatLastLogin = (value) => {
     });
 };
 
+const getEmployeeUserId = (employee) => {
+  const candidate = employee?.userId || employee?.userID;
+  const id = candidate && typeof candidate === "object"
+    ? candidate._id || candidate.id
+    : candidate;
+  return /^[0-9a-f]{24}$/i.test(String(id || "")) ? String(id) : null;
+};
+
+const isAdminSession = () => {
+  for (const key of ["auth_user", "user", "currentUser", "loggedInUser"]) {
+    try {
+      const storedUser = localStorage.getItem(key);
+      if (!storedUser) continue;
+
+      const user = JSON.parse(storedUser);
+      const role = user?.role || user?.user?.role || user?.data?.role;
+      if (!role) continue;
+
+      const normalizedRole = String(role).trim().toLowerCase().replace(/[_-]+/g, " ");
+      return ["admin", "super admin", "superadmin", "administrator"].includes(normalizedRole);
+    } catch {
+      continue;
+    }
+  }
+  return false;
+};
+
 export default function Employees() {
   const { confirm, confirmationDialog } = useConfirm();
   const [employees, setEmployees] = useState([]);
@@ -123,12 +151,67 @@ export default function Employees() {
   const [filterDepartment, setFilterDepartment] = useState("all");
   const [filterEmployeeRole, setFilterEmployeeRole] = useState("all");
   const [toast, setToast] = useState({ message: "", type: "success" });
+  const [resetEmployee, setResetEmployee] = useState(null);
+  const [resetPasswordForm, setResetPasswordForm] = useState({
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [canResetPasswords] = useState(isAdminSession);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => {
       setToast((prev) => (prev.message === message ? { message: "", type: "success" } : prev));
     }, 4000);
+  };
+
+  const closePasswordResetModal = () => {
+    setResetEmployee(null);
+    setResetPasswordForm({ newPassword: "", confirmPassword: "" });
+  };
+
+  const handleResetEmployeePassword = async (event) => {
+    event.preventDefault();
+    if (!resetEmployee) return;
+
+    if (resetPasswordForm.newPassword.trim().length < 6) {
+      showToast("Password must be at least 6 characters long", "error");
+      return;
+    }
+    if (resetPasswordForm.newPassword !== resetPasswordForm.confirmPassword) {
+      showToast("Passwords do not match", "error");
+      return;
+    }
+
+    try {
+      setIsResettingPassword(true);
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const res = await fetch(
+        `${API_BASE}/users/admin/${encodeURIComponent(resetEmployee.userId)}/reset-password`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(resetPasswordForm),
+        }
+      );
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to reset password");
+      }
+
+      closePasswordResetModal();
+      showToast("Password reset. The employee must change it at next login.", "success");
+    } catch (error) {
+      console.error("Failed to reset employee password:", error);
+      showToast(error.message || "Failed to reset password", "error");
+    } finally {
+      setIsResettingPassword(false);
+    }
   };
 
   // =========================
@@ -402,7 +485,7 @@ export default function Employees() {
           return {
             ...empRec,
             _id: empRec._id,
-            userId: empRec.userID || empRec.userId || empRec._id,
+            userId: empRec.userID || empRec.userId || null,
             employeeRecordId: empRec._id,
             employeeRecord: empRec,
             employeeId: empRec._id,
@@ -1460,6 +1543,21 @@ export default function Employees() {
                               <span>Edit</span>
                             </button>
 
+                            {canResetPasswords && getEmployeeUserId(emp) && (
+                              <button
+                                type="button"
+                                onClick={() => setResetEmployee({
+                                  name: emp.name || emp.fullName || emp.email || "this employee",
+                                  userId: getEmployeeUserId(emp),
+                                })}
+                                title="Reset employee password"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 hover:text-amber-900 hover:bg-amber-50 rounded-md transition-colors cursor-pointer font-poppins"
+                              >
+                                <KeyRound className="w-3.5 h-3.5" />
+                                <span>Reset Password</span>
+                              </button>
+                            )}
+
                             {canDeleteOrAssignTeamLead(emp) && (
                               <>
                                 {/* DEACTIVATE / REACTIVATE */}
@@ -1637,6 +1735,21 @@ export default function Employees() {
                           <Edit className="w-3.5 h-3.5" />
                           <span>Edit</span>
                         </button>
+
+                        {canResetPasswords && getEmployeeUserId(emp) && (
+                          <button
+                            type="button"
+                            onClick={() => setResetEmployee({
+                              name: emp.name || emp.fullName || emp.email || "this employee",
+                              userId: getEmployeeUserId(emp),
+                            })}
+                            title="Reset employee password"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 hover:text-amber-900 hover:bg-amber-50 rounded-md transition-colors cursor-pointer font-poppins"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>Reset Password</span>
+                          </button>
+                        )}
 
                         {canDeleteOrAssignTeamLead(emp) && (
                           <>
@@ -2037,6 +2150,102 @@ export default function Employees() {
                         ? "Update Employee"
                         : "Add Employee"}
                   </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {resetEmployee && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs font-poppins"
+          role="presentation"
+          onClick={closePasswordResetModal}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-slate-100"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-password-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 id="reset-password-title" className="text-lg font-semibold text-slate-900">
+                  Reset Password
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Set a temporary password for {resetEmployee.name}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closePasswordResetModal}
+                aria-label="Close password reset"
+                className="p-1 text-slate-500 hover:text-slate-800"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+              The current password cannot be viewed. The employee will be asked to change this password at their next login, and refresh sessions will be revoked.
+            </p>
+
+            <form onSubmit={handleResetEmployeePassword} className="space-y-4">
+              <div>
+                <label htmlFor="reset-new-password" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  New temporary password
+                </label>
+                <input
+                  id="reset-new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                  value={resetPasswordForm.newPassword}
+                  onChange={(event) => setResetPasswordForm((current) => ({
+                    ...current,
+                    newPassword: event.target.value,
+                  }))}
+                  className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="reset-confirm-password" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Confirm password
+                </label>
+                <input
+                  id="reset-confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                  value={resetPasswordForm.confirmPassword}
+                  onChange={(event) => setResetPasswordForm((current) => ({
+                    ...current,
+                    confirmPassword: event.target.value,
+                  }))}
+                  className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={closePasswordResetModal}
+                  disabled={isResettingPassword}
+                  className="h-10 rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isResettingPassword}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#034665] px-4 text-sm font-medium text-white hover:bg-[#02364d] disabled:opacity-60"
+                >
+                  {isResettingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isResettingPassword ? "Resetting..." : "Reset Password"}
                 </button>
               </div>
             </form>
