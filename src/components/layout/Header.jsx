@@ -34,6 +34,12 @@ const getNotificationKey = (notification) => {
   return id ? String(id) : null;
 };
 
+const showNotificationToast = (notification, fallbackTitle) => {
+  const title = notification.title || fallbackTitle;
+  const message = notification.message || 'You have a new update.';
+  showToast(`${title}: ${message}`, 'info', 6000);
+};
+
 const isDeletableAdminNotification = (notification) => {
   const id = notification?._id || notification?.id;
   return Boolean(
@@ -339,6 +345,9 @@ export const Header = ({ onSignOut }) => {
 
       if (newlyArrived.length > 0) {
         playNotificationTone();
+        newlyArrived.forEach((notification) => {
+          showNotificationToast(notification, 'New Admin Notification');
+        });
         const latestUnread = newlyArrived[0];
         if (latestUnread && 'Notification' in window && Notification.permission === 'granted') {
           new Notification(latestUnread.title || 'New Admin Notification', {
@@ -555,6 +564,9 @@ export const Header = ({ onSignOut }) => {
 
         if (newlyArrived.length > 0) {
           playNotificationTone();
+          newlyArrived.forEach((notification) => {
+            showNotificationToast(notification, 'Kevalon Notification');
+          });
           const latestUnread = newlyArrived[0];
           if (latestUnread && 'Notification' in window && Notification.permission === 'granted') {
             new Notification(latestUnread.title || 'Kevalon Notification', {
