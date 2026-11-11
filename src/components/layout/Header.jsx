@@ -125,6 +125,14 @@ export const Header = ({ onSignOut }) => {
     message: '',
     type: 'ANNOUNCEMENT'
   });
+  const [announcementAudience, setAnnouncementAudience] = useState({
+    targetType: 'ALL',
+    targetRole: 'ALL',
+    targetUserIds: [],
+    targetDepartmentIds: [],
+  });
+  const [announcementRecipients, setAnnouncementRecipients] = useState({ employees: [], departments: [] });
+  const [isLoadingAnnouncementRecipients, setIsLoadingAnnouncementRecipients] = useState(false);
   const [editingAnnouncementId, setEditingAnnouncementId] = useState(null);
 
   // --- Employee / TL Private Notifications States ---
@@ -441,9 +449,47 @@ export const Header = ({ onSignOut }) => {
     }
   };
 
+  useEffect(() => {
+    if (!showAnnouncementModal || !isAdmin) return undefined;
+    let active = true;
+    setIsLoadingAnnouncementRecipients(true);
+    api.get('/api/notification/announcement/recipients')
+      .then((response) => {
+        if (!active || !response.data?.success) return;
+        setAnnouncementRecipients({
+          employees: response.data.data?.employees || [],
+          departments: response.data.data?.departments || [],
+        });
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error('Could not load announcement recipients:', error);
+        showToast(error.response?.data?.message || 'Could not load employees and departments.', 'error');
+      })
+      .finally(() => {
+        if (active) setIsLoadingAnnouncementRecipients(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [showAnnouncementModal, isAdmin]);
+
   const handleAnnouncementSubmit = async () => {
     if (!announcementForm.title.trim() || !announcementForm.message.trim()) {
       showToast('Please fill both title and message before posting.', 'error');
+      return;
+    }
+    if (announcementAudience.targetType === 'PERSON' && announcementAudience.targetUserIds.length === 0) {
+      showToast('Select at least one employee for this announcement.', 'error');
+      return;
+    }
+    if (announcementAudience.targetType === 'DEPARTMENT' && announcementAudience.targetDepartmentIds.length === 0) {
+      showToast('Select at least one department for this announcement.', 'error');
+      return;
+    }
+    if (announcementAudience.targetType === 'ROLE' && announcementAudience.targetRole === 'ALL') {
+      showToast('Select a role for this announcement.', 'error');
       return;
     }
 
@@ -453,6 +499,7 @@ export const Header = ({ onSignOut }) => {
         title: announcementForm.title.trim(),
         message: announcementForm.message.trim(),
         type: announcementForm.type || 'ANNOUNCEMENT',
+        ...announcementAudience,
       };
 
       const endpoint = editingAnnouncementId
@@ -477,6 +524,7 @@ export const Header = ({ onSignOut }) => {
           message: '',
           type: 'ANNOUNCEMENT',
         });
+        setAnnouncementAudience({ targetType: 'ALL', targetRole: 'ALL', targetUserIds: [], targetDepartmentIds: [] });
         setEditingAnnouncementId(null);
         setShowAnnouncementModal(false);
         await fetchAdminNotificationsFeed();
@@ -495,6 +543,14 @@ export const Header = ({ onSignOut }) => {
       title: announcement.title || '',
       message: announcement.message || '',
       type: announcement.type || 'ANNOUNCEMENT',
+    });
+    const targetType = announcement.targetType ||
+      (announcement.targetRole && announcement.targetRole !== 'ALL' ? 'ROLE' : 'ALL');
+    setAnnouncementAudience({
+      targetType: ['PERSON', 'DEPARTMENT', 'ROLE'].includes(targetType) ? targetType : 'ALL',
+      targetRole: announcement.targetRole || 'ALL',
+      targetUserIds: (announcement.targetUserIds || []).map((id) => String(id?._id || id)),
+      targetDepartmentIds: (announcement.targetDepartmentIds || []).map((id) => String(id?._id || id)),
     });
     setEditingAnnouncementId(announcement._id || announcement.id || null);
     setShowAnnouncementModal(true);
@@ -945,12 +1001,13 @@ export const Header = ({ onSignOut }) => {
           )}
 
           {/* Admin Announcement Trigger Button - Exact match to reference screenshot */}
-          {userRole === 'admin' && (
+          {(userRole === 'admin' || userRole === 'hr') && (
             <button
               type="button"
               title="Post Announcement"
               onClick={() => {
                 setAnnouncementForm({ title: '', message: '', type: 'ANNOUNCEMENT' });
+                setAnnouncementAudience({ targetType: 'ALL', targetRole: 'ALL', targetUserIds: [], targetDepartmentIds: [] });
                 setEditingAnnouncementId(null);
                 setShowAnnouncementModal(true);
               }}
@@ -1450,10 +1507,7 @@ export const Header = ({ onSignOut }) => {
             <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
               <div
                 className="w-full rounded-xl border border-slate-200/90 bg-white shadow-xl overflow-hidden"
-                style={{
-                  width: '100%',
-                  maxWidth: '28rem',
-                }}
+                style={{ width: '100%', maxWidth: '34rem' }}
               >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
                   <h3 className="text-xs font-semibold text-slate-900">
@@ -1464,6 +1518,7 @@ export const Header = ({ onSignOut }) => {
                     onClick={() => {
                       setShowAnnouncementModal(false);
                       setAnnouncementForm({ title: '', message: '', type: 'ANNOUNCEMENT' });
+                      setAnnouncementAudience({ targetType: 'ALL', targetRole: 'ALL', targetUserIds: [], targetDepartmentIds: [] });
                       setEditingAnnouncementId(null);
                     }}
                     className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
@@ -1495,11 +1550,112 @@ export const Header = ({ onSignOut }) => {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Send to</label>
+                    <select
+                      value={announcementAudience.targetType}
+                      onChange={(event) => setAnnouncementAudience({
+                        targetType: event.target.value,
+                        targetRole: 'ALL',
+                        targetUserIds: [],
+                        targetDepartmentIds: [],
+                      })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
+                    >
+                      <option value="ALL">Everyone</option>
+                      <option value="ROLE">Role</option>
+                      <option value="PERSON">Specific employee(s)</option>
+                      <option value="DEPARTMENT">Department(s)</option>
+                    </select>
+                  </div>
+
+                  {announcementAudience.targetType === 'ROLE' && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Choose role</label>
+                      <select
+                        value={announcementAudience.targetRole}
+                        onChange={(event) => setAnnouncementAudience((current) => ({
+                          ...current,
+                          targetRole: event.target.value,
+                        }))}
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
+                      >
+                        <option value="ALL" disabled>Select a role</option>
+                        <option value="employee">Employee</option>
+                        <option value="team lead">Team Lead</option>
+                        <option value="intern">Intern</option>
+                        <option value="hr">HR</option>
+                        <option value="admin">Admin</option>
+                        <option value="Accountant">Accountant</option>
+                        <option value="CA">CA</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {announcementAudience.targetType === 'PERSON' && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Choose employee(s)</label>
+                      <select
+                        multiple
+                        size="5"
+                        value={announcementAudience.targetUserIds}
+                        onChange={(event) => setAnnouncementAudience((current) => ({
+                          ...current,
+                          targetUserIds: Array.from(event.target.selectedOptions, (option) => option.value),
+                        }))}
+                        disabled={isLoadingAnnouncementRecipients || announcementRecipients.employees.length === 0}
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 disabled:bg-slate-50"
+                      >
+                        {announcementRecipients.employees.map((employee) => (
+                          <option key={employee.id} value={employee.id}>
+                            {employee.name}{employee.department ? ` · ${employee.department}` : ''}{employee.email ? ` (${employee.email})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {isLoadingAnnouncementRecipients
+                          ? 'Loading employees…'
+                          : announcementRecipients.employees.length
+                            ? 'Use Ctrl/Cmd to select multiple employees.'
+                            : 'No active employees are available.'}
+                      </p>
+                    </div>
+                  )}
+
+                  {announcementAudience.targetType === 'DEPARTMENT' && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Choose department(s)</label>
+                      <select
+                        multiple
+                        size="4"
+                        value={announcementAudience.targetDepartmentIds}
+                        onChange={(event) => setAnnouncementAudience((current) => ({
+                          ...current,
+                          targetDepartmentIds: Array.from(event.target.selectedOptions, (option) => option.value),
+                        }))}
+                        disabled={isLoadingAnnouncementRecipients || announcementRecipients.departments.length === 0}
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 disabled:bg-slate-50"
+                      >
+                        {announcementRecipients.departments.map((department) => (
+                          <option key={department.id} value={department.id}>{department.name}</option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {isLoadingAnnouncementRecipients
+                          ? 'Loading departments…'
+                          : announcementRecipients.departments.length
+                            ? 'Every active employee in the selected department(s) will receive it.'
+                            : 'No active departments with employees are available.'}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex justify-end gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => {
                         setAnnouncementForm({ title: '', message: '', type: 'ANNOUNCEMENT' });
+                        setAnnouncementAudience({ targetType: 'ALL', targetRole: 'ALL', targetUserIds: [], targetDepartmentIds: [] });
                         setEditingAnnouncementId(null);
                         setShowAnnouncementModal(false);
                       }}
@@ -1510,7 +1666,14 @@ export const Header = ({ onSignOut }) => {
                     <button
                       type="button"
                       onClick={handleAnnouncementSubmit}
-                      disabled={!announcementForm.title.trim() || !announcementForm.message.trim()}
+                      disabled={
+                        !announcementForm.title.trim() ||
+                        !announcementForm.message.trim() ||
+                        isLoadingAnnouncementRecipients ||
+                        (announcementAudience.targetType === 'ROLE' && announcementAudience.targetRole === 'ALL') ||
+                        (announcementAudience.targetType === 'PERSON' && announcementAudience.targetUserIds.length === 0) ||
+                        (announcementAudience.targetType === 'DEPARTMENT' && announcementAudience.targetDepartmentIds.length === 0)
+                      }
                       className="px-4 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-xs cursor-pointer"
                     >
                       {editingAnnouncementId ? 'Update' : 'Post'}
