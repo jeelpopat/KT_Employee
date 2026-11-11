@@ -4,7 +4,7 @@ import { CheckCircle2, AlertCircle, AlertTriangle, Info, X, RefreshCw } from 'lu
 /**
  * Global helper to trigger UI toasts from anywhere in the application
  */
-export const showToast = (message, type = 'success', duration = 4000) => {
+export const showToast = (message, type = 'success', duration = 4000, dedupeKey = null) => {
   if (typeof window !== 'undefined' && message) {
     window.dispatchEvent(
       new CustomEvent('app_toast', {
@@ -13,6 +13,7 @@ export const showToast = (message, type = 'success', duration = 4000) => {
           message: String(message),
           type: type || 'success',
           duration: duration || 4000,
+          dedupeKey,
         },
       })
     );
@@ -116,11 +117,15 @@ export const ToastContainer = () => {
         id,
         message: detail.message,
         type: detail.type || 'success',
+        dedupeKey: detail.dedupeKey || null,
       };
 
       setToasts((prev) => {
         // Keep at most 4 active toasts
-        const filtered = prev.filter((t) => t.message !== newToast.message);
+        const filtered = prev.filter((toast) => {
+          if (newToast.dedupeKey) return toast.dedupeKey !== newToast.dedupeKey;
+          return toast.dedupeKey || toast.message !== newToast.message;
+        });
         return [...filtered.slice(-3), newToast];
       });
 

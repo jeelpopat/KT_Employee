@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import {
   Bell, User, LogOut,
   Camera, CheckCircle2, AlertCircle, CheckCheck, Plus,
@@ -37,7 +38,7 @@ const getNotificationKey = (notification) => {
 const showNotificationToast = (notification, fallbackTitle) => {
   const title = notification.title || fallbackTitle;
   const message = notification.message || 'You have a new update.';
-  showToast(`${title}: ${message}`, 'info', 6000);
+  showToast(`${title}: ${message}`, 'info', 6000, getNotificationKey(notification));
 };
 
 const isDeletableAdminNotification = (notification) => {
@@ -96,6 +97,9 @@ export const Header = ({ onSignOut }) => {
   const [deletingNotificationIds, setDeletingNotificationIds] = useState(() => new Set());
   const [isDeletingAllNotifications, setIsDeletingAllNotifications] = useState(false);
   const previousAdminNotificationIdsRef = useRef(null);
+  const pendingSocketNotificationIdsRef = useRef(new Set());
+  const activeNotificationSessionRef = useRef(null);
+  const notificationSocketCleanupRef = useRef(null);
 
   // --- Global Announcement Management States (Admin) ---
   const [announcements, setAnnouncements] = useState([]);
@@ -113,6 +117,11 @@ export const Header = ({ onSignOut }) => {
   const [employeeUnreadCount, setEmployeeUnreadCount] = useState(0);
   const [employeeTab, setEmployeeTab] = useState('unread'); // 'unread' | 'all' | 'read'
   const previousEmployeeNotificationIdsRef = useRef(null);
+  const [desktopNotificationPermission, setDesktopNotificationPermission] = useState(() => (
+    typeof window !== 'undefined' && 'Notification' in window
+      ? Notification.permission
+      : 'unsupported'
+  ));
 
   // --- Click Outside Event Listener ---
   useEffect(() => {
@@ -138,15 +147,6 @@ export const Header = ({ onSignOut }) => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, []);
-
-  // Request Browser Notification Permission on Mount
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-    }
   }, []);
 
   // Helper date formatter: e.g. "9 Oct, 06:54 pm"
@@ -337,58 +337,43 @@ export const Header = ({ onSignOut }) => {
       const unread = listWithReadStatus.filter((n) => !n.isRead).length;
       const previousIds = previousAdminNotificationIdsRef.current;
       const newlyArrived = previousIds === null
-        ? []
+        ? listWithReadStatus.filter((notification) => {
+          const key = getNotificationKey(notification);
+          return !notification.isRead && key && pendingSocketNotificationIdsRef.current.has(key);
+        })
         : listWithReadStatus.filter((notification) => {
           const key = getNotificationKey(notification);
           return !notification.isRead && key && !previousIds.has(key);
         });
+      const socketArrivals = newlyArrived.filter((notification) => (
+        pendingSocketNotificationIdsRef.current.has(getNotificationKey(notification))
+      ));
 
       if (newlyArrived.length > 0) {
         playNotificationTone();
         newlyArrived.forEach((notification) => {
           showNotificationToast(notification, 'New Admin Notification');
         });
-        const latestUnread = newlyArrived[0];
-        if (latestUnread && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification(latestUnread.title || 'New Admin Notification', {
-            body: latestUnread.message || 'You have a new update.',
+        if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+          socketArrivals.forEach(() => new Notification('Kevalon Hub', {
+            body: 'You have a new update in Kevalon Hub.',
             icon: '/logo.png',
-          });
+          }));
         }
       }
 
       previousAdminNotificationIdsRef.current = new Set(
         listWithReadStatus.map(getNotificationKey).filter(Boolean)
       );
+      listWithReadStatus.forEach((notification) => {
+        const key = getNotificationKey(notification);
+        if (key) pendingSocketNotificationIdsRef.current.delete(key);
+      });
       setAdminUnreadCount(unread);
     } catch (err) {
       console.error('Error in fetchAdminNotificationsFeed:', err);
     }
   }, []);
-
-  // Poll Admin notifications every 20 seconds and on window focus
-  useEffect(() => {
-    if (!isAdmin) return;
-    const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
-    if (!token) return;
-
-    fetchAdminNotificationsFeed();
-
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      fetchAdminNotificationsFeed();
-    }, 20000);
-
-    const onFocus = () => {
-      fetchAdminNotificationsFeed();
-    };
-    window.addEventListener('focus', onFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, [isAdmin, fetchAdminNotificationsFeed]);
 
   const handleAdminMarkAsRead = async (id, e) => {
     if (e) e.stopPropagation();
@@ -548,7 +533,7 @@ export const Header = ({ onSignOut }) => {
   // ==========================================================
   // 2. EMPLOYEE & TL ISOLATED NOTIFICATIONS (userRole !== 'admin')
   // ==========================================================
-  const fetchEmployeeNotifications = async () => {
+  const fetchEmployeeNotifications = useCallback(async () => {
     try {
       const res = await api.get('/api/employee-panel/notifications');
       if (res.data?.success) {
@@ -556,49 +541,149 @@ export const Header = ({ onSignOut }) => {
         const currentUnread = res.data.unreadCount ?? fetchedList.filter((n) => !n.isRead).length;
         const previousIds = previousEmployeeNotificationIdsRef.current;
         const newlyArrived = previousIds === null
-          ? []
+          ? fetchedList.filter((notification) => {
+            const key = getNotificationKey(notification);
+            return !notification.isRead && key && pendingSocketNotificationIdsRef.current.has(key);
+          })
           : fetchedList.filter((notification) => {
             const key = getNotificationKey(notification);
             return !notification.isRead && key && !previousIds.has(key);
           });
+        const socketArrivals = newlyArrived.filter((notification) => (
+          pendingSocketNotificationIdsRef.current.has(getNotificationKey(notification))
+        ));
 
         if (newlyArrived.length > 0) {
           playNotificationTone();
           newlyArrived.forEach((notification) => {
             showNotificationToast(notification, 'Kevalon Notification');
           });
-          const latestUnread = newlyArrived[0];
-          if (latestUnread && 'Notification' in window && Notification.permission === 'granted') {
-            new Notification(latestUnread.title || 'Kevalon Notification', {
-              body: latestUnread.message || 'You have a new update.',
+          if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+            socketArrivals.forEach(() => new Notification('Kevalon Hub', {
+              body: 'You have a new update in Kevalon Hub.',
               icon: '/logo.png',
-            });
+            }));
           }
         }
 
         previousEmployeeNotificationIdsRef.current = new Set(
           fetchedList.map(getNotificationKey).filter(Boolean)
         );
+        fetchedList.forEach((notification) => {
+          const key = getNotificationKey(notification);
+          if (key) pendingSocketNotificationIdsRef.current.delete(key);
+        });
         setEmployeeNotifications(fetchedList);
         setEmployeeUnreadCount(currentUnread);
       }
     } catch (error) {
       console.error('Failed to fetch employee notifications:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (isAdmin) return;
-    const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
-    if (!token) return;
+    let token;
+    try {
+      token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    } catch (error) {
+      console.error('Could not read the session token for notifications:', error);
+      return undefined;
+    }
 
-    fetchEmployeeNotifications();
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      fetchEmployeeNotifications();
-    }, 45000);
-    return () => clearInterval(interval);
-  }, [isAdmin]);
+    if (!token) return undefined;
+
+    const pendingNotificationIds = pendingSocketNotificationIdsRef.current;
+    const sessionKey = String(user?.id || user?._id || user?.userId || user?.employeeId || token);
+    if (
+      activeNotificationSessionRef.current !== null &&
+      activeNotificationSessionRef.current !== sessionKey
+    ) {
+      previousAdminNotificationIdsRef.current = null;
+      previousEmployeeNotificationIdsRef.current = null;
+      pendingSocketNotificationIdsRef.current.clear();
+      setAdminNotifications([]);
+      setAdminUnreadCount(0);
+      setEmployeeNotifications([]);
+      setEmployeeUnreadCount(0);
+    }
+    activeNotificationSessionRef.current = sessionKey;
+
+    const fetchCurrentNotifications = () => (
+      isAdmin ? fetchAdminNotificationsFeed() : fetchEmployeeNotifications()
+    );
+    const socket = io(BASE_URL, {
+      auth: { token },
+      autoConnect: false,
+    });
+
+    const handleNotification = (payload) => {
+      const notificationId = typeof payload === 'string'
+        ? payload
+        : payload?.notificationId || payload?.id || payload?._id;
+
+      if (!notificationId) {
+        console.error('Received a notification event without a saved notification ID.');
+        return;
+      }
+
+      pendingSocketNotificationIdsRef.current.add(String(notificationId));
+      fetchCurrentNotifications();
+    };
+
+    const handleSocketConnectError = (error) => {
+      console.error('Notification socket connection failed:', error);
+    };
+
+    fetchCurrentNotifications();
+    socket.on('connect', fetchCurrentNotifications);
+    socket.on('notification:new', handleNotification);
+    socket.on('connect_error', handleSocketConnectError);
+    window.addEventListener('focus', fetchCurrentNotifications);
+    socket.connect();
+
+    const cleanupSocket = () => {
+      socket.off('connect', fetchCurrentNotifications);
+      socket.off('notification:new', handleNotification);
+      socket.off('connect_error', handleSocketConnectError);
+      window.removeEventListener('focus', fetchCurrentNotifications);
+      socket.disconnect();
+      pendingNotificationIds.clear();
+      if (notificationSocketCleanupRef.current === cleanupSocket) {
+        notificationSocketCleanupRef.current = null;
+      }
+    };
+    notificationSocketCleanupRef.current = cleanupSocket;
+    return cleanupSocket;
+  }, [
+    isAdmin,
+    user?.id,
+    user?._id,
+    user?.userId,
+    user?.employeeId,
+    fetchAdminNotificationsFeed,
+    fetchEmployeeNotifications,
+  ]);
+
+  const handleEnableDesktopNotifications = async () => {
+    if (!('Notification' in window)) {
+      setDesktopNotificationPermission('unsupported');
+      showToast('Desktop notifications are not supported by this browser.', 'warning');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setDesktopNotificationPermission(permission);
+      if (permission === 'granted') {
+        showToast('Desktop notifications enabled.', 'success');
+      } else {
+        showToast('Desktop notifications are disabled. In-app notifications will still work.', 'warning');
+      }
+    } catch (error) {
+      console.error('Could not request desktop notification permission:', error);
+      showToast('Could not enable desktop notifications.', 'error');
+    }
+  };
 
   const handleEmployeeMarkAsRead = async (id) => {
     try {
@@ -890,6 +975,25 @@ export const Header = ({ onSignOut }) => {
             {/* Notification Dropdown - Tailored per role */}
             {isNotificationsOpen && (
               <div className="fixed inset-x-2.5 top-[68px] sm:top-full sm:mt-2 sm:absolute sm:right-0 sm:left-auto sm:inset-x-auto sm:w-[420px] sm:max-w-[calc(100vw-2rem)] bg-white border border-slate-200/90 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in text-xs">
+                <div className="flex items-center justify-between gap-3 px-3.5 py-2 border-b border-slate-100 bg-white">
+                  <span className="text-[11px] text-slate-600">
+                    {desktopNotificationPermission === 'granted'
+                      ? 'Desktop notifications enabled'
+                      : desktopNotificationPermission === 'denied'
+                        ? 'Blocked in browser settings'
+                        : desktopNotificationPermission === 'unsupported'
+                          ? 'Desktop notifications unavailable'
+                          : 'Enable system notifications'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleEnableDesktopNotifications}
+                    disabled={desktopNotificationPermission === 'granted' || desktopNotificationPermission === 'denied' || desktopNotificationPermission === 'unsupported'}
+                    className="rounded-md bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {desktopNotificationPermission === 'granted' ? 'Enabled' : 'Enable Desktop Notifications'}
+                  </button>
+                </div>
                 {isAdmin ? (
                   <>
                     {/* Admin Header */}
@@ -1310,6 +1414,7 @@ export const Header = ({ onSignOut }) => {
                     onClick={() => {
                       handleCheckOut();
                       setIsProfileMenuOpen(false);
+                      notificationSocketCleanupRef.current?.();
                       if (onSignOut) onSignOut();
                     }}
                     className="w-full px-3.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50/80 flex items-center gap-2 transition-colors cursor-pointer text-left"
