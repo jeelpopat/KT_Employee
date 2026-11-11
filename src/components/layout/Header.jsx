@@ -30,6 +30,20 @@ const playNotificationTone = () => {
   });
 };
 
+const showDesktopNotification = () => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  try {
+    new Notification('Kevalon Hub', {
+      body: 'You have a new update in Kevalon Hub.',
+      icon: '/logo.png',
+      silent: false,
+    });
+  } catch (error) {
+    console.warn('Could not show desktop notification:', error);
+  }
+};
+
 const getNotificationKey = (notification) => {
   const id = notification?._id || notification?.id;
   return id ? String(id) : null;
@@ -100,6 +114,7 @@ export const Header = ({ onSignOut }) => {
   const pendingSocketNotificationIdsRef = useRef(new Set());
   const activeNotificationSessionRef = useRef(null);
   const notificationSocketCleanupRef = useRef(null);
+  const displayedSocketNotificationIdsRef = useRef(new Set());
 
   // --- Global Announcement Management States (Admin) ---
   const [announcements, setAnnouncements] = useState([]);
@@ -350,16 +365,10 @@ export const Header = ({ onSignOut }) => {
       ));
 
       if (newlyArrived.length > 0) {
-        playNotificationTone();
+        if (socketArrivals.length === 0) playNotificationTone();
         newlyArrived.forEach((notification) => {
           showNotificationToast(notification, 'New Admin Notification');
         });
-        if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-          socketArrivals.forEach(() => new Notification('Kevalon Hub', {
-            body: 'You have a new update in Kevalon Hub.',
-            icon: '/logo.png',
-          }));
-        }
       }
 
       previousAdminNotificationIdsRef.current = new Set(
@@ -554,16 +563,10 @@ export const Header = ({ onSignOut }) => {
         ));
 
         if (newlyArrived.length > 0) {
-          playNotificationTone();
+          if (socketArrivals.length === 0) playNotificationTone();
           newlyArrived.forEach((notification) => {
             showNotificationToast(notification, 'Kevalon Notification');
           });
-          if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-            socketArrivals.forEach(() => new Notification('Kevalon Hub', {
-              body: 'You have a new update in Kevalon Hub.',
-              icon: '/logo.png',
-            }));
-          }
         }
 
         previousEmployeeNotificationIdsRef.current = new Set(
@@ -601,6 +604,7 @@ export const Header = ({ onSignOut }) => {
       previousAdminNotificationIdsRef.current = null;
       previousEmployeeNotificationIdsRef.current = null;
       pendingSocketNotificationIdsRef.current.clear();
+      displayedSocketNotificationIdsRef.current.clear();
       setAdminNotifications([]);
       setAdminUnreadCount(0);
       setEmployeeNotifications([]);
@@ -626,7 +630,12 @@ export const Header = ({ onSignOut }) => {
         return;
       }
 
-      pendingSocketNotificationIdsRef.current.add(String(notificationId));
+      const key = String(notificationId);
+      if (displayedSocketNotificationIdsRef.current.has(key)) return;
+      displayedSocketNotificationIdsRef.current.add(key);
+      pendingSocketNotificationIdsRef.current.add(key);
+      playNotificationTone();
+      showDesktopNotification();
       fetchCurrentNotifications();
     };
 
