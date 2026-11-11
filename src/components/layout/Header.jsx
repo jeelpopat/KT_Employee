@@ -14,6 +14,26 @@ import { tabToPath, pathToTab } from '../../utils/navigation.js';
 import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
 
+let notificationAudio;
+
+const playNotificationTone = () => {
+  if (typeof Audio === 'undefined') return;
+
+  if (!notificationAudio) {
+    notificationAudio = new Audio('/notification-tone.mp3');
+  }
+
+  notificationAudio.currentTime = 0;
+  notificationAudio.play().catch((error) => {
+    console.warn('Could not play notification tone:', error);
+  });
+};
+
+const getNotificationKey = (notification) => {
+  const id = notification?._id || notification?.id;
+  return id ? String(id) : null;
+};
+
 const isDeletableAdminNotification = (notification) => {
   const id = notification?._id || notification?.id;
   return Boolean(
@@ -69,7 +89,7 @@ export const Header = ({ onSignOut }) => {
   const [adminTab, setAdminTab] = useState('unread'); // 'unread' | 'all' | 'read'
   const [deletingNotificationIds, setDeletingNotificationIds] = useState(() => new Set());
   const [isDeletingAllNotifications, setIsDeletingAllNotifications] = useState(false);
-  const previousAdminUnreadRef = useRef(0);
+  const previousAdminNotificationIdsRef = useRef(null);
 
   // --- Global Announcement Management States (Admin) ---
   const [announcements, setAnnouncements] = useState([]);
@@ -86,7 +106,7 @@ export const Header = ({ onSignOut }) => {
   const [employeeNotifications, setEmployeeNotifications] = useState([]);
   const [employeeUnreadCount, setEmployeeUnreadCount] = useState(0);
   const [employeeTab, setEmployeeTab] = useState('unread'); // 'unread' | 'all' | 'read'
-  const previousEmployeeUnreadRef = useRef(0);
+  const previousEmployeeNotificationIdsRef = useRef(null);
 
   // --- Click Outside Event Listener ---
   useEffect(() => {
@@ -309,9 +329,17 @@ export const Header = ({ onSignOut }) => {
       listWithReadStatus.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       setAdminNotifications(listWithReadStatus);
       const unread = listWithReadStatus.filter((n) => !n.isRead).length;
+      const previousIds = previousAdminNotificationIdsRef.current;
+      const newlyArrived = previousIds === null
+        ? []
+        : listWithReadStatus.filter((notification) => {
+          const key = getNotificationKey(notification);
+          return !notification.isRead && key && !previousIds.has(key);
+        });
 
-      if (unread > previousAdminUnreadRef.current && previousAdminUnreadRef.current !== 0) {
-        const latestUnread = listWithReadStatus.find((n) => !n.isRead);
+      if (newlyArrived.length > 0) {
+        playNotificationTone();
+        const latestUnread = newlyArrived[0];
         if (latestUnread && 'Notification' in window && Notification.permission === 'granted') {
           new Notification(latestUnread.title || 'New Admin Notification', {
             body: latestUnread.message || 'You have a new update.',
@@ -320,7 +348,9 @@ export const Header = ({ onSignOut }) => {
         }
       }
 
-      previousAdminUnreadRef.current = unread;
+      previousAdminNotificationIdsRef.current = new Set(
+        listWithReadStatus.map(getNotificationKey).filter(Boolean)
+      );
       setAdminUnreadCount(unread);
     } catch (err) {
       console.error('Error in fetchAdminNotificationsFeed:', err);
@@ -515,9 +545,17 @@ export const Header = ({ onSignOut }) => {
       if (res.data?.success) {
         const fetchedList = res.data.data || [];
         const currentUnread = res.data.unreadCount ?? fetchedList.filter((n) => !n.isRead).length;
+        const previousIds = previousEmployeeNotificationIdsRef.current;
+        const newlyArrived = previousIds === null
+          ? []
+          : fetchedList.filter((notification) => {
+            const key = getNotificationKey(notification);
+            return !notification.isRead && key && !previousIds.has(key);
+          });
 
-        if (currentUnread > previousEmployeeUnreadRef.current && previousEmployeeUnreadRef.current !== 0) {
-          const latestUnread = fetchedList.find((n) => !n.isRead);
+        if (newlyArrived.length > 0) {
+          playNotificationTone();
+          const latestUnread = newlyArrived[0];
           if (latestUnread && 'Notification' in window && Notification.permission === 'granted') {
             new Notification(latestUnread.title || 'Kevalon Notification', {
               body: latestUnread.message || 'You have a new update.',
@@ -526,7 +564,9 @@ export const Header = ({ onSignOut }) => {
           }
         }
 
-        previousEmployeeUnreadRef.current = currentUnread;
+        previousEmployeeNotificationIdsRef.current = new Set(
+          fetchedList.map(getNotificationKey).filter(Boolean)
+        );
         setEmployeeNotifications(fetchedList);
         setEmployeeUnreadCount(currentUnread);
       }
