@@ -1885,10 +1885,19 @@ export const EmployeeDeductionsView = () => {
                 </tr>
               ) : paginatedDeductions.length > 0 ? (
                 paginatedDeductions.map((item) => {
+                  const isOwnTeamLeadDeduction = isTL && activeTab === 'my-deductions';
                   const empName =
-                    item.employeeId?.name || item.userId?.name || item.employeeName || 'Staff Member';
+                    item.employeeId?.name ||
+                    item.userId?.name ||
+                    item.employeeName ||
+                    (isOwnTeamLeadDeduction ? user?.name || user?.fullName : '') ||
+                    'Staff Member';
                   const empId =
-                    item.employeeId?.uniqueID || item.userId?.uniqueID || item.employeeId?._id || '—';
+                    item.employeeId?.uniqueID ||
+                    item.userId?.uniqueID ||
+                    (isOwnTeamLeadDeduction ? user?.uniqueID || user?.employeeID || user?.employeeCode : '') ||
+                    item.employeeId?._id ||
+                    '—';
                   const tlName =
                     item.teamLeadUser?.name || item.teamLeadName || (item.teamLeadId ? `TL (${item.teamLeadId})` : 'Self / Head');
                   const title = item.deductionMasterId?.name || item.name || 'Deduction';
