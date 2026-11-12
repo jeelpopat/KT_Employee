@@ -12,6 +12,7 @@ import {
   RotateCw,
   Search,
   Save,
+  Smartphone,
   Users,
   Wallet,
   X,
@@ -25,11 +26,23 @@ const CONTROL_CLASS = 'w-full rounded-lg border border-slate-200 bg-white px-3 p
 const LABEL_CLASS = 'mb-1 block text-xs font-medium text-slate-600';
 const PAYABLE_STATUSES = ['generated', 'approved', 'processed', 'unpaid'];
 const EDITABLE_STATUSES = ['draft', 'generated', 'pending', 'processed', 'unpaid'];
+const UPI_PAYMENT_TYPES = [
+  { value: 'GOOGLE_PAY', label: 'Google Pay' },
+  { value: 'PHONEPE', label: 'PhonePe' },
+  { value: 'PAYTM', label: 'Paytm' },
+  { value: 'BHIM', label: 'BHIM UPI' },
+  { value: 'AMAZON_PAY', label: 'Amazon Pay' },
+  { value: 'OTHER', label: 'Other UPI app' },
+];
+const getSalaryFundingAccounts = (accounts, paymentMode) => accounts.filter((account) => (
+  paymentMode === 'CASH'
+    ? account.accountType === 'Cash'
+    : ['Savings', 'Current'].includes(account.accountType)
+));
 const COMMON_EDIT_FIELDS = [
   { name: 'extraAllowance', label: 'Extra allowance' },
   { name: 'incentive', label: 'Incentive' },
   { name: 'bonus', label: 'Bonus' },
-  { name: 'extraDeduction', label: 'Extra deduction' },
 ];
 const COMPONENT_EDIT_FIELDS = [
   { name: 'basicSalary', label: 'Basic salary' },
@@ -39,6 +52,22 @@ const COMPONENT_EDIT_FIELDS = [
   { name: 'specialAllowance', label: 'Special allowance' },
   { name: 'dearnessAllowance', label: 'Dearness allowance' },
   { name: 'otherAllowances', label: 'Other allowances' },
+  { name: 'fixedBonus', label: 'Fixed bonus' },
+];
+const ATTENDANCE_EDIT_FIELDS = [
+  { name: 'workingDays', label: 'Working days' },
+  { name: 'approvedLeaveDays', label: 'Approved leave days' },
+  { name: 'unauthorizedFullDayCount', label: 'Unauthorized full days' },
+  { name: 'unauthorizedHalfDayCount', label: 'Unauthorized half days' },
+];
+const DEDUCTION_EDIT_FIELDS = [
+  { name: 'pfDeduction', label: 'Employee PF', applicabilityField: 'isPfApplicable' },
+  { name: 'esicDeduction', label: 'Employee ESIC', applicabilityField: 'isEsicApplicable' },
+  { name: 'professionalTax', label: 'Professional Tax', applicabilityField: 'isPtApplicable' },
+  { name: 'tds', label: 'TDS / Income Tax', applicabilityField: 'isTdsApplicable' },
+  { name: 'fixedDeduction', label: 'Fixed deduction' },
+  { name: 'extraDeduction', label: 'Extra deduction' },
+  { name: 'otherDeductions', label: 'Other deductions' },
 ];
 
 const getId = (value) => {
@@ -89,6 +118,7 @@ const getBankDetails = (salary) => {
     branch: employee.bankBranch || details.bankBranch || '',
     accountNumber: String(employee.bankAccountNumber || details.bankAccountNumber || details.accountNumber || '').trim(),
     ifsc: String(employee.ifscCode || details.ifscCode || details.IFSC || '').trim().toUpperCase(),
+    upiId: String(employee.upiId || employee.upiID || employee.upi || details.upiId || details.upiID || details.upi || '').trim(),
   };
 };
 
@@ -213,6 +243,45 @@ const isSimpleFixedPayroll = (salary) => (
   (Number(salary?.basicSalary) > 0 && !Number(salary?.hra) && !Number(salary?.allowance))
 );
 
+const getSalaryEditSections = (salary) => [
+  {
+    title: 'Salary & earnings',
+    fields: [
+      ...(isSimpleFixedPayroll(salary)
+        ? [{ name: 'fixedSalary', label: 'Monthly fixed salary' }]
+        : COMPONENT_EDIT_FIELDS),
+      ...COMMON_EDIT_FIELDS,
+    ],
+  },
+  { title: 'Attendance & leave', fields: ATTENDANCE_EDIT_FIELDS },
+  { title: 'Deductions', fields: DEDUCTION_EDIT_FIELDS },
+];
+
+const isSalaryDeductionApplicable = (salary, field) => (
+  (salary?.[field] ?? salary?.salaryStructureSnapshot?.[field]) !== false
+);
+
+const getSalaryEditValue = (salary, field) => {
+  const aliases = {
+    fixedSalary: ['fixedSalary', 'basicSalary', 'monthlySalary'],
+    bonus: ['bonus', 'extraBonus'],
+    tds: ['tdsAmount', 'tds'],
+    approvedLeaveDays: ['approvedLeaveDays', 'leaveDays'],
+    unauthorizedFullDayCount: ['unauthorizedFullDayCount', 'unauthorizedFullDays'],
+    unauthorizedHalfDayCount: ['unauthorizedHalfDayCount', 'unauthorizedHalfDays'],
+    workingDays: ['workingDays', 'totalDays'],
+  };
+  const keys = aliases[field] || [field];
+  const sources = [salary, salary?.deductionBreakdown, salary?.salaryStructureSnapshot].filter(Boolean);
+  const positiveValue = sources
+    .flatMap((source) => keys.map((key) => source[key]))
+    .find((value) => Number(value) > 0);
+  const existingValue = sources
+    .flatMap((source) => keys.map((key) => source[key]))
+    .find((value) => value !== undefined && value !== null);
+  return String(Number(positiveValue ?? existingValue) || 0);
+};
+
 const formatCurrency = (value) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
@@ -237,10 +306,19 @@ const formatSalaryPeriod = (salary) => {
     .format(new Date(year, month - 1, 1));
 };
 
+const getPaymentTypeLabel = (paymentType) => (
+  UPI_PAYMENT_TYPES.find((option) => option.value === String(paymentType || '').toUpperCase())?.label ||
+  (paymentType ? String(paymentType).replace(/[_-]+/g, ' ') : '')
+);
+
 const getPaymentMethodLabel = (salary) => {
   if (String(salary?.status || '').toLowerCase() !== 'paid') return '—';
   const mode = String(salary?.paymentMode || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
   if (mode === 'CASH') return 'Cash';
+  if (mode === 'UPI') {
+    const typeLabel = getPaymentTypeLabel(salary?.paymentType);
+    return typeLabel ? `UPI · ${typeLabel}` : 'UPI';
+  }
   if (['BANK_TRANSFER', 'ACCOUNT', 'BANK', 'BANK_ACCOUNT', 'NEFT', 'IMPS', 'RTGS'].includes(mode)) return 'Account';
   if (mode === 'CHEQUE') return 'Cheque';
   return mode ? mode.replace(/_/g, ' ') : 'Not specified';
@@ -272,6 +350,9 @@ export const FinanceSalariesManagementView = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [salaries, setSalaries] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [isLoadingBankAccounts, setIsLoadingBankAccounts] = useState(false);
+  const [bankAccountLoadError, setBankAccountLoadError] = useState('');
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(!preferredCompanyId);
   const [isLoadingBranches, setIsLoadingBranches] = useState(Boolean(preferredCompanyId));
   const [isLoadingSalaries, setIsLoadingSalaries] = useState(false);
@@ -285,6 +366,8 @@ export const FinanceSalariesManagementView = () => {
   const [salaryEditError, setSalaryEditError] = useState('');
   const [isSavingSalary, setIsSavingSalary] = useState(false);
   const [paymentMode, setPaymentMode] = useState('BANK_TRANSFER');
+  const [paymentType, setPaymentType] = useState('GOOGLE_PAY');
+  const [paidFromAccountId, setPaidFromAccountId] = useState('');
   const [transferConfirmed, setTransferConfirmed] = useState(false);
   const [transferReference, setTransferReference] = useState('');
   const [paymentError, setPaymentError] = useState('');
@@ -388,6 +471,42 @@ export const FinanceSalariesManagementView = () => {
     return () => { active = false; };
   }, [companyId, branchId, month, year, reloadKey]);
 
+  useEffect(() => {
+    if (!companyId || !branchId) {
+      setBankAccounts([]);
+      setIsLoadingBankAccounts(false);
+      setBankAccountLoadError('');
+      return undefined;
+    }
+    let active = true;
+    setIsLoadingBankAccounts(true);
+    setBankAccountLoadError('');
+    setBankAccounts([]);
+    const params = new URLSearchParams({ companyId, branchId });
+    api.get(`/api/bank-account?${params.toString()}`)
+      .then((response) => {
+        if (!active) return;
+        if (response.data?.success === false) {
+          throw new Error(response.data.message || 'Could not load company bank accounts.');
+        }
+        const accounts = getRecords(response.data?.data);
+        setBankAccounts(accounts.filter((account) => (
+          account.isActive !== false &&
+          ['Savings', 'Current', 'Cash'].includes(account.accountType)
+        )));
+      })
+      .catch((error) => {
+        if (active) {
+          setBankAccounts([]);
+          setBankAccountLoadError(getErrorMessage(error, 'Could not load company bank accounts.'));
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoadingBankAccounts(false);
+      });
+    return () => { active = false; };
+  }, [companyId, branchId, reloadKey]);
+
   const changeCompany = (nextCompanyId) => {
     setCompanyId(nextCompanyId);
     setBranches([]);
@@ -438,42 +557,46 @@ export const FinanceSalariesManagementView = () => {
     if (isPaying) return;
     setSelectedSalary(null);
     setPaymentMode('BANK_TRANSFER');
+    setPaymentType('GOOGLE_PAY');
+    setPaidFromAccountId('');
     setTransferConfirmed(false);
     setTransferReference('');
     setPaymentError('');
   };
 
   const openSalaryEditor = (salary) => {
-    const simpleFixed = isSimpleFixedPayroll(salary);
-    const fields = [
-      ...(simpleFixed
-        ? [{ name: 'fixedSalary', label: 'Monthly fixed salary' }]
-        : COMPONENT_EDIT_FIELDS),
-      ...COMMON_EDIT_FIELDS,
-    ];
-    const form = Object.fromEntries(fields.map(({ name }) => [
-      name,
-      String(Number(
-        name === 'bonus'
-          ? salary.bonus ?? salary.extraBonus
-          : salary[name] ?? (name === 'fixedSalary' ? salary.basicSalary ?? salary.monthlySalary : 0)
-      ) || 0),
-    ]));
+    const fields = getSalaryEditSections(salary).flatMap((section) => section.fields);
+    const form = Object.fromEntries(fields.map(({ name }) => [name, getSalaryEditValue(salary, name)]));
     setEditingSalary(salary);
-    setSalaryEditForm({ ...form, remarks: salary.remarks || '' });
+    setSalaryEditForm({
+      ...form,
+      isPenaltyApproved: Boolean(salary.isPenaltyApproved),
+      penaltyDate: String(salary.penaltyDate || '').slice(0, 10),
+      remarks: salary.remarks || '',
+    });
     setSalaryEditError('');
   };
 
   const handleSaveSalary = async (event) => {
     event.preventDefault();
     if (!editingSalary) return;
-    const fields = Object.keys(salaryEditForm).filter((field) => field !== 'remarks');
+    const fields = Object.keys(salaryEditForm).filter((field) => (
+      !['remarks', 'isPenaltyApproved', 'penaltyDate'].includes(field)
+    ));
     const invalidField = fields.find((field) => {
       const value = salaryEditForm[field];
       return String(value).trim() === '' || !Number.isFinite(Number(value)) || Number(value) < 0;
     });
     if (invalidField) {
-      setSalaryEditError('Enter a valid amount of 0 or greater for every salary component.');
+      setSalaryEditError('Enter a valid non-negative number for each editable payroll field.');
+      return;
+    }
+    const workingDays = Number(salaryEditForm.workingDays);
+    const absenceDays = Number(salaryEditForm.approvedLeaveDays) +
+      Number(salaryEditForm.unauthorizedFullDayCount) +
+      Number(salaryEditForm.unauthorizedHalfDayCount) * 0.5;
+    if (absenceDays > workingDays + 0.01) {
+      setSalaryEditError('Approved leave and unauthorized absence cannot exceed working days.');
       return;
     }
 
@@ -482,6 +605,8 @@ export const FinanceSalariesManagementView = () => {
     try {
       const payload = {
         ...Object.fromEntries(fields.map((field) => [field, Number(salaryEditForm[field])])),
+        isPenaltyApproved: Boolean(salaryEditForm.isPenaltyApproved),
+        penaltyDate: salaryEditForm.penaltyDate || null,
         remarks: salaryEditForm.remarks,
       };
       if (Object.prototype.hasOwnProperty.call(payload, 'bonus')) payload.extraBonus = payload.bonus;
@@ -511,6 +636,8 @@ export const FinanceSalariesManagementView = () => {
         if (selectedSalary) {
           setSelectedSalary(null);
           setPaymentMode('BANK_TRANSFER');
+          setPaymentType('GOOGLE_PAY');
+          setPaidFromAccountId('');
           setTransferConfirmed(false);
           setTransferReference('');
           setPaymentError('');
@@ -534,7 +661,8 @@ export const FinanceSalariesManagementView = () => {
   const handlePaySalary = async (event) => {
     event.preventDefault();
     if (!selectedSalary || !transferConfirmed || !companyId || !branchId) {
-      setPaymentError(`Confirm that the ${paymentMode === 'CASH' ? 'cash payment' : 'bank transfer'} has already been completed.`);
+      const method = paymentMode === 'CASH' ? 'cash payment' : paymentMode === 'UPI' ? 'UPI payment' : 'bank transfer';
+      setPaymentError(`Confirm that the ${method} has already been completed.`);
       return;
     }
     const employeeBank = getBankDetails(selectedSalary);
@@ -542,21 +670,48 @@ export const FinanceSalariesManagementView = () => {
       setPaymentError('Employee bank account number and IFSC code are required.');
       return;
     }
+    if (paymentMode === 'UPI' && !employeeBank.upiId) {
+      setPaymentError('The employee’s UPI ID is required before recording a UPI salary payment.');
+      return;
+    }
+    if (paymentMode === 'UPI' && !UPI_PAYMENT_TYPES.some((option) => option.value === paymentType)) {
+      setPaymentError('Select the UPI app used for this salary payment.');
+      return;
+    }
+    const fundingAccount = bankAccounts.find((account) => getId(account) === paidFromAccountId);
+    if (!fundingAccount) {
+      setPaymentError(`Select the company ${paymentMode === 'CASH' ? 'cash' : 'bank'} account used for this payment.`);
+      return;
+    }
+    const availableBalance = Number(fundingAccount.currentBalance ?? fundingAccount.balance);
+    if (!Number.isFinite(availableBalance)) {
+      setPaymentError('Could not verify the selected company account balance. Refresh and try again.');
+      return;
+    }
+    if (availableBalance + 0.01 < getSalaryAmount(selectedSalary)) {
+      setPaymentError(`Insufficient funds in ${fundingAccount.accountName}. Available: ${formatCurrency(availableBalance)}; required: ${formatCurrency(getSalaryAmount(selectedSalary))}.`);
+      return;
+    }
 
     setIsPaying(true);
     setPaymentError('');
     const reference = transferReference.trim();
+    const paymentTypeLabel = getPaymentTypeLabel(paymentType);
     const remarks = paymentMode === 'CASH'
       ? 'Cash salary payment confirmed by Finance.'
-      : reference
-        ? `Manual bank transfer confirmed. UTR/Reference: ${reference}`
-        : 'Manual bank transfer confirmed by Finance.';
+      : paymentMode === 'UPI'
+        ? `Manual UPI payment confirmed via ${paymentTypeLabel}.${reference ? ` UTR/Reference: ${reference}` : ''}`
+        : reference
+          ? `Manual bank transfer confirmed. UTR/Reference: ${reference}`
+          : 'Manual bank transfer confirmed by Finance.';
     try {
       const response = await api.put('/api/salaries/finance-register/pay', {
         companyId,
         branchId,
         salaryId: getId(selectedSalary),
         paymentMode,
+        paymentType: paymentMode === 'UPI' ? paymentType : null,
+        paidFromAccountId,
         paidAt: new Date().toISOString(),
         transferConfirmed: true,
         remarks,
@@ -566,9 +721,11 @@ export const FinanceSalariesManagementView = () => {
       }
       invalidateCache(/salaries/);
       invalidateCache(/payroll/);
-      showToast(`${getEmployeeName(selectedSalary)}'s salary marked paid by ${getPaymentMethodLabel({ status: 'Paid', paymentMode })}.`, 'success');
+      showToast(`${getEmployeeName(selectedSalary)}'s salary marked paid by ${getPaymentMethodLabel({ status: 'Paid', paymentMode, paymentType })}.`, 'success');
       setSelectedSalary(null);
       setPaymentMode('BANK_TRANSFER');
+      setPaymentType('GOOGLE_PAY');
+      setPaidFromAccountId('');
       setTransferConfirmed(false);
       setTransferReference('');
       setReloadKey((value) => value + 1);
@@ -628,10 +785,7 @@ export const FinanceSalariesManagementView = () => {
       </div>
       </div>
 
-      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs leading-5 text-amber-900">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <p>Complete the cash handover or bank transfer outside this app, then confirm the actual payment method here. This screen does not move money.</p>
-      </div>
+
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
@@ -821,6 +975,8 @@ export const FinanceSalariesManagementView = () => {
                           onClick={() => {
                             setSelectedSalary(salary);
                             setPaymentMode('BANK_TRANSFER');
+                            setPaymentType('GOOGLE_PAY');
+                            setPaidFromAccountId('');
                             setTransferConfirmed(false);
                             setTransferReference('');
                             setPaymentError('');
@@ -849,6 +1005,14 @@ export const FinanceSalariesManagementView = () => {
         const employeeBank = getBankDetails(selectedSalary);
         const employeeName = getEmployeeName(selectedSalary);
         const isBankPayment = paymentMode === 'BANK_TRANSFER';
+        const isUpiPayment = paymentMode === 'UPI';
+        const availableFundingAccounts = getSalaryFundingAccounts(bankAccounts, paymentMode);
+        const selectedFundingAccount = availableFundingAccounts.find((account) => getId(account) === paidFromAccountId);
+        const requiredAmount = getSalaryAmount(selectedSalary);
+        const fundingBalance = Number(selectedFundingAccount?.currentBalance ?? selectedFundingAccount?.balance);
+        const hasUnavailableBalance = selectedFundingAccount && !Number.isFinite(fundingBalance);
+        const hasInsufficientFunds = selectedFundingAccount &&
+          Number.isFinite(fundingBalance) && fundingBalance + 0.01 < requiredAmount;
         return (
           <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/35 p-3 sm:p-5">
             <button type="button" className="absolute inset-0 cursor-default" aria-label="Close salary payment confirmation" onClick={closePayment} />
@@ -874,12 +1038,13 @@ export const FinanceSalariesManagementView = () => {
               <form onSubmit={handlePaySalary} className="mt-4 space-y-4">
                 <fieldset>
                   <legend className={LABEL_CLASS}>How was the salary paid?</legend>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {[
                       { value: 'CASH', label: 'Cash', Icon: Banknote },
                       { value: 'BANK_TRANSFER', label: 'Account transfer', Icon: Building2 },
+                      { value: 'UPI', label: 'UPI', Icon: Smartphone },
                     ].map(({ value, label, Icon }) => (
-                      <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-semibold transition ${
+                      <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-xs font-semibold transition sm:text-sm ${
                         paymentMode === value
                           ? 'border-indigo-400 bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200'
                           : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -891,6 +1056,7 @@ export const FinanceSalariesManagementView = () => {
                           checked={paymentMode === value}
                           onChange={() => {
                             setPaymentMode(value);
+                            setPaidFromAccountId('');
                             setTransferConfirmed(false);
                             setTransferReference('');
                             setPaymentError('');
@@ -904,6 +1070,57 @@ export const FinanceSalariesManagementView = () => {
                     ))}
                   </div>
                 </fieldset>
+                <div>
+                  <label htmlFor="salary-funding-account" className={LABEL_CLASS}>
+                    Pay from company {paymentMode === 'CASH' ? 'cash' : 'bank'} account
+                  </label>
+                  <select
+                    id="salary-funding-account"
+                    className={CONTROL_CLASS}
+                    value={paidFromAccountId}
+                    onChange={(event) => {
+                      setPaidFromAccountId(event.target.value);
+                      setPaymentError('');
+                    }}
+                    disabled={isPaying || isLoadingBankAccounts || availableFundingAccounts.length === 0}
+                    required
+                  >
+                    <option value="">Select a company account</option>
+                    {availableFundingAccounts.map((account) => (
+                      <option key={getId(account)} value={getId(account)}>
+                        {account.accountName} · {account.bankName || account.accountType} · Available {
+                          Number.isFinite(Number(account.currentBalance ?? account.balance))
+                            ? formatCurrency(account.currentBalance ?? account.balance)
+                            : 'Not available'
+                        }
+                      </option>
+                    ))}
+                  </select>
+                  {isLoadingBankAccounts && <p className="mt-1 text-[10px] text-slate-500">Loading company accounts…</p>}
+                  {!isLoadingBankAccounts && bankAccountLoadError && (
+                    <p role="alert" className="mt-1 text-[10px] text-rose-700">{bankAccountLoadError}</p>
+                  )}
+                  {!isLoadingBankAccounts && !bankAccountLoadError && availableFundingAccounts.length === 0 && (
+                    <p className="mt-1 text-[10px] text-rose-700">
+                      No active company {paymentMode === 'CASH' ? 'cash' : 'bank'} account is available.
+                    </p>
+                  )}
+                  {selectedFundingAccount && (
+                    <p className={`mt-1 text-[10px] ${hasInsufficientFunds ? 'text-rose-700' : 'text-slate-500'}`}>
+                      Available: {Number.isFinite(fundingBalance) ? formatCurrency(fundingBalance) : 'Not available'} · Required: {formatCurrency(requiredAmount)}
+                    </p>
+                  )}
+                  {hasUnavailableBalance && (
+                    <p role="alert" className="mt-1 text-[10px] font-medium text-rose-700">
+                      Could not verify this account’s balance. Refresh and try again.
+                    </p>
+                  )}
+                  {hasInsufficientFunds && (
+                    <p role="alert" className="mt-1 text-[10px] font-medium text-rose-700">
+                      Insufficient funds. Choose another account or add funds before recording this payment.
+                    </p>
+                  )}
+                </div>
                 {isBankPayment ? (
                   <>
                     <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3.5 text-xs">
@@ -928,6 +1145,48 @@ export const FinanceSalariesManagementView = () => {
                       />
                     </label>
                   </>
+                ) : isUpiPayment ? (
+                  <>
+                    <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-3.5 text-xs">
+                      <p className="mb-2 font-semibold text-violet-900">Employee UPI destination</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-slate-500">Employee</p>
+                          <p className="mt-0.5 font-semibold text-slate-800">{employeeName}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-slate-500">UPI ID</p>
+                          <p className="mt-0.5 break-all font-semibold text-slate-800">{employeeBank.upiId || 'Missing UPI ID'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <label className="block">
+                      <span className={LABEL_CLASS}>UPI payment type / app</span>
+                      <select
+                        className={CONTROL_CLASS}
+                        value={paymentType}
+                        onChange={(event) => setPaymentType(event.target.value)}
+                        disabled={isPaying}
+                        required
+                      >
+                        <option value="">Select UPI app</option>
+                        {UPI_PAYMENT_TYPES.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className={LABEL_CLASS}>UPI transaction ID / UTR (optional)</span>
+                      <input
+                        className={CONTROL_CLASS}
+                        value={transferReference}
+                        onChange={(event) => setTransferReference(event.target.value)}
+                        maxLength={100}
+                        disabled={isPaying}
+                        placeholder="Enter transaction reference"
+                      />
+                    </label>
+                  </>
                 ) : (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
                     Confirm only after the salary has been handed to the employee in cash.
@@ -944,7 +1203,9 @@ export const FinanceSalariesManagementView = () => {
                   />
                   <span>{isBankPayment
                     ? 'I have completed this bank transfer to the employee’s account. This confirmation will mark the payroll as Paid.'
-                    : 'I have handed the salary to the employee in cash. This confirmation will mark the payroll as Paid.'}</span>
+                    : isUpiPayment
+                      ? `I have sent this salary to ${employeeBank.upiId || 'the employee’s UPI ID'} using ${getPaymentTypeLabel(paymentType) || 'the selected UPI app'}. This confirmation will mark the payroll as Paid.`
+                      : 'I have handed the salary to the employee in cash. This confirmation will mark the payroll as Paid.'}</span>
                 </label>
                 {paymentError && (
                   <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -954,7 +1215,14 @@ export const FinanceSalariesManagementView = () => {
                 <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
                   <Button type="button" variant="outline" onClick={closePayment} isDisabled={isPaying}>Cancel</Button>
                   <Button type="submit" leftIcon={CheckCircle2} isLoading={isPaying} isDisabled={
-                    !transferConfirmed || (isBankPayment && (!employeeBank.accountNumber || !employeeBank.ifsc))
+                    !transferConfirmed ||
+                    !paidFromAccountId ||
+                    isLoadingBankAccounts ||
+                    Boolean(bankAccountLoadError) ||
+                    Boolean(hasUnavailableBalance) ||
+                    Boolean(hasInsufficientFunds) ||
+                    (isBankPayment && (!employeeBank.accountNumber || !employeeBank.ifsc)) ||
+                    (isUpiPayment && (!employeeBank.upiId || !paymentType))
                   }>
                     Mark as Paid
                   </Button>
@@ -995,13 +1263,8 @@ export const FinanceSalariesManagementView = () => {
         if (grossSalary - listedEarnings > 0.01) {
           earnings.push({ label: 'Other / unitemized earnings', amount: grossSalary - listedEarnings });
         }
-        const employerData = viewingSalary.employerContributions || viewingSalary.salaryStructureSnapshot?.employerContributions || {};
-        const employerContributions = [
-          { label: 'Employer PF', amount: employerData.pf },
-          { label: 'Employer ESIC', amount: employerData.esic },
-          { label: 'Gratuity', amount: employerData.gratuity },
-          { label: 'Other contribution', amount: employerData.other },
-        ];
+        const grossTotal = grossSalary || getSalaryAmount(viewingSalary) + salaryDeductionBreakdown.totalDeduction;
+        const netPay = getSalaryAmount(viewingSalary);
         const attendanceDetails = [
           ['Salary structure', viewingSalary.structureType || viewingSalary.salaryStructureSnapshot?.structureType || '—'],
           ['Monthly base salary', detailAmount('monthlySalary', 'fixedSalary') ? formatCurrency(detailAmount('monthlySalary', 'fixedSalary')) : '—'],
@@ -1030,6 +1293,9 @@ export const FinanceSalariesManagementView = () => {
           ['Financial year', viewingSalary.financialYearId?.yearLabel || viewingSalary.financialYearId?.year || viewingSalary.financialYearId?.name || '—'],
         ];
         const bank = getBankDetails(viewingSalary);
+        const paidFromAccount = viewingSalary.paidFromAccountId && typeof viewingSalary.paidFromAccountId === 'object'
+          ? viewingSalary.paidFromAccountId
+          : null;
         const remarkReference = String(viewingSalary.remarks || '').match(/(?:UTR\/Reference|reference)\s*:\s*([^\n.]+)/i)?.[1]?.trim();
         const designation = employee.designation?.designationName || employee.designation?.name || employee.designation || '—';
         const department = employee.department?.departmentName || employee.department?.name || employee.department || '—';
@@ -1044,21 +1310,28 @@ export const FinanceSalariesManagementView = () => {
         const approvalInfo = [
           ['Status', viewingSalary.status || 'Generated'],
           ['Payment method', getPaymentMethodLabel(viewingSalary)],
+          ...(String(viewingSalary.paymentMode || '').toUpperCase() === 'UPI'
+            ? [['Payment type', getPaymentTypeLabel(viewingSalary.paymentType) || 'UPI']]
+            : []),
           ['Generated date', formatDate(viewingSalary.generatedAt || viewingSalary.createdAt)],
           ['Approved date', formatDate(viewingSalary.approvedAt)],
           ['Paid date', formatDate(viewingSalary.paidAt)],
+          ['Paid from account', paidFromAccount?.accountName
+            ? `${paidFromAccount.accountName} · ${paidFromAccount.bankName || paidFromAccount.accountType || 'Account'}`
+            : '—'],
           ['Payment reference', viewingSalary.utrNumber || viewingSalary.transactionReference || viewingSalary.paymentReference || remarkReference || '—'],
           ['Bank name', bank.bank || '—'],
           ['Account holder', bank.holder || '—'],
           ['Account number', bank.accountNumber ? `Ending in ${bank.accountNumber.slice(-4)}` : '—'],
           ['IFSC code', bank.ifsc || '—'],
+          ...(bank.upiId ? [['UPI ID', bank.upiId]] : []),
           ['Generated by', viewingSalary.generatedBy?.name || viewingSalary.generatedBy?.fullName || '—'],
           ['Approved by', viewingSalary.approvedBy?.name || viewingSalary.approvedBy?.fullName || '—'],
           ['Paid by', viewingSalary.paidBy?.name || viewingSalary.paidBy?.fullName || '—'],
           ['Remarks', viewingSalary.remarks || '—'],
         ];
-        const renderAmounts = (items, showZero = false) => {
-          const rows = items.filter((item) => showZero || Number(item.amount) > 0);
+        const renderAmounts = (items) => {
+          const rows = items.filter((item) => Number(item.amount) > 0);
           return rows.length ? (
             <div className="divide-y divide-slate-100">
               {rows.map((item, index) => (
@@ -1075,9 +1348,15 @@ export const FinanceSalariesManagementView = () => {
             <p className="py-2 text-sm text-slate-400">No components recorded.</p>
           );
         };
+        const isZeroDetailValue = (value) => {
+          if (typeof value === 'number') return value === 0;
+          if (typeof value !== 'string' || !value.trim()) return false;
+          const numericValue = Number(value.replace(/[₹,\s]/g, ''));
+          return Number.isFinite(numericValue) && numericValue === 0;
+        };
         const renderDetailGrid = (items) => (
           <div className="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map(([label, value]) => (
+            {items.filter(([, value]) => !isZeroDetailValue(value)).map(([label, value]) => (
               <div key={label} className="border-b border-slate-100 py-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
                 <p className="mt-0.5 break-words text-xs font-medium text-slate-700">{value}</p>
@@ -1100,36 +1379,46 @@ export const FinanceSalariesManagementView = () => {
                 </button>
               </div>
               <div className="space-y-4 p-5 sm:p-6">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Gross salary</p>
-                    <p className="mt-1 text-base font-bold tabular-nums text-slate-900">{formatCurrency(grossSalary || getSalaryAmount(viewingSalary) + salaryDeductionBreakdown.totalDeduction)}</p>
-                  </div>
-                  <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600">Total deductions</p>
-                    <p className="mt-1 text-base font-bold tabular-nums text-slate-900">{formatCurrency(salaryDeductionBreakdown.totalDeduction)}</p>
-                  </div>
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Net pay</p>
-                    <p className="mt-1 text-base font-bold tabular-nums text-slate-900">{formatCurrency(getSalaryAmount(viewingSalary))}</p>
-                  </div>
+                <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
+                  {grossTotal > 0 && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Gross salary</p>
+                      <p className="mt-1 text-base font-bold tabular-nums text-slate-900">{formatCurrency(grossTotal)}</p>
+                    </div>
+                  )}
+                  {salaryDeductionBreakdown.totalDeduction > 0 && (
+                    <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600">Total deductions</p>
+                      <p className="mt-1 text-base font-bold tabular-nums text-slate-900">{formatCurrency(salaryDeductionBreakdown.totalDeduction)}</p>
+                    </div>
+                  )}
+                  {netPay > 0 && (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Net pay</p>
+                      <p className="mt-1 text-base font-bold tabular-nums text-slate-900">{formatCurrency(netPay)}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-xl border border-slate-200 p-4">
                     <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-700">Earnings</h3>
                     {renderAmounts(earnings)}
-                    <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold">
-                      <span>Gross earnings</span>
-                      <span className="tabular-nums">{formatCurrency(grossSalary || getSalaryAmount(viewingSalary) + salaryDeductionBreakdown.totalDeduction)}</span>
-                    </div>
+                    {grossTotal > 0 && (
+                      <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold">
+                        <span>Gross earnings</span>
+                        <span className="tabular-nums">{formatCurrency(grossTotal)}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="rounded-xl border border-slate-200 p-4">
                     <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-700">Deductions</h3>
-                    {renderAmounts(salaryDeductionBreakdown.deductions, true)}
-                    <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold">
-                      <span>Total deductions</span>
-                      <span className="tabular-nums">{formatCurrency(salaryDeductionBreakdown.totalDeduction)}</span>
-                    </div>
+                    {renderAmounts(salaryDeductionBreakdown.deductions)}
+                    {salaryDeductionBreakdown.totalDeduction > 0 && (
+                      <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold">
+                        <span>Total deductions</span>
+                        <span className="tabular-nums">{formatCurrency(salaryDeductionBreakdown.totalDeduction)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {salaryDeductionBreakdown.unitemizedBalance < -0.01 && (
@@ -1149,15 +1438,6 @@ export const FinanceSalariesManagementView = () => {
                 <section className="rounded-xl border border-slate-200 p-4">
                   <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-700">Attendance &amp; payroll calculation</h3>
                   {renderDetailGrid(attendanceDetails)}
-                </section>
-                <section className="rounded-xl border border-slate-200 p-4">
-                  <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-700">Employer contributions</h3>
-                  <p className="mb-1 text-[10px] text-slate-500">Employer-paid amounts are shown separately and are not deducted from employee net pay.</p>
-                  {renderAmounts(employerContributions, true)}
-                  <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold">
-                    <span>Total employer contribution</span>
-                    <span className="tabular-nums">{formatCurrency(employerContributions.reduce((total, item) => total + (Number(item.amount) || 0), 0))}</span>
-                  </div>
                 </section>
                 <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-700">Payment &amp; payroll record</h3>
@@ -1187,13 +1467,8 @@ export const FinanceSalariesManagementView = () => {
       })()}
 
       {editingSalary && (() => {
-        const simpleFixed = isSimpleFixedPayroll(editingSalary);
-        const fields = [
-          ...(simpleFixed
-            ? [{ name: 'fixedSalary', label: 'Monthly fixed salary' }]
-            : COMPONENT_EDIT_FIELDS),
-          ...COMMON_EDIT_FIELDS,
-        ];
+        const sections = getSalaryEditSections(editingSalary);
+        const customDeductions = getSalaryDeductionBreakdown(editingSalary).customDeductions;
         return (
           <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-5">
             <button
@@ -1211,7 +1486,9 @@ export const FinanceSalariesManagementView = () => {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">Edit payroll</p>
                   <h2 id="edit-salary-title" className="mt-0.5 text-lg font-bold text-slate-900">{getEmployeeName(editingSalary)}</h2>
-                  <p className="mt-1 text-xs text-slate-500">{formatSalaryPeriod(editingSalary)} · Current net {formatCurrency(getSalaryAmount(editingSalary))}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatSalaryPeriod(editingSalary)} · Gross {formatCurrency(editingSalary.grossSalary)} · Deductions {formatCurrency(editingSalary.totalDeduction)} · Net {formatCurrency(getSalaryAmount(editingSalary))}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -1227,23 +1504,88 @@ export const FinanceSalariesManagementView = () => {
                 </button>
               </div>
               <form onSubmit={handleSaveSalary} className="mt-5 space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {fields.map(({ name, label }) => (
-                    <label key={name}>
-                      <span className={LABEL_CLASS}>{label}</span>
+                {sections.map((section) => (
+                  <section key={section.title} className="rounded-xl border border-slate-200 p-4">
+                    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">{section.title}</h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {section.fields.map(({ name, label, applicabilityField }) => {
+                        const isApplicable = !applicabilityField ||
+                          isSalaryDeductionApplicable(editingSalary, applicabilityField);
+                        return (
+                        <label key={name}>
+                          <span className={LABEL_CLASS}>
+                            {label}
+                            {!isApplicable && <span className="ml-1 font-normal text-slate-400">Not applicable</span>}
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            required
+                            className={CONTROL_CLASS}
+                            value={salaryEditForm[name] ?? ''}
+                            onChange={(event) => setSalaryEditForm((current) => ({ ...current, [name]: event.target.value }))}
+                            disabled={isSavingSalary || !isApplicable}
+                          />
+                        </label>
+                        );
+                      })}
+                    </div>
+                    {section.title === 'Attendance & leave' && (
+                      <p className="mt-2 text-[10px] leading-4 text-slate-500">
+                        Half-day values support 0.5. LOP and payable days are recalculated from these attendance inputs.
+                      </p>
+                    )}
+                  </section>
+                ))}
+                <section className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">Penalty &amp; custom deductions</h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
+                        type="checkbox"
+                        checked={Boolean(salaryEditForm.isPenaltyApproved)}
+                        onChange={(event) => setSalaryEditForm((current) => ({ ...current, isPenaltyApproved: event.target.checked }))}
+                        disabled={isSavingSalary}
+                        className="h-4 w-4 accent-indigo-700"
+                      />
+                      Apply authorized penalty
+                    </label>
+                    <label>
+                      <span className={LABEL_CLASS}>Penalty date</span>
+                      <input
+                        type="date"
                         className={CONTROL_CLASS}
-                        value={salaryEditForm[name] ?? ''}
-                        onChange={(event) => setSalaryEditForm((current) => ({ ...current, [name]: event.target.value }))}
+                        value={salaryEditForm.penaltyDate ?? ''}
+                        onChange={(event) => setSalaryEditForm((current) => ({ ...current, penaltyDate: event.target.value }))}
                         disabled={isSavingSalary}
                       />
                     </label>
-                  ))}
-                </div>
+                  </div>
+                  <div className="mt-3 border-t border-slate-100 pt-3">
+                    <p className="text-[11px] font-semibold text-slate-700">Approved employee deductions</p>
+                    {customDeductions.length ? (
+                      <div className="mt-2 divide-y divide-slate-100">
+                        {customDeductions.map((item, index) => (
+                          <div key={`${item.deductionRecordId || item.deductionMasterId?._id || item.code || index}`} className="flex items-start justify-between gap-3 py-2 text-xs">
+                            <span className="min-w-0 text-slate-600">
+                              {item.deductionMasterId?.name || item.name || item.code || 'Employee deduction'}
+                              <span className="mt-0.5 block text-[10px] text-slate-400">
+                                {[item.deductionMasterId?.category || item.category, item.deductionMasterId?.description].filter(Boolean).join(' · ')}
+                              </span>
+                            </span>
+                            <span className="shrink-0 font-semibold tabular-nums text-slate-800">{formatCurrency(item.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-[10px] text-slate-500">No approved employee deductions are recorded for this payroll.</p>
+                    )}
+                    <p className="mt-2 text-[10px] leading-4 text-slate-500">
+                      These approved deduction records are managed in Employee Deductions and are recalculated with payroll.
+                    </p>
+                  </div>
+                </section>
                 <label className="block">
                   <span className={LABEL_CLASS}>Remarks</span>
                   <textarea
@@ -1255,7 +1597,7 @@ export const FinanceSalariesManagementView = () => {
                   />
                 </label>
                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-                  Net salary and deductions are recalculated when you save. Approved and paid payroll records cannot be edited.
+                  Gross, LOP, statutory deductions, penalties, total deductions, and net pay are recalculated when saved. Approved and paid payroll records cannot be edited.
                 </p>
                 {salaryEditError && (
                   <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">

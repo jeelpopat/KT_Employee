@@ -15,7 +15,10 @@ import { PurchaseBillsManagementView } from './PurchaseBillsManagementView.jsx';
 import { SalesInvoicesManagementView } from './SalesInvoicesManagementView.jsx';
 import { JournalEntriesManagementView } from './JournalEntriesManagementView.jsx';
 import { DebitNotesManagementView } from './DebitNotesManagementView.jsx';
+import { FinanceOverviewView } from './FinanceOverviewView.jsx';
 
+const AuditLogsView = lazy(() => import('../../pages/AuditLogs.jsx'));
+const FinanceNotificationsView = lazy(() => import('./FinanceNotificationsView.jsx'));
 const CreditNotesManagementView = lazy(() => import('./CreditNotesManagementView.jsx')
   .then((module) => ({ default: module.CreditNotesManagementView })));
 const FixedAssetsManagementView = lazy(() => import('./FixedAssetsManagementView.jsx')
@@ -46,6 +49,9 @@ const formatModuleTitle = (pathname) => {
 export const FinancePanel = () => {
   const { pathname } = useLocation();
 
+  if (pathname === '/finance') {
+    return <FinanceOverviewView />;
+  }
   if (pathname === '/finance/company-profile') {
     return <CompanyProfileView />;
   }
@@ -111,6 +117,12 @@ export const FinancePanel = () => {
   }
   if (pathname === '/finance/gst-returns') {
     return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading GST Returns…</p>}><GSTReturnsManagementView /></Suspense>;
+  }
+  if (pathname === '/finance/notifications') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Notifications…</p>}><FinanceNotificationsView /></Suspense>;
+  }
+  if (pathname === '/finance/audit-logs') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Audit Logs…</p>}><AuditLogsView /></Suspense>;
   }
 
   return (

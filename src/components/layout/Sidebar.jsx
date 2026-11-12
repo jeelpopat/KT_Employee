@@ -722,7 +722,7 @@ export const Sidebar = ({ onSignOut }) => {
     {
       title: 'AUDIT & ACTIVITY',
       items: [
-        { tab: 'finance-notifications', label: 'Notification', path: '/finance/notifications', icon: Bell },
+        { tab: 'finance-notifications', label: 'Notifications', path: '/finance/notifications', icon: Bell },
         { tab: 'finance-audit-logs', label: 'Audit Logs', path: '/finance/audit-logs', icon: ScrollText },
       ]
     },
