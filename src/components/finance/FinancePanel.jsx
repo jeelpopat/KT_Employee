@@ -24,6 +24,10 @@ const LoansManagementView = lazy(() => import('./LoansManagementView.jsx')
   .then((module) => ({ default: module.LoansManagementView })));
 const CustomerPaymentsManagementView = lazy(() => import('./CustomerPaymentsManagementView.jsx')
   .then((module) => ({ default: module.CustomerPaymentsManagementView })));
+const ExpensesManagementView = lazy(() => import('./ExpensesManagementView.jsx')
+  .then((module) => ({ default: module.ExpensesManagementView })));
+const GSTReturnsManagementView = lazy(() => import('./GSTReturnsManagementView.jsx')
+  .then((module) => ({ default: module.GSTReturnsManagementView })));
 
 const formatModuleTitle = (pathname) => {
   const moduleSlug = pathname.split('/').filter(Boolean).pop();
@@ -96,6 +100,12 @@ export const FinancePanel = () => {
   }
   if (pathname === '/finance/customer-payments') {
     return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Customer Payments…</p>}><CustomerPaymentsManagementView /></Suspense>;
+  }
+  if (pathname === '/finance/expenses') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Expenses…</p>}><ExpensesManagementView /></Suspense>;
+  }
+  if (pathname === '/finance/gst-returns') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading GST Returns…</p>}><GSTReturnsManagementView /></Suspense>;
   }
 
   return (

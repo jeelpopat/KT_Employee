@@ -891,11 +891,9 @@ export const Header = ({ onSignOut }) => {
         setAdminNotifications(remainingNotifications);
         const unreadCount = remainingNotifications.filter((item) => !item.isRead).length;
         setAdminUnreadCount(unreadCount);
-        previousAdminUnreadRef.current = unreadCount;
       } else {
         setEmployeeNotifications([]);
         setEmployeeUnreadCount(0);
-        previousEmployeeUnreadRef.current = 0;
       }
       showToast('All notifications deleted successfully.', 'success');
     } catch (error) {
@@ -994,10 +992,10 @@ export const Header = ({ onSignOut }) => {
       className="fixed top-0 left-0 right-0 w-full z-50 h-16 border-b border-[#083b4e] text-white transition-colors shadow-xs font-poppins"
       style={{ background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }}
     >
-      <div className="flex h-full items-center justify-between px-3 sm:px-6">
+      <div className="flex h-full items-center justify-between gap-1 px-2 sm:px-6">
 
         {/* Left: Mobile Sidebar Toggle & White Brand Logo */}
-        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-4">
           <button
             type="button"
             onClick={() => {
@@ -1025,20 +1023,20 @@ export const Header = ({ onSignOut }) => {
             <img
               src={whiteLogo}
               alt="Kevalon Technology"
-              className="h-10 sm:h-11 md:h-12 w-auto max-h-12 object-contain shrink-0 drop-shadow-xs"
+              className="h-8 w-[56px] object-contain sm:h-11 sm:w-auto md:h-12 max-h-12 shrink-0 drop-shadow-xs"
             />
           </div>
           {userRole === 'admin' && (
             <div
               role="group"
               aria-label="Panel switch"
-              className="inline-flex items-center gap-0.5 rounded-lg border border-white/25 bg-white/10 p-0.5"
+              className="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-white/25 bg-white/10 p-0.5"
             >
               <button
                 type="button"
                 aria-pressed={!isFinancePanel}
                 onClick={openHrmsPanel}
-                className={`rounded-md px-2 py-1.5 text-[11px] sm:px-2.5 sm:text-xs font-semibold transition-colors ${
+                className={`rounded-md px-1.5 py-1.5 text-[10px] sm:px-2.5 sm:text-xs font-semibold transition-colors ${
                   !isFinancePanel
                     ? 'bg-white text-[#0b4d68] shadow-xs'
                     : 'text-white/90 hover:bg-white/10 hover:text-white'
@@ -1050,20 +1048,21 @@ export const Header = ({ onSignOut }) => {
                 type="button"
                 aria-pressed={isFinancePanel}
                 onClick={() => navigate('/finance')}
-                className={`rounded-md px-2 py-1.5 text-[11px] sm:px-2.5 sm:text-xs font-semibold transition-colors ${
+                className={`rounded-md px-1.5 py-1.5 text-[10px] sm:px-2.5 sm:text-xs font-semibold transition-colors ${
                   isFinancePanel
                     ? 'bg-white text-[#0b4d68] shadow-xs'
                     : 'text-white/90 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                Finance
+                <span className="sm:hidden">Fin</span>
+                <span className="hidden sm:inline">Finance</span>
               </button>
             </div>
           )}
         </div>
 
         {/* Right: Actions, Notifications, Profile & Mobile Menu */}
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0 font-poppins">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-4 font-poppins">
           {/* Active monitoring badge for employees and team leads */}
           {userRole !== 'hr' && userRole !== 'admin' && attendanceStatus === 'checked_in' && (
             <button
@@ -1088,10 +1087,10 @@ export const Header = ({ onSignOut }) => {
                 setEditingAnnouncementId(null);
                 setShowAnnouncementModal(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-md bg-white text-[#0b4d68] hover:bg-slate-50 text-xs sm:text-[13px] font-medium font-poppins transition-colors cursor-pointer shadow-xs border-0"
+              className="inline-flex items-center gap-1.5 px-2 py-1.5 sm:px-3.5 sm:py-1.5 rounded-md bg-white text-[#0b4d68] hover:bg-slate-50 text-xs sm:text-[13px] font-medium font-poppins transition-colors cursor-pointer shadow-xs border-0"
             >
               <Plus size={14} strokeWidth={2.2} className="text-[#0b4d68]" />
-              <span>Announcement</span>
+              <span className="hidden sm:inline">Announcement</span>
             </button>
           )}
 
