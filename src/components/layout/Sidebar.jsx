@@ -710,6 +710,7 @@ export const Sidebar = ({ onSignOut }) => {
       items: [
         { tab: 'finance-journal-entries', label: 'Journal Entries', path: '/finance/journal-entries', icon: BookOpen },
         { tab: 'finance-debit-notes', label: 'Debit Notes', path: '/finance/debit-notes', icon: FileMinus },
+        { tab: 'finance-loans', label: 'Borrowings', path: '/finance/loans', icon: Banknote },
       ]
     },
     {

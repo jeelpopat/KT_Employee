@@ -511,10 +511,10 @@ export const CompanyProfileView = () => {
 
           <div className="grid gap-2.5 md:grid-cols-2 md:gap-3">
             <div className="space-y-2.5 md:space-y-3">
-              {['name', 'gstin', 'pan', 'email', 'phone', 'city', 'state'].map(renderFieldRow)}
+              {['name', , 'pan', 'phone', 'city', 'weeklyOff','workingHoursStartTime'].map(renderFieldRow)}
             </div>
             <div className="space-y-2.5 md:space-y-3">
-              {['pincode', 'country', 'workingHoursStartTime', 'workingHoursEndTime', 'weeklyOff'].map(renderFieldRow)}
+              {['gstin', 'email','country','state','pincode', 'workingHoursEndTime',   ].map(renderFieldRow)}
             </div>
             {renderFieldRow('address')}
           </div>

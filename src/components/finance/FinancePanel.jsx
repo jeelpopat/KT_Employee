@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CompanyProfileView } from './CompanyProfileView.jsx';
 import { BranchManagementView } from './BranchManagementView.jsx';
@@ -12,6 +12,18 @@ import { ChartOfAccountsManagementView } from './ChartOfAccountsManagementView.j
 import { PurchaseOrdersManagementView } from './PurchaseOrdersManagementView.jsx';
 import { TaxMasterManagementView } from './TaxMasterManagementView.jsx';
 import { PurchaseBillsManagementView } from './PurchaseBillsManagementView.jsx';
+import { SalesInvoicesManagementView } from './SalesInvoicesManagementView.jsx';
+import { JournalEntriesManagementView } from './JournalEntriesManagementView.jsx';
+import { DebitNotesManagementView } from './DebitNotesManagementView.jsx';
+
+const CreditNotesManagementView = lazy(() => import('./CreditNotesManagementView.jsx')
+  .then((module) => ({ default: module.CreditNotesManagementView })));
+const FixedAssetsManagementView = lazy(() => import('./FixedAssetsManagementView.jsx')
+  .then((module) => ({ default: module.FixedAssetsManagementView })));
+const LoansManagementView = lazy(() => import('./LoansManagementView.jsx')
+  .then((module) => ({ default: module.LoansManagementView })));
+const CustomerPaymentsManagementView = lazy(() => import('./CustomerPaymentsManagementView.jsx')
+  .then((module) => ({ default: module.CustomerPaymentsManagementView })));
 
 const formatModuleTitle = (pathname) => {
   const moduleSlug = pathname.split('/').filter(Boolean).pop();
@@ -61,8 +73,29 @@ export const FinancePanel = () => {
   if (pathname === '/finance/purchase-bills') {
     return <PurchaseBillsManagementView />;
   }
+  if (pathname === '/finance/sales-invoices') {
+    return <SalesInvoicesManagementView />;
+  }
   if (pathname === '/finance/tax-master') {
     return <TaxMasterManagementView />;
+  }
+  if (pathname === '/finance/journal-entries') {
+    return <JournalEntriesManagementView />;
+  }
+  if (pathname === '/finance/debit-notes') {
+    return <DebitNotesManagementView />;
+  }
+  if (pathname === '/finance/credit-notes') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Credit Notes…</p>}><CreditNotesManagementView /></Suspense>;
+  }
+  if (pathname === '/finance/fixed-assets') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Fixed Assets…</p>}><FixedAssetsManagementView /></Suspense>;
+  }
+  if (pathname === '/finance/loans') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Loans…</p>}><LoansManagementView /></Suspense>;
+  }
+  if (pathname === '/finance/customer-payments') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Customer Payments…</p>}><CustomerPaymentsManagementView /></Suspense>;
   }
 
   return (
