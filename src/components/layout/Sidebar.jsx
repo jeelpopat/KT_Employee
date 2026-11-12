@@ -477,6 +477,7 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
         { tab: 'admin-adjustments', label: 'Adjustments', icon: AdjustmentsIcon },
         { tab: 'admin-holidays', label: 'Holidays and Events', icon: HolidaysIcon },
+        { tab: 'admin-daily-task', label: 'Daily Task', icon: DailyReportIcon },
         { tab: 'admin-announcements', label: 'Announcements', icon: AnnouncementIcon },
       ]
     },
@@ -533,6 +534,7 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
         { tab: 'admin-adjustments', label: 'Adjustments', icon: AdjustmentsIcon },
         { tab: 'admin-holidays', label: 'Holidays and Events', icon: HolidaysIcon },
+        { tab: 'admin-daily-task', label: 'Daily Task', icon: DailyReportIcon },
       ]
     },
     {
