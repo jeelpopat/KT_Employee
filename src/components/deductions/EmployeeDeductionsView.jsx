@@ -22,9 +22,14 @@ import {
 } from '../../services/deductionService.js';
 import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
-import { useApp, deriveUserRole, getRealAuthUserId, resolveEmployeeName } from '../../context/AppContext.jsx';
+import { useApp, deriveUserRole, getRealAuthUserId } from '../../context/AppContext.jsx';
 import { filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
-import { fetchTeamsList, extractAssignedTeamEmployees, getLoggedInUserIdentifiers, isTeamOwnedByLead } from '../../utils/teamLeadUtils.js';
+import {
+  fetchTeamsList,
+  extractAssignedTeamEmployees,
+  getLoggedInUserIdentifiers,
+  isTeamOwnedByLead
+} from '../../utils/teamLeadUtils.js';
 
 // Format Indian Rupee Currency
 const formatINR = (val) => {
@@ -79,6 +84,37 @@ const getRoleLabel = (u) => {
   return 'Employee';
 };
 
+const getDeductionEmployeeKeys = (deduction) => {
+  const keys = new Set();
+  const add = (value) => {
+    if (!value) return;
+    if (typeof value === 'object') {
+      ['_id', 'id', 'userId', 'employeeId', 'empId', 'uniqueID', 'employeeID', 'employeeCode']
+        .forEach((key) => add(value[key]));
+      return;
+    }
+    keys.add(String(value).trim().toLowerCase());
+  };
+
+  [
+    deduction?.employeeId,
+    deduction?.userId,
+    deduction?.employee,
+    deduction?.employeeUserId,
+    deduction?.employeeCode,
+    deduction?.employeeID
+  ].forEach(add);
+  return keys;
+};
+
+const getDeductionRecordKeys = (deduction) => [
+  deduction?._id,
+  deduction?.id,
+  deduction?.deductionRecordId
+]
+  .filter(Boolean)
+  .map((key) => String(key).trim().toLowerCase());
+
 export const EmployeeDeductionsView = () => {
   const { user, userRole } = useApp();
   const { confirm, confirmationDialog } = useConfirm();
@@ -89,6 +125,29 @@ export const EmployeeDeductionsView = () => {
   const isAdminOrHr = isAdmin || isHr;
   const isTL = currentRole === 'team_leader';
   const isEmployee = !isAdminOrHr && !isTL;
+  const currentUserDeductionIdentifiers = useMemo(() => {
+    const identifiers = new Set(getLoggedInUserIdentifiers(user).ids);
+    const addUserIdentifiers = (source) => {
+      if (!source || typeof source !== 'object') return;
+      [
+        source._id,
+        source.id,
+        source.userId,
+        source.employeeId,
+        source.empId,
+        source.uniqueID,
+        source.employeeID,
+        source.employeeCode
+      ].forEach((value) => {
+        if (value) identifiers.add(String(value).trim().toLowerCase());
+      });
+    };
+
+    [user, user?.employee, user?.profile].forEach(addUserIdentifiers);
+    const authUserId = getRealAuthUserId(user);
+    if (authUserId) identifiers.add(String(authUserId).trim().toLowerCase());
+    return identifiers;
+  }, [user]);
 
   // Active Main Tab
   // For Admin/HR: 'all' | 'pending' | 'approved' | 'rejected' | 'locked'
@@ -260,7 +319,7 @@ export const EmployeeDeductionsView = () => {
     else setIsRefreshing(true);
 
     try {
-      if (isEmployee || activeTab === 'my-deductions') {
+      if (isEmployee || isTL || activeTab === 'my-deductions') {
         const myData = await fetchMyDeductions();
         setMyDeductions(myData);
       }
@@ -416,8 +475,18 @@ export const EmployeeDeductionsView = () => {
     if (activeTab === 'my-deductions' || isEmployee) {
       return myDeductions;
     }
+    if (isTL && activeTab === 'team-requests') {
+      const ownRecordKeys = new Set(myDeductions.flatMap(getDeductionRecordKeys));
+      return deductions.filter((deduction) => {
+        if (getDeductionRecordKeys(deduction).some((key) => ownRecordKeys.has(key))) {
+          return false;
+        }
+        return ![...getDeductionEmployeeKeys(deduction)]
+          .some((key) => currentUserDeductionIdentifiers.has(key));
+      });
+    }
     return deductions;
-  }, [activeTab, isEmployee, myDeductions, deductions]);
+  }, [activeTab, isEmployee, isTL, myDeductions, deductions, currentUserDeductionIdentifiers]);
 
   // Filtered & Sorted Dataset
   const filteredDeductions = useMemo(() => {
