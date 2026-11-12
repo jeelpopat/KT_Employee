@@ -118,6 +118,7 @@ export const Header = ({ onSignOut }) => {
 
   // --- Global Announcement Management States (Admin) ---
   const [announcements, setAnnouncements] = useState([]);
+  const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [showAllAnnouncementsModal, setShowAllAnnouncementsModal] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({
@@ -187,6 +188,26 @@ export const Header = ({ onSignOut }) => {
     });
   };
 
+  const fetchAdminAnnouncements = useCallback(async () => {
+    const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+    setIsLoadingAnnouncements(true);
+    try {
+      const response = await fetch(`${BASE_URL}/api/notification/announcement/admin/all`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !Array.isArray(data.data)) {
+        throw new Error(data.message || `Failed to fetch announcements (HTTP ${response.status})`);
+      }
+      setAnnouncements(data.data);
+    } catch (error) {
+      console.error('Could not load all announcements:', error);
+      showToast(error.message || 'Could not load announcements.', 'error');
+    } finally {
+      setIsLoadingAnnouncements(false);
+    }
+  }, []);
+
   // Helper icons and backgrounds for notifications
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -243,9 +264,6 @@ export const Header = ({ onSignOut }) => {
           if (data.success && Array.isArray(data.data) && data.data.length > 0) {
             unifiedList = data.data;
             backendSucceeded = true;
-            if (data.announcements && Array.isArray(data.announcements)) {
-              setAnnouncements(data.announcements);
-            }
           }
         }
       } catch (e) {
@@ -256,7 +274,7 @@ export const Header = ({ onSignOut }) => {
       if (!backendSucceeded) {
         let announcementsList = [];
         try {
-          const annRes = await fetch(`${BASE_URL}/api/notification/announcement/all`, {
+          const annRes = await fetch(`${BASE_URL}/api/notification/announcement/admin/all`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const annData = await annRes.json();
@@ -346,6 +364,10 @@ export const Header = ({ onSignOut }) => {
         }
       }
 
+      if (isAdmin) {
+        await fetchAdminAnnouncements();
+      }
+
       // Apply read status from local storage
       const listWithReadStatus = unifiedList.map((item) => {
         const itemId = item.id || item._id;
@@ -390,7 +412,7 @@ export const Header = ({ onSignOut }) => {
     } catch (err) {
       console.error('Error in fetchAdminNotificationsFeed:', err);
     }
-  }, []);
+  }, [fetchAdminAnnouncements, isAdmin]);
 
   const handleAdminMarkAsRead = async (id, e) => {
     if (e) e.stopPropagation();
@@ -476,6 +498,11 @@ export const Header = ({ onSignOut }) => {
   }, [showAnnouncementModal, isAdmin]);
 
   const handleAnnouncementSubmit = async () => {
+    if (!isAdmin) {
+      showToast('Only Admin and HR can manage announcements.', 'error');
+      return;
+    }
+
     if (!announcementForm.title.trim() || !announcementForm.message.trim()) {
       showToast('Please fill both title and message before posting.', 'error');
       return;
@@ -528,6 +555,7 @@ export const Header = ({ onSignOut }) => {
         setEditingAnnouncementId(null);
         setShowAnnouncementModal(false);
         await fetchAdminNotificationsFeed();
+        await fetchAdminAnnouncements();
         showToast('Announcement published successfully!', 'success');
       } else {
         showToast(data?.message || 'Failed to save announcement. Please try again.', 'error');
@@ -539,6 +567,8 @@ export const Header = ({ onSignOut }) => {
   };
 
   const handleAnnouncementEdit = (announcement) => {
+    if (!isAdmin) return;
+
     setAnnouncementForm({
       title: announcement.title || '',
       message: announcement.message || '',
@@ -557,6 +587,8 @@ export const Header = ({ onSignOut }) => {
   };
 
   const handleAnnouncementDelete = async (announcementId) => {
+    if (!isAdmin) return;
+
     const confirmed = await confirm({
       title: 'Delete announcement?',
       message: 'Are you sure you want to delete this announcement?',
@@ -579,11 +611,23 @@ export const Header = ({ onSignOut }) => {
 
       if (response.ok) {
         await fetchAdminNotificationsFeed();
+        await fetchAdminAnnouncements();
       }
     } catch (error) {
       console.error('Error deleting announcement:', error);
     }
   };
+
+  useEffect(() => {
+    if (!isAdmin) return undefined;
+    const handleOpenAnnouncements = () => {
+      setIsNotificationsOpen(false);
+      setShowAllAnnouncementsModal(true);
+      fetchAdminAnnouncements();
+    };
+    window.addEventListener('open-admin-announcements', handleOpenAnnouncements);
+    return () => window.removeEventListener('open-admin-announcements', handleOpenAnnouncements);
+  }, [fetchAdminAnnouncements, isAdmin]);
 
   // Admin filter lists
   const unreadAdminList = adminNotifications.filter((n) => !n.isRead);
@@ -1700,7 +1744,11 @@ export const Header = ({ onSignOut }) => {
                 </div>
 
                 <div className="p-4 overflow-y-auto space-y-3 flex-1">
-                  {announcements.length === 0 ? (
+                  {isLoadingAnnouncements ? (
+                    <div className="text-center py-6 text-xs text-slate-400">
+                      Loading announcements…
+                    </div>
+                  ) : announcements.length === 0 ? (
                     <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
                       No announcements
                     </div>
@@ -1714,20 +1762,22 @@ export const Header = ({ onSignOut }) => {
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 mt-1">{announcement.message}</p>
-                        <div className="mt-2.5 flex items-center justify-end gap-2 border-t border-slate-200/60 pt-1.5">
-                          <button
-                            onClick={() => handleAnnouncementEdit(announcement)}
-                            className="flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
-                          >
-                            <Edit3 className="h-3 w-3" /> Edit
-                          </button>
-                          <button
-                            onClick={() => handleAnnouncementDelete(announcement._id || announcement.id)}
-                            className="flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700 cursor-pointer"
-                          >
-                            <Trash2 className="h-3 w-3" /> Delete
-                          </button>
-                        </div>
+                        {isAdmin && (
+                          <div className="mt-2.5 flex items-center justify-end gap-2 border-t border-slate-200/60 pt-1.5">
+                            <button
+                              onClick={() => handleAnnouncementEdit(announcement)}
+                              className="flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                            >
+                              <Edit3 className="h-3 w-3" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleAnnouncementDelete(announcement._id || announcement.id)}
+                              className="flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700 cursor-pointer"
+                            >
+                              <Trash2 className="h-3 w-3" /> Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

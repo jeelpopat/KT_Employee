@@ -170,6 +170,14 @@ const HolidaysIcon = ({ size = 18, className = "" }) => (
   </svg>
 );
 
+const AnnouncementIcon = ({ size = 18, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4v-14l-4 4H4a1 1 0 0 0-1 1Z" />
+    <path d="M10 8a9 9 0 0 1 0 8" />
+    <path d="M14 5a14 14 0 0 1 0 14" />
+  </svg>
+);
+
 // 8. Employee: Two users outline
 const EmployeeIcon = ({ size = 18, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -439,6 +447,12 @@ export const Sidebar = ({ onSignOut }) => {
   };
 
   const handleNavClick = (tab) => {
+    if (tab === 'admin-announcements') {
+      window.dispatchEvent(new CustomEvent('open-admin-announcements'));
+      setIsMobileSidebarOpen(false);
+      return;
+    }
+
     setCurrentTab(tab);
     if (tabToPath && tabToPath[tab]) {
       navigate(tabToPath[tab]);
@@ -463,6 +477,7 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
         { tab: 'admin-adjustments', label: 'Adjustments', icon: AdjustmentsIcon },
         { tab: 'admin-holidays', label: 'Holidays and Events', icon: HolidaysIcon },
+        { tab: 'admin-announcements', label: 'Announcements', icon: AnnouncementIcon },
       ]
     },
     {
