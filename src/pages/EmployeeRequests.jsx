@@ -25,7 +25,10 @@ import {
   Landmark,
   UserCheck,
   Download,
-  MoreVertical
+  MoreVertical,
+  ArrowLeft,
+  Home,
+  Mail
 } from 'lucide-react';
 import api from '../api/axios';
 import { BASE_URL } from '../api/config';
@@ -177,6 +180,17 @@ const EmployeeRequests = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [dateRange, setDateRange] = useState('30d');
   const [openActionsFor, setOpenActionsFor] = useState(null);
+
+  useEffect(() => {
+    if (!selectedUser) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setSelectedUser(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedUser]);
 
   // ================= APPROVAL MODAL & METADATA STATE =================
   const [approvingUser, setApprovingUser] = useState(null);
@@ -2090,8 +2104,203 @@ const EmployeeRequests = () => {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const selectedUserStatus = selectedUser ? getStatusBadge(selectedUser) : null;
+  const SelectedUserStatusIcon = selectedUserStatus?.icon;
+  const selectedUserApproved = selectedUser ? isUserApproved(selectedUser) : false;
+  const selectedUserRequestId = selectedUser
+    ? selectedUser.requestId || `REQ-${String(getUserIdentifier(selectedUser, 0)).slice(-6).toUpperCase()}`
+    : '';
+  const selectedUserRequestDate = selectedUser?.createdAt || selectedUser?.requestedAt || selectedUser?.date;
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-7 pb-6">
+      {selectedUser ? (() => {
+        const teamLead = getAssignedTeamLead(selectedUser);
+        const bankDetails = getUserBankDetails(selectedUser);
+        const photoValue = selectedUser.profileImage || selectedUser.profileImg || selectedUser.avatar || selectedUser.photo || selectedUser.image;
+        const photo = typeof photoValue === 'string'
+          ? photoValue
+          : photoValue?.url || photoValue?.path || photoValue?.secure_url || '';
+        const photoUrl = typeof photo === 'string'
+          ? (/^(https?:|data:|blob:)/i.test(photo) ? photo : `${BASE_URL}${photo.startsWith('/') ? '' : '/'}${photo}`)
+          : '';
+        const displayValue = (value) => {
+          if (!value || typeof value !== 'object') return value;
+          return value.name || value.departmentName || value.designationName || value.title || value.yearLabel || value.year || '';
+        };
+        const detailValue = (value) => displayValue(value) || '—';
+        const infoCard = (title, Icon, iconClass, rows) => (
+          <section className="overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm">
+            <header className="flex items-center gap-2.5 border-b border-blue-50 px-4 py-3">
+              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconClass}`}>
+                <Icon className="h-4 w-4" />
+              </span>
+              <h2 className="text-sm font-bold text-[#102b5c]">{title}</h2>
+            </header>
+            <div className="space-y-2.5 px-4 py-3.5">
+              {rows.map(({ label, value, Icon: RowIcon }) => (
+                <div key={label} className="grid min-w-0 grid-cols-[minmax(100px,0.8fr)_minmax(0,1.2fr)] items-center gap-2 text-xs sm:text-sm">
+                  <span className="text-slate-500">{label}</span>
+                  <span className="flex min-w-0 items-center gap-2 font-medium text-[#14284d]">
+                    {RowIcon && <RowIcon className="h-3.5 w-3.5 shrink-0 text-[#173c7b]" />}
+                    <span className="truncate">{detailValue(value)}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+        return (
+          <div className="space-y-4 sm:space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="mb-1.5 flex items-center gap-2 text-xs text-slate-500">
+                  <Home className="h-3.5 w-3.5" />
+                  <span>/</span>
+                  <span>Employees</span>
+                  <span>/</span>
+                  <span className="font-semibold text-[#14284d]">Employee Profile</span>
+                </div>
+                <h1 className="text-2xl font-bold tracking-tight text-[#102b5c] sm:text-3xl">Employee Profile</h1>
+                <p className="mt-1 text-sm text-slate-600">View detailed information about the employee.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUser(null)}
+                className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-blue-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#173c7b] shadow-sm transition hover:bg-blue-50 sm:self-auto"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Directory
+              </button>
+            </div>
+
+            <section className="relative overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-r from-[#f0f6ff] via-white to-[#dceaff] p-4 shadow-sm sm:p-5">
+              <div className="pointer-events-none absolute -right-10 -top-14 h-52 w-52 rounded-full bg-blue-200/50 blur-3xl" />
+              <div className="relative grid gap-5 md:grid-cols-[1.3fr_0.9fr] md:items-center">
+                <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-2 border-blue-400 bg-white shadow-sm sm:h-28 sm:w-28">
+                    <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${getGradientColor(selectedUser?.name || selectedUser?.fullName)} text-2xl font-bold text-white`}>
+                      {getInitials(selectedUser?.name || selectedUser?.fullName)}
+                    </div>
+                    {photoUrl && (
+                      <img
+                        src={photoUrl}
+                        alt={selectedUser?.name || selectedUser?.fullName || 'Employee'}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-xl font-bold tracking-tight text-[#102b5c] sm:text-2xl">
+                        {selectedUser?.name || selectedUser?.fullName || 'Employee'}
+                      </h2>
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${selectedUserStatus?.className}`}>
+                        {SelectedUserStatusIcon && <SelectedUserStatusIcon className="h-3 w-3" />}
+                        {selectedUserStatus?.text}
+                      </span>
+                    </div>
+                    <p className="mt-2 flex min-w-0 items-center gap-2 text-sm text-[#173c7b]">
+                      <Mail className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{selectedUser?.email || 'No email provided'}</span>
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-lg border border-blue-200 bg-blue-100/80 px-2.5 py-1 font-mono font-semibold text-[#173c7b]">{selectedUserRequestId}</span>
+                      <span className="inline-flex items-center gap-1.5 text-slate-700">
+                        <Calendar className="h-3.5 w-3.5 text-[#173c7b]" />
+                        Request received: {selectedUserRequestDate && !Number.isNaN(new Date(selectedUserRequestDate).getTime())
+                          ? new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(selectedUserRequestDate))
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-blue-200/80 pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+                  <div className="flex items-center gap-2 text-[#0b55c8]">
+                    <Users className="h-5 w-5" />
+                    <h3 className="text-sm font-bold text-[#102b5c]">Assigned Team Lead (TL)</h3>
+                  </div>
+                  <span className="ml-7 mt-1 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-semibold text-blue-800">
+                    {isTeamLeadUser(selectedUser) ? 'Team Lead' : 'Team Member'}
+                  </span>
+                  <div className="ml-7 mt-2 flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700">
+                      <Crown className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-[#14284d]">
+                        {teamLead?.name || (isTeamLeadUser(selectedUser) ? selectedUser?.name || selectedUser?.fullName : 'No Team Lead assigned')}
+                      </p>
+                      <p className="truncate text-xs text-slate-600">{teamLead?.email || (isTeamLeadUser(selectedUser) ? 'Team Lead account' : '—')}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {infoCard('Bank Account Details', Landmark, 'bg-blue-100 text-blue-700', [
+                { label: 'Bank Name', value: bankDetails?.bankName },
+                { label: 'Account Number', value: bankDetails?.accountNumber },
+                { label: 'IFSC Code', value: bankDetails?.ifscCode },
+                { label: 'Account Holder', value: bankDetails?.accountHolderName || selectedUser?.name || selectedUser?.fullName },
+                { label: 'Branch', value: bankDetails?.bankBranch },
+                { label: 'UPI ID', value: bankDetails?.upiId },
+              ])}
+              {infoCard('Organization Assignment', Building2, 'bg-blue-100 text-blue-700', [
+                { label: 'Company', value: getCompanyName(selectedUser?.companyId, selectedUser) },
+                { label: 'Branch', value: getBranchName(selectedUser?.branchId, selectedUser) },
+                { label: 'Financial Year', value: getFinancialYearName(selectedUser?.financialYearId, selectedUser) },
+              ])}
+              {infoCard('Personal Information', User, 'bg-blue-100 text-blue-700', [
+                { label: 'Phone', value: selectedUser?.phoneNumber || selectedUser?.phone, Icon: Phone },
+                { label: 'Date of Birth', value: selectedUser?.dob, Icon: Calendar },
+                { label: 'Gender', value: selectedUser?.gender, Icon: User },
+                { label: 'Blood Group', value: selectedUser?.bloodGroup, Icon: Droplet },
+              ])}
+              {infoCard('Professional Details', Briefcase, 'bg-blue-100 text-blue-700', [
+                { label: 'Department', value: selectedUser?.department, Icon: Building },
+                { label: 'Designation', value: selectedUser?.designation, Icon: Briefcase },
+                { label: 'Role', value: selectedUser?.role, Icon: User },
+                { label: 'Unique ID', value: selectedUser?.uniqueID, Icon: Hash },
+              ])}
+            </div>
+
+            <section className="overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm">
+              <header className="flex items-center gap-2.5 border-b border-blue-50 px-4 py-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700"><MapPin className="h-4 w-4" /></span>
+                <h2 className="text-sm font-bold text-[#102b5c]">Address</h2>
+              </header>
+              <div className="flex items-start gap-3 px-4 py-3.5 text-sm text-[#14284d]">
+                <Home className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+                <p className="break-words">{selectedUser?.address || 'No address provided'}</p>
+              </div>
+            </section>
+
+            {!isReadOnlyRequestRole(selectedUser) && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const employee = selectedUser;
+                    setSelectedUser(null);
+                    handleApproveClick(employee);
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition ${
+                    selectedUserApproved ? 'bg-[#173c7b] hover:bg-[#102b5c]' : 'bg-emerald-700 hover:bg-emerald-800'
+                  }`}
+                >
+                  {selectedUserApproved ? <UserCheck size={16} /> : <ShieldCheck size={16} />}
+                  {selectedUserApproved ? 'Edit assignment' : 'Approve request'}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })() : (
+      <>
       {/* Floating Success Toast */}
       {successNotification && (
         <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg border text-xs sm:text-sm font-medium bg-emerald-50 text-emerald-800 border-emerald-200 animate-in fade-in slide-in-from-top-4">
@@ -2368,12 +2577,17 @@ const EmployeeRequests = () => {
                         {requestId}
                       </td>
                       <td className="px-4 py-3.5">
-                        <div className="flex min-w-[170px] items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUser(user)}
+                          aria-label={`Open ${name} profile`}
+                          className="flex min-w-[170px] items-center gap-2.5 rounded-lg text-left hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                        >
                           <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${getGradientColor(name)} text-xs font-bold text-white`}>
                             {getInitials(name)}
                           </div>
                           <span className="truncate text-sm font-semibold text-slate-900">{name}</span>
-                        </div>
+                        </button>
                       </td>
                       <td className="max-w-[220px] truncate px-4 py-3.5 text-sm text-slate-500">
                         {user?.email || '—'}
@@ -2401,10 +2615,10 @@ const EmployeeRequests = () => {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => isApproved || isReadOnlyRequestRole(user) ? setSelectedUser(user) : handleApproveClick(user)}
+                            onClick={() => setSelectedUser(user)}
                             className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
                           >
-                            {isApproved || isReadOnlyRequestRole(user) ? 'View' : 'Review'}
+                            View
                           </button>
                           <div className="relative">
                             <button
@@ -2927,48 +3141,74 @@ const EmployeeRequests = () => {
       {/* ==================================================== */}
       {selectedUser && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm animate-in fade-in duration-200 sm:p-6"
           onClick={() => setSelectedUser(null)}
         >
           <div
-            className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200/80 bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-300 mx-1 sm:mx-2"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="employee-profile-title"
+            className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/60 bg-slate-50 shadow-2xl animate-in slide-in-from-bottom-4 duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Gradient Header */}
-            <div className={`bg-gradient-to-r ${getGradientColor(selectedUser?.name)} p-4 sm:p-6 relative`}>
+            <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-5 py-5 sm:px-7 sm:py-6">
+              <div className="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-indigo-400/15 blur-3xl" />
               <button
                 type="button"
+                aria-label="Close employee profile"
                 onClick={() => setSelectedUser(null)}
-                className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-full bg-white/20 p-1.5 sm:p-2 text-white transition hover:bg-white/30 cursor-pointer"
+                className="absolute right-4 top-4 z-10 rounded-xl border border-white/15 bg-white/10 p-2 text-white/80 transition hover:bg-white/20 hover:text-white"
               >
-                <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                <X className="h-4 w-4" />
               </button>
 
-              <div className="flex flex-col items-center text-center">
-                <div className={`h-16 w-16 sm:h-20 sm:w-20 rounded-xl sm:rounded-2xl bg-gradient-to-br ${getGradientColor(selectedUser?.name)} flex items-center justify-center text-2xl sm:text-3xl font-bold text-white shadow-xl ring-2 sm:ring-4 ring-white/30`}>
+              <div className="relative flex flex-col gap-4 pr-10 sm:flex-row sm:items-center">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xl font-bold text-white shadow-lg ring-4 ring-white/5">
                   {getInitials(selectedUser?.name || selectedUser?.fullName)}
                 </div>
-                <h2 className="mt-2 sm:mt-3 text-lg sm:text-xl font-bold text-white">
-                  {selectedUser?.name || selectedUser?.fullName}
-                </h2>
-                <p className="text-xs sm:text-sm text-white/80 break-all">{selectedUser?.email}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-200">Employee profile</p>
+                  <h2 id="employee-profile-title" className="mt-1 truncate text-xl font-bold text-white sm:text-2xl">
+                    {selectedUser?.name || selectedUser?.fullName || 'Employee'}
+                  </h2>
+                  <p className="mt-1 break-all text-sm text-slate-300">{selectedUser?.email || 'No email provided'}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white">
+                      {SelectedUserStatusIcon && <SelectedUserStatusIcon size={13} />}
+                      {selectedUserStatus?.text}
+                    </span>
+                    <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-medium capitalize text-slate-200">
+                      {selectedUser?.role || 'Employee'}
+                    </span>
+                    <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 font-mono text-[10px] text-slate-300">
+                      {selectedUserRequestId}
+                    </span>
+                  </div>
+                </div>
+                <div className="hidden shrink-0 text-right sm:block">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Request received</p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {selectedUserRequestDate && !Number.isNaN(new Date(selectedUserRequestDate).getTime())
+                      ? new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(selectedUserRequestDate))
+                      : '—'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Content */}
-            <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="grid gap-3 overflow-y-auto p-4 sm:grid-cols-2 sm:gap-4 sm:p-6">
               {/* Assigned Team Lead */}
               {(() => {
                 const suTL = getAssignedTeamLead(selectedUser);
                 return (
-                  <div>
-                    <h3 className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
-                      <Crown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                      <Crown className="h-4 w-4 text-amber-500" />
                       Assigned Team Lead (TL)
                     </h3>
-                    <div className="mt-2 sm:mt-3">
+                    <div className="mt-3">
                       {suTL ? (
-                        <div className="flex items-center gap-2 sm:gap-3 rounded-lg bg-amber-50/80 px-2 sm:px-3 py-2 border border-amber-200">
+                        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-3">
                           <Crown className="h-4 w-4 text-amber-600 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-[10px] sm:text-xs text-amber-700">Team Lead</p>
@@ -2982,7 +3222,7 @@ const EmployeeRequests = () => {
                           </span>
                         </div>
                       ) : isTeamLeadUser(selectedUser) ? (
-                        <div className="flex items-center gap-2 sm:gap-3 rounded-lg bg-purple-50/80 px-2 sm:px-3 py-2 border border-purple-200">
+                        <div className="flex items-center gap-3 rounded-lg border border-purple-200 bg-purple-50/80 px-3 py-3">
                           <Crown className="h-4 w-4 text-purple-600 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-[10px] sm:text-xs text-purple-700 font-bold uppercase tracking-wider">Role: Team Leader</p>
@@ -3010,40 +3250,40 @@ const EmployeeRequests = () => {
               {(() => {
                 const suBank = getUserBankDetails(selectedUser);
                 return (
-                  <div className="border-t border-slate-200 pt-3 sm:pt-4">
-                    <h3 className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
-                      <Landmark className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-600" />
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                      <Landmark className="h-4 w-4 text-emerald-600" />
                       Bank Account Details
                     </h3>
-                    <div className="mt-2 sm:mt-3">
+                    <div className="mt-3">
                       {suBank ? (
-                        <div className="space-y-2 rounded-lg bg-emerald-50/50 p-2.5 sm:p-3 border border-emerald-100">
-                          <div className="flex items-center justify-between text-xs">
+                        <div className="space-y-2.5 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+                          <div className="flex items-start justify-between gap-3 text-xs">
                             <span className="text-slate-500">Bank Name</span>
                             <span className="font-semibold text-slate-900">{suBank.bankName || <span className="text-slate-400 italic font-normal">No data</span>}</span>
                           </div>
-                          <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-start justify-between gap-3 text-xs">
                             <span className="text-slate-500">Account Number</span>
                             <span className="font-mono font-bold text-slate-900">{suBank.accountNumber || <span className="text-slate-400 italic font-normal">No data</span>}</span>
                           </div>
-                          <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-start justify-between gap-3 text-xs">
                             <span className="text-slate-500">IFSC Code</span>
                             <span className="font-mono font-semibold text-indigo-700 uppercase">{suBank.ifscCode || <span className="text-slate-400 italic font-normal">No data</span>}</span>
                           </div>
                           {suBank.accountHolderName && (
-                            <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-start justify-between gap-3 text-xs">
                               <span className="text-slate-500">Account Holder</span>
                               <span className="font-medium text-slate-800">{suBank.accountHolderName}</span>
                             </div>
                           )}
                           {suBank.bankBranch && (
-                            <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-start justify-between gap-3 text-xs">
                               <span className="text-slate-500">Branch</span>
                               <span className="text-slate-700">{suBank.bankBranch}</span>
                             </div>
                           )}
                           {suBank.upiId && (
-                            <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-start justify-between gap-3 text-xs">
                               <span className="text-slate-500">UPI ID</span>
                               <span className="font-mono text-emerald-700">{suBank.upiId}</span>
                             </div>
@@ -3061,37 +3301,37 @@ const EmployeeRequests = () => {
               })()}
 
               {/* Organization Assignment */}
-              <div className="border-t border-slate-200 pt-3 sm:pt-4">
-                <h3 className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
-                  <Building2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <Building2 className="h-4 w-4 text-indigo-600" />
                   Organization Assignment
                 </h3>
-                <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
-                  <div className="flex items-center gap-2 sm:gap-3 rounded-lg bg-indigo-50/70 px-2 sm:px-3 py-1.5 sm:py-2 border border-indigo-100">
-                    <Building2 className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600 shrink-0" />
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                    <Building2 className="h-4 w-4 shrink-0 text-indigo-600" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] sm:text-xs text-slate-400">Company</p>
-                      <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Company</p>
+                      <p className="truncate text-sm font-semibold text-slate-800">
                         {getCompanyName(selectedUser?.companyId, selectedUser) || <span className="text-slate-400 italic font-normal">No data</span>}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:gap-3 rounded-lg bg-indigo-50/70 px-2 sm:px-3 py-1.5 sm:py-2 border border-indigo-100">
-                    <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600 shrink-0" />
+                  <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                    <MapPin className="h-4 w-4 shrink-0 text-indigo-600" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] sm:text-xs text-slate-400">Branch</p>
-                      <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Branch</p>
+                      <p className="truncate text-sm font-semibold text-slate-800">
                         {getBranchName(selectedUser?.branchId, selectedUser) || <span className="text-slate-400 italic font-normal">No data</span>}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:gap-3 rounded-lg bg-indigo-50/70 px-2 sm:px-3 py-1.5 sm:py-2 border border-indigo-100">
-                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600 shrink-0" />
+                  <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                    <Calendar className="h-4 w-4 shrink-0 text-indigo-600" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] sm:text-xs text-slate-400">Financial Year</p>
-                      <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate font-mono">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Financial Year</p>
+                      <p className="truncate font-mono text-sm font-semibold text-slate-800">
                         {getFinancialYearName(selectedUser?.financialYearId, selectedUser) || <span className="text-slate-400 italic font-normal">No data</span>}
                       </p>
                     </div>
@@ -3100,23 +3340,23 @@ const EmployeeRequests = () => {
               </div>
 
               {/* Personal Info */}
-              <div className="border-t border-slate-200 pt-3 sm:pt-4">
-                <h3 className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
-                  <User className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <User className="h-4 w-4 text-sky-600" />
                   Personal Information
                 </h3>
-                <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {[
                     { icon: Phone, label: 'Phone', value: selectedUser?.phoneNumber || selectedUser?.phone },
                     { icon: Calendar, label: 'Date of Birth', value: selectedUser?.dob },
                     { icon: User, label: 'Gender', value: selectedUser?.gender },
                     { icon: Droplet, label: 'Blood Group', value: selectedUser?.bloodGroup }
                   ].map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 sm:gap-3 rounded-lg bg-slate-50 px-2 sm:px-3 py-1.5 sm:py-2">
-                      <item.icon className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 shrink-0" />
+                    <div key={idx} className="flex min-w-0 items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                      <item.icon className="h-4 w-4 shrink-0 text-sky-600" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] sm:text-xs text-slate-400">{item.label}</p>
-                        <p className="text-xs sm:text-sm font-medium text-slate-700 truncate">
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
+                        <p className="truncate text-sm font-medium text-slate-700">
                           {item.value || <span className="text-slate-400 italic font-normal">No data</span>}
                         </p>
                       </div>
@@ -3126,12 +3366,12 @@ const EmployeeRequests = () => {
               </div>
 
               {/* Professional Info */}
-              <div className="border-t border-slate-200 pt-3 sm:pt-4">
-                <h3 className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
-                  <Briefcase className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <Briefcase className="h-4 w-4 text-violet-600" />
                   Professional Details
                 </h3>
-                <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {[
                     { icon: Building, label: 'Department', value: selectedUser?.department },
                     {
@@ -3144,11 +3384,11 @@ const EmployeeRequests = () => {
                     { icon: Briefcase, label: 'Role', value: selectedUser?.role },
                     { icon: Hash, label: 'Unique ID', value: selectedUser?.uniqueID }
                   ].map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 sm:gap-3 rounded-lg bg-slate-50 px-2 sm:px-3 py-1.5 sm:py-2">
-                      <item.icon className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 shrink-0" />
+                    <div key={idx} className="flex min-w-0 items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                      <item.icon className="h-4 w-4 shrink-0 text-violet-600" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] sm:text-xs text-slate-400">{item.label}</p>
-                        <p className="text-xs sm:text-sm font-medium text-slate-700 truncate">
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
+                        <p className="truncate text-sm font-medium text-slate-700">
                           {item.value || <span className="text-slate-400 italic font-normal">No data</span>}
                         </p>
                       </div>
@@ -3158,30 +3398,33 @@ const EmployeeRequests = () => {
               </div>
 
               {/* Address */}
-              <div className="border-t border-slate-200 pt-3 sm:pt-4">
-                <h3 className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
-                  <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:col-span-2">
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <MapPin className="h-4 w-4 text-rose-600" />
                   Address
                 </h3>
-                <div className="mt-2 sm:mt-3 rounded-lg bg-slate-50 p-2 sm:p-3 border border-slate-100">
-                  <p className="text-xs sm:text-sm text-slate-700 break-words">
+                <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <p className="break-words text-sm leading-6 text-slate-700">
                     {selectedUser?.address || <span className="text-slate-400 italic font-normal">No data</span>}
                   </p>
                 </div>
               </div>
 
               {/* Status & Quick Action */}
-              <div className="border-t border-slate-200 pt-3 sm:pt-4 space-y-2">
-                <div className={`rounded-lg p-2 sm:p-3 ${selectedUser?.isApproved
-                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                  : 'bg-amber-50 border border-amber-200 text-amber-800'
-                  }`}>
-                  <p className="text-xs sm:text-sm font-medium text-center">
-                    Status: {selectedUser?.isApproved ? '✅ Approved' : '⏳ Pending Review'}
-                  </p>
+              <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  {SelectedUserStatusIcon && (
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl border ${selectedUserStatus?.className}`}>
+                      <SelectedUserStatusIcon className="h-5 w-5" />
+                    </span>
+                  )}
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Request status</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-800">{selectedUserStatus?.text}</p>
+                  </div>
                 </div>
 
-                {!isReadOnlyRequestRole(selectedUser) && (selectedUser?.isApproved ? (
+                {!isReadOnlyRequestRole(selectedUser) && (selectedUserApproved ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -3189,10 +3432,10 @@ const EmployeeRequests = () => {
                       setSelectedUser(null);
                       handleApproveClick(u);
                     }}
-                    className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 sm:w-auto"
                   >
                     <UserCheck size={16} />
-                    <span>Change Team Lead / Edit Assignment</span>
+                    <span>Edit assignment</span>
                   </button>
                 ) : (
                   <button
@@ -3202,16 +3445,18 @@ const EmployeeRequests = () => {
                       setSelectedUser(null);
                       handleApproveClick(u);
                     }}
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 sm:w-auto"
                   >
                     <ShieldCheck size={16} />
-                    <span>Approve Employee Request</span>
+                    <span>Approve request</span>
                   </button>
                 ))}
               </div>
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
