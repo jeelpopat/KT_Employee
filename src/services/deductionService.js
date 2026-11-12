@@ -226,6 +226,16 @@ export const fetchEmployeeDeductions = async (params = {}) => {
 };
 
 /**
+ * Fetch deductions belonging to the authenticated Team Lead's assigned team.
+ * The backend derives the team scope from the authenticated user.
+ */
+export const fetchTeamDeductions = async (params = {}) => {
+  const res = await api.get('/api/teamLead/deductions', { params });
+  const list = res.data?.data || res.data?.deductions || res.data || [];
+  return Array.isArray(list) ? list : [];
+};
+
+/**
  * Fetch logged-in employee's own deductions (Self-service portal)
  * @param {Object} params - { month, year, status }
  */

@@ -10,6 +10,7 @@ import {
 import api from '../../api/axios.js';
 import {
   fetchEmployeeDeductions,
+  fetchTeamDeductions,
   fetchMyDeductions,
   fetchDeductionMasters,
   createEmployeeDeduction,
@@ -360,7 +361,10 @@ export const EmployeeDeductionsView = () => {
         setMyDeductions(myData);
       }
 
-      if (!isEmployee) {
+      if (isTL) {
+        const data = await fetchTeamDeductions();
+        setDeductions(data);
+      } else if (!isEmployee) {
         const data = await fetchEmployeeDeductions();
         setDeductions(data);
       }
