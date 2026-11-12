@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  ArrowLeftRight, Banknote, Bell, BookOpen, Building2, CalendarDays,
+  FileMinus, FileText, GitBranch, Landmark, Package, Percent, Receipt,
+  ScrollText, ShoppingCart, Truck, UserRound, Users
+} from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { tabToPath } from '../../utils/navigation.js';
 import api from '../../api/axios.js';
@@ -344,9 +349,10 @@ export const Sidebar = ({ onSignOut }) => {
     : { checkIn: 0, leave: 0, employee: 0, deduction: 0 };
   const navigate = useNavigate();
   const location = useLocation();
+  const isFinancePanel = location.pathname === '/finance' || location.pathname.startsWith('/finance/');
 
   useEffect(() => {
-    if (userRole !== 'admin' && userRole !== 'hr' && userRole !== 'team_leader') {
+    if (isFinancePanel || (userRole !== 'admin' && userRole !== 'hr' && userRole !== 'team_leader')) {
       return undefined;
     }
 
@@ -401,9 +407,10 @@ export const Sidebar = ({ onSignOut }) => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [userRole]);
+  }, [isFinancePanel, userRole]);
 
-  const isTabActive = (itemTab) => {
+  const isTabActive = (itemTab, itemPath) => {
+    if (itemPath && location.pathname === itemPath) return true;
     if (currentTab === itemTab) return true;
 
     // Check location pathname match with tabToPath
@@ -447,7 +454,7 @@ export const Sidebar = ({ onSignOut }) => {
     return false;
   };
 
-  const handleNavClick = (tab) => {
+  const handleNavClick = (tab, path) => {
     if (tab === 'admin-announcements') {
       window.dispatchEvent(new CustomEvent('open-admin-announcements'));
       setIsMobileSidebarOpen(false);
@@ -455,7 +462,9 @@ export const Sidebar = ({ onSignOut }) => {
     }
 
     setCurrentTab(tab);
-    if (tabToPath && tabToPath[tab]) {
+    if (path) {
+      navigate(path);
+    } else if (tabToPath && tabToPath[tab]) {
       navigate(tabToPath[tab]);
     }
     setIsMobileSidebarOpen(false);
@@ -651,10 +660,84 @@ export const Sidebar = ({ onSignOut }) => {
     }
   ];
 
+  const FINANCE_SECTIONS = [
+    {
+      title: 'ORGANIZATION & SETUP',
+      items: [
+        { tab: 'finance-company-profile', label: 'Company Profile', path: '/finance/company-profile', icon: Building2 },
+        { tab: 'finance-branch-management', label: 'Branch Management', path: '/finance/branch-management', icon: GitBranch },
+        { tab: 'finance-financial-year', label: 'Financial Year', path: '/finance/financial-year', icon: CalendarDays },
+        { tab: 'finance-user-management', label: 'User Management', path: '/finance/user-management', icon: Users },
+      ]
+    },
+    {
+      title: 'MASTERS',
+      items: [
+        { tab: 'finance-customers', label: 'Customers', path: '/finance/customers', icon: UserRound },
+        { tab: 'finance-suppliers', label: 'Suppliers', path: '/finance/suppliers', icon: Truck },
+        { tab: 'finance-products-services', label: 'Product & Service', path: '/finance/products-services', icon: Package },
+        { tab: 'finance-tax-master', label: 'Tax Master', path: '/finance/tax-master', icon: Percent },
+        { tab: 'finance-bank-cash-accounts', label: 'Bank & Cash Account', path: '/finance/bank-cash-accounts', icon: Landmark },
+        { tab: 'finance-account-transfer', label: 'Account Transfer', path: '/finance/account-transfer', icon: ArrowLeftRight },
+        { tab: 'finance-coa', label: 'Charts Of Account (COA)', path: '/finance/coa', icon: BookOpen },
+      ]
+    },
+    {
+      title: 'PURCHASE',
+      items: [
+        { tab: 'finance-purchase-orders', label: 'Purchase Order', path: '/finance/purchase-orders', icon: ShoppingCart },
+        { tab: 'finance-purchase-bills', label: 'Purchase Bill', path: '/finance/purchase-bills', icon: Receipt },
+      ]
+    },
+    {
+      title: 'SALES & RECEIVABLES',
+      items: [
+        { tab: 'finance-sales-invoices', label: 'Sales Invoice', path: '/finance/sales-invoices', icon: FileText },
+        { tab: 'finance-customer-payments', label: 'Customer Payments', path: '/finance/customer-payments', icon: Banknote },
+        { tab: 'finance-credit-notes', label: 'Credit Notes', path: '/finance/credit-notes', icon: FileMinus },
+      ]
+    },
+    {
+      title: 'EXPENSE & PAYROLL',
+      items: [
+        { tab: 'finance-expenses', label: 'Expenses', path: '/finance/expenses', icon: Receipt },
+        { tab: 'finance-salaries', label: 'Salaries', path: '/finance/salaries', icon: Banknote },
+        { tab: 'finance-fixed-assets', label: 'Fixed Assets', path: '/finance/fixed-assets', icon: Landmark },
+      ]
+    },
+    {
+      title: 'ACCOUNTING',
+      items: [
+        { tab: 'finance-journal-entries', label: 'Journal Entries', path: '/finance/journal-entries', icon: BookOpen },
+        { tab: 'finance-debit-notes', label: 'Debit Notes', path: '/finance/debit-notes', icon: FileMinus },
+      ]
+    },
+    {
+      title: 'TAX & COMPLIANCE',
+      items: [
+        { tab: 'finance-gst-returns', label: 'GST Returns', path: '/finance/gst-returns', icon: FileText },
+      ]
+    },
+    {
+      title: 'AUDIT & ACTIVITY',
+      items: [
+        { tab: 'finance-notifications', label: 'Notification', path: '/finance/notifications', icon: Bell },
+        { tab: 'finance-audit-logs', label: 'Audit Logs', path: '/finance/audit-logs', icon: ScrollText },
+      ]
+    },
+    {
+      title: 'ACCOUNT',
+      items: [
+        { tab: 'profile', label: 'Profile', icon: ProfileIcon },
+      ]
+    }
+  ];
+
   const menuSections =
-    userRole === 'admin' ? ADMIN_SECTIONS :
-      userRole === 'hr' ? HR_SECTIONS :
-        userRole === 'team_leader' ? TL_SECTIONS : EMP_SECTIONS;
+    isFinancePanel && userRole === 'admin' ? FINANCE_SECTIONS :
+      userRole === 'admin' ? ADMIN_SECTIONS :
+        userRole === 'hr' ? HR_SECTIONS :
+          userRole === 'team_leader' ? TL_SECTIONS : EMP_SECTIONS;
 
   const roleLabels = {
     admin: 'Administrator',
@@ -693,14 +776,14 @@ export const Sidebar = ({ onSignOut }) => {
               {/* Items in this section */}
               {section.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = isTabActive(item.tab);
+                const isActive = isTabActive(item.tab, item.path);
                 const isProfile = item.tab === 'profile';
 
                 return (
                   <button
                     key={item.tab}
                     type="button"
-                    onClick={() => handleNavClick(item.tab)}
+                    onClick={() => handleNavClick(item.tab, item.path)}
                     className={`w-full flex items-center justify-between px-4 py-2.5 transition-colors cursor-pointer text-left border-b border-[#edf2f7] font-poppins relative select-none rounded-none ${isActive
                       ? "text-white font-medium shadow-none"
                       : "bg-white text-[#1e293b] hover:bg-[#f6f9fc] font-medium"

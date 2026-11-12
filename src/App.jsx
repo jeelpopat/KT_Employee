@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
 import { performAutoCheckout, clearAuth, isTokenExpired, validateUserSession, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
@@ -15,6 +15,7 @@ import { stopScreenCapture } from './services/monitoringService.js';
 // Lazy-load layout and views so unauthenticated users download ONLY the Login screen
 const Sidebar = lazy(() => import('./components/layout/Sidebar.jsx').then(m => ({ default: m.Sidebar })));
 const Header = lazy(() => import('./components/layout/Header.jsx').then(m => ({ default: m.Header })));
+const FinancePanel = lazy(() => import('./components/finance/FinancePanel.jsx').then(m => ({ default: m.FinancePanel })));
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView.jsx').then(m => ({ default: m.DashboardView })));
 const AttendanceView = lazy(() => import('./components/attendance/AttendanceView.jsx').then(m => ({ default: m.AttendanceView })));
 const DailyReportView = lazy(() => import('./components/daily-report/DailyReportView.jsx').then(m => ({ default: m.DailyReportView })));
@@ -84,6 +85,7 @@ const MainLayout = ({ handleSignOut }) => {
   const [startingScreenCapture, setStartingScreenCapture] = useState(false);
   const [screenCaptureError, setScreenCaptureError] = useState('');
   const location = useLocation();
+  const isFinanceRoute = location.pathname === '/finance' || location.pathname.startsWith('/finance/');
 
   useEffect(() => () => stopScreenCapture(), []);
 
@@ -137,6 +139,9 @@ const MainLayout = ({ handleSignOut }) => {
         </div>
       </div>
     );
+  }
+  if (isFinanceRoute && userRole !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   const renderActiveTab = () => {
@@ -248,7 +253,7 @@ const MainLayout = ({ handleSignOut }) => {
             </div>
             <div className="page-content w-full">
               <Suspense fallback={<PageSkeleton />}>
-                {renderActiveTab()}
+                {isFinanceRoute ? <FinancePanel /> : renderActiveTab()}
               </Suspense>
             </div>
           </main>

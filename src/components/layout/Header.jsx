@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import {
   Bell, User, LogOut,
@@ -74,9 +74,16 @@ export const Header = ({ onSignOut }) => {
     isMobileSidebarOpen, setIsMobileSidebarOpen
   } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
   const { confirm, confirmationDialog } = useConfirm();
 
   const isAdmin = userRole === 'admin' || userRole === 'hr';
+  const isFinancePanel = location.pathname === '/finance' || location.pathname.startsWith('/finance/');
+
+  const openHrmsPanel = () => {
+    setCurrentTab('admin-dashboard');
+    navigate(tabToPath['admin-dashboard']);
+  };
 
   const handleOpenProfile = () => {
     setCurrentTab('profile');
@@ -1021,6 +1028,38 @@ export const Header = ({ onSignOut }) => {
               className="h-10 sm:h-11 md:h-12 w-auto max-h-12 object-contain shrink-0 drop-shadow-xs"
             />
           </div>
+          {userRole === 'admin' && (
+            <div
+              role="group"
+              aria-label="Panel switch"
+              className="inline-flex items-center gap-0.5 rounded-lg border border-white/25 bg-white/10 p-0.5"
+            >
+              <button
+                type="button"
+                aria-pressed={!isFinancePanel}
+                onClick={openHrmsPanel}
+                className={`rounded-md px-2 py-1.5 text-[11px] sm:px-2.5 sm:text-xs font-semibold transition-colors ${
+                  !isFinancePanel
+                    ? 'bg-white text-[#0b4d68] shadow-xs'
+                    : 'text-white/90 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                HRMS
+              </button>
+              <button
+                type="button"
+                aria-pressed={isFinancePanel}
+                onClick={() => navigate('/finance')}
+                className={`rounded-md px-2 py-1.5 text-[11px] sm:px-2.5 sm:text-xs font-semibold transition-colors ${
+                  isFinancePanel
+                    ? 'bg-white text-[#0b4d68] shadow-xs'
+                    : 'text-white/90 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                Finance
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Actions, Notifications, Profile & Mobile Menu */}
