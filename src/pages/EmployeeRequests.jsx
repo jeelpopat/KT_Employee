@@ -6,8 +6,6 @@ import {
   XCircle,
   Loader2,
   Search,
-  ChevronDown,
-  ChevronUp,
   Phone,
   Briefcase,
   MapPin,
@@ -25,7 +23,9 @@ import {
   ShieldCheck,
   Crown,
   Landmark,
-  UserCheck
+  UserCheck,
+  Download,
+  MoreVertical
 } from 'lucide-react';
 import api from '../api/axios';
 import { BASE_URL } from '../api/config';
@@ -135,6 +135,11 @@ const isUserApproved = (user) =>
   user?.approved === true ||
   String(user?.status || '').trim().toLowerCase() === 'approved';
 
+const isUserInactive = (user) =>
+  user?.isActive === false ||
+  ['inactive', 'rejected'].includes(String(user?.status || '').trim().toLowerCase()) ||
+  String(user?.employeeStatus || '').trim().toLowerCase() === 'inactive';
+
 const isReadOnlyRequestRole = (user) => {
   if (isTeamLeadUser(user)) return false;
 
@@ -170,7 +175,8 @@ const EmployeeRequests = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
-  const [expandedCards, setExpandedCards] = useState(new Set());
+  const [dateRange, setDateRange] = useState('30d');
+  const [openActionsFor, setOpenActionsFor] = useState(null);
 
   // ================= APPROVAL MODAL & METADATA STATE =================
   const [approvingUser, setApprovingUser] = useState(null);
@@ -1960,18 +1966,6 @@ const EmployeeRequests = () => {
     }
   };
 
-  const toggleExpand = (userId) => {
-    setExpandedCards(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(userId)) {
-        newSet.delete(userId);
-      } else {
-        newSet.add(userId);
-      }
-      return newSet;
-    });
-  };
-
   const getInitials = (name) => {
     return name
       ?.split(' ')
@@ -1997,20 +1991,14 @@ const EmployeeRequests = () => {
   };
 
   const getStatusBadge = (user) => {
-    const isApproved = user?.isApproved === true || user?.approved === true || user?.status === 'approved';
-    if (isApproved) {
+    if (isUserApproved(user)) {
       return {
         text: 'Approved',
         className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         icon: CheckCircle
       };
     }
-    const isInactive =
-      user?.isActive === false ||
-      String(user?.employeeStatus || '').trim().toLowerCase() === 'inactive' ||
-      String(user?.status || '').trim().toLowerCase() === 'rejected' ||
-      String(user?.status || '').trim().toLowerCase() === 'inactive';
-    if (isInactive) {
+    if (isUserInactive(user)) {
       return {
         text: 'Inactive',
         className: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -2024,45 +2012,83 @@ const EmployeeRequests = () => {
     };
   };
 
-  // 1. Base users matching search & excluding non-eligible users
-  const baseUsers = users.filter((user) => {
-    if (isUnknownEmployeeOrUser(user)) return false;
+  const eligibleUsers = users.filter((user) => !isUnknownEmployeeOrUser(user));
 
-    const term = searchTerm.trim().toLowerCase();
-    const searchMatch = !term ||
-      user?.name?.toLowerCase().includes(term) ||
-      user?.email?.toLowerCase().includes(term) ||
-      user?.department?.toLowerCase().includes(term);
-
-    return searchMatch;
-  });
-
-  // 2. Consistent Stats computed across all eligible users (never disappears on tab click)
+  // Keep the summary counts independent from search and list filters.
   const stats = {
-    total: baseUsers.length,
-    pending: baseUsers.filter((u) => {
-      const isApproved = u?.isApproved === true || u?.approved === true || u?.status === 'approved';
-      return !isApproved;
-    }).length,
-    approved: baseUsers.filter((u) => {
-      const isApproved = u?.isApproved === true || u?.approved === true || u?.status === 'approved';
-      return isApproved;
-    }).length,
+    total: eligibleUsers.length,
+    pending: eligibleUsers.filter((user) =>
+      !isUserApproved(user) && !isUserInactive(user)
+    ).length,
+    approved: eligibleUsers.filter(isUserApproved).length,
+    rejected: eligibleUsers.filter((user) =>
+      !isUserApproved(user) && isUserInactive(user)
+    ).length
   };
 
-  // 3. Filtered users according to active filter tab
+  const baseUsers = eligibleUsers.filter((user) => {
+    const term = searchTerm.trim().toLowerCase();
+    const searchMatch = !term ||
+      String(user?.name || user?.fullName || '').toLowerCase().includes(term) ||
+      String(user?.email || '').toLowerCase().includes(term) ||
+      String(user?.department || '').toLowerCase().includes(term) ||
+      String(user?.role || '').toLowerCase().includes(term) ||
+      String(user?.requestId || user?.uniqueID || user?._id || user?.id || '').toLowerCase().includes(term);
+
+    const requestDateValue = user?.createdAt || user?.requestedAt || user?.date;
+    const requestDate = requestDateValue ? new Date(requestDateValue) : null;
+    const dateThreshold = new Date();
+    dateThreshold.setDate(dateThreshold.getDate() - (dateRange === '90d' ? 90 : 30));
+    const matchesDateRange = dateRange === 'all' ||
+      !requestDate ||
+      Number.isNaN(requestDate.getTime()) ||
+      requestDate >= dateThreshold;
+
+    return searchMatch && matchesDateRange;
+  });
+
   const filteredUsers = baseUsers
     .filter((user) => {
-      const isApproved = user?.isApproved === true || user?.approved === true || user?.status === 'approved';
+      const isApproved = isUserApproved(user);
+      const isRejected = isUserInactive(user);
       if (filterStatus === 'approved') return isApproved;
-      if (filterStatus === 'pending') return !isApproved;
+      if (filterStatus === 'pending') return !isApproved && !isRejected;
+      if (filterStatus === 'rejected') return isRejected;
       return true;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.createdAt || a.date || 0);
-      const dateB = new Date(b.createdAt || b.date || 0);
+      const dateA = new Date(a.createdAt || a.requestedAt || a.date || 0);
+      const dateB = new Date(b.createdAt || b.requestedAt || b.date || 0);
       return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
     });
+
+  const exportRequests = () => {
+    const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = [
+      ['Request ID', 'Employee Name', 'Email', 'Role', 'Department', 'Request Date', 'Status'],
+      ...filteredUsers.map((user, index) => {
+        const recordId = getUserIdentifier(user, index);
+        const requestId = user.requestId || `REQ-${String(recordId).slice(-6).toUpperCase()}`;
+        const requestDate = user.createdAt || user.requestedAt || user.date;
+        return [
+          requestId,
+          user.name || user.fullName || '',
+          user.email || '',
+          user.role || '',
+          user.department || '',
+          requestDate ? new Date(requestDate).toLocaleDateString() : '',
+          getStatusBadge(user).text
+        ];
+      })
+    ];
+    const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `employee-requests-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-7 pb-6">
@@ -2107,7 +2133,7 @@ const EmployeeRequests = () => {
       </div>
 
       {/* Request metrics */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-4">
         {[
           {
             key: 'all',
@@ -2138,6 +2164,16 @@ const EmployeeRequests = () => {
             activeClass: 'border-emerald-300 bg-emerald-50/70 ring-2 ring-emerald-100',
             iconClass: 'bg-emerald-100 text-emerald-700',
             valueClass: 'text-emerald-700',
+          },
+          {
+            key: 'rejected',
+            label: 'Inactive / rejected',
+            caption: 'Not active employee accounts',
+            value: stats.rejected,
+            Icon: XCircle,
+            activeClass: 'border-rose-300 bg-rose-50/70 ring-2 ring-rose-100',
+            iconClass: 'bg-rose-100 text-rose-700',
+            valueClass: 'text-rose-700',
           },
         ].map((item) => {
           const isSelected = filterStatus === item.key;
@@ -2200,6 +2236,17 @@ const EmployeeRequests = () => {
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
+              <option value="rejected">Inactive / rejected</option>
+            </select>
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              aria-label="Filter requests by date"
+              className="h-11 min-w-36 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition focus:border-sky-500 focus:outline-none focus:ring-4 focus:ring-sky-500/10"
+            >
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="all">All time</option>
             </select>
             <select
               value={sortBy}
@@ -2211,6 +2258,15 @@ const EmployeeRequests = () => {
               <option value="oldest">Oldest First</option>
             </select>
             <button
+              type="button"
+              onClick={exportRequests}
+              className="flex h-11 items-center gap-2 rounded-xl border border-sky-700 bg-sky-700 px-3.5 text-sm font-semibold text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
+            >
+              <Download size={15} />
+              <span>Export</span>
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 fetchUsers();
                 fetchApprovalMetadata();
@@ -2239,7 +2295,7 @@ const EmployeeRequests = () => {
 
       {/* Loading State */}
       {loading && (
-        <TableSkeleton rows={8} cols={6} />
+        <TableSkeleton rows={8} cols={8} />
       )}
 
       {/* Error State */}
@@ -2268,311 +2324,148 @@ const EmployeeRequests = () => {
         </div>
       )}
 
-      {/* Employee Cards Grid */}
-      <div className="grid gap-3 sm:gap-4 md:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredUsers.map((user, index) => {
-          const userId = getUserIdentifier(user, index);
-          const name = user?.name || user?.fullName || 'No Name';
-          const email = user?.email || 'No Email';
-          const role = user?.role || null;
-          const department = user?.department || null;
-          const phone = user?.phone || user?.phoneNumber || null;
-          const isApproved = user?.isApproved === true || user?.approved === true || user?.status === 'approved';
-          const isProcessingReject = processingState?.userId === userId && (processingState?.action === 'reject' || processingState?.action === 'revoke');
-          const isExpanded = expandedCards.has(userId);
-          const StatusBadge = getStatusBadge(user).icon;
+      {!loading && !error && filteredUsers.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Employee request list</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Review applicants and manage their organization access.</p>
+            </div>
+            <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-600">
+              {filteredUsers.length} {filteredUsers.length === 1 ? 'request' : 'requests'}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1050px] border-collapse text-left">
+              <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Request ID</th>
+                  <th className="px-4 py-3">Employee</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Department</th>
+                  <th className="px-4 py-3">Request date</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredUsers.map((user, index) => {
+                  const userId = getUserIdentifier(user, index);
+                  const name = user?.name || user?.fullName || 'No Name';
+                  const requestDate = user?.createdAt || user?.requestedAt || user?.date;
+                  const requestId = user?.requestId || `REQ-${String(userId).slice(-6).toUpperCase()}`;
+                  const status = getStatusBadge(user);
+                  const StatusIcon = status.icon;
+                  const isApproved = isUserApproved(user);
+                  const isProcessing = processingState?.userId === userId &&
+                    (processingState?.action === 'revoke' || processingState?.action === 'reject');
+                  const menuOpen = openActionsFor === userId;
 
-          const companyDisplay = getCompanyName(user?.companyId, user);
-          const branchDisplay = getBranchName(user?.branchId, user);
-          const fyDisplay = getFinancialYearName(user?.financialYearId, user);
-          const assignedTL = getAssignedTeamLead(user);
-          const userBank = getUserBankDetails(user);
-
-          return (
-            <div
-              key={userId}
-              className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs transition-all duration-300 hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5"
-            >
-              {/* Animated Gradient Border */}
-              <div className="absolute inset-x-0 top-0 h-0.5 sm:h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-              {/* Card Header */}
-              <div className="p-3 sm:p-4 md:p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <div className={`relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-gradient-to-br ${getGradientColor(name)} flex items-center justify-center text-base sm:text-lg font-bold text-white shadow-lg shrink-0`}>
-                      {getInitials(name)}
-                      {!isApproved && (
-                        <div className="absolute -right-0.5 -top-0.5 sm:-right-1 sm:-top-1 h-2.5 w-2.5 sm:h-3 sm:w-3 animate-pulse rounded-full bg-amber-400 ring-1 sm:ring-2 ring-white" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-semibold text-slate-900 truncate">{name}</h3>
-                      <p className="text-[10px] sm:text-xs text-slate-500 truncate">{email}</p>
-                    </div>
-                  </div>
-                  <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs font-medium shrink-0 ${getStatusBadge(user).className}`}>
-                    <StatusBadge className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                    <span className="hidden xs:inline">{getStatusBadge(user).text}</span>
-                  </div>
-                </div>
-
-                {/* Quick Info */}
-                <div className="mt-3 sm:mt-4 grid grid-cols-2 gap-1.5 sm:gap-2">
-                  <div className="rounded-lg bg-slate-50/50 px-2 py-1.5 sm:px-3 sm:py-2">
-                    <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-400">
-                      <Briefcase className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                      <span>Role</span>
-                    </div>
-                    <p className="mt-0.5 text-[11px] sm:text-sm font-medium text-slate-700 truncate capitalize">
-                      {role || <span className="text-slate-400 font-normal italic">No data</span>}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50/50 px-2 py-1.5 sm:px-3 sm:py-2">
-                    <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-400">
-                      <Building className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                      <span>Department</span>
-                    </div>
-                    <p className="mt-0.5 text-[11px] sm:text-sm font-medium text-slate-700 truncate">
-                      {department || <span className="text-slate-400 font-normal italic">No data</span>}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Team Lead Badge */}
-                {assignedTL?.name ? (
-                  <div className="mt-2.5 flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-50/70 border border-amber-200/80 text-xs text-amber-900">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Crown size={14} className="text-amber-600 shrink-0" />
-                      <span className="font-semibold text-[11px] text-amber-800">Team Lead:</span>
-                      <span className="font-bold text-[11px] truncate text-slate-800">{assignedTL.name}</span>
-                    </div>
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 shrink-0">
-                      Assigned TL
-                    </span>
-                  </div>
-                ) : isTeamLeadUser(user) ? (
-                  <div className="mt-2.5 flex items-center justify-between gap-2 p-2 rounded-lg bg-purple-50/70 border border-purple-200/80 text-xs text-purple-900">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Crown size={14} className="text-purple-600 shrink-0" />
-                      <span className="font-bold text-[11px] text-purple-800">Team Leader</span>
-                    </div>
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 shrink-0">
-                      Lead Role
-                    </span>
-                  </div>
-                ) : (
-                  <div className="mt-2.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-500 font-medium">
-                    <AlertCircle size={13} className="shrink-0 text-slate-400" />
-                    <span>No Team Lead (No data)</span>
-                  </div>
-                )}
-
-                {/* Bank Details Badge if available */}
-                {userBank && (
-                  <div className="mt-1.5 flex items-center justify-between px-2.5 py-1 rounded-lg bg-emerald-50/70 border border-emerald-200/70 text-[11px] text-emerald-800">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Landmark size={13} className="text-emerald-600 shrink-0" />
-                      <span className="font-medium truncate">{userBank.bankName || 'No data'}</span>
-                    </div>
-                    {userBank.accountNumber && (
-                      <span className="font-mono text-[10px] text-emerald-700 shrink-0">
-                        •••• {String(userBank.accountNumber).slice(-4)}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Company & Branch Chip if assigned */}
-                {(companyDisplay || branchDisplay || fyDisplay) ? (
-                  <div className="mt-2 p-2 rounded-lg bg-indigo-50/60 border border-indigo-100 text-[11px] flex flex-col gap-1">
-                    {companyDisplay && (
-                      <div className="flex items-center gap-1.5 text-indigo-900 font-medium truncate">
-                        <Building2 size={12} className="text-indigo-600 shrink-0" />
-                        <span className="truncate">{companyDisplay}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-indigo-700 text-[10px]">
-                      {branchDisplay && (
-                        <span className="flex items-center gap-1 truncate">
-                          <MapPin size={11} className="shrink-0" />
-                          <span className="truncate">{branchDisplay}</span>
+                  return (
+                    <tr key={userId} className="transition-colors hover:bg-slate-50/80">
+                      <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs font-semibold text-sky-700">
+                        {requestId}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex min-w-[170px] items-center gap-2.5">
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${getGradientColor(name)} text-xs font-bold text-white`}>
+                            {getInitials(name)}
+                          </div>
+                          <span className="truncate text-sm font-semibold text-slate-900">{name}</span>
+                        </div>
+                      </td>
+                      <td className="max-w-[220px] truncate px-4 py-3.5 text-sm text-slate-500">
+                        {user?.email || '—'}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex max-w-[150px] truncate rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium capitalize text-indigo-700">
+                          {user?.role || 'Employee'}
                         </span>
-                      )}
-                      {fyDisplay && (
-                        <span className="flex items-center gap-1 shrink-0 font-mono text-[9px] px-1.5 py-0.5 bg-white rounded border border-indigo-200">
-                          {fyDisplay}
+                      </td>
+                      <td className="max-w-[180px] truncate px-4 py-3.5 text-sm text-slate-600">
+                        {user?.department || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-600">
+                        {requestDate && !Number.isNaN(new Date(requestDate).getTime())
+                          ? new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(requestDate))
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${status.className}`}>
+                          <StatusIcon size={13} />
+                          {status.text}
                         </span>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Expandable Details */}
-                {!isReadOnlyRequestRole(user) && (
-                  <div className="mt-2 sm:mt-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(userId)}
-                    className="flex w-full items-center justify-between rounded-lg bg-slate-50/50 px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm text-slate-600 transition hover:bg-slate-100 cursor-pointer"
-                  >
-                    <span className="text-[10px] sm:text-xs font-medium text-slate-500">
-                      {isExpanded ? 'Hide Details' : 'View Details'}
-                    </span>
-                    {isExpanded ? (
-                      <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    ) : (
-                      <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    )}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="mt-2 sm:mt-3 space-y-1.5 sm:space-y-2 rounded-lg bg-slate-50/50 p-2 sm:p-3">
-                      {/* Team Lead in details */}
-                      <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                        <Crown className={`h-3 w-3 sm:h-4 sm:w-4 ${isTeamLeadUser(user) ? 'text-purple-600' : 'text-amber-500'} shrink-0`} />
-                        <span className="text-slate-700 font-medium truncate">
-                          {isTeamLeadUser(user) ? (
-                            <>Role: <span className="font-bold text-purple-800">Team Leader (Lead Role)</span></>
-                          ) : (
-                            <>Team Lead: <span className="font-bold text-slate-900">{assignedTL?.name || 'No data'}</span></>
-                          )}
-                        </span>
-                      </div>
-
-                      {/* Bank Details in details */}
-                      {userBank && (
-                        <div className="flex items-start gap-1.5 sm:gap-2 text-[11px] sm:text-sm p-2 rounded-lg bg-emerald-50/60 border border-emerald-100">
-                          <Landmark className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                          <div className="min-w-0 text-slate-700 text-[11px]">
-                            <p className="font-semibold text-slate-900 truncate">{userBank.bankName || 'No data'} {userBank.bankBranch ? `(${userBank.bankBranch})` : ''}</p>
-                            <p className="font-mono text-slate-600">
-                              {userBank.accountNumber ? `A/C: ${userBank.accountNumber}` : ''}
-                              {userBank.ifscCode ? ` • IFSC: ${userBank.ifscCode}` : ''}
-                            </p>
-                            {userBank.accountHolderName && <p className="text-[10px] text-slate-500">Holder: {userBank.accountHolderName}</p>}
-                            {userBank.upiId && <p className="text-[10px] text-indigo-600 font-mono">UPI: {userBank.upiId}</p>}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => isApproved || isReadOnlyRequestRole(user) ? setSelectedUser(user) : handleApproveClick(user)}
+                            className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+                          >
+                            {isApproved || isReadOnlyRequestRole(user) ? 'View' : 'Review'}
+                          </button>
+                          <div className="relative">
+                            <button
+                              type="button"
+                              aria-label={`More actions for ${name}`}
+                              aria-expanded={menuOpen}
+                              onClick={() => setOpenActionsFor(menuOpen ? null : userId)}
+                              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                            {menuOpen && (
+                              <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setOpenActionsFor(null);
+                                  }}
+                                  className="w-full rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                >
+                                  View profile
+                                </button>
+                                {!isReadOnlyRequestRole(user) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionsFor(null);
+                                      handleApproveClick(user);
+                                    }}
+                                    className="w-full rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                  >
+                                    {isApproved ? 'Change team lead' : 'Review request'}
+                                  </button>
+                                )}
+                                {isApproved && !isReadOnlyRequestRole(user) && (
+                                  <button
+                                    type="button"
+                                    disabled={isProcessing}
+                                    onClick={() => {
+                                      setOpenActionsFor(null);
+                                      handleAction(user, 'revoke');
+                                    }}
+                                    className="w-full rounded-md px-2.5 py-2 text-left text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                                  >
+                                    {isProcessing ? 'Updating…' : 'Revoke approval'}
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
-                      )}
-
-                      <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                        <Phone className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
-                        <span className="text-slate-600 truncate">{phone || 'No data'}</span>
-                      </div>
-                      {user?.address && (
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                          <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
-                          <span className="text-slate-600 truncate">{user.address}</span>
-                        </div>
-                      )}
-                      {user?.dob && (
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
-                          <span className="text-slate-600 truncate">DOB: {user.dob}</span>
-                        </div>
-                      )}
-                      {user?.bloodGroup && (
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                          <Droplet className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
-                          <span className="text-slate-600 truncate">Blood: {user.bloodGroup}</span>
-                        </div>
-                      )}
-                      {user?.gender && (
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                          <User className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
-                          <span className="text-slate-600 truncate">Gender: {user.gender}</span>
-                        </div>
-                      )}
-                      {user?.designation && (
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                          <Briefcase className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
-                          <span className="text-slate-600 truncate">Designation: {typeof user.designation === 'object' ? (user.designation?.name || user.designation?.designationName || 'No data') : (user.designation || 'No data')}</span>
-                        </div>
-                      )}
-                      {user?.uniqueID && (
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
-                          <Hash className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
-                          <span className="text-slate-600 truncate">ID: {user.uniqueID}</span>
-                        </div>
-                      )}
-                      <div className="pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedUser(user)}
-                          className="text-[11px] text-indigo-600 hover:underline font-medium cursor-pointer"
-                        >
-                          View Full Profile Modal &rarr;
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                {!isReadOnlyRequestRole(user) && (() => {
-                  return (
-                    <div className="mt-3 sm:mt-4 flex flex-col xs:flex-row gap-1.5 sm:gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleApproveClick(user);
-                        }}
-                        className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 cursor-pointer ${isApproved
-                          ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98] border border-blue-200/80'
-                          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-[1.02] active:scale-[0.98]'
-                          }`}
-                      >
-                        {isApproved ? (
-                          <span className="flex items-center justify-center gap-1.5">
-                            <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
-                            Change TL / Edit
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center gap-1.5">
-                            <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                            Approve...
-                          </span>
-                        )}
-                      </button>
-                      {isApproved && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (isProcessingReject) return;
-                            handleAction(user, 'revoke');
-                          }}
-                          disabled={isProcessingReject}
-                          title="Revoke approval"
-                          className={`flex-1 rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium transition-all duration-200 ${isProcessingReject
-                            ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                            : 'cursor-pointer bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-[1.02] active:scale-[0.98]'
-                            }`}
-                        >
-                          {isProcessingReject ? (
-                            <span className="flex items-center justify-center gap-1.5">
-                              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                              Processing...
-                            </span>
-                          ) : (
-                            <span className="flex items-center justify-center gap-1.5">
-                              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-                              Revoke
-                            </span>
-                          )}
-                        </button>
-                      )}
-                    </div>
+                      </td>
+                    </tr>
                   );
-                })()}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* ==================================================== */}
       {/* APPROVE EMPLOYEE MODAL (COMPANY, BRANCH & FINANCIAL YEAR) */}

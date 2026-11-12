@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Wallet, Plus, Edit3, Eye, Search, Filter, RefreshCw, CheckCircle2,
-  AlertCircle, X, Download, Printer, Users, Shield, ArrowUpRight,
-  ArrowDownRight, DollarSign, Percent, Calendar, Check, ChevronRight,
-  Building2, CreditCard, Sparkles, FileText, Info, Award, UserCheck,
-  TrendingUp, Clock, ChevronDown, CheckSquare, Layers, Send, Calculator,
+  AlertCircle, X, Download, Printer, Shield, Calendar, Check,
+  CreditCard, Sparkles, FileText, Info,
+  Layers,
   FileSpreadsheet, Receipt, PieChart
 } from 'lucide-react';
 import api, { invalidateCache } from '../../api/axios.js';
@@ -221,6 +220,17 @@ const getStatusBadgeClass = (status) => {
     default:
       return 'bg-slate-50 text-slate-700 border-slate-200';
   }
+};
+
+const getPaymentModeLabel = (mode) => {
+  const normalizedMode = String(mode || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const labels = {
+    BANK_TRANSFER: 'Bank Transfer',
+    CASH: 'Cash',
+    CHEQUE: 'Cheque',
+    UPI: 'UPI'
+  };
+  return labels[normalizedMode] || (normalizedMode ? normalizedMode.replace(/_/g, ' ') : '—');
 };
 
 // Calculate total calendar days in a given month and year
@@ -497,28 +507,10 @@ export const SalaryView = () => {
   const [myPayslips, setMyPayslips] = useState([]);
   const [downloadingSlipId, setDownloadingSlipId] = useState(null);
   const [printingSlipId, setPrintingSlipId] = useState(null);
-  const [updatingStatusId, setUpdatingStatusId] = useState(null);
 
   // Detail / Statement Modal State (for both Admin & Employee)
   const [viewingDetailSalary, setViewingDetailSalary] = useState(null);
   const [viewingPayslipModal, setViewingPayslipModal] = useState(null);
-
-  // ==========================================
-  // MODAL: UPDATE MONTHLY PAYROLL / MARK AS PAID
-  // PUT /api/salaries/:id/pay
-  // ==========================================
-  const [isUpdatePayrollModalOpen, setIsUpdatePayrollModalOpen] = useState(false);
-  const [selectedPayrollToUpdate, setSelectedPayrollToUpdate] = useState(null);
-  const [isSubmittingUpdatePayroll, setIsSubmittingUpdatePayroll] = useState(false);
-  const [updatePayrollError, setUpdatePayrollError] = useState('');
-  const [updatePayrollForm, setUpdatePayrollForm] = useState({
-    paymentMode: 'CASH',
-    status: 'Processed',
-    paidAt: '',
-    remarks: '',
-    extraBonus: '',
-    extraDeduction: ''
-  });
 
   // ==========================================
   // MODAL 1: CREATE / EDIT SALARY STRUCTURE (ADMIN)
@@ -653,9 +645,6 @@ export const SalaryView = () => {
   const [isLoadingDeductionPreview, setIsLoadingDeductionPreview] = useState(false);
   const [liveDeductionPreview, setLiveDeductionPreview] = useState(null);
   const [processPreviewError, setProcessPreviewError] = useState('');
-  const [updatePayrollPreview, setUpdatePayrollPreview] = useState(null);
-  const [isLoadingUpdatePayrollPreview, setIsLoadingUpdatePayrollPreview] = useState(false);
-  const [updatePayrollPreviewError, setUpdatePayrollPreviewError] = useState('');
   const processPreviewRequestId = useRef(0);
 
   // Live sync employee custom approved deductions and preview from backend API
@@ -952,12 +941,6 @@ export const SalaryView = () => {
 
       const list = Array.isArray(rawData) ? rawData : [];
 
-      // Load persisted salary status and leave overrides so user status and leave changes remain persistent and live
-      let savedOverrides = {};
-      try {
-        savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
-      } catch { }
-
       const staffMap = new Map();
       (staffList || companyStaff || []).forEach((u) => {
         if (u?._id) staffMap.set(String(u._id), u);
@@ -1008,8 +991,10 @@ export const SalaryView = () => {
           matchedUser?.uniqueID ||
           uId;
         const pId = String(item._id || item.id || '');
-        const rawStatus = String(savedOverrides[pId] || item.status || item.paymentStatus || item.salaryStatus || 'processed').toLowerCase().trim();
-        const currentStatus = rawStatus === 'paid' ? 'paid' : 'processed';
+        const rawStatus = String(item.status || item.paymentStatus || item.salaryStatus || 'Generated').trim();
+        const currentStatus = rawStatus
+          ? `${rawStatus.charAt(0).toUpperCase()}${rawStatus.slice(1).toLowerCase()}`
+          : 'Generated';
 
         return {
           ...item,
@@ -1140,19 +1125,19 @@ export const SalaryView = () => {
     // Silent background auto-refresh every 15 seconds
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
-      if (!isStructureModalOpen && !isProcessModalOpen && !isUpdatePayrollModalOpen) {
+      if (!isStructureModalOpen && !isProcessModalOpen) {
         loadData(false, true);
       }
     }, 15000);
 
     const handleFocus = () => {
-      if (!isStructureModalOpen && !isProcessModalOpen && !isUpdatePayrollModalOpen) {
+      if (!isStructureModalOpen && !isProcessModalOpen) {
         loadData(false, true);
       }
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && !isStructureModalOpen && !isProcessModalOpen && !isUpdatePayrollModalOpen) {
+      if (document.visibilityState === 'visible' && !isStructureModalOpen && !isProcessModalOpen) {
         loadData(false, true);
       }
     };
@@ -1165,7 +1150,7 @@ export const SalaryView = () => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [myMongoUserId, isAdmin, isStructureModalOpen, isProcessModalOpen, isUpdatePayrollModalOpen]);
+  }, [myMongoUserId, isAdmin, isStructureModalOpen, isProcessModalOpen]);
 
   // ==========================================
   // 2. ADMIN ACTIONS: CREATE / EDIT SALARY STRUCTURE
@@ -1465,35 +1450,6 @@ export const SalaryView = () => {
     }
   };
 
-  // 3c. MARK PAID ACTION (PUT /api/payroll/pay)
-  const handlePayPayroll = async (payroll) => {
-    const salaryId = payroll._id || payroll.id;
-    if (!salaryId) return;
-    try {
-      await api.put('/api/payroll/pay', {
-        salaryId,
-        id: salaryId,
-        paymentMode: 'BANK_TRANSFER',
-        paidAt: new Date().toISOString(),
-        remarks: 'Disbursed via Bank Transfer'
-      });
-      setNotification({
-        type: 'success',
-        message: `Salary for ${payroll.userObj?.name || 'Staff Member'} marked as Paid!`
-      });
-      invalidateCache(/payroll/);
-      invalidateCache(/salaries/);
-      invalidateCache(/salary/);
-      await loadData(true);
-    } catch (err) {
-      console.error('Failed to mark payroll as paid:', err);
-      setNotification({
-        type: 'error',
-        message: err.response?.data?.message || err.message || 'Failed to disburse salary'
-      });
-    }
-  };
-
   // ==========================================
   // 4. GENERATE PAYSLIP HTML HELPER FOR PRINT & PDF
   // ==========================================
@@ -1669,385 +1625,6 @@ export const SalaryView = () => {
   ${printScript}
 </body>
 </html>`;
-  };
-
-  // ==========================================
-  // MODAL LOGIC: UPDATE MONTHLY PAYROLL / MARK AS PAID
-  // PUT /api/salaries/:id/pay
-  // ==========================================
-  const openUpdatePayrollModal = (payroll) => {
-    if (!payroll) return;
-    setSelectedPayrollToUpdate(payroll);
-    setUpdatePayrollError('');
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    let initialPaidDate = todayStr;
-    if (payroll.paidAt) {
-      try {
-        const d = new Date(payroll.paidAt);
-        if (!isNaN(d.getTime())) {
-          initialPaidDate = d.toISOString().split('T')[0];
-        }
-      } catch { }
-    }
-
-    const rawStatus = String(payroll.status || 'processed').toLowerCase().trim();
-    const currentStatus = rawStatus === 'paid' ? 'Paid' : 'Processed';
-
-    const approvedLeaveDays = payroll.approvedLeaveDays != null
-      ? Number(payroll.approvedLeaveDays)
-      : (payroll.leaveDays != null ? Number(payroll.leaveDays) : null);
-    const unauthorizedFullDays = payroll.unauthorizedFullDays != null
-      ? Number(payroll.unauthorizedFullDays)
-      : (payroll.unauthorizedFullDayCount != null ? Number(payroll.unauthorizedFullDayCount) : null);
-    const unauthorizedHalfDays = payroll.unauthorizedHalfDays != null
-      ? Number(payroll.unauthorizedHalfDays)
-      : (payroll.unauthorizedHalfDayCount != null ? Number(payroll.unauthorizedHalfDayCount) : null);
-    const unauthorizedAbsenceDays = payroll.unapprovedLeaveDays != null
-      ? Number(payroll.unapprovedLeaveDays)
-      : (payroll.unauthorizedAbsenceDays != null ? Number(payroll.unauthorizedAbsenceDays) : null);
-    const lopDays = payroll.lopDays != null ? Number(payroll.lopDays) : null;
-    const totalMonthDays = payroll.totalDays != null ? Number(payroll.totalDays) : getDaysInMonth(payroll.month, payroll.year);
-    const defaultPayableDays = payroll.daysPayable != null ? Number(payroll.daysPayable) : null;
-
-    setUpdatePayrollForm({
-      paymentMode: payroll.paymentMode || 'CASH',
-      status: currentStatus,
-      paidAt: initialPaidDate,
-      remarks: payroll.remarks || (payroll.paymentMode === 'CASH' || !payroll.paymentMode ? 'Salary paid in cash' : 'Salary disbursed'),
-      extraBonus: payroll.extraBonus != null && Number(payroll.extraBonus) !== 0 ? String(payroll.extraBonus) : '',
-      extraDeduction: payroll.extraDeduction != null && Number(payroll.extraDeduction) !== 0 ? String(payroll.extraDeduction) : '',
-      totalDays: totalMonthDays,
-      leaveDays: approvedLeaveDays,
-      approvedLeaveDays,
-      unauthorizedFullDays,
-      unauthorizedHalfDays,
-      unauthorizedAbsenceDays,
-      lopDays,
-      daysPayable: defaultPayableDays,
-      applyLegallyApprovedPenalty: Boolean(payroll.isPenaltyApproved),
-      legallyApprovedPenaltyAmount: payroll.legallyApprovedPenalties ?? payroll.appliedPenalty ?? '',
-      penaltyDate: payroll.penaltyDate || ''
-    });
-
-    setIsUpdatePayrollModalOpen(true);
-  };
-
-  const updatePayrollCalculations = useMemo(() => {
-    const values = getPayrollPreviewValues(updatePayrollPreview);
-    return {
-      baseGross: values.monthlySalary,
-      monthlySalary: values.monthlySalary,
-      earnedBaseSalary: values.earnedBaseSalary,
-      grossSalary: values.grossSalary,
-      fixedDeduction: getPreviewNumber(updatePayrollPreview, ['fixedDeduction']),
-      tdsAmount: values.tdsAmount,
-      totalDeduction: values.totalDeduction,
-      netSalary: values.netSalary,
-      totalDays: values.calendarDays,
-      calendarDays: values.calendarDays,
-      sundays: values.sundays,
-      holidayDays: values.holidayDays,
-      workingDays: values.workingDays,
-      daysPayable: values.daysPayable,
-      leaveDays: values.approvedLeaveDays,
-      approvedLeaveDays: values.approvedLeaveDays,
-      unauthorizedFullDays: values.unauthorizedFullDays ?? updatePayrollForm.unauthorizedFullDays,
-      unauthorizedHalfDays: values.unauthorizedHalfDays ?? updatePayrollForm.unauthorizedHalfDays,
-      unauthorizedAbsenceDays: values.unauthorizedAbsenceDays,
-      lopDays: values.lopDays,
-      presentDays: values.daysPayable,
-      perDaySalary: values.perDaySalary,
-      lopDeduction: values.lopDeduction,
-      proposedPenaltyAmount: values.proposedPenalty,
-      legallyApprovedPenalty: values.appliedPenalty,
-      pfDeduction: values.pfDeduction,
-      esicDeduction: values.esicDeduction,
-      professionalTax: values.professionalTax
-    };
-  }, [updatePayrollForm, updatePayrollPreview]);
-
-  useEffect(() => {
-    if (!isUpdatePayrollModalOpen || !selectedPayrollToUpdate) return undefined;
-    let active = true;
-    const employeeId = selectedPayrollToUpdate.employeeId?._id ||
-      selectedPayrollToUpdate.employeeId ||
-      selectedPayrollToUpdate.userId?._id ||
-      selectedPayrollToUpdate.userId;
-    setIsLoadingUpdatePayrollPreview(true);
-    setUpdatePayrollPreviewError('');
-    setUpdatePayrollPreview(null);
-    previewPayrollWithDeductions({
-      employeeId,
-      userId: employeeId,
-      payrollId: selectedPayrollToUpdate._id || selectedPayrollToUpdate.id,
-      salaryStructureId: selectedPayrollToUpdate.salaryStructureId?._id ||
-        selectedPayrollToUpdate.salaryStructureId ||
-        selectedPayrollToUpdate.salaryStructureSnapshot?._id,
-      month: Number(selectedPayrollToUpdate.month),
-      year: Number(selectedPayrollToUpdate.year),
-      totalDays: updatePayrollForm.totalDays,
-      leaveDays: updatePayrollForm.leaveDays,
-      approvedLeaveDays: updatePayrollForm.leaveDays,
-      unauthorizedFullDays: updatePayrollForm.unauthorizedFullDays,
-      unauthorizedHalfDays: updatePayrollForm.unauthorizedHalfDays,
-      unauthorizedFullDayCount: updatePayrollForm.unauthorizedFullDays,
-      unauthorizedHalfDayCount: updatePayrollForm.unauthorizedHalfDays,
-      extraBonus: Number(updatePayrollForm.extraBonus) || 0,
-      extraDeduction: Number(updatePayrollForm.extraDeduction) || 0,
-      isPenaltyApproved: Boolean(updatePayrollForm.applyLegallyApprovedPenalty),
-      legallyApprovedPenalties: updatePayrollForm.applyLegallyApprovedPenalty
-        ? Number(updatePayrollForm.legallyApprovedPenaltyAmount) || 0
-        : 0,
-      penaltyDate: updatePayrollForm.penaltyDate || null
-    }).then((preview) => {
-      if (active) setUpdatePayrollPreview(preview);
-    }).catch((err) => {
-      if (!active) return;
-      setUpdatePayrollPreviewError(err.response?.data?.message || err.message || 'Payroll preview is unavailable.');
-    }).finally(() => {
-      if (active) setIsLoadingUpdatePayrollPreview(false);
-    });
-    return () => {
-      active = false;
-    };
-  }, [isUpdatePayrollModalOpen, selectedPayrollToUpdate, updatePayrollForm]);
-
-  const handleSubmitUpdatePayroll = async (e) => {
-    e.preventDefault();
-    if (!selectedPayrollToUpdate) return;
-    if (isLoadingUpdatePayrollPreview || !updatePayrollPreview) {
-      setUpdatePayrollError(updatePayrollPreviewError || 'Wait for the authoritative payroll preview before updating.');
-      return;
-    }
-
-    setIsSubmittingUpdatePayroll(true);
-    setUpdatePayrollError('');
-
-    const empId =
-      selectedPayrollToUpdate.employeeId?._id ||
-      selectedPayrollToUpdate.employeeId ||
-      selectedPayrollToUpdate.userId?._id ||
-      selectedPayrollToUpdate.userId ||
-      selectedPayrollToUpdate._id;
-
-    const formattedPaidAt = updatePayrollForm.paidAt
-      ? new Date(updatePayrollForm.paidAt).toISOString()
-      : new Date().toISOString();
-
-    const wasAlreadyPaid = String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid';
-    if (wasAlreadyPaid && String(updatePayrollForm.status || '').toLowerCase() === 'processed') {
-      setUpdatePayrollError('Once payroll status is Paid, it cannot be changed back to Processed.');
-      setIsSubmittingUpdatePayroll(false);
-      return;
-    }
-
-    const chosenStatus = wasAlreadyPaid ? 'paid' : (String(updatePayrollForm.status || 'Processed').toLowerCase() === 'paid' ? 'paid' : 'processed');
-    const payload = {
-      paymentMode: updatePayrollForm.paymentMode || 'CASH',
-      remarks: updatePayrollForm.remarks || '',
-      paidAt: formattedPaidAt,
-      status: chosenStatus,
-      month: Number(selectedPayrollToUpdate.month),
-      year: Number(selectedPayrollToUpdate.year),
-      extraBonus: Number(updatePayrollForm.extraBonus) || 0,
-      extraDeduction: Number(updatePayrollForm.extraDeduction) || 0,
-      totalDays: updatePayrollForm.totalDays,
-      leaveDays: updatePayrollForm.leaveDays,
-      approvedLeaveDays: updatePayrollForm.leaveDays,
-      unauthorizedFullDays: updatePayrollForm.unauthorizedFullDays == null
-        ? undefined
-        : Number(updatePayrollForm.unauthorizedFullDays),
-      unauthorizedHalfDays: updatePayrollForm.unauthorizedHalfDays == null
-        ? undefined
-        : Number(updatePayrollForm.unauthorizedHalfDays),
-      unauthorizedFullDayCount: updatePayrollForm.unauthorizedFullDays == null
-        ? undefined
-        : Number(updatePayrollForm.unauthorizedFullDays),
-      unauthorizedHalfDayCount: updatePayrollForm.unauthorizedHalfDays == null
-        ? undefined
-        : Number(updatePayrollForm.unauthorizedHalfDays),
-      isPenaltyApproved: Boolean(updatePayrollForm.applyLegallyApprovedPenalty),
-      legallyApprovedPenalties: updatePayrollForm.applyLegallyApprovedPenalty
-        ? Number(updatePayrollForm.legallyApprovedPenaltyAmount) || 0
-        : 0,
-      penaltyDate: updatePayrollForm.penaltyDate || null,
-    };
-
-    try {
-      let res;
-      try {
-        // PUT: /api/salaries/:id/pay
-        res = await api.put(`/api/salaries/${empId}/pay`, payload);
-      } catch (errPrimary) {
-        if (selectedPayrollToUpdate._id && String(selectedPayrollToUpdate._id) !== String(empId)) {
-          res = await api.put(`/api/salaries/${selectedPayrollToUpdate._id}/pay`, payload);
-        } else {
-          throw errPrimary;
-        }
-      }
-
-      const updatedRecord = res.data?.data || res.data?.salary || res.data;
-      const successMsg = res.data?.message || 'Monthly salary marked as Paid successfully';
-
-      // Persist status and leave overrides locally
-      const targetId = String(selectedPayrollToUpdate._id || empId);
-      try {
-        const savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
-        localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
-      } catch { }
-
-      // Update state live across tables
-      setAllProcessedPayrolls((prev) =>
-        prev.map((item) => {
-          const itemId = String(item._id || item.id || '');
-          const itemEmpId = String(item.employeeId?._id || item.employeeId || item.userId?._id || item.userId || '');
-          if (itemId === targetId || itemEmpId === String(empId)) {
-            return {
-              ...item,
-              ...(updatedRecord && typeof updatedRecord === 'object' ? updatedRecord : {}),
-              status: payload.status,
-              paymentMode: payload.paymentMode,
-              remarks: payload.remarks,
-              paidAt: payload.paidAt
-            };
-          }
-          return item;
-        })
-      );
-
-      setMyProcessedPayrolls((prev) =>
-        prev.map((item) => {
-          const itemId = String(item._id || item.id || '');
-          const itemEmpId = String(item.employeeId?._id || item.employeeId || item.userId?._id || item.userId || '');
-          if (itemId === targetId || itemEmpId === String(empId)) {
-            return {
-              ...item,
-              ...(updatedRecord && typeof updatedRecord === 'object' ? updatedRecord : {}),
-              status: payload.status,
-              paymentMode: payload.paymentMode,
-              remarks: payload.remarks,
-              paidAt: payload.paidAt
-            };
-          }
-          return item;
-        })
-      );
-
-      invalidateCache(/salaries/);
-      invalidateCache(/salary/);
-      invalidateCache(/payroll/);
-
-      setNotification({
-        type: 'success',
-        message: successMsg
-      });
-
-      setIsUpdatePayrollModalOpen(false);
-      setSelectedPayrollToUpdate(null);
-      await loadData(true);
-    } catch (err) {
-      console.error('Failed to update monthly payroll:', err);
-      setUpdatePayrollError(
-        err.response?.data?.message || err.message || 'Failed to update monthly payroll.'
-      );
-    } finally {
-      setIsSubmittingUpdatePayroll(false);
-    }
-  };
-
-  // ==========================================
-  // CHANGE SALARY STATUS (ADMIN)
-  // Updates live details in UI and synchronizes with backend PUT /api/salaries/:id/pay
-  // ==========================================
-  const handleChangeSalaryStatus = async (payroll, newStatus) => {
-    const pId = String(payroll?._id || payroll?.id || '');
-    if (!pId || !newStatus) return;
-
-    const currentStatus = String(payroll?.status || '').toLowerCase().trim();
-    if (currentStatus === 'paid' && String(newStatus).toLowerCase() !== 'paid') {
-      setNotification({
-        type: 'warning',
-        message: 'Once salary status is Paid, it cannot be changed back to Processed.'
-      });
-      return;
-    }
-
-    setUpdatingStatusId(pId);
-
-    // 1. Optimistic UI update across all active states so UI reflects live changes immediately
-    setAllProcessedPayrolls((prev) =>
-      prev.map((item) => {
-        const id = String(item._id || item.id || '');
-        return id === pId ? { ...item, status: newStatus } : item;
-      })
-    );
-
-    setMyProcessedPayrolls((prev) =>
-      prev.map((item) => {
-        const id = String(item._id || item.id || '');
-        return id === pId ? { ...item, status: newStatus } : item;
-      })
-    );
-
-    setAllPayslips((prev) =>
-      prev.map((ps) => {
-        const matchId = String(ps.payrollId?._id || ps.payrollId || '');
-        return matchId === pId ? { ...ps, status: newStatus } : ps;
-      })
-    );
-
-    // 2. Persist in local storage so status is preserved across page reloads
-    try {
-      const savedOverrides = JSON.parse(localStorage.getItem('payroll_status_overrides') || '{}');
-      savedOverrides[pId] = newStatus;
-      localStorage.setItem('payroll_status_overrides', JSON.stringify(savedOverrides));
-    } catch { }
-
-    // 3. Update backend in real-time via PUT: api/salaries/:id/pay
-    const empId =
-      payroll.employeeId?._id ||
-      payroll.employeeId ||
-      payroll.userId?._id ||
-      payroll.userId ||
-      pId;
-
-    const payload = {
-      status: newStatus,
-      paymentMode: payroll.paymentMode || 'CASH',
-      paidAt: new Date().toISOString(),
-      month: Number(payroll.month),
-      year: Number(payroll.year),
-      remarks: payroll.remarks || `Marked as ${newStatus}`
-    };
-
-    let backendUpdated = false;
-    try {
-      await api.put(`/api/salaries/${empId}/pay`, payload);
-      backendUpdated = true;
-      invalidateCache(/salaries/);
-      invalidateCache(/payroll/);
-    } catch (errPay) {
-      console.warn('PUT /api/salaries/:id/pay notice:', errPay.response?.data?.message || errPay.message);
-      if (payroll._id && String(payroll._id) !== String(empId)) {
-        try {
-          await api.put(`/api/salaries/${payroll._id}/pay`, payload);
-          backendUpdated = true;
-          invalidateCache(/salaries/);
-          invalidateCache(/payroll/);
-        } catch { }
-      }
-    }
-
-    const staffName = payroll.userObj?.name || 'Staff Member';
-    const period = formatMonthYear(payroll.month, payroll.year);
-
-    setNotification({
-      type: 'success',
-      message: `Salary status updated to "${newStatus.toUpperCase()}" for ${staffName} (${period})`
-    });
-
-    setUpdatingStatusId(null);
   };
 
   // ==========================================
@@ -2569,6 +2146,8 @@ export const SalaryView = () => {
                 className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none font-medium cursor-pointer"
               >
                 <option value="all">All Statuses</option>
+                <option value="generated">Generated</option>
+                <option value="approved">Approved</option>
                 <option value="processed">Processed</option>
                 <option value="paid">Paid</option>
               </select>
@@ -2612,6 +2191,7 @@ export const SalaryView = () => {
                 <Layers size={16} className="text-emerald-600" />
                 <span>Processed Monthly Payroll Records</span>
               </h3>
+              <p className="mt-1 text-xs text-slate-500">Payment status and payment type are synced from Finance.</p>
             </div>
 
             {filteredProcessedPayrolls.length === 0 ? (
@@ -2645,6 +2225,7 @@ export const SalaryView = () => {
                       <th className="py-3 px-4">Deductions</th>
                       <th className="py-3 px-4">Net Disbursed</th>
                       <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Payment Type</th>
                       {/* <th className="py-3 px-4">Payslip</th> */}
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
@@ -2754,7 +2335,17 @@ export const SalaryView = () => {
                             </span>
                           </td>
 
-                          {/* Actions: Separate Generate, Approve, Mark Paid and Breakdown */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {String(payroll.status || '').toLowerCase() === 'paid' ? (
+                              <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
+                                {getPaymentModeLabel(payroll.paymentMode)}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          {/* Payroll approval and payslip actions; payment is recorded in Finance. */}
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5 flex-wrap">
                               {/* Approve action if not yet approved or paid */}
@@ -2767,19 +2358,6 @@ export const SalaryView = () => {
                                 >
                                   <CheckCircle2 size={12} className="text-indigo-600" />
                                   <span>Approve</span>
-                                </button>
-                              )}
-
-                              {/* Mark Paid action if approved */}
-                              {isAdmin && String(payroll.status || '').toLowerCase() === 'approved' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handlePayPayroll(payroll)}
-                                  className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer shadow-2xs"
-                                  title="Disburse / Mark as Paid via Bank Transfer"
-                                >
-                                  <CreditCard size={12} className="text-emerald-600" />
-                                  <span>Mark Paid</span>
                                 </button>
                               )}
 
@@ -2812,16 +2390,6 @@ export const SalaryView = () => {
                                 </button>
                               )}
 
-                              {isAdmin && (
-                                <button
-                                  type="button"
-                                  onClick={() => openUpdatePayrollModal(payroll)}
-                                  className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded transition cursor-pointer"
-                                  title="Update Payroll Details"
-                                >
-                                  <Edit3 size={13} />
-                                </button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -3124,6 +2692,7 @@ export const SalaryView = () => {
                       <th className="py-3 px-4">Deductions & TDS</th>
                       <th className="py-3 px-4">Net Disbursed</th>
                       <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Payment Type</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -3148,6 +2717,15 @@ export const SalaryView = () => {
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase shadow-2xs ${getStatusBadgeClass(rec.status)}`}>
                             {rec.status || 'Generated'}
                           </span>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          {String(rec.status || '').toLowerCase() === 'paid' ? (
+                            <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-semibold text-sky-700">
+                              {getPaymentModeLabel(rec.paymentMode)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
@@ -3176,17 +2754,6 @@ export const SalaryView = () => {
                                 <span>PDF</span>
                               </button>
                             )}
-                            {isAdmin && (
-                              <button
-                                type="button"
-                                onClick={() => openUpdatePayrollModal(rec)}
-                                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition cursor-pointer border border-emerald-200"
-                                title="Update Monthly Payroll / Mark as Paid"
-                              >
-                                <CreditCard size={12} />
-                                <span>Update / Pay</span>
-                              </button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -3198,491 +2765,6 @@ export const SalaryView = () => {
           </div>
         </div>
       )}
-
-      {/* ==================================================== */}
-      {/* MODAL: UPDATE MONTHLY PAYROLL / MARK AS PAID (PUT /api/salaries/:id/pay) */}
-      {/* ==================================================== */}
-      {isUpdatePayrollModalOpen && selectedPayrollToUpdate && (() => {
-        const staff = selectedPayrollToUpdate.userObj || selectedPayrollToUpdate.employeeId || selectedPayrollToUpdate.userId || {};
-        const staffName = staff.name || staff.fullName || resolveEmployeeName(staff) || 'Staff Member';
-        const staffRole = getRoleLabel(staff);
-        const staffInitials = (staffName || 'S')
-          .split(' ')
-          .map((w) => w[0])
-          .filter(Boolean)
-          .slice(0, 2)
-          .join('')
-          .toUpperCase();
-        const periodStr = formatMonthYear(selectedPayrollToUpdate.month, selectedPayrollToUpdate.year);
-
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
-            onClick={() => !isSubmittingUpdatePayroll && setIsUpdatePayrollModalOpen(false)}
-          >
-            <div
-              className="bg-white border border-slate-200 rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                    <CreditCard size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Update Monthly Payroll
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Update payment details & mark as Paid for {periodStr}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  disabled={isSubmittingUpdatePayroll}
-                  onClick={() => setIsUpdatePayrollModalOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Modal Form */}
-              <form onSubmit={handleSubmitUpdatePayroll} className="p-6 overflow-y-auto space-y-4 text-xs">
-                {updatePayrollError && (
-                  <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                    <AlertCircle size={15} className="shrink-0" />
-                    <span>{updatePayrollError}</span>
-                  </div>
-                )}
-
-                {/* Staff Member Info Card (Dynamically derived, zero static data) */}
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                    {staffInitials}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm text-slate-900 truncate">
-                        {staffName}
-                      </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {staffRole}
-                      </span>
-                      {(staff.uniqueID || staff.employeeId?.uniqueID) && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono text-slate-500 bg-slate-200">
-                          {staff.uniqueID || staff.employeeId?.uniqueID}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <span>Period: <strong className="text-slate-800 font-mono">{periodStr}</strong></span>
-                      {(staff.designation || staff.department) && (
-                        <span>• {staff.designation || ''}{staff.department ? ` (${staff.department})` : ''}</span>
-                      )}
-                      {(staff.email || selectedPayrollToUpdate.employeeId?.email) && (
-                        <span>• {staff.email || selectedPayrollToUpdate.employeeId?.email}</span>
-                      )}
-                    </div>
-                    {/* Dynamic Account Info if available */}
-                    {(staff.bankAccountNumber || staff.bankDetails?.accountNumber || staff.bankDetails?.bankAccountNumber || staff.upiId || staff.bankDetails?.upiId) && (
-                      <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600">
-                        {(staff.bankAccountNumber || staff.bankDetails?.accountNumber || staff.bankDetails?.bankAccountNumber) && (
-                          <span>
-                            <strong className="text-slate-700">A/C:</strong>{' '}
-                            {staff.bankAccountNumber || staff.bankDetails?.accountNumber || staff.bankDetails?.bankAccountNumber}
-                            {(staff.ifscCode || staff.bankDetails?.ifscCode) && ` (${staff.ifscCode || staff.bankDetails?.ifscCode})`}
-                          </span>
-                        )}
-                        {(staff.upiId || staff.bankDetails?.upiId) && (
-                          <span>
-                            <strong className="text-slate-700">UPI:</strong>{' '}
-                            {staff.upiId || staff.bankDetails?.upiId}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Monthly Attendance & Leave Days Section */}
-                <div className="p-3.5 bg-slate-50/90 rounded-xl border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                      <Calendar size={14} className="text-indigo-600" />
-                      <span>Monthly Attendance & Leave Days</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-medium text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                      Backend calculation preview
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Calendar Days
-                      </label>
-                      <input
-                        type="number"
-                        value={updatePayrollCalculations.calendarDays ?? ''}
-                        readOnly
-                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono font-semibold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Approved Unpaid Leave Days
-                      </label>
-                      <input
-                        type="number"
-                        readOnly
-                        value={updatePayrollCalculations.approvedLeaveDays ?? ''}
-                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-amber-300 rounded-lg text-amber-700 font-mono font-bold cursor-not-allowed focus:outline-none"
-                        placeholder="0"
-                        title="Approved Leaves is fixed (Authorized Unpaid Leave)"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Unauthorized Full-Day Incident Count
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={updatePayrollForm.unauthorizedFullDays ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? null : Math.max(0, Number(e.target.value) || 0);
-                          setUpdatePayrollForm((prev) => ({
-                            ...prev,
-                            unauthorizedFullDays: val
-                          }));
-                        }}
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
-                        placeholder="0"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Unauthorized Half-Day Incident Count
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={updatePayrollForm.unauthorizedHalfDays ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? null : Math.max(0, Number(e.target.value) || 0);
-                          setUpdatePayrollForm((prev) => ({
-                            ...prev,
-                            unauthorizedHalfDays: val
-                          }));
-                        }}
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-rose-300 rounded-lg text-rose-700 font-mono font-bold focus:outline-none focus:border-rose-500"
-                        placeholder="0"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Total LOP Days
-                      </label>
-                      <input
-                        type="number"
-                        readOnly
-                        value={updatePayrollCalculations.lopDays ?? ''}
-                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-rose-200 rounded-lg text-rose-700 font-mono font-bold cursor-not-allowed focus:outline-none"
-                        placeholder="0"
-                        title="LOP days returned by the backend payroll preview."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Payable Days
-                      </label>
-                      <input
-                        type="number"
-                        readOnly
-                        value={updatePayrollCalculations.daysPayable ?? ''}
-                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-emerald-300 rounded-lg text-emerald-700 font-mono font-bold cursor-not-allowed focus:outline-none"
-                        placeholder="—"
-                        title="Payable days returned by the backend payroll preview."
-                      />
-                    </div>
-                  </div>
-
-                  {isLoadingUpdatePayrollPreview && <p className="text-xs text-indigo-700">Loading backend payroll preview…</p>}
-                  {updatePayrollPreviewError && <p role="alert" className="text-xs text-rose-700">{updatePayrollPreviewError}</p>}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
-                    <div>Sundays: <strong>{updatePayrollCalculations.sundays ?? '—'}</strong></div>
-                    <div>Configured Holiday Days (Saturday included): <strong>{updatePayrollCalculations.holidayDays ?? '—'}</strong></div>
-                    <div>Working Days / Calculation Divisor: <strong>{updatePayrollCalculations.workingDays ?? '—'}</strong></div>
-                    <div>Per Day Salary: <strong>{formatINR(updatePayrollCalculations.perDaySalary)}</strong></div>
-                    <div>Actual Absence Days: <strong>{updatePayrollCalculations.unauthorizedAbsenceDays ?? '—'}</strong></div>
-                  </div>
-                </div>
-
-                {/* Disciplinary Penalty Advisory & Application in Update Modal */}
-                {(updatePayrollCalculations.proposedPenaltyAmount != null || updatePayrollCalculations.legallyApprovedPenalty != null) && (
-                  <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 text-xs space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <Info size={14} className="text-amber-600" />
-                        <span>Disciplinary Penalty Advisory (Unauthorized Absence)</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-amber-800 uppercase bg-amber-100 px-2 py-0.5 rounded">
-                        Labor Law Compliance
-                      </span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-amber-800">
-                      Proposed Penalty: <strong>{formatINR(updatePayrollCalculations.proposedPenaltyAmount)}</strong>. Applied Penalty: <strong>{formatINR(updatePayrollCalculations.legallyApprovedPenalty)}</strong>. Payable days are not changed by penalty.
-                    </p>
-
-                    <div className="p-3 bg-white rounded-lg border border-amber-300 space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(updatePayrollForm.applyLegallyApprovedPenalty)}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setUpdatePayrollForm((prev) => ({
-                              ...prev,
-                              applyLegallyApprovedPenalty: checked,
-                              legallyApprovedPenaltyAmount: checked ? (updatePayrollCalculations.proposedPenaltyAmount ?? '') : 0,
-                              penaltyDate: checked && !prev.penaltyDate ? new Date().toISOString().split('T')[0] : prev.penaltyDate
-                            }));
-                          }}
-                          className="w-4 h-4 rounded text-rose-600 border-slate-300 focus:ring-rose-500 cursor-pointer"
-                        />
-                        <span className="font-bold text-xs text-slate-800">
-                          Authorize penalty (proposed {formatINR(updatePayrollCalculations.proposedPenaltyAmount)})
-                        </span>
-                      </label>
-
-                      {updatePayrollForm.applyLegallyApprovedPenalty && (
-                        <div className="pl-6 pt-1 space-y-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                                Penalty Incident / Authorized Date <span className="text-rose-500">*</span>
-                              </label>
-                              <input
-                                type="date"
-                                value={updatePayrollForm.penaltyDate || ''}
-                                onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, penaltyDate: e.target.value })}
-                                className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md font-mono text-slate-900 focus:outline-none focus:border-rose-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                                Approved Penalty Amount (₹)
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                value={updatePayrollForm.legallyApprovedPenaltyAmount ?? ''}
-                                onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, legallyApprovedPenaltyAmount: Number(e.target.value) || 0 })}
-                                className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md font-mono text-slate-900 focus:outline-none focus:border-rose-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Live Calculated Financial Summary */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Monthly Contracted Salary</span>
-                    <span className="font-mono font-bold text-slate-800 text-xs">{formatINR(updatePayrollCalculations.monthlySalary)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Earned Base Salary (Info)</span>
-                    <span className="font-mono font-bold text-slate-800 text-xs">{formatINR(updatePayrollCalculations.earnedBaseSalary)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Gross Earnings</span>
-                    <span className="font-mono font-bold text-slate-800 text-xs">
-                      {formatINR(updatePayrollCalculations.grossSalary)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">LOP Amount</span>
-                    <span className="font-mono font-semibold text-rose-600 text-xs">
-                      {updatePayrollCalculations.lopDeduction == null ? '—' : `-${formatINR(updatePayrollCalculations.lopDeduction)}`}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-amber-700 uppercase font-semibold block">Proposed Penalty</span>
-                    <span className="font-mono font-semibold text-amber-700 text-xs">{formatINR(updatePayrollCalculations.proposedPenaltyAmount)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-rose-700 uppercase font-semibold block">Applied Penalty</span>
-                    <span className="font-mono font-semibold text-rose-700 text-xs">{formatINR(updatePayrollCalculations.legallyApprovedPenalty)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Deductions</span>
-                    <span className="font-mono font-bold text-rose-600 text-xs">
-                      {updatePayrollCalculations.totalDeduction == null ? '—' : `-${formatINR(updatePayrollCalculations.totalDeduction)}`}
-                    </span>
-                  </div>
-                  <div className="border-l border-slate-200 pl-2 bg-emerald-50/60 rounded">
-                    <span className="text-[10px] text-emerald-700 uppercase font-bold block">Net Take-Home</span>
-                    <span className="font-mono font-black text-emerald-600 text-xs sm:text-sm">
-                      {formatINR(updatePayrollCalculations.netSalary)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Status & Payment Mode */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Disbursement Status <span className="text-rose-500">*</span>
-                      </label>
-                      {String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid' && (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                          Locked as Paid
-                        </span>
-                      )}
-                    </div>
-                    <select
-                      value={String(updatePayrollForm.status || 'Processed').toLowerCase() === 'paid' ? 'Paid' : 'Processed'}
-                      disabled={String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid'}
-                      onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, status: e.target.value })}
-                      className={`w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-semibold ${String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid'
-                        ? 'opacity-80 cursor-not-allowed bg-slate-100'
-                        : 'cursor-pointer'
-                        }`}
-                      title={String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid' ? "Paid status is final and cannot be reverted to Processed" : "Select disbursement status"}
-                    >
-                      {String(selectedPayrollToUpdate.status || '').toLowerCase() !== 'paid' && (
-                        <option value="Processed">Processed</option>
-                      )}
-                      <option value="Paid">Paid</option>
-                    </select>
-                    {String(selectedPayrollToUpdate.status || '').toLowerCase() === 'paid' && (
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        Once marked as Paid, the status cannot be changed back to Processed.
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Payment Mode <span className="text-rose-500">*</span>
-                    </label>
-                    <select
-                      value={updatePayrollForm.paymentMode}
-                      onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, paymentMode: e.target.value })}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      <option value="CASH">CASH (Cash in Hand)</option>
-                      <option value="BANK_TRANSFER">BANK TRANSFER (Direct Deposit)</option>
-                      <option value="UPI">UPI (Google Pay / PhonePe)</option>
-                      <option value="CHEQUE">CHEQUE</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Payment Date & Remarks */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Payment Date (Paid At)
-                    </label>
-                    <input
-                      type="date"
-                      value={updatePayrollForm.paidAt}
-                      onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, paidAt: e.target.value })}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Payment Remarks / Note
-                    </label>
-                    <input
-                      type="text"
-                      value={updatePayrollForm.remarks}
-                      onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, remarks: e.target.value })}
-                      placeholder="e.g. Salary paid in cash"
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Optional Payroll Adjustments */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-slate-700">
-                      Payroll Adjustments (Optional)
-                    </span>
-                    <span className="text-[10px] text-slate-400">Recalculates net amount</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">
-                        Extra Bonus / Incentive (₹)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={updatePayrollForm.extraBonus}
-                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, extraBonus: e.target.value })}
-                        placeholder="0"
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-500 mb-1">
-                        Extra Deduction / LOP (₹)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={updatePayrollForm.extraDeduction}
-                        onChange={(e) => setUpdatePayrollForm({ ...updatePayrollForm, extraDeduction: e.target.value })}
-                        placeholder="0"
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Modal Footer Buttons */}
-                <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
-                  <button
-                    type="button"
-                    disabled={isSubmittingUpdatePayroll}
-                    onClick={() => setIsUpdatePayrollModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingUpdatePayroll}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
-                  >
-                    {isSubmittingUpdatePayroll ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    <span>Update Payroll Status</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ==================================================== */}
       {/* 4. MODAL: PROCESS MONTHLY PAYROLL (POST api/payroll/process) */}
@@ -4027,7 +3109,7 @@ export const SalaryView = () => {
                     </label>
                     <div className="px-3 py-2 text-xs bg-blue-50 border border-blue-200 rounded-lg text-blue-800 font-semibold flex items-center justify-between">
                       <span>Status: Generated</span>
-                      <span className="text-[10px] font-normal text-blue-600">(Requires HR Approval &rarr; Mark Paid)</span>
+                      <span className="text-[10px] font-normal text-blue-600">(Requires HR approval; payment is recorded through Finance)</span>
                     </div>
                   </div>
                 </div>
@@ -4578,7 +3660,6 @@ export const SalaryView = () => {
         const period = formatMonthYear(slip.month, slip.year);
         const status = slip.status || 'Generated';
         const isPaid = String(status).toLowerCase() === 'paid';
-        const isApproved = String(status).toLowerCase() === 'approved';
 
         // 13 REQUIRED CONTRACT & SALARY BREAKDOWN METRICS (Using backend response values)
         // 1. Monthly Contracted Salary
@@ -5005,20 +4086,6 @@ export const SalaryView = () => {
                     </button>
                   )}
 
-                  {/* Mark Paid Action in modal if Approved */}
-                  {isAdmin && isApproved && (
-                    <button
-                      onClick={async () => {
-                        await handlePayPayroll(slip);
-                        setViewingPayslipModal(null);
-                      }}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                      title="Mark as Paid and disburse"
-                    >
-                      <CreditCard size={13} />
-                      <span>Mark Paid (Disburse)</span>
-                    </button>
-                  )}
                 </div>
 
                 <button
