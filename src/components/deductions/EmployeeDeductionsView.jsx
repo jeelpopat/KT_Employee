@@ -115,6 +115,36 @@ const getDeductionRecordKeys = (deduction) => [
   .filter(Boolean)
   .map((key) => String(key).trim().toLowerCase());
 
+const getTeamMemberIdentityKeys = (member) => {
+  const keys = new Set();
+  const add = (value) => {
+    if (!value) return;
+    if (typeof value === 'object') {
+      [
+        value._id,
+        value.id,
+        value.userId,
+        value.userID,
+        value.employeeId,
+        value.employeeID,
+        value.empId,
+        value.uniqueID,
+        value.uniqueId,
+        value.employeeCode
+      ].forEach(add);
+      [value.email, value.employeeEmail].forEach((email) => {
+        if (email) keys.add(`email:${String(email).trim().toLowerCase()}`);
+      });
+      [value.user, value.employee, value.profile].forEach(add);
+      return;
+    }
+    keys.add(`id:${String(value).trim().toLowerCase()}`);
+  };
+
+  add(member);
+  return keys;
+};
+
 export const EmployeeDeductionsView = () => {
   const { user, userRole } = useApp();
   const { confirm, confirmationDialog } = useConfirm();
@@ -288,18 +318,24 @@ export const EmployeeDeductionsView = () => {
           return false;
         });
 
-        // Combine team members and direct reports, deduplicating strictly by ID
+        // Prefer user records, then merge team roster entries using all known identity fields.
         const combinedMap = new Map();
-        [...memberRecords, ...directReports].forEach((m) => {
+        const identityMap = new Map();
+        [...directReports, ...memberRecords].forEach((m) => {
           if (!m) return;
-          const mId = String(m._id || m.id || m.uniqueID || '').toLowerCase();
-          // Guarantee the TL themselves is NEVER shown as an employee under themselves
-          if (!myIdentities.ids.has(mId)) {
-            const canonicalId = m._id || m.id || m.uniqueID;
-            if (canonicalId && !combinedMap.has(String(canonicalId))) {
-              combinedMap.set(String(canonicalId), m);
-            }
-          }
+          const identityKeys = getTeamMemberIdentityKeys(m);
+          if ([...identityKeys].some((key) => key.startsWith('id:') && myIdentities.ids.has(key.slice(3)))) return;
+
+          const existingKey = [...identityKeys].map((key) => identityMap.get(key)).find(Boolean);
+          if (existingKey) return;
+
+          const canonicalId = m._id || m.id || m.userId || m.userID ||
+            m.employeeId || m.employeeID || m.uniqueID || m.uniqueId || m.employeeCode;
+          if (!canonicalId) return;
+
+          const recordKey = String(canonicalId).trim().toLowerCase();
+          combinedMap.set(recordKey, m);
+          identityKeys.forEach((key) => identityMap.set(key, recordKey));
         });
 
         const finalTLMembers = Array.from(combinedMap.values());
