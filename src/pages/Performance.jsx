@@ -27,6 +27,7 @@ import {
   filterOutUnknownUsers
 } from "../utils/roleFilters";
 import { useApp, deriveUserRole, getRealAuthUserId } from "../context/AppContext.jsx";
+import { EmployeeAvatar } from "../components/common/EmployeeAvatar.jsx";
 import {
   fetchTeamsList,
   getLoggedInUserIdentifiers,
@@ -2479,6 +2480,22 @@ const Performance = () => {
                   const rowNumber = index + 1;
                   const empName = getEmployeeDisplayName(perf);
                   const empEmail = getEmployeeEmail(perf);
+                  const populatedEmployee = [
+                    perf.employeeID,
+                    perf.employee,
+                    perf.employeeId,
+                    perf.userId,
+                    perf.user
+                  ].find((value) => value && typeof value === "object");
+                  const employeeIdentifier = String(
+                    (typeof perf.employeeID === "object" ? perf.employeeID?._id || perf.employeeID?.id : perf.employeeID) ||
+                    (typeof perf.employeeId === "object" ? perf.employeeId?._id || perf.employeeId?.id : perf.employeeId) ||
+                    perf.userId ||
+                    ""
+                  );
+                  const avatarEmployee = populatedEmployee || (employeeIdentifier && employees.find((employee) =>
+                    String(employee?._id || employee?.id || employee?.userId || employee?.employeeId || "") === employeeIdentifier
+                  )) || perf;
                   const pct = getNumericPercentage(perf);
                   const ratingVal = getRating(perf);
                   const feedbackText = getFeedback(perf);
@@ -2500,13 +2517,20 @@ const Performance = () => {
 
                       {/* Employee (Name + Subtext Email) */}
                       <td className="py-3.5 px-4">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-slate-900 text-xs sm:text-[13px]">
-                            {empName}
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-normal">
-                            {empEmail || "No email available"}
-                          </span>
+                        <div className="flex items-center gap-2.5">
+                          <EmployeeAvatar
+                            employee={avatarEmployee}
+                            alt={`${empName} profile`}
+                            className="h-8 w-8"
+                          />
+                          <div className="flex min-w-0 flex-col">
+                            <span className="font-semibold text-slate-900 text-xs sm:text-[13px]">
+                              {empName}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-normal">
+                              {empEmail || "No email available"}
+                            </span>
+                          </div>
                         </div>
                       </td>
 

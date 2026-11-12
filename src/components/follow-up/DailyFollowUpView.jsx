@@ -10,6 +10,7 @@ import api from '../../api/axios.js';
 import { useApp } from '../../context/AppContext.jsx';
 import { isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
 import { getTaskProgress } from '../../utils/taskUtils.js';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 export const DailyFollowUpView = () => {
   const { user } = useApp();
@@ -237,11 +238,10 @@ export const DailyFollowUpView = () => {
       // Extra safety check: skip if this is current TL or unknown employee
       if (isCurrentUserReport(update) || isUnknownEmployeeOrUser(update)) return;
 
-      const empName = update.employeeId?.name || u?.name || '';
-      if (!empName || isUnknownEmployeeOrUser(empName)) return;
-
       const empId = update.employeeId?._id || update.employeeId?.id || update.employeeId?.name || update.employeeId || 'unknown';
       const u = userMap[empId] || userMap[update.employeeId?.name?.toLowerCase()?.trim()];
+      const empName = update.employeeId?.name || u?.name || '';
+      if (!empName || isUnknownEmployeeOrUser(empName)) return;
 
       // Also verify person is not current TL
       if (u?._id && currentTLIds.has(String(u._id))) return;
@@ -254,7 +254,7 @@ export const DailyFollowUpView = () => {
           name: update.employeeId?.name || u?.name || 'Unnamed Employee',
           role: update.employeeId?.role || u?.role || 'Employee',
           designation: u?.designation || update.employeeId?.designation || 'Team Member',
-          avatar: u?.avatar || u?.profileImage || null,
+          avatar: u?.avatar || u?.profileImage || u?.profilePhoto || u?.photoUrl || update.employeeId,
           email: u?.email || '',
           totalHours: 0,
           reports: [],
@@ -330,23 +330,6 @@ export const DailyFollowUpView = () => {
     try {
       localStorage.setItem('kt_tl_followup_notes', JSON.stringify(updated));
     } catch {}
-  };
-
-  // Avatar initial color generator
-  const getAvatarColor = (name = '') => {
-    const colors = [
-      'bg-indigo-100 text-indigo-700',
-      'bg-teal-100 text-teal-700',
-      'bg-emerald-100 text-emerald-700',
-      'bg-violet-100 text-violet-700',
-      'bg-amber-100 text-amber-700',
-      'bg-rose-100 text-rose-700'
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
   };
 
   // Date formatter
@@ -499,17 +482,12 @@ export const DailyFollowUpView = () => {
                 >
                   <div className="flex items-center gap-3.5">
                     {/* Employee Avatar */}
-                    {person.avatar ? (
-                      <img
-                        src={person.avatar}
-                        alt={person.name}
-                        className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-2xs"
-                      />
-                    ) : (
-                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm shadow-2xs ${getAvatarColor(person.name)}`}>
-                        {person.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                      </div>
-                    )}
+                    <EmployeeAvatar
+                      employee={person}
+                      src={person.avatar}
+                      alt={`${person.name} profile`}
+                      className="h-11 w-11 border border-slate-200 shadow-2xs"
+                    />
 
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">

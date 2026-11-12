@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BASE_URL } from "../../api/config";
 import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
+import { EmployeeAvatar } from "../../components/common/EmployeeAvatar.jsx";
 import { 
   Users, 
   UserPlus, 
@@ -704,6 +705,9 @@ const fetchAllMembers = async () => {
       return {
         id: employee?._id || user?._id || user?.id || `${roleType}-${index}`,
         userId: user?._id || user?.id || employee?.userID || employee?.userId || '',
+        profileImage:
+          user?.profilePhoto || user?.profileImage || user?.photoUrl || user?.avatar ||
+          employee?.profilePhoto || employee?.profileImage || employee?.photoUrl || employee?.avatar || '',
         employeeId: finalEmployeeId,
         name: fullName,
         firstName: user?.firstName || employee?.firstName || '',
@@ -1376,9 +1380,11 @@ const fetchAllMembers = async () => {
 
                   <div className="flex gap-3 items-start">
                     <div className="relative flex-shrink-0">
-                      <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${member.avatarColor} text-white flex items-center justify-center font-bold text-xs shadow-xs`}>
-                        {member.initials}
-                      </div>
+                      <EmployeeAvatar
+                        employee={member}
+                        className="h-11 w-11 rounded-xl border border-slate-200 shadow-xs"
+                        alt={`${member.name} profile`}
+                      />
                       <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${statusStyle.dot} ring-2 ring-white`}></div>
                     </div>
 
@@ -1426,9 +1432,11 @@ const fetchAllMembers = async () => {
             
             <div className="sticky top-0 bg-white/95 backdrop-blur-xs border-b border-slate-200/80 px-4 py-3 flex items-center justify-between z-10">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-8 h-8 bg-gradient-to-br ${selectedMember.avatarColor} text-white flex items-center justify-center font-bold text-xs flex-shrink-0`}>
-                  {selectedMember.initials}
-                </div>
+                <EmployeeAvatar
+                  employee={selectedMember}
+                  className="h-8 w-8 rounded-full border border-slate-200"
+                  alt={`${selectedMember.name} profile`}
+                />
                 <div className="min-w-0">
                   <h2 className="text-sm font-bold text-slate-900 truncate">{selectedMember.name}</h2>
                   <p className="text-[11px] text-slate-500 truncate">{selectedMember.designation}</p>

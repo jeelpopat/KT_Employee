@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
+import { EmployeeAvatar } from "../../components/common/EmployeeAvatar.jsx";
 import {
   Users,
   Plus,
@@ -1428,7 +1429,6 @@ export default function Employees() {
                   {filteredEmployees.map((emp, index) => {
                     const displayName = emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "Employee";
                     const inactive = isEmployeeInactive(emp);
-                    const initial = displayName.charAt(0).toUpperCase();
 
                     return (
                       <tr
@@ -1443,12 +1443,11 @@ export default function Employees() {
                         {/* EMPLOYEE */}
                         <td className="px-3 py-3">
                           <div className="flex min-w-0 items-center gap-2.5">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 font-poppins shadow-2xs"
-                              style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
-                            >
-                              {initial}
-                            </div>
+                            <EmployeeAvatar
+                              employee={emp}
+                              alt={`${displayName} profile`}
+                              className="h-8 w-8 shadow-2xs"
+                            />
                             <div className="min-w-0">
                               <p className="font-bold text-slate-900 text-xs sm:text-[13px] font-poppins truncate">
                                 {displayName}
@@ -1622,7 +1621,6 @@ export default function Employees() {
               {filteredEmployees.map((emp) => {
                 const displayName = emp.name || `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || "Employee";
                 const inactive = isEmployeeInactive(emp);
-                const initial = displayName.charAt(0).toUpperCase();
 
                 return (
                   <div
@@ -1631,12 +1629,11 @@ export default function Employees() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 font-poppins shadow-2xs"
-                          style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
-                        >
-                          {initial}
-                        </div>
+                        <EmployeeAvatar
+                          employee={emp}
+                          alt={`${displayName} profile`}
+                          className="h-9 w-9 shadow-2xs"
+                        />
                         <div className="min-w-0">
                           <p className="font-bold text-slate-900 text-sm font-poppins truncate">
                             {displayName}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
+import { EmployeeAvatar } from "../../components/common/EmployeeAvatar.jsx";
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
@@ -577,6 +578,7 @@ const mapLog = (item, index) => {
     : (typeof rawTotalWorkTime === 'string' ? rawTotalWorkTime : '');
 
   return {
+    raw: item,
     id:
       item?._id ||
       item?.id ||
@@ -3242,12 +3244,11 @@ export default function AttendanceLogs() {
                       {/* Employee (Avatar + Name + Email) */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-2xs"
-                            style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
-                          >
-                            {getInitials(log.name)}
-                          </div>
+                          <EmployeeAvatar
+                            employee={log.raw}
+                            className="h-8 w-8 rounded-full border border-slate-200 shadow-2xs"
+                            alt={`${log.name} profile`}
+                          />
 
                           <div className="min-w-0">
                             <span className="font-semibold text-slate-900 text-xs sm:text-[13px] block truncate">
@@ -3582,12 +3583,11 @@ export default function AttendanceLogs() {
                           </td>
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2.5">
-                              <div
-                                className="w-7 h-7 rounded-full text-white flex items-center justify-center text-[11px] font-semibold shrink-0 shadow-2xs"
-                                style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
-                              >
-                                {getInitials(log.name)}
-                              </div>
+                              <EmployeeAvatar
+                                employee={log.raw}
+                                className="h-7 w-7 rounded-full border border-slate-200 shadow-2xs"
+                                alt={`${log.name} profile`}
+                              />
                               <div className="min-w-0">
                                 <span className="font-semibold text-slate-900 text-xs block truncate">
                                   {log.name}
@@ -4190,12 +4190,11 @@ export default function AttendanceLogs() {
             {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/80">
               <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-full text-white flex items-center justify-center text-sm font-bold shadow-xs shrink-0"
-                  style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
-                >
-                  {getInitials(employeeHistoryModal.name)}
-                </div>
+                <EmployeeAvatar
+                  employee={employeeHistoryModal}
+                  className="h-10 w-10 rounded-full border border-slate-200 shadow-xs"
+                  alt={`${employeeHistoryModal.name} profile`}
+                />
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 id="emp-history-title" className="text-base sm:text-lg font-bold text-slate-900">
@@ -4557,12 +4556,11 @@ export default function AttendanceLogs() {
               {/* Header: Avatar, Name, Date, Close Button */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
-                  <div
-                    className="w-14 h-14 rounded-full text-white flex items-center justify-center text-xl font-bold shrink-0 shadow-xs"
-                    style={{ backgroundColor: '#0284c7' }}
-                  >
-                    {getInitials(activeLog.name)}
-                  </div>
+                  <EmployeeAvatar
+                    employee={activeLog.raw}
+                    className="h-14 w-14 rounded-full border border-slate-200 shadow-xs"
+                    alt={`${activeLog.name} profile`}
+                  />
                   <div className="min-w-0">
                     <h2 id="attendance-details-title" className="truncate text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                       {activeLog.name}

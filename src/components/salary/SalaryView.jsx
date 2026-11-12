@@ -14,6 +14,7 @@ import { DeductionBreakdownSection } from '../deductions/DeductionBreakdownSecti
 import { DeductionMasterView } from '../deductions/DeductionMasterView.jsx';
 import { EmployeeDeductionsView } from '../deductions/EmployeeDeductionsView.jsx';
 import { DeductionReportsView } from '../deductions/DeductionReportsView.jsx';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 import { previewPayrollWithDeductions } from '../../services/deductionService.js';
 
 // Currency Formatter (Indian Rupee) - strictly formatted with 2 decimal places per specification
@@ -2663,15 +2664,6 @@ export const SalaryView = () => {
                           (psUserId === payUserId && String(ps.month) === String(payroll.month) && String(ps.year) === String(payroll.year));
                       });
 
-                      const initials = (u.name || 'S')
-                        .split(' ')
-                        .map((w) => w[0])
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase();
-
-
                       return (
                         <tr
                           key={payroll._id}
@@ -2685,12 +2677,11 @@ export const SalaryView = () => {
 
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2.5">
-                              <div
-                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 text-white shadow-xs ${isLead ? 'bg-amber-500' : 'bg-indigo-600'
-                                  }`}
-                              >
-                                {initials}
-                              </div>
+                              <EmployeeAvatar
+                                employee={u}
+                                alt={`${u.name || 'Employee'} profile`}
+                                className={`h-7 w-7 shadow-xs ${isLead ? 'ring-1 ring-amber-300' : ''}`}
+                              />
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-semibold text-slate-900 truncate block">
@@ -2966,24 +2957,15 @@ export const SalaryView = () => {
                       const totalDed = fixedDed + tdsAmt;
                       const net = Number(salary.netSalary != null ? salary.netSalary : Math.max(0, gross - totalDed));
 
-                      const initials = (u.name || 'S')
-                        .split(' ')
-                        .map((w) => w[0])
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase();
-
                       return (
                         <tr key={salary._id} className="hover:bg-slate-50/70 transition">
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-2.5">
-                              <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 text-white shadow-xs ${isLead ? 'bg-amber-500' : 'bg-indigo-600'
-                                  }`}
-                              >
-                                {initials}
-                              </div>
+                              <EmployeeAvatar
+                                employee={u}
+                                alt={`${u.name || 'Employee'} profile`}
+                                className={`h-8 w-8 shadow-xs ${isLead ? 'ring-1 ring-amber-300' : ''}`}
+                              />
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-semibold text-slate-900 truncate block">

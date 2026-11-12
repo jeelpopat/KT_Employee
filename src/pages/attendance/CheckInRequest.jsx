@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { LoadingScreen, TableSkeleton } from "../../components/common/Loader.jsx";
+import { EmployeeAvatar } from "../../components/common/EmployeeAvatar.jsx";
 import {
   Clock,
   CheckCircle,
@@ -348,42 +349,6 @@ const formatCheckInTime = (value) => {
     minute: "2-digit",
     hour12: true,
   });
-};
-
-// ============================================================
-// EXTRACT EMPLOYEE INITIALS (e.g. "Pandya Hetvi" -> "HP")
-// ============================================================
-const getEmployeeInitials = (req) => {
-  if (!req) return "EM";
-  const raw = req.raw || req;
-  const firstName =
-    raw.firstName ||
-    raw.userId?.firstName ||
-    raw.user?.firstName ||
-    raw.employee?.firstName ||
-    raw.employeeId?.firstName;
-  const lastName =
-    raw.lastName ||
-    raw.userId?.lastName ||
-    raw.user?.lastName ||
-    raw.employee?.lastName ||
-    raw.employeeId?.lastName;
-
-  if (firstName && lastName) {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  }
-  if (firstName) {
-    return firstName.slice(0, 2).toUpperCase();
-  }
-
-  const name = (req.name || "").replace(/\([^)]*\)/g, "").trim();
-  if (!name) return "EM";
-
-  const parts = name.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
 };
 
 // ============================================================
@@ -1837,12 +1802,11 @@ export default function CheckInRequest() {
                     {/* Employee (Avatar + Name & Role + ID & Phone) */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-2xs select-none"
-                          style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
-                        >
-                          {getEmployeeInitials(req)}
-                        </div>
+                        <EmployeeAvatar
+                          employee={req.raw}
+                          className="h-8 w-8 rounded-full border border-slate-200 shadow-2xs"
+                          alt={`${req.name} profile`}
+                        />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-semibold text-slate-900 text-xs sm:text-[13px] truncate">

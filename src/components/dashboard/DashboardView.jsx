@@ -27,6 +27,7 @@ import {
 } from '../../utils/timelineUtils.js';
 import { filterOutFinanceUsers, filterOutUnknownUsers } from '../../utils/roleFilters.js';
 import { getHalfDayType, isHalfDayLeave } from '../../utils/leaveUtils.js';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 const parseBirthdayDate = (value) => {
   if (!value) return null;
@@ -87,6 +88,7 @@ const getCurrentMonthBirthdaysFromUsers = (users) => {
       if (birthdayDate < today) return null;
 
       return {
+        ...record,
         id: record._id || record.id || record.employeeId || record.email || name,
         name,
         birthdayDate,
@@ -3231,15 +3233,16 @@ export const DashboardView = () => {
               <p className="text-xs text-slate-400 w-full text-center">No birthdays upcoming.</p>
             ) : (
               upcomingBirthdays.map((b, i) => {
-                const initials = b.name ? b.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'BD';
                 const d = new Date(b.birthdayDate);
                 const dateStr = `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })}`;
 
                 return (
                   <div key={i} className="flex flex-col items-center min-w-[80px] text-center group cursor-pointer">
-                    <div className="w-13 h-13 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm border border-indigo-200/60 mb-2 group-hover:scale-105 transition-transform">
-                      {initials}
-                    </div>
+                    <EmployeeAvatar
+                      employee={b}
+                      alt={`${b.name} profile`}
+                      className="mb-2 h-13 w-13 border border-indigo-200/60 transition-transform group-hover:scale-105"
+                    />
                     <p className="text-xs font-medium text-slate-800 truncate w-full px-1">{b.name}</p>
                     <p className="text-[10px] text-slate-400 mt-0.5 font-medium">{dateStr}</p>
                   </div>
@@ -3276,19 +3279,13 @@ export const DashboardView = () => {
               </div>
             ) : (
               teamOnLeave.map((t, i) => {
-                const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name || 'User')}&background=F59E0B&color=fff&bold=true`;
-                const photoSrc = cleanPhotoUrl(t.profilePhoto) || avatarFallback;
                 return (
                   <div key={t._id || i} className="flex flex-col items-center min-w-[96px] text-center group cursor-pointer p-2 rounded-xl hover:bg-slate-50 transition-all">
                     <div className="relative mb-2">
-                      <img 
-                        src={photoSrc} 
-                        alt={t.name} 
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = avatarFallback;
-                        }}
-                        className="w-13 h-13 rounded-full object-cover border-2 border-amber-400 shadow-xs group-hover:scale-105 group-hover:border-amber-500 transition-transform bg-amber-50" 
+                      <EmployeeAvatar
+                        employee={t}
+                        alt={`${t.name} profile`}
+                        className="h-13 w-13 border-2 border-amber-400 shadow-xs transition-transform group-hover:scale-105 group-hover:border-amber-500"
                       />
                       <span className="absolute bottom-0 right-0 w-3 h-3 bg-amber-500 border-2 border-white rounded-full" title="On Leave" />
                     </div>

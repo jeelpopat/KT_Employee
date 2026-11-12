@@ -23,6 +23,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from "../../utils/roleFilters";
+import { EmployeeAvatar } from "../../components/common/EmployeeAvatar.jsx";
 import {
   getLoggedInUserIdentifiers,
   fetchTeamsList,
@@ -792,6 +793,7 @@ export default function LeaveRequest() {
               leave?.id ||
               `${employee?._id || "employee"}-${index}`,
 
+            employee,
             employeeId: getEmployeeId(
               leave?.employeeId || employee
             ),
@@ -2069,12 +2071,11 @@ export default function LeaveRequest() {
 
                       <td className="px-3 py-3">
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <div
-                            className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0 font-poppins shadow-2xs"
-                            style={{ background: "linear-gradient(166.41deg, #034665 9.73%, #068DCB 106.69%)" }}
-                          >
-                            {getInitials(request.name)}
-                          </div>
+                          <EmployeeAvatar
+                            employee={request.employee}
+                            className="h-8 w-8 rounded-full border border-slate-200 shadow-2xs"
+                            alt={`${request.name} profile`}
+                          />
                           <div className="min-w-0">
                             <p className="font-bold text-slate-900 text-xs sm:text-[13px] font-poppins truncate">
                               {request.name}

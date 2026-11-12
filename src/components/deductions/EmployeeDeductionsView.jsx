@@ -23,6 +23,7 @@ import {
 } from '../../services/deductionService.js';
 import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 import { useApp, deriveUserRole, getRealAuthUserId } from '../../context/AppContext.jsx';
 import { filterOutUnknownUsers, isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
 import {
@@ -1975,8 +1976,18 @@ export const EmployeeDeductionsView = () => {
 
                       {/* Employee */}
                       <td className="py-2.5 px-3.5">
-                        <div className="font-semibold text-slate-900">{empName}</div>
-                        <div className="text-[11px] text-slate-400 font-mono">{empId}</div>
+                        <div className="flex items-center gap-2">
+                          <EmployeeAvatar
+                            employee={item.employeeId || item.userId}
+                            user={isOwnTeamLeadDeduction ? user : undefined}
+                            alt={`${empName} profile`}
+                            className="h-8 w-8 border border-slate-200"
+                          />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-900">{empName}</div>
+                            <div className="text-[11px] text-slate-400 font-mono">{empId}</div>
+                          </div>
+                        </div>
                       </td>
 
                       {/* Team Leader */}

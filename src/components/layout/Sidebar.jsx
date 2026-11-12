@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext.jsx';
 import { tabToPath } from '../../utils/navigation.js';
 import api from '../../api/axios.js';
 import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 const getResponseRecords = (payload, arrayKeys, envelopeKeys = ['data', 'result', 'payload', 'response']) => {
   if (Array.isArray(payload)) return payload;
@@ -776,9 +777,11 @@ export const Sidebar = ({ onSignOut }) => {
         <div className="shrink-0 p-3 bg-white border-t border-[#e2edf5] font-poppins lg:hidden shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
           <div className="flex items-center justify-between gap-2 mb-2 px-1">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-[#034665] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-              </div>
+              <EmployeeAvatar
+                employee={user}
+                alt={`${user?.name || 'User'} profile`}
+                className="h-7 w-7 border border-slate-200"
+              />
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-slate-800 truncate leading-tight">
                   {user?.name || 'User'}

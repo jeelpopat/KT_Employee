@@ -6,6 +6,7 @@ import {
 import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
 import { normalizeTaskStatus, getProgressForStatus, getTaskProgress } from '../../utils/taskUtils.js';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 export const TaskDetailDrawer = ({ onTaskUpdate }) => {
   const { user, selectedTask, setSelectedTask } = useApp();
@@ -198,9 +199,18 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
 
               <div>
                 <span className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Assigned By</span>
-                <span className="text-xs font-semibold text-slate-800 truncate block">
-                  {displayTask.assignedBy?.name || displayTask.assignedBy?.email || 'Admin'}
-                </span>
+                <div className="flex items-center gap-2">
+                  {displayTask.assignedBy && typeof displayTask.assignedBy === 'object' && (
+                    <EmployeeAvatar
+                      employee={displayTask.assignedBy}
+                      alt={`${displayTask.assignedBy.name || 'Admin'} profile`}
+                      className="h-7 w-7"
+                    />
+                  )}
+                  <span className="text-xs font-semibold text-slate-800 truncate block">
+                    {displayTask.assignedBy?.name || displayTask.assignedBy?.email || 'Admin'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -210,9 +220,18 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                 <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1 flex items-center gap-1">
                   <User size={12} /> Assigned Employee
                 </span>
-                <p className="font-semibold text-slate-800">
-                  {displayTask.assignedEmployee?.name || 'Unassigned'}
-                </p>
+                <div className="flex items-center gap-2">
+                  {displayTask.assignedEmployee && (
+                    <EmployeeAvatar
+                      employee={displayTask.assignedEmployee}
+                      alt={`${displayTask.assignedEmployee.name || 'Employee'} profile`}
+                      className="h-8 w-8 border border-slate-200"
+                    />
+                  )}
+                  <p className="font-semibold text-slate-800">
+                    {displayTask.assignedEmployee?.name || 'Unassigned'}
+                  </p>
+                </div>
                 {displayTask.assignedEmployee?.email && (
                   <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate">
                     {displayTask.assignedEmployee?.email}
@@ -350,9 +369,11 @@ export const TaskDetailDrawer = ({ onTaskUpdate }) => {
                 ) : (
                   comments.map((c, idx) => (
                     <div key={c._id || idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start space-x-3 text-xs">
-                      <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0 ring-1 ring-indigo-200">
-                        {String(c.userId?.name || c.commentedBy?.name || 'TM').slice(0, 2).toUpperCase()}
-                      </div>
+                      <EmployeeAvatar
+                        employee={c.userId || c.commentedBy || c}
+                        alt={`${c.userId?.name || c.commentedBy?.name || 'Team Member'} profile`}
+                        className="h-7 w-7 ring-1 ring-indigo-200"
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center">
                           <span className="font-semibold text-slate-900">

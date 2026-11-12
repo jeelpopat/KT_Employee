@@ -14,6 +14,7 @@ import {
   fetchDeductionMasters
 } from '../../services/deductionService.js';
 import { showToast } from '../common/Toast.jsx';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 import { filterOutUnknownUsers } from '../../utils/roleFilters.js';
 
 // Format Currency in Indian Rupee format
@@ -996,7 +997,6 @@ export const DeductionReportsView = () => {
                 paginatedRecords.map((d) => {
                   const empName = d.employeeId?.name || d.userId?.name || 'Staff Member';
                   const empCode = d.employeeId?.uniqueID || d.userId?.uniqueID || '';
-                  const initial = empName.charAt(0).toUpperCase() || 'E';
                   const isApproved = d.status === 'Approved';
                   const isPending = d.status === 'Pending';
                   const isRejected = d.status === 'Rejected';
@@ -1018,9 +1018,11 @@ export const DeductionReportsView = () => {
                       {/* Employee */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-xs text-indigo-700 shrink-0">
-                            {initial}
-                          </div>
+                          <EmployeeAvatar
+                            employee={d.employeeId || d.userId}
+                            alt={`${empName} profile`}
+                            className="h-7 w-7 border border-indigo-100"
+                          />
                           <div>
                             <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                               {empName}

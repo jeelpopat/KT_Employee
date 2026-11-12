@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Plus, Trash2, Save, Send, Search, Clock, CheckCircle2, PauseCircle, Loader2, RefreshCw, AlertTriangle, UserX, UserCheck
+  FileText, Plus, Trash2, Save, Send, Search, Clock, CheckCircle2, PauseCircle, Loader2, RefreshCw, AlertTriangle, UserX
 } from 'lucide-react';
 import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
@@ -11,6 +11,7 @@ import {
   isEmployeeRole,
   fetchEmployeeTeamLead
 } from '../../utils/teamLeadUtils.js';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 const matchesEmployeeAssignment = (assignment, identifiers) => {
   if (!assignment || !identifiers) return false;
@@ -600,9 +601,11 @@ export const DailyReportView = () => {
         {teamLead && (
           <div className="mb-4 px-3.5 py-2.5 rounded-lg border border-slate-200 bg-slate-50/80 text-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">
-                <UserCheck size={12} />
-              </div>
+              <EmployeeAvatar
+                employee={teamLead}
+                alt={`${teamLead.name || 'Team Lead'} profile`}
+                className="h-5 w-5 border border-indigo-100"
+              />
               <span className="text-slate-500 font-medium">Assigned Team Lead:</span>
               <span className="font-semibold text-slate-900">{teamLead.name || 'Team Lead'}</span>
               {teamLead.email && <span className="text-slate-400 font-mono hidden sm:inline">({teamLead.email})</span>}

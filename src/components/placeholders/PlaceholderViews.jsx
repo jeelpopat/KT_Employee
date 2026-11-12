@@ -5,7 +5,7 @@ import {
   FileBadge, PhoneCall, ListTodo, CalendarX, ClipboardCheck,
   BarChart, Download, Search, CheckCircle2, Clock, Eye, AlertCircle,
   ExternalLink, FileText, ChevronRight, Filter, Plus, Check, X,
-  Shield, Award, BookCheck, Sparkles, Building2, UserCheck, Loader2,
+  Award, BookCheck, Sparkles, Building2, UserCheck, Loader2,
   Trash2, Edit3, MessageSquare, Calendar, User, CheckSquare,
   AlertTriangle, RefreshCw, Layers, CheckCircle, XCircle, CheckCheck
 } from 'lucide-react';
@@ -24,6 +24,7 @@ import {
 } from '../../utils/teamLeadUtils.js';
 import { normalizeTaskStatus, getProgressForStatus, getTaskProgress } from '../../utils/taskUtils.js';
 import { showToast } from '../common/Toast.jsx';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 export { ProjectView };
 
@@ -606,6 +607,13 @@ export const TeamMembersView = () => {
                   existing.projects.push(pTitle);
                 }
                 existing.projectRoles[pTitle] = isLead ? 'Team Leader' : (role || 'Employee');
+                const photo = m.profilePhoto || m.profileImage || m.profileImg || m.photoUrl || m.avatar || m.imageUrl || m.image || m.photo ||
+                  m.user?.profilePhoto || m.user?.profileImage || m.user?.photoUrl ||
+                  m.employee?.profilePhoto || m.employee?.profileImage || m.employee?.photoUrl;
+                if (photo && !existing.profilePhoto) {
+                  existing.profilePhoto = photo;
+                  existing.profileImage = photo;
+                }
                 if (isLead) {
                   existing.isLead = true;
                   existing.role = 'Team Leader';
@@ -618,6 +626,12 @@ export const TeamMembersView = () => {
                   name,
                   email,
                   employeeID: m.employeeID || m.employee?.employeeID || '',
+                  profilePhoto: m.profilePhoto || m.profileImage || m.profileImg || m.photoUrl || m.avatar || m.imageUrl || m.image || m.photo ||
+                    m.user?.profilePhoto || m.user?.profileImage || m.user?.photoUrl ||
+                    m.employee?.profilePhoto || m.employee?.profileImage || m.employee?.photoUrl,
+                  profileImage: m.profileImage || m.profilePhoto || m.profileImg || m.photoUrl || m.avatar || m.imageUrl || m.image || m.photo ||
+                    m.user?.profileImage || m.user?.profilePhoto || m.user?.photoUrl ||
+                    m.employee?.profileImage || m.employee?.profilePhoto || m.employee?.photoUrl,
                   role: isLead ? 'Team Leader' : (role || 'Employee'),
                   status: 'Online',
                   isLead,
@@ -665,6 +679,13 @@ export const TeamMembersView = () => {
         if (existing) {
           if (teamName && !existing.projects.includes(teamName)) existing.projects.push(teamName);
           if (teamName) existing.projectRoles[teamName] = isLead ? 'Team Leader' : 'Employee';
+          const photo = record.profilePhoto || record.profileImage || record.profileImg || record.photoUrl || record.avatar || record.imageUrl || record.image || record.photo ||
+            record.user?.profilePhoto || record.user?.profileImage || record.user?.photoUrl ||
+            record.employee?.profilePhoto || record.employee?.profileImage || record.employee?.photoUrl;
+          if (photo && !existing.profilePhoto) {
+            existing.profilePhoto = photo;
+            existing.profileImage = photo;
+          }
           if (isLead) {
             existing.isLead = true;
             existing.role = 'Team Leader';
@@ -677,6 +698,12 @@ export const TeamMembersView = () => {
           name,
           email,
           employeeID: record.employeeID || record.employeeId || record.uniqueID || record.employeeCode || '',
+          profilePhoto: record.profilePhoto || record.profileImage || record.profileImg || record.photoUrl || record.avatar || record.imageUrl || record.image || record.photo ||
+            record.user?.profilePhoto || record.user?.profileImage || record.user?.photoUrl ||
+            record.employee?.profilePhoto || record.employee?.profileImage || record.employee?.photoUrl,
+          profileImage: record.profileImage || record.profilePhoto || record.profileImg || record.photoUrl || record.avatar || record.imageUrl || record.image || record.photo ||
+            record.user?.profileImage || record.user?.profilePhoto || record.user?.photoUrl ||
+            record.employee?.profileImage || record.employee?.profilePhoto || record.employee?.photoUrl,
           role: isLead ? 'Team Leader' : 'Employee',
           status: 'Online',
           isLead,
@@ -813,26 +840,17 @@ export const TeamMembersView = () => {
                 ? 'Multiple Roles'
                 : m.role;
             const isLead = displayRole === 'Team Leader';
-            const initials = m.name
-              .split(' ')
-              .map(w => w[0])
-              .filter(Boolean)
-              .slice(0, 2)
-              .join('')
-              .toUpperCase() || 'M';
-
             return (
               <div
                 key={m.id || idx}
                 className="bg-white border border-slate-200/80 hover:border-indigo-300 rounded-xl p-4 shadow-xs flex flex-col justify-between space-y-3 transition-all"
               >
                 <div className="flex items-start gap-3">
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${isLead
-                    ? 'bg-amber-500'
-                    : 'bg-indigo-600'
-                    }`}>
-                    {initials}
-                  </div>
+                  <EmployeeAvatar
+                    employee={m}
+                    alt={`${m.name} profile`}
+                    className={`h-11 w-11 shadow-xs ${isLead ? 'ring-1 ring-amber-300' : ''}`}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <div className="flex items-center gap-1.5 truncate">
@@ -944,6 +962,11 @@ export const EmployeesView = () => {
           return sources;
         };
 
+        const getDirectoryPhoto = (sources) => sources.map(source =>
+          source.profilePhoto || source.profileImage || source.profileImg || source.photoUrl ||
+          source.avatar || source.imageUrl || source.image || source.photo
+        ).find(Boolean) || '';
+
         const getDirectoryText = (value) => {
           if (value && typeof value === 'object') {
             value = value.roleName || value.name || value.title || value.key || value.label || value.displayName || value._id || value.id || '';
@@ -1041,6 +1064,11 @@ export const EmployeesView = () => {
             const existingIndex = seenKeys.get(uniqueKey);
             const existing = combined[existingIndex];
             const categoryPriority = { EMP: 0, ACCOUNTANT: 1, CA: 2, TL: 3, ADMIN: 4, HR: 5 };
+            const photo = getDirectoryPhoto(sources);
+            if (photo && !existing.profilePhoto) {
+              existing.profilePhoto = photo;
+              existing.profileImage = photo;
+            }
             if (categoryPriority[category] > categoryPriority[existing.role]) {
               combined[existingIndex] = {
                 ...existing,
@@ -1059,6 +1087,8 @@ export const EmployeesView = () => {
             id: sources.map(source => source.employeeID || source.employeeId || source._id).find(Boolean) || 'EMP',
             name: sources.map(source => source.fullName || source.name).find(Boolean) || 'Company Member',
             email: emailKey,
+            profilePhoto: getDirectoryPhoto(sources),
+            profileImage: getDirectoryPhoto(sources),
             phone: sources.map(source => source.phone || source.phoneNumber || source.mobile).find(Boolean) || '',
             role: category,
             roleFull,
@@ -1178,14 +1208,6 @@ export const EmployeesView = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.map((emp, i) => {
-                  const initials = emp.name
-                    .split(' ')
-                    .map(w => w[0])
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .join('')
-                    .toUpperCase() || 'M';
-
                   return (
                     <tr key={i} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-4 font-mono font-semibold text-slate-500 text-xs">
@@ -1193,13 +1215,11 @@ export const EmployeesView = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${emp.role === 'TL' ? 'bg-amber-500' :
-                              emp.role === 'HR' ? 'bg-rose-500' :
-                                emp.role === 'ADMIN' ? 'bg-purple-600' :
-                                  'bg-indigo-600'
-                            }`}>
-                            {initials}
-                          </div>
+                          <EmployeeAvatar
+                            employee={emp}
+                            alt={`${emp.name} profile`}
+                            className="h-8 w-8"
+                          />
                           <div>
                             <div className="font-semibold text-slate-900">{emp.name}</div>
                             <div className="text-[11px] text-slate-400">{emp.email}</div>
@@ -2073,9 +2093,13 @@ export const TeamTaskManagementView = () => {
                         {/* Assignee & Due Date */}
                         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
                           <div className="flex items-center gap-1.5 truncate max-w-[140px]" title={assignedName}>
-                            <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[9px] font-bold shrink-0">
-                              {assignedName.charAt(0).toUpperCase()}
-                            </div>
+                            {task.assignedEmployee && (
+                              <EmployeeAvatar
+                                employee={task.assignedEmployee}
+                                alt={`${assignedName} profile`}
+                                className="h-5 w-5"
+                              />
+                            )}
                             <span className="truncate">{assignedName}</span>
                           </div>
 
@@ -2805,23 +2829,6 @@ export const TeamLeaveManagementView = () => {
     }
   };
 
-  // Avatar initial background color generator
-  const getAvatarColor = (name = '') => {
-    const colors = [
-      'bg-indigo-100 text-indigo-700',
-      'bg-teal-100 text-teal-700',
-      'bg-purple-100 text-purple-700',
-      'bg-emerald-100 text-emerald-700',
-      'bg-amber-100 text-amber-700',
-      'bg-rose-100 text-rose-700'
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
-
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Toast Notification */}
@@ -2974,24 +2981,11 @@ export const TeamLeaveManagementView = () => {
                 {/* Left: Applicant details and leave info */}
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-2.5 flex-wrap">
-                    {applicantPhoto ? (
-                      <img
-                        src={applicantPhoto}
-                        alt={applicantName}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.parentElement?.querySelector('.avatar-initial-fallback');
-                          if (fallback) fallback.style.display = 'flex';
-                        }}
-                        className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-2xs"
-                      />
-                    ) : null}
-                    <div
-                      className={`avatar-initial-fallback w-9 h-9 rounded-full items-center justify-center font-bold text-xs shadow-2xs ${getAvatarColor(applicantName)}`}
-                      style={{ display: applicantPhoto ? 'none' : 'flex' }}
-                    >
-                      {applicantName.charAt(0).toUpperCase()}
-                    </div>
+                    <EmployeeAvatar
+                      src={applicantPhoto}
+                      alt={`${applicantName} profile`}
+                      className="h-9 w-9 border border-slate-200 shadow-2xs"
+                    />
                     <div>
                       <span className="font-bold text-sm text-slate-900 mr-2">
                         {applicantName}

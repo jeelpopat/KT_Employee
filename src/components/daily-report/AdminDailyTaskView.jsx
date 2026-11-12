@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Clock3, FileText, RefreshCw, Search, UserRound } from 'lucide-react';
+import { CalendarDays, Clock3, FileText, RefreshCw, Search } from 'lucide-react';
 import api from '../../api/axios.js';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 const formatDate = (value) => {
   if (!value) return '—';
@@ -165,19 +166,23 @@ export const AdminDailyTaskView = () => {
                 <article key={report._id} className="space-y-3 p-4 sm:p-5">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <h2 className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
-                          <UserRound size={14} className="text-indigo-500" />
-                          {employeeName}
-                        </h2>
-                        {report.employeeId?.uniqueID && (
-                          <span className="font-mono text-[11px] text-slate-400">
-                            {report.employeeId.uniqueID}
-                          </span>
-                        )}
-                        {report.employeeId?.email && (
-                          <span className="text-[11px] text-slate-500">{report.employeeId.email}</span>
-                        )}
+                      <div className="flex items-center gap-2.5">
+                        <EmployeeAvatar
+                          employee={report.employeeId}
+                          alt={`${employeeName} profile`}
+                          className="h-9 w-9 border border-slate-200 shadow-2xs"
+                        />
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <h2 className="text-sm font-bold text-slate-900">{employeeName}</h2>
+                          {report.employeeId?.uniqueID && (
+                            <span className="font-mono text-[11px] text-slate-400">
+                              {report.employeeId.uniqueID}
+                            </span>
+                          )}
+                          {report.employeeId?.email && (
+                            <span className="text-[11px] text-slate-500">{report.employeeId.email}</span>
+                          )}
+                        </div>
                       </div>
                       <p className="mt-1 text-xs font-medium text-indigo-700">{projectName}</p>
                       {taskNames.length > 0 && (

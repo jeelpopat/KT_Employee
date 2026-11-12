@@ -4,7 +4,7 @@ import {
   Briefcase, Calendar, Users, CheckCircle2, Clock, 
   Search, Filter, Loader2, RefreshCw, FolderKanban,
   CheckSquare, TrendingUp, AlertCircle, X, ExternalLink,
-  Shield, Mail, Award, UserCheck, ChevronRight, User,
+  Mail, Award, UserCheck, ChevronRight, User,
   Plus, Edit3, Trash2, Save, Check
 } from 'lucide-react';
 import api from '../../api/axios.js';
@@ -17,6 +17,7 @@ import {
 } from '../../utils/teamLeadUtils.js';
 import { normalizeTaskStatus, getProgressForStatus } from '../../utils/taskUtils.js';
 import { showToast } from '../common/Toast.jsx';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 // Helper to normalize and build assigned member list from project and /members endpoint data
 const buildAssignedMemberList = (proj, membersData, hasLiveAssignments = false) => {
@@ -43,6 +44,12 @@ const buildAssignedMemberList = (proj, membersData, hasLiveAssignments = false) 
       name,
       email: m.email || '',
       employeeID: m.employeeID || '',
+      profilePhoto: m.profilePhoto || m.profileImage || m.profileImg || m.photoUrl || m.avatar || m.imageUrl || m.image || m.photo ||
+        m.user?.profilePhoto || m.user?.profileImage || m.user?.profileImg || m.user?.photoUrl ||
+        m.employee?.profilePhoto || m.employee?.profileImage || m.employee?.profileImg || m.employee?.photoUrl,
+      profileImage: m.profileImage || m.profilePhoto || m.profileImg || m.photoUrl || m.avatar || m.imageUrl || m.image || m.photo ||
+        m.user?.profileImage || m.user?.profilePhoto || m.user?.profileImg || m.user?.photoUrl ||
+        m.employee?.profileImage || m.employee?.profilePhoto || m.employee?.profileImg || m.employee?.photoUrl,
       role: m.role || defaultRole,
       roleType,
       isLead
@@ -861,9 +868,11 @@ export const ProjectView = () => {
                   {/* Team Lead Indicator */}
                   {lead && (
                     <div className="flex items-center gap-2 pt-0.5">
-                      <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-[10px] font-bold shrink-0">
-                        <Shield size={10} />
-                      </div>
+                      <EmployeeAvatar
+                        employee={lead}
+                        alt={`${lead.name} profile`}
+                        className="h-5 w-5 border border-amber-200"
+                      />
                       <span className="text-xs font-semibold text-slate-800 truncate">
                         {lead.name}
                       </span>
@@ -877,28 +886,16 @@ export const ProjectView = () => {
                   <div className="flex items-center justify-between pt-1">
                     <div className="flex items-center -space-x-1.5 overflow-hidden">
                       {assignedMembers.slice(0, 4).map((member, mIdx) => {
-                        const initials = member.name
-                          .split(' ')
-                          .map(w => w[0])
-                          .filter(Boolean)
-                          .slice(0, 2)
-                          .join('')
-                          .toUpperCase() || 'M';
-
                         return (
-                          <div
+                          <EmployeeAvatar
                             key={member.id || mIdx}
+                            employee={member}
+                            alt={`${member.name} profile`}
                             title={`${member.name} (${member.role}) - ${member.email}`}
-                            className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-xs cursor-pointer ${
-                              member.isLead
-                                ? 'bg-amber-500 text-white'
-                                : member.roleType === 'INT'
-                                  ? 'bg-purple-500 text-white'
-                                  : 'bg-indigo-600 text-white'
+                            className={`h-7 w-7 border-2 border-white shadow-xs cursor-pointer ${
+                              member.isLead ? 'ring-1 ring-amber-400' : ''
                             }`}
-                          >
-                            {initials}
-                          </div>
+                          />
                         );
                       })}
                       {assignedMembers.length > 4 && (
@@ -1093,9 +1090,11 @@ export const ProjectView = () => {
                     {selectedProjectModal.leadMember && (
                        <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-lg flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
-                            <Shield size={18} />
-                          </div>
+                          <EmployeeAvatar
+                            employee={selectedProjectModal.leadMember}
+                            alt={`${selectedProjectModal.leadMember.name} profile`}
+                            className="h-10 w-10 shadow-xs ring-1 ring-amber-300"
+                          />
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <h5 className="text-sm font-bold text-slate-900 truncate">
@@ -1128,23 +1127,17 @@ export const ProjectView = () => {
                       {selectedProjectModal.allAssigned
                         .filter(m => !m.isLead)
                         .map((member, idx) => {
-                          const initials = member.name
-                            .split(' ')
-                            .map(w => w[0])
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .join('')
-                            .toUpperCase() || 'M';
-
                           return (
                             <div 
                               key={member.id || idx}
                               className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between gap-3"
                             >
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-xs bg-indigo-600">
-                                  {initials}
-                                </div>
+                                <EmployeeAvatar
+                                  employee={member}
+                                  alt={`${member.name} profile`}
+                                  className="h-9 w-9 shadow-xs"
+                                />
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-1.5">
                                     <h5 className="text-xs font-bold text-slate-800 truncate">

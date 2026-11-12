@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LoadingScreen, TableSkeleton } from '../common/Loader.jsx';
 import { 
   Plus, CheckCircle2, Clock, XCircle, 
-  Paperclip, Search, Info, Calendar, FileText, Loader2, RefreshCw, AlertCircle, AlertTriangle, UserX, UserCheck
+  Paperclip, Search, Info, Calendar, FileText, Loader2, RefreshCw, AlertCircle, AlertTriangle, UserX
 } from 'lucide-react';
 import api from '../../api/axios.js'; 
 import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
@@ -10,6 +10,7 @@ import { isEmployeeRole, fetchEmployeeTeamLead } from '../../utils/teamLeadUtils
 import { calculateLeaveDays, expandHolidayDates } from '../../utils/holidayUtils.js';
 import { getHalfDayType, isHalfDayLeave, normalizeHalfDayType } from '../../utils/leaveUtils.js';
 import { LeaveDatePicker } from '../common/LeaveDatePicker.jsx';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 export const LeaveManagementView = () => {
   const { user, userRole } = useApp();
@@ -784,9 +785,11 @@ export const LeaveManagementView = () => {
           {teamLead && (
             <div className="px-3.5 py-2.5 rounded-lg border border-slate-200 bg-slate-50/80 text-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">
-                  <UserCheck size={12} />
-                </div>
+                <EmployeeAvatar
+                  employee={teamLead}
+                  alt={`${teamLead.name || 'Team Lead'} profile`}
+                  className="h-5 w-5 border border-indigo-100"
+                />
                 <span className="text-slate-500 font-medium">Assigned Team Lead:</span>
                 <span className="font-semibold text-slate-900">{teamLead.name || 'Team Lead'}</span>
                 {teamLead.email && <span className="text-slate-400 font-mono hidden sm:inline">({teamLead.email})</span>}
@@ -1101,7 +1104,11 @@ export const LeaveManagementView = () => {
               {teamLead && (
                 <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-xs flex items-center justify-between">
                   <div className="flex items-center gap-1.5 truncate">
-                    <UserCheck size={14} className="text-indigo-600 shrink-0" />
+                    <EmployeeAvatar
+                      employee={teamLead}
+                      alt={`${teamLead.name || 'Team Lead'} profile`}
+                      className="h-5 w-5 border border-indigo-100"
+                    />
                     <span className="text-slate-500">Routing to TL:</span>
                     <span className="font-semibold text-slate-900">{teamLead.name}</span>
                   </div>

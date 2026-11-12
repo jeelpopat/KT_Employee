@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { LoadingScreen, PageSkeleton } from "../components/common/Loader.jsx";
+import { EmployeeAvatar } from "../components/common/EmployeeAvatar.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -1014,25 +1015,17 @@ export default function Dashboard() {
                   {presentRecords.map((record, index) => {
                     const displayName = record.employee?.name || record.employeeName || record.user?.name || record.name || "N/A";
                     const role = record.employee?.role || record.role || record.user?.role || record.employee?.designation?.name || "Team Member";
-                    const initials = displayName
-                      .trim()
-                      .split(/\s+/)
-                      .filter(Boolean)
-                      .map((word) => word.charAt(0).toUpperCase())
-                      .slice(0, 2)
-                      .join("") || "EM";
 
                     return (
                       <div
                         key={record._id || record.id || index}
                         className="bg-slate-50/80 hover:bg-white border border-slate-200/70 hover:border-[#068DCB]/40 rounded-xl p-3 flex flex-col items-center justify-center text-center w-32 shrink-0 transition-all hover:-translate-y-0.5 hover:shadow-sm"
                       >
-                        <div
-                          className="w-10 h-10 rounded-full text-white flex items-center justify-center font-bold text-xs shadow-xs font-poppins shrink-0"
-                          style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
-                        >
-                          {initials}
-                        </div>
+                        <EmployeeAvatar
+                          employee={record.employee || record.user || record}
+                          alt={`${displayName} profile`}
+                          className="h-10 w-10 shadow-xs"
+                        />
                         <p className="mt-2 text-xs font-bold text-slate-900 truncate w-full" title={displayName}>
                           {displayName}
                         </p>
@@ -1120,9 +1113,11 @@ export default function Dashboard() {
                         className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50/50 transition-colors shadow-xs"
                       >
                         <div className="flex items-start gap-3">
-                          <div className="w-9 h-9 rounded-full bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                            {empName.slice(0, 2).toUpperCase()}
-                          </div>
+                          <EmployeeAvatar
+                            employee={leave.employee || leave.user || leave.employeeId || leave}
+                            alt={`${empName} profile`}
+                            className="h-9 w-9 border border-amber-200 mt-0.5"
+                          />
                           <div>
                             <div className="flex items-center gap-2">
                               <h4 className="text-xs sm:text-sm font-bold text-slate-900">{empName}</h4>
@@ -1397,26 +1392,16 @@ export default function Dashboard() {
                                   ? "Team lead"
                                   : roleCleaned.charAt(0).toUpperCase() + roleCleaned.slice(1).toLowerCase();
 
-                              const initials = displayName
-                                .trim()
-                                .split(/\s+/)
-                                .filter(Boolean)
-                                .map((word) => word.charAt(0).toUpperCase())
-                                .slice(0, 2)
-                                .join("") || "EM";
-
                               return (
                                 <div
                                   key={record._id || record.id || index}
                                   className="bg-white rounded-xl border border-slate-200 p-3 flex flex-col items-center justify-center text-center shadow-xs transition-shadow hover:shadow-sm"
                                 >
-                                  {/* Ocean Blue Circle with vertical gradient */}
-                                  <div
-                                    className="w-11 h-11 rounded-full text-white flex items-center justify-center font-bold text-xs select-none shadow-xs shrink-0 font-poppins"
-                                    style={{ background: "linear-gradient(180deg, #034665 0%, #068DCB 100%)" }}
-                                  >
-                                    {initials}
-                                  </div>
+                                  <EmployeeAvatar
+                                    employee={record.employee || record.user || record}
+                                    alt={`${displayName} profile`}
+                                    className="h-11 w-11 shadow-xs"
+                                  />
 
                                   {/* Employee Name */}
                                   <p

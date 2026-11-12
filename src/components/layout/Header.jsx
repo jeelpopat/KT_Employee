@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api, { BASE_URL } from '../../api/axios.js';
-import companyLogo from '../../assets/Logo.png';
 import whiteLogo from '../../assets/white logo.png';
+import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 import { tabToPath, pathToTab } from '../../utils/navigation.js';
 import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
@@ -980,12 +980,6 @@ export const Header = ({ onSignOut }) => {
     headerProfileData?.employee?.email ||
     '';
   const displayPhoto = isProfilePhotoReset ? '' : extractPhoto(user) || extractPhoto(headerProfileData);
-  const [headerImgError, setHeaderImgError] = useState(false);
-
-  useEffect(() => {
-    setHeaderImgError(false);
-  }, [displayPhoto]);
-
   const activeUnreadCount = isAdmin ? adminUnreadCount : employeeUnreadCount;
 
   return (
@@ -1449,28 +1443,13 @@ export const Header = ({ onSignOut }) => {
               className="flex items-center gap-2.5 p-1 pl-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer bg-transparent font-poppins"
             >
               <div className="relative shrink-0">
-                <div className="w-8 h-8 rounded-full bg-white text-[#0b4d68] font-bold text-xs flex items-center justify-center shadow-xs overflow-hidden font-poppins">
-                  {isAdmin ? (
-                    displayName
-                      .split(' ')
-                      .map((word) => word.charAt(0).toUpperCase())
-                      .slice(0, 2)
-                      .join('') || 'HK'
-                  ) : displayPhoto && !headerImgError ? (
-                    <img
-                      src={displayPhoto}
-                      alt={displayName}
-                      onError={() => setHeaderImgError(true)}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={companyLogo}
-                      alt="Company logo"
-                      className="w-full h-full object-contain p-0.5"
-                    />
-                  )}
-                </div>
+                <EmployeeAvatar
+                  employee={headerProfileData}
+                  user={user}
+                  src={displayPhoto}
+                  alt={`${displayName || 'User'} profile`}
+                  className="h-8 w-8 shadow-xs"
+                />
               </div>
 
               <div className="hidden sm:flex items-center pr-1">
@@ -1488,22 +1467,13 @@ export const Header = ({ onSignOut }) => {
                   className="px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 transition-colors"
                   title="View full profile"
                 >
-                  <div className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
-                    {displayPhoto && !headerImgError ? (
-                      <img
-                        src={displayPhoto}
-                        alt={displayName}
-                        onError={() => setHeaderImgError(true)}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <img
-                        src={companyLogo}
-                        alt="Logo"
-                        className="w-full h-full object-contain p-0.5"
-                      />
-                    )}
-                  </div>
+                  <EmployeeAvatar
+                    employee={headerProfileData}
+                    user={user}
+                    src={displayPhoto}
+                    alt={`${displayName || 'User'} profile`}
+                    className="h-8 w-8 rounded-lg border border-slate-200 bg-slate-50"
+                  />
                   <div className="overflow-hidden min-w-0 flex-1">
                     <p className="text-xs font-bold text-slate-900 truncate">{displayName}</p>
                     <p className="text-[10px] text-slate-400 truncate">{displayEmail}</p>

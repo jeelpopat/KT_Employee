@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { LoadingScreen } from "../../components/common/Loader.jsx";
+import { EmployeeAvatar } from "../../components/common/EmployeeAvatar.jsx";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import { 
@@ -3263,21 +3264,15 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                           const plan = report.tomorrowPlan || report.tomorrow_plan || "—";
                           const issues = report.issuesFaced || report.blockers || "";
 
-                          const initials = empName
-                            .split(" ")
-                            .filter(Boolean)
-                            .map((n) => n[0])
-                            .slice(0, 2)
-                            .join("")
-                            .toUpperCase() || "E";
-
                           return (
                             <tr key={report._id} className="hover:bg-slate-50/70 transition-colors">
                               <td className="px-5 py-3.5">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-[#034665] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                                    {initials}
-                                  </div>
+                                  <EmployeeAvatar
+                                    employee={report.employeeId || report}
+                                    alt={`${empName} profile`}
+                                    className="h-8 w-8 border border-slate-200"
+                                  />
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="font-semibold text-slate-900 truncate">
@@ -4186,9 +4181,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                           Assigned Member
                         </span>
                         <div className="flex items-center gap-2 mt-1">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {(getUserName(modalAssigned?.member) || "U").charAt(0).toUpperCase()}
-                          </div>
+                          <EmployeeAvatar
+                            employee={modalAssigned?.member}
+                            alt={`${getUserName(modalAssigned?.member) || 'Employee'} profile`}
+                            className="h-6 w-6"
+                          />
                           <div className="min-w-0">
                             <span className="text-sm font-semibold text-slate-800 block truncate">
                               {getUserName(modalAssigned?.member) || "Unassigned"}
@@ -4267,9 +4264,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-[10px] font-bold">
-                                    {(getUpdateMemberName(update) || "U").charAt(0).toUpperCase()}
-                                  </div>
+                                  <EmployeeAvatar
+                                    employee={update.employeeId || update.employee || update.user || update}
+                                    alt={`${getUpdateMemberName(update) || 'Employee'} profile`}
+                                    className="h-5 w-5"
+                                  />
                                   <span className="text-xs font-bold text-slate-800">
                                     {getUpdateMemberName(update)}
                                   </span>
@@ -4410,9 +4409,11 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee</span>
                   <div className="flex items-center gap-2 mt-1">
-                    <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                      {(selectedDailyReportModal.employeeId?.name || selectedDailyReportModal.employeeName || selectedDailyReportModal.name || 'U').charAt(0).toUpperCase()}
-                    </div>
+                    <EmployeeAvatar
+                      employee={selectedDailyReportModal.employeeId || selectedDailyReportModal}
+                      alt={`${selectedDailyReportModal.employeeName || selectedDailyReportModal.name || 'Employee'} profile`}
+                      className="h-7 w-7"
+                    />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-slate-800 truncate">
                         {selectedDailyReportModal.employeeId?.name || selectedDailyReportModal.employeeName || selectedDailyReportModal.name || (selectedDailyReportModal.employeeId?.email ? selectedDailyReportModal.employeeId.email.split('@')[0] : 'User')}

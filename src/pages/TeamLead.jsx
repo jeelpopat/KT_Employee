@@ -10,6 +10,7 @@ import {
 } from "../utils/roleFilters";
 import { showToast } from "../components/common/Toast";
 import { BASE_URL as BACKEND_URL } from "../api/config";
+import { EmployeeAvatar } from "../components/common/EmployeeAvatar.jsx";
 
 const BASE_URL = `${BACKEND_URL}/api`;
 
@@ -721,9 +722,11 @@ const AssignmentModal = ({
                         className="w-4 h-4 text-purple-600 border-slate-300 rounded focus:ring-purple-500 cursor-pointer"
                       />
 
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-100 to-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0 border border-slate-200/60">
-                        {(getDisplayName(employee) || 'E').charAt(0).toUpperCase()}
-                      </div>
+                      <EmployeeAvatar
+                        employee={employee}
+                        alt={`${getDisplayName(employee)} profile`}
+                        className="h-8 w-8 border border-slate-200/60"
+                      />
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
