@@ -44,6 +44,14 @@ const EMPTY_REPAYMENT = {
   reference: '',
   notes: '',
 };
+const EMPTY_SUMMARY = {
+  principalAmount: 0,
+  principalRepaid: 0,
+  principalOutstanding: 0,
+  interestReceived: 0,
+  activeLoans: 0,
+  paidOffLoans: 0,
+};
 
 const getId = (value) => {
   if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
@@ -95,7 +103,7 @@ export const LendingManagementView = () => {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [lendings, setLendings] = useState([]);
-  const [summary, setSummary] = useState({ principalAmount: 0, principalOutstanding: 0, interestReceived: 0, activeLoans: 0 });
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [pagination, setPagination] = useState({ page: 1, limit: PAGE_LIMIT, total: 0 });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -123,6 +131,9 @@ export const LendingManagementView = () => {
   const branchNames = useMemo(() => new Map(
     branches.map((branch) => [getId(branch), branch.branchName || branch.name || 'Branch']),
   ), [branches]);
+  const summaryScope = branchId === ALL_BRANCHES
+    ? 'all branches'
+    : (branchNames.get(branchId) || 'selected branch');
   const pageCount = Math.max(1, Math.ceil(pagination.total / pagination.limit));
   const firstVisible = pagination.total ? (page - 1) * pagination.limit + 1 : 0;
   const lastVisible = Math.min(page * pagination.limit, pagination.total);
@@ -241,7 +252,7 @@ export const LendingManagementView = () => {
         }
         setLendings(Array.isArray(data.items) ? data.items : []);
         setPagination(pageInfo);
-        setSummary(data.summary || { principalAmount: 0, principalOutstanding: 0, interestReceived: 0, activeLoans: 0 });
+        setSummary({ ...EMPTY_SUMMARY, ...data.summary });
         setLoadError('');
       })
       .catch((error) => { if (active) setLoadError(getErrorMessage(error, 'Could not load lending records.')); })
@@ -441,16 +452,30 @@ export const LendingManagementView = () => {
         </div>
       </header>
 
-      <section aria-label="Lending summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Lending portfolio summary" className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Portfolio summary</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Totals for {summaryScope}; table search and status filters do not change these figures.
+            </p>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600">
+            {numberValue(summary.activeLoans).toLocaleString()} active · {numberValue(summary.paidOffLoans).toLocaleString()} paid off
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
-          { title: 'Total lending', value: formatCurrency(summary.principalAmount), detail: `${pagination.total.toLocaleString()} customer loans`, icon: Landmark, tone: 'bg-blue-50 text-blue-700' },
-          { title: 'Principal outstanding', value: formatCurrency(summary.principalOutstanding), detail: 'Customer principal to be recovered', icon: CircleDollarSign, tone: 'bg-amber-50 text-amber-700' },
-          { title: 'Active loans', value: numberValue(summary.activeLoans).toLocaleString(), detail: 'Currently open lending records', icon: UserRound, tone: 'bg-cyan-50 text-[#034665]' },
-          { title: 'Interest received', value: formatCurrency(summary.interestReceived), detail: 'Recorded interest income', icon: Percent, tone: 'bg-emerald-50 text-emerald-700' },
+          { title: 'Total disbursed', value: formatCurrency(summary.principalAmount), detail: `${(numberValue(summary.activeLoans) + numberValue(summary.paidOffLoans)).toLocaleString()} loans in portfolio`, icon: Landmark, tone: 'bg-blue-50 text-blue-700' },
+          { title: 'Principal received', value: formatCurrency(summary.principalRepaid), detail: 'Principal repayments collected', icon: Banknote, tone: 'bg-emerald-50 text-emerald-700' },
+          { title: 'Principal outstanding', value: formatCurrency(summary.principalOutstanding), detail: 'Principal still to be recovered', icon: CircleDollarSign, tone: 'bg-amber-50 text-amber-700' },
+          { title: 'Interest received', value: formatCurrency(summary.interestReceived), detail: 'Recorded interest income', icon: Percent, tone: 'bg-cyan-50 text-[#034665]' },
+          { title: 'Active loans', value: numberValue(summary.activeLoans).toLocaleString(), detail: `${numberValue(summary.paidOffLoans).toLocaleString()} paid off`, icon: UserRound, tone: 'bg-slate-100 text-slate-700' },
         ].map((card) => {
           const Icon = card.icon;
           return <article key={card.title} className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs transition-all duration-200 hover:shadow-md sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-slate-500">{card.title}</p><p className="mt-2 text-xl font-bold tracking-tight text-slate-900">{card.value}</p></div><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${card.tone}`}><Icon size={20} aria-hidden="true" /></span></div><p className="mt-3 text-xs text-slate-500">{card.detail}</p></article>;
         })}
+        </div>
       </section>
 
       <section aria-label="Lending filters" className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
