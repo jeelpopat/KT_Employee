@@ -22,7 +22,7 @@ import { useApp } from '../../context/AppContext.jsx';
 
 const ALL_BRANCHES = 'all';
 const PAGE_LIMIT = 20;
-const CONTROL_CLASS = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-violet-600 focus:ring-2 focus:ring-violet-100';
+const CONTROL_CLASS = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-[#068DCB] focus:ring-2 focus:ring-cyan-100';
 const LABEL_CLASS = 'mb-1 block text-xs font-medium text-slate-600';
 const EMPTY_LOAN = {
   financialYearId: '',
@@ -423,18 +423,20 @@ export const LendingManagementView = () => {
   }, [drawerMode, isSaving]);
 
   return (
-    <section className="mx-auto max-w-[1480px] space-y-5 pb-8">
-      <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-violet-950 via-indigo-950 to-violet-800 p-6 text-white shadow-lg shadow-violet-950/10 sm:p-8">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+    <section className="mx-auto max-w-[1480px] space-y-5 pb-8 font-poppins">
+      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#034665] via-[#045d86] to-[#068DCB] p-5 text-white shadow-lg sm:p-6">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-cyan-400/15 blur-2xl" />
+        <div className="relative z-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <p className="text-sm font-semibold tracking-wide text-violet-200">FINANCE · LENDING</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Lending</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-violet-100/80">Manage loans given to customers, track repayments and monitor outstanding principal.</p>
-            <p className="mt-4 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold">{branchId === ALL_BRANCHES ? 'All branches · consolidated' : (branchNames.get(branchId) || 'Selected branch')}</p>
+            <p className="text-[11px] font-semibold tracking-wide text-cyan-100">FINANCE · LENDING</p>
+            <h1 className="mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">Lending</h1>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-cyan-50/90 sm:text-sm">Manage loans given to customers, track repayments and monitor outstanding principal.</p>
+            <p className="mt-3 inline-flex rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-md">{branchId === ALL_BRANCHES ? 'All branches · consolidated' : (branchNames.get(branchId) || 'Selected branch')}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" leftIcon={RefreshCw} onClick={() => { setIsLoadingLendings(true); setIsLoadingSetup(Boolean(formBranchId)); setReloadKey((value) => value + 1); }} isDisabled={!activeCompanyId} className="border-white/25 bg-white/10 text-white hover:bg-white/15">Refresh</Button>
-            <Button leftIcon={Plus} onClick={openCreate} isDisabled={!activeCompanyId || !selectableBranches.length || isLoadingSetup} className="bg-white text-violet-900 hover:bg-violet-50">Give a loan</Button>
+          <div className="relative z-10 flex flex-wrap gap-2">
+            <Button variant="outline" leftIcon={RefreshCw} onClick={() => { setIsLoadingLendings(true); setIsLoadingSetup(Boolean(formBranchId)); setReloadKey((value) => value + 1); }} isDisabled={!activeCompanyId} className="border-white/25 bg-white/15 text-white hover:bg-white/20">Refresh</Button>
+            <Button leftIcon={Plus} onClick={openCreate} isDisabled={!activeCompanyId || !selectableBranches.length || isLoadingSetup} className="bg-white text-[#034665] shadow-md hover:bg-cyan-50">Give a loan</Button>
           </div>
         </div>
       </header>
@@ -443,15 +445,15 @@ export const LendingManagementView = () => {
         {[
           { title: 'Total lending', value: formatCurrency(summary.principalAmount), detail: `${pagination.total.toLocaleString()} customer loans`, icon: Landmark, tone: 'bg-blue-50 text-blue-700' },
           { title: 'Principal outstanding', value: formatCurrency(summary.principalOutstanding), detail: 'Customer principal to be recovered', icon: CircleDollarSign, tone: 'bg-amber-50 text-amber-700' },
-          { title: 'Active loans', value: numberValue(summary.activeLoans).toLocaleString(), detail: 'Currently open lending records', icon: UserRound, tone: 'bg-violet-50 text-violet-700' },
+          { title: 'Active loans', value: numberValue(summary.activeLoans).toLocaleString(), detail: 'Currently open lending records', icon: UserRound, tone: 'bg-cyan-50 text-[#034665]' },
           { title: 'Interest received', value: formatCurrency(summary.interestReceived), detail: 'Recorded interest income', icon: Percent, tone: 'bg-emerald-50 text-emerald-700' },
         ].map((card) => {
           const Icon = card.icon;
-          return <article key={card.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-slate-500">{card.title}</p><p className="mt-2 text-xl font-bold tracking-tight text-slate-900">{card.value}</p></div><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${card.tone}`}><Icon size={20} aria-hidden="true" /></span></div><p className="mt-3 text-xs text-slate-500">{card.detail}</p></article>;
+          return <article key={card.title} className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs transition-all duration-200 hover:shadow-md sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-slate-500">{card.title}</p><p className="mt-2 text-xl font-bold tracking-tight text-slate-900">{card.value}</p></div><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${card.tone}`}><Icon size={20} aria-hidden="true" /></span></div><p className="mt-3 text-xs text-slate-500">{card.detail}</p></article>;
         })}
       </section>
 
-      <section aria-label="Lending filters" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section aria-label="Lending filters" className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
         <div className="grid gap-2 lg:grid-cols-[170px_minmax(220px,1fr)]">
           <select aria-label="Lending status" className={`${CONTROL_CLASS} h-10`} value={statusFilter} onChange={(event) => { setIsLoadingLendings(true); setStatusFilter(event.target.value); setPage(1); }}><option value="all">All statuses</option><option value="ACTIVE">Active</option><option value="PAID_OFF">Paid off</option></select>
           <label className="relative"><span className="sr-only">Search lending records</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className={`${CONTROL_CLASS} h-10 pl-9`} value={search} onChange={(event) => { setIsLoadingLendings(true); setSearch(event.target.value); setPage(1); }} placeholder="Search customer or loan reference..." /></label>
@@ -465,22 +467,22 @@ export const LendingManagementView = () => {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4"><div><h2 className="text-base font-bold text-slate-900">Customer lending register</h2><p className="mt-1 text-xs text-slate-500">Loan balances, terms and repayment activity.</p></div><span className="text-xs font-medium text-slate-500">{pagination.total.toLocaleString()} records</span></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Customer</th><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Start / maturity</th><th className="px-4 py-3 text-right">Principal</th><th className="px-4 py-3 text-right">Outstanding</th><th className="px-4 py-3 text-center">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {isLoadingLendings ? <tr><td colSpan="7" className="px-5 py-14 text-center text-sm text-slate-500"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin text-violet-700" />Loading lending records…</td></tr>
+              {isLoadingLendings ? <tr><td colSpan="7" className="px-5 py-14 text-center text-sm text-slate-500"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin text-[#068DCB]" />Loading lending records…</td></tr>
                 : lendings.length === 0 ? <tr><td colSpan="7" className="px-5 py-14 text-center"><Landmark className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm font-medium text-slate-700">No lending records found</p><p className="mt-1 text-xs text-slate-500">Create a customer loan to begin tracking disbursements and repayments.</p></td></tr>
-                  : lendings.map((lending) => <tr key={getId(lending)} className="transition-colors hover:bg-violet-50/30">
-                    <td className="max-w-[240px] px-5 py-3.5"><div className="flex items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-700"><UserRound className="h-4 w-4" /></span><div className="min-w-0"><p className="truncate font-semibold text-slate-900">{lending.customerName}</p><p className="truncate text-[11px] text-slate-500">{lending.customerPhone || 'Customer'}{lending.loanReference ? ` · ${lending.loanReference}` : ''}</p></div></div></td>
+                  : lendings.map((lending) => <tr key={getId(lending)} className="transition-colors hover:bg-cyan-50/50">
+                    <td className="max-w-[240px] px-5 py-3.5"><div className="flex items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#edf4f8] text-[#034665]"><UserRound className="h-4 w-4" /></span><div className="min-w-0"><p className="truncate font-semibold text-slate-900">{lending.customerName}</p><p className="truncate text-[11px] text-slate-500">{lending.customerPhone || 'Customer'}{lending.loanReference ? ` · ${lending.loanReference}` : ''}</p></div></div></td>
                     <td className="px-4 py-3.5 text-xs text-slate-600">{branchNames.get(getId(lending.branchId)) || 'Branch'}</td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-xs text-slate-600">{formatDate(lending.startDate)}<p className="mt-0.5 text-[11px] text-slate-400">Maturity {formatDate(lending.maturityDate)}</p></td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-700">{formatCurrency(lending.principalAmount)}</td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold tabular-nums text-slate-900">{formatCurrency(lending.principalOutstanding)}</td>
                     <td className="px-4 py-3.5 text-center"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${lending.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{lending.status === 'ACTIVE' ? 'Active' : 'Paid off'}</span></td>
-                    <td className="px-5 py-3.5"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" title="View lending details" aria-label="View lending details" onClick={() => openDetails(lending)}><Eye className="h-4 w-4 text-slate-500" /></Button>{lending.status === 'ACTIVE' && <Button variant="ghost" size="sm" title="Record repayment" aria-label="Record repayment" onClick={() => openRepayment(lending)}><Banknote className="h-4 w-4 text-violet-700" /></Button>}</div></td>
+                    <td className="px-5 py-3.5"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" title="View lending details" aria-label="View lending details" onClick={() => openDetails(lending)}><Eye className="h-4 w-4 text-slate-500" /></Button>{lending.status === 'ACTIVE' && <Button variant="ghost" size="sm" title="Record repayment" aria-label="Record repayment" onClick={() => openRepayment(lending)}><Banknote className="h-4 w-4 text-[#045d86]" /></Button>}</div></td>
                   </tr>)}
             </tbody>
           </table>
@@ -491,7 +493,7 @@ export const LendingManagementView = () => {
       {drawerMode && <div className="fixed inset-x-0 bottom-0 top-[64px] z-[70]">
         <button type="button" className="absolute inset-0 h-full w-full cursor-default bg-slate-950/25" aria-label="Close lending panel" onClick={closeDrawer} />
         <aside role="dialog" aria-modal="true" aria-labelledby="lending-drawer-title" className="absolute inset-y-0 right-0 flex w-full max-w-[600px] flex-col border-l border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-lg bg-violet-50 text-violet-700">{drawerMode === 'details' ? <History className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</span><div><h2 id="lending-drawer-title" className="text-base font-bold text-slate-900">{drawerMode === 'create' ? 'Give a customer loan' : drawerMode === 'repayment' ? 'Record repayment' : 'Lending details'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{selectedLending ? `${selectedLending.customerName} · ${formatCurrency(selectedLending.principalOutstanding)} outstanding` : 'New customer lending record'}</p></div></div><button type="button" onClick={closeDrawer} disabled={isSaving} aria-label="Close lending panel" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-lg bg-[#edf4f8] text-[#034665]">{drawerMode === 'details' ? <History className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</span><div><h2 id="lending-drawer-title" className="text-base font-bold text-slate-900">{drawerMode === 'create' ? 'Give a customer loan' : drawerMode === 'repayment' ? 'Record repayment' : 'Lending details'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{selectedLending ? `${selectedLending.customerName} · ${formatCurrency(selectedLending.principalOutstanding)} outstanding` : 'New customer lending record'}</p></div></div><button type="button" onClick={closeDrawer} disabled={isSaving} aria-label="Close lending panel" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
 
           {drawerMode === 'create' && <form onSubmit={handleCreate} className="flex min-h-0 flex-1 flex-col"><div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -509,21 +511,21 @@ export const LendingManagementView = () => {
             {setupError && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{setupError}</p>}
             {!isLoadingSetup && formBranchId && customers.length === 0 && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Add an active customer for this branch before creating a lending record.</p>}
             {panelError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />{panelError}</p>}
-            <p className="rounded-lg bg-violet-50 px-3 py-2 text-xs text-violet-800">Disbursement is posted as a debit to loan receivable and a credit to the selected bank/cash account.</p>
-          </div><div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">{selectedAccount?.accountName || 'Select a disbursement account'}</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeDrawer} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-violet-700 hover:bg-violet-800 focus:ring-violet-500/30">Save loan</Button></div></div></form>}
+            <p className="rounded-lg bg-[#edf4f8] px-3 py-2 text-xs text-[#034665]">Disbursement is posted as a debit to loan receivable and a credit to the selected bank/cash account.</p>
+          </div><div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">{selectedAccount?.accountName || 'Select a disbursement account'}</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeDrawer} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-[#045d86] hover:bg-[#034665] focus:ring-cyan-500/30">Save loan</Button></div></div></form>}
 
           {drawerMode === 'repayment' && <form onSubmit={handleRepayment} className="flex min-h-0 flex-1 flex-col"><div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-            <div className="grid grid-cols-2 gap-3 rounded-xl bg-violet-50 p-3 text-xs"><div><p className="text-violet-800">Principal outstanding</p><p className="mt-1 font-bold text-slate-900">{formatCurrency(selectedLending?.principalOutstanding)}</p></div><div><p className="text-violet-800">Interest rate</p><p className="mt-1 font-bold text-slate-900">{numberValue(selectedLending?.annualInterestRatePercent)}% p.a.</p></div></div>
+            <div className="grid grid-cols-2 gap-3 rounded-xl bg-[#edf4f8] p-3 text-xs"><div><p className="text-[#034665]">Principal outstanding</p><p className="mt-1 font-bold text-slate-900">{formatCurrency(selectedLending?.principalOutstanding)}</p></div><div><p className="text-[#034665]">Interest rate</p><p className="mt-1 font-bold text-slate-900">{numberValue(selectedLending?.annualInterestRatePercent)}% p.a.</p></div></div>
             <label className="block"><span className={LABEL_CLASS}>Payment date <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} type="date" value={repaymentForm.paymentDate} onChange={(event) => setRepaymentForm((current) => ({ ...current, paymentDate: event.target.value }))} required /></label>
             <label className="block"><span className={LABEL_CLASS}>Financial year <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={repaymentForm.financialYearId} onChange={(event) => setRepaymentForm((current) => ({ ...current, financialYearId: event.target.value }))} required disabled={isLoadingSetup}><option value="">Select open financial year</option>{financialYears.map((year) => <option key={getId(year)} value={getId(year)}>{year.yearLabel}</option>)}</select></label>
             <label className="block"><span className={LABEL_CLASS}>Deposit to <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={repaymentForm.bankAccountId} onChange={(event) => setRepaymentForm((current) => ({ ...current, bankAccountId: event.target.value }))} required disabled={isLoadingSetup}><option value="">Select receiving account</option>{bankAccounts.map((account) => <option key={getId(account)} value={getId(account)}>{account.accountName} · {account.accountType}</option>)}</select></label>
             <div className="grid gap-3 sm:grid-cols-2"><label><span className={LABEL_CLASS}>Principal received</span><input className={CONTROL_CLASS} type="number" min="0" max={numberValue(selectedLending?.principalOutstanding)} step="0.01" value={repaymentForm.principalAmount} onChange={(event) => setRepaymentForm((current) => ({ ...current, principalAmount: event.target.value }))} required /></label><label><span className={LABEL_CLASS}>Interest received</span><input className={CONTROL_CLASS} type="number" min="0" step="0.01" value={repaymentForm.interestAmount} onChange={(event) => setRepaymentForm((current) => ({ ...current, interestAmount: event.target.value }))} required /></label></div>
-            <div className="flex justify-between rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2 text-sm"><span className="font-medium text-slate-600">Total received</span><span className="font-bold tabular-nums text-slate-900">{formatCurrency(repaymentTotal)}</span></div>
+            <div className="flex justify-between rounded-lg border border-cyan-100 bg-cyan-50/50 px-3 py-2 text-sm"><span className="font-medium text-slate-600">Total received</span><span className="font-bold tabular-nums text-slate-900">{formatCurrency(repaymentTotal)}</span></div>
             <label className="block"><span className={LABEL_CLASS}>Reference</span><input className={CONTROL_CLASS} value={repaymentForm.reference} onChange={(event) => setRepaymentForm((current) => ({ ...current, reference: event.target.value }))} maxLength={200} /></label>
             <label className="block"><span className={LABEL_CLASS}>Notes</span><textarea className={`${CONTROL_CLASS} min-h-16 resize-y`} value={repaymentForm.notes} onChange={(event) => setRepaymentForm((current) => ({ ...current, notes: event.target.value }))} maxLength={2000} /></label>
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Record the principal and interest split from the customer's payment. The annual interest rate is informational; interest is not auto-accrued.</p>
             {panelError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />{panelError}</p>}
-          </div><div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><Button variant="outline" type="button" onClick={closeDrawer} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-violet-700 hover:bg-violet-800 focus:ring-violet-500/30">Record repayment</Button></div></form>}
+          </div><div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><Button variant="outline" type="button" onClick={closeDrawer} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-[#045d86] hover:bg-[#034665] focus:ring-cyan-500/30">Record repayment</Button></div></form>}
 
           {drawerMode === 'details' && <><div className="flex-1 overflow-y-auto px-5 py-4">
             {isLoadingDetails ? <p className="py-12 text-center text-sm text-slate-500"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading lending details…</p>

@@ -70,7 +70,7 @@ const StatCard = ({ title, value, caption, icon: Icon, tone = 'blue' }) => {
     green: 'bg-emerald-50 text-emerald-700',
   };
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs transition-all duration-200 hover:shadow-md sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-slate-500">{title}</p>
@@ -307,23 +307,25 @@ export const FinanceOverviewView = () => {
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
-      <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-blue-800 p-6 text-white shadow-lg shadow-blue-950/10 sm:p-8">
-        <div className="flex flex-col justify-between gap-6 xl:flex-row xl:items-center">
+    <main className="mx-auto w-full max-w-[1500px] space-y-5 p-4 font-poppins sm:space-y-6 sm:p-6 lg:p-8">
+      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#034665] via-[#045d86] to-[#068DCB] p-5 text-white shadow-lg sm:p-6">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-cyan-400/15 blur-2xl" />
+        <div className="relative z-10 flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
           <div>
-            <p className="text-sm font-semibold tracking-wide text-blue-200">FINANCE · DASHBOARD</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Finance Overview</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100/80">Your consolidated view of revenue, expenses, branch performance and recent activity.</p>
-            <span className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-50">
+            <p className="text-[11px] font-semibold tracking-wide text-cyan-100">FINANCE · DASHBOARD</p>
+            <h1 className="mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">Finance Overview</h1>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-cyan-50/90 sm:text-sm">Your consolidated view of revenue, expenses, branch performance and recent activity.</p>
+            <span className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-md">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               {isAllBranches ? 'All branches · consolidated totals' : (branchNames.get(branchId) || 'Selected branch')}
             </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 self-start xl:self-center">
             <button
               type="button"
               onClick={refreshDashboard}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition hover:bg-white/15"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/25 bg-white/15 px-3 text-xs font-semibold text-white transition hover:bg-white/20"
             >
               <RefreshCw size={16} aria-hidden="true" /> Refresh
             </button>
@@ -331,7 +333,7 @@ export const FinanceOverviewView = () => {
               type="button"
               onClick={handleExport}
               disabled={!dashboard || isExporting}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-blue-900 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-white px-3.5 text-xs font-bold text-[#034665] shadow-md transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download size={16} aria-hidden="true" /> Export report
             </button>
@@ -339,7 +341,7 @@ export const FinanceOverviewView = () => {
         </div>
       </header>
 
-      <section aria-label="Dashboard filters" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <section aria-label="Dashboard filters" className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-slate-900">Report filters</h2>
@@ -422,11 +424,11 @@ export const FinanceOverviewView = () => {
       )}
 
       {!activeCompanyId && !isLoading ? (
-        <div className="grid min-h-64 place-items-center rounded-2xl border border-slate-200 bg-white p-6 text-center">
+        <div className="grid min-h-64 place-items-center rounded-xl border border-slate-200/80 bg-white p-6 text-center shadow-xs">
           <div><p className="font-semibold text-slate-800">Choose a company to continue</p><p className="mt-1 text-sm text-slate-500">The dashboard will show results for the selected company.</p></div>
         </div>
       ) : isLoading && !dashboard ? (
-        <div className="grid min-h-72 place-items-center rounded-2xl border border-slate-200 bg-white">
+        <div className="grid min-h-72 place-items-center rounded-xl border border-slate-200/80 bg-white shadow-xs">
           <div className="flex items-center gap-3 text-sm font-medium text-slate-500">
             <LoaderCircle size={20} className="animate-spin text-blue-700" aria-hidden="true" />
             Loading Finance overview…
@@ -444,7 +446,7 @@ export const FinanceOverviewView = () => {
           </section>
 
           <section className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.8fr)]">
-            <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <article className="min-w-0 rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Branch performance</h2>
@@ -485,7 +487,7 @@ export const FinanceOverviewView = () => {
               )}
             </article>
 
-            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <article className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
               <div>
                 <h2 className="text-base font-bold text-slate-900">Expense breakdown</h2>
                 <p className="mt-1 text-sm text-slate-500">How total outgoing is distributed</p>
@@ -520,7 +522,7 @@ export const FinanceOverviewView = () => {
           </section>
 
           <section className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.3fr)]">
-            <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <article className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Branch summary</h2>
@@ -559,7 +561,7 @@ export const FinanceOverviewView = () => {
               </div>
             </article>
 
-            <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <article className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Recent transactions</h2>
