@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
 import { performAutoCheckout, clearAuth, isTokenExpired, validateUserSession, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
@@ -11,6 +11,7 @@ import { pathToTab } from './utils/navigation.js';
 import { RefreshFeedback, ToastContainer, showToast } from './components/common/Toast.jsx';
 import { LoadingScreen, PageSkeleton, TopProgressBar } from './components/common/Loader.jsx';
 import { stopScreenCapture } from './services/monitoringService.js';
+import SeoMeta from './SeoMeta.jsx';
 
 // Lazy-load layout and views so unauthenticated users download ONLY the Login screen
 const Sidebar = lazy(() => import('./components/layout/Sidebar.jsx').then(m => ({ default: m.Sidebar })));
@@ -481,14 +482,258 @@ export default function App() {
     return <LoadingScreen message="Verifying session..." fullScreen className="bg-slate-50 font-sans" />;
   }
 
+  const marketingPages = {
+    '/crm-software': {
+      eyebrow: 'KEVALON CRM',
+      title: 'Smart CRM software for growing businesses',
+      description: 'Bring leads, customers, team activity and pipeline data into a single, searchable workspace built for modern business teams.',
+      bullets: [
+        'Automate lead capture, assignment and follow-up tasks.',
+        'Track customer communication across sales and service teams.',
+        'Monitor pipeline performance with real-time reporting.'
+      ],
+      stats: [
+        { value: '24/7', label: 'lead visibility' },
+        { value: '100%', label: 'team alignment' },
+        { value: 'A+', label: 'workflow health' }
+      ]
+    },
+    '/features': {
+      eyebrow: 'FEATURES',
+      title: 'Built to streamline sales and customer operations',
+      description: 'Kevalon CRM brings customer records, sales pipelines and everyday business workflows together for stronger execution.',
+      bullets: [
+        'Lead management with automated routing and status tracking.',
+        'Customer activity timelines for service and sales visibility.',
+        'Dashboards for team performance, follow-ups and conversion trends.'
+      ],
+      stats: [
+        { value: '8+', label: 'core modules' },
+        { value: '1 view', label: 'team dashboard' },
+        { value: 'A+', label: 'process clarity' }
+      ]
+    },
+    '/lead-management': {
+      eyebrow: 'LEAD MANAGEMENT',
+      title: 'Convert more leads with a focused sales workflow',
+      description: 'Capture every opportunity, prioritize follow-ups and keep your sales pipeline moving with clear ownership at every stage.',
+      bullets: [
+        'Assign qualified leads to the right sales owners quickly.',
+        'Track lead status, communications and next-step actions.',
+        'Improve conversion rates with structured sales execution.'
+      ],
+      stats: [
+        { value: 'Faster', label: 'lead response' },
+        { value: 'Clear', label: 'ownership' },
+        { value: 'Higher', label: 'conversion' }
+      ]
+    },
+    '/customer-management': {
+      eyebrow: 'CUSTOMER MANAGEMENT',
+      title: 'Keep customer relationships consistent and measurable',
+      description: 'Organize customer details, service interactions and business context in one secure experience for better retention.',
+      bullets: [
+        'Maintain a clean, searchable customer database.',
+        'Review interactions, history and renewal status in one place.',
+        'Support better onboarding and after-sales engagement.'
+      ],
+      stats: [
+        { value: '360°', label: 'customer view' },
+        { value: 'Secure', label: 'records' },
+        { value: 'Better', label: 'retention' }
+      ]
+    },
+    '/sales-management': {
+      eyebrow: 'SALES MANAGEMENT',
+      title: 'Close deals with stronger visibility and control',
+      description: 'Give sales teams the tools to forecast accurately, manage pipelines and complete work without operational gaps.',
+      bullets: [
+        'Monitor stages, targets and revenue performance in real time.',
+        'Reduce administrative friction with automated updates.',
+        'Support decision-making with smarter business reporting.'
+      ],
+      stats: [
+        { value: 'Live', label: 'pipeline view' },
+        { value: 'Smart', label: 'forecasting' },
+        { value: 'Growth', label: 'focused' }
+      ]
+    },
+    '/about': {
+      eyebrow: 'ABOUT US',
+      title: 'Built by Kevalon Technology for ambitious businesses',
+      description: 'Kevalon Technology creates digital workflows that help growing teams manage customers, sales and internal operations with clarity.',
+      bullets: [
+        'Business-first CRM design for operational efficiency.',
+        'Support for teams across sales, service and administration.',
+        'A practical, scalable approach for Indian business growth.'
+      ],
+      stats: [
+        { value: 'India', label: 'business focus' },
+        { value: 'Scalable', label: 'solutions' },
+        { value: 'Trusted', label: 'operations' }
+      ]
+    },
+    '/contact': {
+      eyebrow: 'CONTACT',
+      title: 'Talk to our team about your CRM requirements',
+      description: 'Whether you need better lead tracking or a stronger customer workflow, Kevalon Technology can help design the right fit.',
+      bullets: [
+        'Discuss your sales and customer process challenges.',
+        'Explore system configuration for your business workflow.',
+        'Request a tailored demo for your operations team.'
+      ],
+      stats: [
+        { value: 'Demo', label: 'available' },
+        { value: 'Consultation', label: 'support' },
+        { value: 'Fast', label: 'response' }
+      ]
+    },
+    '/blog': {
+      eyebrow: 'BLOG',
+      title: 'CRM insights for smarter customer and sales operations',
+      description: 'Explore practical ideas for improving lead capture, customer retention and organized business performance with CRM strategy.',
+      bullets: [
+        'Learn how structured customer data improves service quality.',
+        'Understand best practices for lead follow-up and sales visibility.',
+        'Explore business efficiency ideas for modern teams.'
+      ],
+      stats: [
+        { value: 'Insights', label: 'for growth' },
+        { value: 'Practical', label: 'advice' },
+        { value: 'Clear', label: 'strategy' }
+      ]
+    }
+  };
+
   const publicPages = ['/security-policy', '/privacy', '/support', '/terms-of-service'];
   const publicPage = publicPages.includes(location.pathname) ? location.pathname : null;
+  const marketingPage = marketingPages[location.pathname] ? location.pathname : null;
+
+  const MarketingPage = ({ page }) => {
+    const pageConfig = marketingPages[page];
+
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900">
+        <SeoMeta pathname={page} />
+        <header className="border-b border-slate-200 bg-white/90 backdrop-blur-sm">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+            <Link to="/crm-software" className="flex items-center gap-3 text-slate-900">
+              <img src="/kevalon-logo.png" alt="Kevalon Technology" className="h-10 w-10 rounded-xl object-cover" />
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-600">Kevalon</div>
+                <div className="text-sm font-bold text-slate-900">CRM</div>
+              </div>
+            </Link>
+            <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex">
+              <Link to="/crm-software" className="transition hover:text-sky-600">CRM</Link>
+              <Link to="/features" className="transition hover:text-sky-600">Features</Link>
+              <Link to="/lead-management" className="transition hover:text-sky-600">Lead Management</Link>
+              <Link to="/customer-management" className="transition hover:text-sky-600">Customer Management</Link>
+              <Link to="/sales-management" className="transition hover:text-sky-600">Sales Management</Link>
+              <Link to="/contact" className="transition hover:text-sky-600">Contact</Link>
+            </nav>
+            <Link to="/login" className="rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500">
+              Login
+            </Link>
+          </div>
+        </header>
+
+        <main>
+          <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-20">
+            <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+              <div>
+                <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
+                  {pageConfig.eyebrow}
+                </span>
+                <h1 className="mt-5 text-4xl font-black leading-tight text-slate-900 sm:text-5xl">
+                  {pageConfig.title}
+                </h1>
+                <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
+                  {pageConfig.description}
+                </p>
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <Link to="/contact" className="rounded-full bg-sky-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500">
+                    Request a demo
+                  </Link>
+                  <Link to="/features" className="rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50">
+                    Explore features
+                  </Link>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/60">
+                <div className="rounded-2xl bg-slate-900 p-5 text-white">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-300">
+                    <span>Kevalon CRM</span>
+                    <span>Live overview</span>
+                  </div>
+                  <div className="mt-8 space-y-5">
+                    {pageConfig.stats.map((stat) => (
+                      <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="text-2xl font-black text-sky-300">{stat.value}</div>
+                        <div className="mt-1 text-sm text-slate-200">{stat.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+            <div className="grid gap-6 md:grid-cols-3">
+              {pageConfig.bullets.map((bullet) => (
+                <div key={bullet} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-lg text-sky-700">✓</div>
+                  <p className="text-base font-medium leading-7 text-slate-700">{bullet}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-slate-900 py-16 text-white">
+            <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+              <div className="grid gap-8 lg:grid-cols-2">
+                <div>
+                  <h2 className="text-3xl font-black text-white">Built for business clarity</h2>
+                  <p className="mt-4 max-w-xl text-lg text-slate-300">
+                    Kevalon CRM helps teams focus on customer relationships, process consistency and measurable business growth without adding complexity.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-200">
+                  <span className="rounded-full border border-slate-700 bg-slate-800 px-3 py-2">Lead tracking</span>
+                  <span className="rounded-full border border-slate-700 bg-slate-800 px-3 py-2">Customer records</span>
+                  <span className="rounded-full border border-slate-700 bg-slate-800 px-3 py-2">Sales visibility</span>
+                  <span className="rounded-full border border-slate-700 bg-slate-800 px-3 py-2">Actionable insights</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <footer className="border-t border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-slate-600 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+            <div>© {new Date().getFullYear()} Kevalon Technology</div>
+            <div className="flex flex-wrap gap-4">
+              <Link to="/privacy" className="hover:text-sky-600">Privacy</Link>
+              <Link to="/terms-of-service" className="hover:text-sky-600">Terms</Link>
+              <Link to="/security-policy" className="hover:text-sky-600">Security</Link>
+              <Link to="/support" className="hover:text-sky-600">Support</Link>
+            </div>
+          </div>
+        </footer>
+      </div>
+    );
+  };
 
   return (
     <AppProvider>
+      <SeoMeta pathname={location.pathname} />
       <ToastContainer />
       {isAuthenticated ? (
         <MainLayout handleSignOut={handleSignOut} />
+      ) : marketingPage ? (
+        <MarketingPage page={marketingPage} />
       ) : publicPage ? (
         <PublicInfoView page={publicPage} />
       ) : authView === 'reset_password' ? (

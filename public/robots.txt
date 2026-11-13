@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /admin
+Disallow: /employee
+Disallow: /dashboard
+Disallow: /performance
+Disallow: /attendance
+Disallow: /profile
+Disallow: /finance
+Disallow: /tasks
+Disallow: /leave
+
+Sitemap: https://crm.kevalontechnology.com/sitemap.xml
