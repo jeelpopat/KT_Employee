@@ -225,7 +225,7 @@ export const LendingManagementView = () => {
       page: String(page),
       limit: String(PAGE_LIMIT),
     });
-    if (branchId !== ALL_BRANCHES) params.set('branchId', branchId);
+    params.set('branchId', branchId);
     if (statusFilter !== 'all') params.set('status', statusFilter);
     if (search.trim()) params.set('search', search.trim());
     api.get(`/api/lending?${params.toString()}`)
