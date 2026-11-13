@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  ArrowLeftRight, Banknote, Bell, BookOpen, Building2, CalendarDays,
+  ArrowLeftRight, Banknote, Bell, BookOpen, Building2, CalendarDays, CircleDollarSign,
   FileMinus, FileText, GitBranch, Landmark, Package, Percent, Receipt,
   ScrollText, ShoppingCart, Truck, UserRound, Users
 } from 'lucide-react';
@@ -694,7 +694,14 @@ export const Sidebar = ({ onSignOut }) => {
       items: [
         { tab: 'finance-sales-invoices', label: 'Sales Invoice', path: '/finance/sales-invoices', icon: FileText },
         { tab: 'finance-customer-payments', label: 'Customer Payments', path: '/finance/customer-payments', icon: Banknote },
+        { tab: 'finance-income', label: 'Income', path: '/finance/income', icon: CircleDollarSign },
         { tab: 'finance-credit-notes', label: 'Credit Notes', path: '/finance/credit-notes', icon: FileMinus },
+      ]
+    },
+    {
+      title: 'LENDING',
+      items: [
+        { tab: 'finance-lending', label: 'Lending', path: '/finance/lending', icon: Landmark },
       ]
     },
     {

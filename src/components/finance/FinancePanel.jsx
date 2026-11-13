@@ -19,6 +19,10 @@ import { FinanceOverviewView } from './FinanceOverviewView.jsx';
 
 const AuditLogsView = lazy(() => import('../../pages/AuditLogs.jsx'));
 const FinanceNotificationsView = lazy(() => import('./FinanceNotificationsView.jsx'));
+const IncomeManagementView = lazy(() => import('./IncomeManagementView.jsx')
+  .then((module) => ({ default: module.IncomeManagementView })));
+const LendingManagementView = lazy(() => import('./LendingManagementView.jsx')
+  .then((module) => ({ default: module.LendingManagementView })));
 const CreditNotesManagementView = lazy(() => import('./CreditNotesManagementView.jsx')
   .then((module) => ({ default: module.CreditNotesManagementView })));
 const FixedAssetsManagementView = lazy(() => import('./FixedAssetsManagementView.jsx')
@@ -96,6 +100,12 @@ export const FinancePanel = () => {
   }
   if (pathname === '/finance/debit-notes') {
     return <DebitNotesManagementView />;
+  }
+  if (pathname === '/finance/income') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Income…</p>}><IncomeManagementView /></Suspense>;
+  }
+  if (pathname === '/finance/lending') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Lending…</p>}><LendingManagementView /></Suspense>;
   }
   if (pathname === '/finance/credit-notes') {
     return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Credit Notes…</p>}><CreditNotesManagementView /></Suspense>;
