@@ -60,6 +60,7 @@ const getErrorMessage = (error) => (
 );
 
 const CHART_COLORS = ['#2563eb', '#8b5cf6', '#14b8a6', '#f59e0b', '#ec4899', '#64748b', '#06b6d4', '#84cc16'];
+const ALL_BRANCHES = 'all';
 
 const StatCard = ({ title, value, caption, icon: Icon, tone = 'blue' }) => {
   const tones = {
@@ -91,7 +92,7 @@ export const FinanceOverviewView = () => {
   const [companies, setCompanies] = useState([]);
   const activeCompanyId = preferredCompanyId || companyId;
   const [branches, setBranches] = useState([]);
-  const [branchId, setBranchId] = useState('');
+  const [branchId, setBranchId] = useState(ALL_BRANCHES);
   const [dateRange, setDateRange] = useState(getCurrentMonthRange);
   const [dashboard, setDashboard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -158,7 +159,7 @@ export const FinanceOverviewView = () => {
 
     let active = true;
     const params = { companyId: activeCompanyId, ...dateRange };
-    if (branchId) params.branchId = branchId;
+    if (branchId !== ALL_BRANCHES) params.branchId = branchId;
 
     api.get('/api/admin/dashboard', { params })
       .then((response) => {
@@ -189,6 +190,7 @@ export const FinanceOverviewView = () => {
   ), [branches]);
 
   const stats = dashboard?.statistics || {};
+  const isAllBranches = branchId === ALL_BRANCHES;
   const sales = Number(stats.sales?.totalAmount ?? stats.totalSales) || 0;
   const received = Number(stats.sales?.totalReceived) || 0;
   const expenses = Number(stats.totalOutflow) ||
@@ -244,7 +246,7 @@ export const FinanceOverviewView = () => {
     1,
     ...branchPerformance.flatMap((branch) => [Number(branch.revenue) || 0, Number(branch.totalExpenses) || 0]),
   );
-  const chartBranches = branchPerformance.slice(0, 7);
+  const chartBranches = branchPerformance;
   const totalBreakdown = expenseBreakdown.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   let runningPercent = 0;
   const donutGradient = totalBreakdown > 0
@@ -276,6 +278,13 @@ export const FinanceOverviewView = () => {
     try {
       const rows = [
         ['Branch', 'Revenue', 'Expenses', 'Net profit', 'Receivables'],
+        ...(isAllBranches ? [[
+          'All branches total',
+          sales,
+          expenses,
+          netProfit,
+          receivables,
+        ]] : []),
         ...branchPerformance.map((branch) => [
           branch.branchId ? (branchNames.get(branch.branchId) || 'Branch') : 'Unassigned',
           branch.revenue || 0,
@@ -299,11 +308,44 @@ export const FinanceOverviewView = () => {
 
   return (
     <main className="mx-auto w-full max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
-      <header className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
-        <div>
-          <p className="text-sm font-semibold text-blue-700">Finance</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Finance Overview</h1>
-          <p className="mt-2 text-sm text-slate-500">A clear view of business performance, cash flow and recent activity.</p>
+      <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-blue-800 p-6 text-white shadow-lg shadow-blue-950/10 sm:p-8">
+        <div className="flex flex-col justify-between gap-6 xl:flex-row xl:items-center">
+          <div>
+            <p className="text-sm font-semibold tracking-wide text-blue-200">FINANCE · DASHBOARD</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Finance Overview</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100/80">Your consolidated view of revenue, expenses, branch performance and recent activity.</p>
+            <span className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-50">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              {isAllBranches ? 'All branches · consolidated totals' : (branchNames.get(branchId) || 'Selected branch')}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={refreshDashboard}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition hover:bg-white/15"
+            >
+              <RefreshCw size={16} aria-hidden="true" /> Refresh
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={!dashboard || isExporting}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-blue-900 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={16} aria-hidden="true" /> Export report
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <section aria-label="Dashboard filters" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Report filters</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Choose a company, branch and reporting period.</p>
+          </div>
+          {isLoading && dashboard && <span className="text-xs font-medium text-blue-700">Updating dashboard…</span>}
         </div>
         <div className="flex flex-wrap items-end gap-3">
           {!preferredCompanyId && companies.length > 1 && (
@@ -314,6 +356,7 @@ export const FinanceOverviewView = () => {
                 onChange={(event) => {
                   setIsLoading(true);
                   setCompanyId(event.target.value);
+                  setBranchId(ALL_BRANCHES);
                 }}
                 className="h-10 min-w-44 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
@@ -331,7 +374,7 @@ export const FinanceOverviewView = () => {
               onChange={(event) => changeBranch(event.target.value)}
               className="h-10 min-w-44 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             >
-              <option value="">All branches</option>
+              <option value={ALL_BRANCHES}>All branches</option>
               {branches.map((branch) => (
                 <option key={getId(branch)} value={getId(branch)}>{branch.branchName || branch.name || 'Branch'}</option>
               ))}
@@ -363,23 +406,8 @@ export const FinanceOverviewView = () => {
               />
             </span>
           </label>
-          <button
-            type="button"
-            onClick={refreshDashboard}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            <RefreshCw size={16} aria-hidden="true" /> Refresh
-          </button>
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={!dashboard || isExporting}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download size={16} aria-hidden="true" /> Export report
-          </button>
         </div>
-      </header>
+      </section>
 
       {branchError && (
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -406,11 +434,13 @@ export const FinanceOverviewView = () => {
         </div>
       ) : dashboard && (
         <>
-          <section aria-label="Finance summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section aria-label="Finance summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <StatCard title="Total revenue" value={formatCurrency(sales)} caption={`${stats.sales?.count || 0} sales invoices in this period`} icon={CircleDollarSign} tone="blue" />
+            <StatCard title="Payments received" value={formatCurrency(received)} caption="Collected against sales invoices" icon={ArrowDownRight} tone="green" />
             <StatCard title="Total expenses" value={formatCurrency(expenses)} caption="Purchases, operating expenses and payroll" icon={ReceiptText} tone="violet" />
             <StatCard title="Net profit" value={formatCurrency(netProfit)} caption="Revenue less purchases, expenses and salaries" icon={ChartNoAxesCombined} tone={netProfit < 0 ? 'amber' : 'green'} />
-            <StatCard title="Pending receivables" value={formatCurrency(receivables)} caption={`${formatCurrency(received)} received against invoices`} icon={Wallet} tone="amber" />
+            <StatCard title="Pending receivables" value={formatCurrency(receivables)} caption="Outstanding customer invoices" icon={Wallet} tone="amber" />
+            <StatCard title="Cash & bank balance" value={formatCurrency(stats.liquidBalance)} caption={`Cash ${formatCurrency(stats.cashBalance)} · Bank ${formatCurrency(stats.bankBalance)}`} icon={Banknote} tone="blue" />
           </section>
 
           <section className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.8fr)]">
@@ -418,10 +448,10 @@ export const FinanceOverviewView = () => {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Branch performance</h2>
-                  <p className="mt-1 text-sm text-slate-500">Revenue compared with total outgoing by branch</p>
+                  <p className="mt-1 text-sm text-slate-500">{isAllBranches ? 'Revenue compared with outgoing across all branches' : 'Revenue compared with outgoing for this branch'}</p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  {chartBranches.length} {chartBranches.length === 1 ? 'branch' : 'branches'}
+                  {branchPerformance.length} {branchPerformance.length === 1 ? 'branch' : 'branches'}
                 </span>
               </div>
               <div className="mt-6 flex flex-wrap gap-4 text-xs font-medium text-slate-500">
@@ -494,14 +524,14 @@ export const FinanceOverviewView = () => {
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Branch summary</h2>
-                  <p className="mt-1 text-sm text-slate-500">Performance for the selected period</p>
+                  <p className="mt-1 text-sm text-slate-500">{isAllBranches ? 'Branch-wise results with consolidated company totals' : 'Results for the selected branch and period'}</p>
                 </div>
                 <ArrowUpRight size={18} className="text-emerald-600" aria-hidden="true" />
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[540px] text-left text-sm">
+                <table className="w-full min-w-[680px] text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                    <tr><th className="px-5 py-3 font-semibold">Branch</th><th className="px-4 py-3 text-right font-semibold">Revenue</th><th className="px-4 py-3 text-right font-semibold">Expenses</th><th className="px-5 py-3 text-right font-semibold">Net profit</th></tr>
+                  <tr><th className="px-5 py-3 font-semibold">Branch</th><th className="px-4 py-3 text-right font-semibold">Revenue</th><th className="px-4 py-3 text-right font-semibold">Expenses</th><th className="px-4 py-3 text-right font-semibold">Receivables</th><th className="px-5 py-3 text-right font-semibold">Net profit</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {branchPerformance.length ? branchPerformance.map((branch) => (
@@ -509,10 +539,20 @@ export const FinanceOverviewView = () => {
                         <td className="px-5 py-4 font-semibold text-slate-900">{branch.branchId ? (branchNames.get(branch.branchId) || 'Branch') : 'Unassigned'}</td>
                         <td className="px-4 py-4 text-right tabular-nums">{formatCurrency(branch.revenue)}</td>
                         <td className="px-4 py-4 text-right tabular-nums">{formatCurrency(branch.totalExpenses)}</td>
+                        <td className="px-4 py-4 text-right tabular-nums">{formatCurrency(branch.receivables)}</td>
                         <td className={`px-5 py-4 text-right font-semibold tabular-nums ${branch.netProfit < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{formatCurrency(branch.netProfit)}</td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="4" className="px-5 py-12 text-center text-sm text-slate-500">No branch totals available for this period.</td></tr>
+                      <tr><td colSpan="5" className="px-5 py-12 text-center text-sm text-slate-500">No branch totals available for this period.</td></tr>
+                    )}
+                    {isAllBranches && (
+                      <tr className="border-t-2 border-blue-100 bg-blue-50/70 font-bold text-slate-900">
+                        <td className="px-5 py-4">All branches total</td>
+                        <td className="px-4 py-4 text-right tabular-nums">{formatCurrency(sales)}</td>
+                        <td className="px-4 py-4 text-right tabular-nums">{formatCurrency(expenses)}</td>
+                        <td className="px-4 py-4 text-right tabular-nums">{formatCurrency(receivables)}</td>
+                        <td className={`px-5 py-4 text-right tabular-nums ${netProfit < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{formatCurrency(netProfit)}</td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
