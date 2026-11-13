@@ -1,9 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Building2,
   CalendarDays,
   CircleAlert,
   Coins,
+  Download,
+  Landmark,
+  LoaderCircle,
   Plus,
   RotateCw,
   Search,
@@ -12,6 +15,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios.js';
 import { Button } from '../common/Button.jsx';
+import { Modal } from '../common/Modal.jsx';
 import { showToast } from '../common/Toast.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 
@@ -59,6 +63,10 @@ const formatCurrency = (value) => new Intl.NumberFormat(undefined, {
   currency: 'INR',
   maximumFractionDigits: 2,
 }).format(Number(value) || 0);
+const formatLedgerBalance = (value) => {
+  const balance = Number(value) || 0;
+  return `${formatCurrency(Math.abs(balance))} ${balance < 0 ? 'CR' : 'DR'}`;
+};
 const formatDate = (value) => {
   if (!value) return '—';
   const date = new Date(value);
@@ -101,10 +109,18 @@ export const ExpensesManagementView = () => {
   const [isLoadingExpenses, setIsLoadingExpenses] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isLedgerOpen, setIsLedgerOpen] = useState(false);
+  const [ledgerAccountId, setLedgerAccountId] = useState('');
+  const [ledgerFrom, setLedgerFrom] = useState('');
+  const [ledgerTo, setLedgerTo] = useState('');
+  const [ledgerData, setLedgerData] = useState(null);
+  const [isLoadingLedger, setIsLoadingLedger] = useState(false);
+  const [ledgerError, setLedgerError] = useState('');
   const [loadError, setLoadError] = useState('');
   const [setupError, setSetupError] = useState('');
   const [formError, setFormError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const ledgerRequestRef = useRef(0);
 
   const activeAccess = user?.companyAccess?.find((access) => (
     access?.isActive && getId(access.companyId) === companyId
@@ -239,8 +255,102 @@ export const ExpensesManagementView = () => {
     });
   }, [expenses, search, fromDate, toDate]);
   const pageTotal = visibleExpenses.reduce((sum, expense) => sum + Number(expense.totalAmount || 0), 0);
+  const ledgerEntries = Array.isArray(ledgerData?.entries) ? ledgerData.entries : [];
+  const ledgerTotals = ledgerEntries.reduce((totals, entry) => ({
+    debit: totals.debit + (Number(entry.debit) || 0),
+    credit: totals.credit + (Number(entry.credit) || 0),
+  }), { debit: 0, credit: 0 });
+
+  const loadLedger = async (accountId, from = ledgerFrom, to = ledgerTo) => {
+    if (!accountId) {
+      setLedgerError('Select a bank or cash account to view its ledger.');
+      return;
+    }
+    const requestId = ++ledgerRequestRef.current;
+    setIsLoadingLedger(true);
+    setLedgerError('');
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    try {
+      const suffix = params.toString() ? `?${params.toString()}` : '';
+      const response = await api.get(`/api/bank-account/${encodeURIComponent(accountId)}/ledger${suffix}`);
+      if (requestId !== ledgerRequestRef.current) return;
+      if (response.data?.success === false || !response.data?.data) {
+        throw new Error(response.data?.message || 'Could not load the bank ledger.');
+      }
+      setLedgerData(response.data.data);
+    } catch (error) {
+      if (requestId === ledgerRequestRef.current) {
+        setLedgerData(null);
+        setLedgerError(getErrorMessage(error, 'Could not load the bank ledger.'));
+      }
+    } finally {
+      if (requestId === ledgerRequestRef.current) setIsLoadingLedger(false);
+    }
+  };
+
+  const openLedger = () => {
+    const account = paymentAccounts.find((item) => ['Savings', 'Current'].includes(item.accountType)) ||
+      paymentAccounts[0];
+    setLedgerAccountId(getId(account));
+    setLedgerFrom('');
+    setLedgerTo('');
+    setLedgerData(null);
+    setLedgerError('');
+    setIsLedgerOpen(true);
+    if (account) loadLedger(getId(account), '', '');
+  };
+
+  const closeLedger = () => {
+    ledgerRequestRef.current += 1;
+    setIsLedgerOpen(false);
+    setIsLoadingLedger(false);
+    setLedgerError('');
+  };
+
+  const handleLedgerSearch = (event) => {
+    event.preventDefault();
+    if (ledgerFrom && ledgerTo && ledgerFrom > ledgerTo) {
+      setLedgerError('From date must be on or before the To date.');
+      return;
+    }
+    loadLedger(ledgerAccountId, ledgerFrom, ledgerTo);
+  };
+
+  const exportLedger = () => {
+    if (!ledgerData) return;
+    const account = paymentAccounts.find((item) => getId(item) === ledgerAccountId);
+    const rows = [
+      ['Account', account?.accountName || ledgerData.account?.name || 'Bank / cash account'],
+      ['Opening balance', formatLedgerBalance(ledgerData.openingBalance)],
+      ['Money in', formatCurrency(ledgerTotals.debit)],
+      ['Money out', formatCurrency(ledgerTotals.credit)],
+      ['Closing balance', formatLedgerBalance(ledgerData.closingBalance)],
+      [],
+      ['Date', 'Description', 'Reference', 'Money in (Debit)', 'Money out (Credit)', 'Running balance'],
+      ...ledgerEntries.map((entry) => [
+        formatDate(entry.date),
+        entry.narration || entry.remarks || '',
+        entry.reference || '',
+        Number(entry.debit) || 0,
+        Number(entry.credit) || 0,
+        `${formatCurrency(Math.abs(Number(entry.runningBalance) || 0))} ${entry.balanceType || ''}`.trim(),
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+    const file = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    const accountName = (account?.accountName || 'bank-account').replace(/[^a-z0-9-]+/gi, '-');
+    link.href = url;
+    link.download = `${accountName}-ledger.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const changeCompany = (nextCompanyId) => {
+    closeLedger();
     setCompanyId(nextCompanyId);
     setBranches([]);
     setBranchId('');
@@ -353,7 +463,7 @@ export const ExpensesManagementView = () => {
       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className="font-medium text-slate-600">Expense &amp; Payroll</span><span aria-hidden="true">›</span><span className="font-semibold text-slate-800">Expenses</span></div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3"><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700"><Coins className="h-7 w-7" /></div><div><h1 className="text-2xl font-bold tracking-tight text-slate-900">Expenses</h1><p className="mt-1 text-sm text-slate-500">Record operating expenses and post their accounting entries.</p></div></div>
-        <div className="flex items-center gap-2"><Button variant="outline" leftIcon={RotateCw} onClick={refreshExpenses} isDisabled={!companyId}>Refresh</Button><Button leftIcon={Plus} onClick={openCreateForm} className="bg-cyan-700 hover:bg-cyan-800 focus:ring-cyan-500/30" isDisabled={!companyId || !branchId || !financialYears.length || !paymentAccounts.length || isLoadingSetup}>Record Expense</Button></div>
+        <div className="flex items-center gap-2"><Button variant="outline" leftIcon={RotateCw} onClick={refreshExpenses} isDisabled={!companyId}>Refresh</Button><Button variant="outline" leftIcon={Landmark} onClick={openLedger} isDisabled={!paymentAccounts.length || isLoadingSetup}>Bank Ledger</Button><Button leftIcon={Plus} onClick={openCreateForm} className="bg-cyan-700 hover:bg-cyan-800 focus:ring-cyan-500/30" isDisabled={!companyId || !branchId || !financialYears.length || !paymentAccounts.length || isLoadingSetup}>Record Expense</Button></div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -415,6 +525,88 @@ export const ExpensesManagementView = () => {
           </form>
         </aside>
       </div>}
+
+      <Modal
+        isOpen={isLedgerOpen}
+        onClose={closeLedger}
+        title="Bank / cash ledger"
+        subtitle={ledgerData?.account?.name || 'View account statement and running balance'}
+        size="full"
+        closeOnBackdrop={!isLoadingLedger}
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={closeLedger}>Close</Button>
+            <Button type="button" leftIcon={Download} onClick={exportLedger} isDisabled={!ledgerData}>Export CSV</Button>
+          </>
+        )}
+      >
+        <form onSubmit={handleLedgerSearch} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_170px_170px_auto]">
+          <label className="grid gap-1 text-[11px] font-medium text-slate-600">
+            Bank / cash account
+            <select className={CONTROL_CLASS} value={ledgerAccountId} onChange={(event) => { setLedgerAccountId(event.target.value); setLedgerData(null); setLedgerError(''); }} disabled={isLoadingLedger}>
+              <option value="">Select account</option>
+              {paymentAccounts.map((account) => <option key={getId(account)} value={getId(account)}>{account.accountName} · {account.accountType}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-[11px] font-medium text-slate-600">
+            From date
+            <input className={CONTROL_CLASS} type="date" value={ledgerFrom} max={ledgerTo || undefined} onChange={(event) => { setLedgerFrom(event.target.value); setLedgerData(null); }} disabled={isLoadingLedger} />
+          </label>
+          <label className="grid gap-1 text-[11px] font-medium text-slate-600">
+            To date
+            <input className={CONTROL_CLASS} type="date" value={ledgerTo} min={ledgerFrom || undefined} onChange={(event) => { setLedgerTo(event.target.value); setLedgerData(null); }} disabled={isLoadingLedger} />
+          </label>
+          <Button type="submit" leftIcon={Search} isLoading={isLoadingLedger} isDisabled={!ledgerAccountId} className="self-end">View statement</Button>
+        </form>
+
+        {ledgerError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{ledgerError}</p>}
+        {isLoadingLedger ? (
+          <div className="grid min-h-40 place-items-center text-sm text-slate-500"><span className="inline-flex items-center gap-2"><LoaderCircle className="h-4 w-4 animate-spin" />Loading account ledger…</span></div>
+        ) : ledgerData ? (
+          <>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['Opening balance', formatLedgerBalance(ledgerData.openingBalance)],
+                ['Money in', formatCurrency(ledgerTotals.debit)],
+                ['Money out', formatCurrency(ledgerTotals.credit)],
+                ['Closing balance', formatLedgerBalance(ledgerData.closingBalance)],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-[11px] font-medium text-slate-500">{label}</p>
+                  <p className="mt-1 text-sm font-bold tabular-nums text-slate-900">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px] text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    <tr><th className="px-3 py-2.5">Date</th><th className="px-3 py-2.5">Particulars</th><th className="px-3 py-2.5">Reference</th><th className="px-3 py-2.5 text-right">Money in (Dr)</th><th className="px-3 py-2.5 text-right">Money out (Cr)</th><th className="px-3 py-2.5 text-right">Balance</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {ledgerEntries.length ? ledgerEntries.map((entry, index) => (
+                      <tr key={`${entry.entryId || 'entry'}-${index}`} className="hover:bg-slate-50/70">
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(entry.date)}</td>
+                        <td className="max-w-[320px] px-3 py-2.5"><p className="truncate font-medium text-slate-800">{entry.narration || entry.remarks || 'Transaction'}</p><p className="mt-0.5 text-[10px] capitalize text-slate-400">{String(entry.source || '').replaceAll('-', ' ')}</p></td>
+                        <td className="px-3 py-2.5 text-slate-600">{entry.reference || '—'}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-emerald-700">{Number(entry.debit) ? formatCurrency(entry.debit) : '—'}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-rose-700">{Number(entry.credit) ? formatCurrency(entry.credit) : '—'}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900">{formatCurrency(Math.abs(Number(entry.runningBalance) || 0))} {entry.balanceType || ''}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan="6" className="px-3 py-10 text-center text-slate-500">No transactions found for this account and date range.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="grid min-h-36 place-items-center text-center text-xs text-slate-500">
+            Select an account and choose View statement to load its ledger.
+          </div>
+        )}
+      </Modal>
     </section>
   );
 };
