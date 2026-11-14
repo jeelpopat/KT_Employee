@@ -7,9 +7,11 @@ import {
   Download,
   Landmark,
   LoaderCircle,
+  Pencil,
   Plus,
   RotateCw,
   Search,
+  Trash2,
   Wallet,
   X,
 } from 'lucide-react';
@@ -17,6 +19,7 @@ import api from '../../api/axios.js';
 import { Button } from '../common/Button.jsx';
 import { Modal } from '../common/Modal.jsx';
 import { showToast } from '../common/Toast.jsx';
+import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 
 const CONTROL_CLASS = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100';
@@ -87,6 +90,7 @@ const paymentModeFor = (account) => {
 
 export const ExpensesManagementView = () => {
   const { user } = useApp();
+  const { confirm, confirmationDialog } = useConfirm();
   const preferredCompanyId = getUserCompanyId(user);
   const [companyId, setCompanyId] = useState(preferredCompanyId);
   const [companies, setCompanies] = useState([]);
@@ -103,11 +107,13 @@ export const ExpensesManagementView = () => {
   const [toDate, setToDate] = useState('');
   const [search, setSearch] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
+  const [editingExpense, setEditingExpense] = useState(null);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(!preferredCompanyId);
   const [isLoadingBranches, setIsLoadingBranches] = useState(Boolean(preferredCompanyId));
   const [isLoadingSetup, setIsLoadingSetup] = useState(false);
   const [isLoadingExpenses, setIsLoadingExpenses] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingExpenseId, setDeletingExpenseId] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isLedgerOpen, setIsLedgerOpen] = useState(false);
   const [ledgerAccountId, setLedgerAccountId] = useState('');
@@ -128,6 +134,9 @@ export const ExpensesManagementView = () => {
   const userBranchId = getId(activeAccess?.branchId) ||
     (companyId === preferredCompanyId ? getId(user?.branchId) : '');
   const role = String(activeAccess?.role || user?.role || '').trim().toLowerCase().replace(/_/g, ' ');
+  const normalizedRole = role.replace(/[\s-]+/g, '');
+  const canEditExpenses = ['admin', 'superadmin', 'ca', 'accountant'].includes(normalizedRole);
+  const canDeleteExpenses = ['admin', 'superadmin', 'ca'].includes(normalizedRole);
   const canSelectAllBranches = ['admin', 'super admin', 'superadmin'].includes(role) ||
     user?.companyCreated === true;
   const selectableBranches = branches.filter((branch) => (
@@ -239,7 +248,13 @@ export const ExpensesManagementView = () => {
 
   const selectedAccount = paymentAccounts.find((account) => getId(account) === form.bankAccountId);
   const selectedFinancialYear = financialYears.find((year) => getId(year) === form.financialYearId);
-  const selectedTax = taxRates.find((tax) => getId(tax) === form.taxRateId);
+  const editingTaxRate = editingExpense?.taxRate && getId(editingExpense.taxRate) === form.taxRateId
+    ? editingExpense.taxRate
+    : null;
+  const taxRateOptions = editingTaxRate && !taxRates.some((tax) => getId(tax) === form.taxRateId)
+    ? [...taxRates, editingTaxRate]
+    : taxRates;
+  const selectedTax = taxRates.find((tax) => getId(tax) === form.taxRateId) || editingTaxRate;
   const previousCategories = useMemo(() => {
     const seen = new Set();
     return expenses.reduce((categories, expense) => {
@@ -381,7 +396,28 @@ export const ExpensesManagementView = () => {
   const openCreateForm = () => {
     const today = new Date().toISOString().slice(0, 10);
     const year = financialYears.find((item) => today >= dateInputValue(item.startDate) && today <= dateInputValue(item.endDate)) || financialYears[0];
+    setEditingExpense(null);
     setForm({ ...EMPTY_FORM, financialYearId: getId(year), bankAccountId: getId(paymentAccounts[0]) });
+    setFormError('');
+    setIsFormOpen(true);
+  };
+
+  const openEditForm = (expense) => {
+    setEditingExpense(expense);
+    setForm({
+      ...EMPTY_FORM,
+      financialYearId: getId(expense.financialYearId),
+      expenseDate: dateInputValue(expense.expenseDate),
+      category: expense.category || '',
+      description: expense.description || '',
+      amount: String(expense.amount ?? ''),
+      taxRateId: getId(expense.taxRateId),
+      vendorId: getId(expense.vendorId),
+      bankAccountId: getId(expense.bankAccountId),
+      expenseAccountId: getId(expense.expenseAccountId),
+      reference: expense.reference || '',
+      notes: expense.notes || '',
+    });
     setFormError('');
     setIsFormOpen(true);
   };
@@ -389,6 +425,7 @@ export const ExpensesManagementView = () => {
   const closeForm = () => {
     if (isSaving) return;
     setIsFormOpen(false);
+    setEditingExpense(null);
     setFormError('');
   };
 
@@ -412,7 +449,10 @@ export const ExpensesManagementView = () => {
       setFormError('Expense total must be greater than zero.');
       return;
     }
-    const availableBalance = Number(selectedAccount.currentBalance ?? selectedAccount.balance);
+    const samePaymentAccount = editingExpense &&
+      getId(editingExpense.bankAccountId) === form.bankAccountId;
+    const availableBalance = Number(selectedAccount.currentBalance ?? selectedAccount.balance) +
+      (samePaymentAccount ? Number(editingExpense.totalAmount) || 0 : 0);
     if (Number.isFinite(availableBalance) && totalAmount - availableBalance > 0.01) {
       setFormError(`Insufficient balance in ${selectedAccount.accountName}. Available: ${formatCurrency(availableBalance)}.`);
       return;
@@ -420,7 +460,7 @@ export const ExpensesManagementView = () => {
 
     setIsSaving(true);
     try {
-      const response = await api.post('/api/expense', {
+      const payload = {
         companyId,
         branchId,
         financialYearId: form.financialYearId,
@@ -437,19 +477,54 @@ export const ExpensesManagementView = () => {
         vendorId: form.vendorId || null,
         reference: form.reference.trim(),
         notes: form.notes.trim(),
-      });
+      };
+      const response = editingExpense
+        ? await api.put(`/api/expense/${encodeURIComponent(getId(editingExpense))}`, payload)
+        : await api.post('/api/expense', payload);
       if (response.data?.success === false || !response.data?.data) {
-        throw new Error(response.data?.message || 'Expense was not recorded.');
+        throw new Error(response.data?.message || `Expense was not ${editingExpense ? 'updated' : 'recorded'}.`);
       }
-      showToast('Expense recorded and journal posted.', 'success');
+      showToast(
+        editingExpense
+          ? 'Expense updated. The previous journal entry was reversed.'
+          : 'Expense recorded and journal posted.',
+        'success',
+      );
       setIsFormOpen(false);
+      setEditingExpense(null);
       setReloadKey((value) => value + 1);
     } catch (error) {
-      const message = getErrorMessage(error, 'Could not record expense.');
+      const message = getErrorMessage(error, `Could not ${editingExpense ? 'update' : 'record'} expense.`);
       setFormError(message);
       showToast(message, 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteExpense = async (expense) => {
+    const expenseId = getId(expense);
+    const confirmed = await confirm({
+      title: 'Delete this expense?',
+      message: `This will remove "${expense.category || expense.description}" from the expense list and reverse its accounting journal. This action cannot be undone.`,
+      confirmLabel: 'Delete expense',
+      danger: true,
+    });
+    if (!confirmed) return;
+
+    setDeletingExpenseId(expenseId);
+    try {
+      const params = new URLSearchParams({ companyId, branchId });
+      const response = await api.delete(`/api/expense/${encodeURIComponent(expenseId)}?${params.toString()}`);
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message || 'Expense was not deleted.');
+      }
+      showToast(response.data?.message || 'Expense deleted and accounting journal reversed.', 'success');
+      setReloadKey((value) => value + 1);
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Could not delete expense.'), 'error');
+    } finally {
+      setDeletingExpenseId('');
     }
   };
 
@@ -500,11 +575,15 @@ export const ExpensesManagementView = () => {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto"><table className="w-full min-w-[880px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Category / Description</th><th className="px-4 py-3">Vendor</th><th className="px-4 py-3">Paid From</th><th className="px-4 py-3 text-right">Amount</th><th className="px-4 py-3 text-right">Tax</th><th className="px-4 py-3 text-right">Total</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">{isLoadingExpenses ? <tr><td colSpan="7" className="px-4 py-12 text-center text-sm text-slate-500">Loading expenses…</td></tr>
-            : visibleExpenses.length === 0 ? <tr><td colSpan="7" className="px-4 py-14 text-center"><Wallet className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm font-medium text-slate-700">No expenses found</p><p className="mt-1 text-xs text-slate-500">Record an expense to see it in this register.</p></td></tr>
-              : visibleExpenses.map((expense) => <tr key={getId(expense)} className="transition-colors hover:bg-cyan-50/30"><td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">{formatDate(expense.expenseDate)}</td><td className="max-w-[260px] px-4 py-3"><p className="truncate font-semibold text-slate-800">{expense.category}</p><p className="mt-0.5 truncate text-xs text-slate-500">{expense.description}</p></td><td className="px-4 py-3 text-xs text-slate-600">{expense.vendorName || '—'}</td><td className="px-4 py-3 text-xs text-slate-600">{expense.bankAccountName || '—'}</td><td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatCurrency(expense.amount)}</td><td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatCurrency(expense.taxAmount)}</td><td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">{formatCurrency(expense.totalAmount)}</td></tr>)}</tbody>
+        <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs font-semibold text-slate-600"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Category / Description</th><th className="px-4 py-3">Vendor</th><th className="px-4 py-3">Paid From</th><th className="px-4 py-3 text-right">Amount</th><th className="px-4 py-3 text-right">Tax</th><th className="px-4 py-3 text-right">Total</th>{(canEditExpenses || canDeleteExpenses) && <th className="px-4 py-3 text-right">Actions</th>}</tr></thead>
+          <tbody className="divide-y divide-slate-100">{isLoadingExpenses ? <tr><td colSpan={canEditExpenses || canDeleteExpenses ? 8 : 7} className="px-4 py-12 text-center text-sm text-slate-500">Loading expenses…</td></tr>
+            : visibleExpenses.length === 0 ? <tr><td colSpan={canEditExpenses || canDeleteExpenses ? 8 : 7} className="px-4 py-14 text-center"><Wallet className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm font-medium text-slate-700">No expenses found</p><p className="mt-1 text-xs text-slate-500">Record an expense to see it in this register.</p></td></tr>
+              : visibleExpenses.map((expense) => {
+                const expenseId = getId(expense);
+                const canReverse = financialYears.some((year) => getId(year) === getId(expense.financialYearId));
+                return <tr key={expenseId} className="transition-colors hover:bg-cyan-50/30"><td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">{formatDate(expense.expenseDate)}</td><td className="max-w-[260px] px-4 py-3"><p className="truncate font-semibold text-slate-800">{expense.category}</p><p className="mt-0.5 truncate text-xs text-slate-500">{expense.description}</p></td><td className="px-4 py-3 text-xs text-slate-600">{expense.vendorName || '—'}</td><td className="px-4 py-3 text-xs text-slate-600">{expense.bankAccountName || '—'}</td><td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatCurrency(expense.amount)}</td><td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatCurrency(expense.taxAmount)}</td><td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">{formatCurrency(expense.totalAmount)}</td>{(canEditExpenses || canDeleteExpenses) && <td className="px-4 py-3"><div className="flex justify-end gap-1.5">{canEditExpenses && <Button variant="outline" size="sm" leftIcon={Pencil} onClick={() => openEditForm(expense)} isDisabled={!canReverse || Boolean(deletingExpenseId)} title={canReverse ? 'Edit expense' : 'This expense belongs to a locked or unavailable financial year'}>Edit</Button>}{canDeleteExpenses && <Button variant="danger" size="sm" leftIcon={Trash2} onClick={() => handleDeleteExpense(expense)} isLoading={deletingExpenseId === expenseId} isDisabled={!canReverse || (Boolean(deletingExpenseId) && deletingExpenseId !== expenseId)} title={canReverse ? 'Delete and reverse this expense' : 'This expense belongs to a locked or unavailable financial year'}>Delete</Button>}</div></td>}</tr>;
+              })}</tbody>
         </table></div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-xs text-slate-500"><span>{visibleExpenses.length} expenses · Total {formatCurrency(pageTotal)}</span><span>Expenses are posted immediately to the selected bank/cash account.</span></div>
       </div>
@@ -512,7 +591,7 @@ export const ExpensesManagementView = () => {
       {isFormOpen && <div className="fixed inset-x-0 bottom-0 top-[64px] z-[70]">
         <button type="button" className="absolute inset-0 h-full w-full cursor-default bg-slate-950/25" aria-label="Close expense form" onClick={closeForm} />
         <aside role="dialog" aria-modal="true" aria-labelledby="create-expense-title" className="absolute inset-y-0 right-0 flex w-full max-w-[620px] flex-col border-l border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700"><Coins className="h-4 w-4" /></div><div><h2 id="create-expense-title" className="text-base font-bold text-slate-900">Record Expense</h2><p className="mt-0.5 text-[11px] text-slate-500">Payment is posted from the selected account</p></div></div><button type="button" onClick={closeForm} disabled={isSaving} aria-label="Close expense form" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700"><Coins className="h-4 w-4" /></div><div><h2 id="create-expense-title" className="text-base font-bold text-slate-900">{editingExpense ? 'Edit Expense' : 'Record Expense'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{editingExpense ? 'Changes will reverse the previous journal and post an updated entry.' : 'Payment is posted from the selected account'}</p></div></div><button type="button" onClick={closeForm} disabled={isSaving} aria-label="Close expense form" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
           <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -520,7 +599,7 @@ export const ExpensesManagementView = () => {
                 <label><span className={LABEL_CLASS}>Financial Year <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={form.financialYearId} onChange={(event) => setForm((previous) => ({ ...previous, financialYearId: event.target.value }))} required disabled={isSaving}><option value="">Select open financial year</option>{financialYears.map((year) => <option key={getId(year)} value={getId(year)}>{year.yearLabel}</option>)}</select></label>
                 <label><span className={LABEL_CLASS}>Vendor / Supplier</span><select className={CONTROL_CLASS} value={form.vendorId} onChange={(event) => setForm((previous) => ({ ...previous, vendorId: event.target.value }))} disabled={isSaving}><option value="">No vendor</option>{suppliers.map((supplier) => <option key={getId(supplier)} value={getId(supplier)}>{supplier.name}</option>)}</select></label>
                 <label><span className={LABEL_CLASS}>Expense Amount <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm((previous) => ({ ...previous, amount: event.target.value }))} required disabled={isSaving} /></label>
-                               <label><span className={LABEL_CLASS}>Tax Rate</span><select className={CONTROL_CLASS} value={form.taxRateId} onChange={(event) => setForm((previous) => ({ ...previous, taxRateId: event.target.value }))} disabled={isSaving}><option value="">No tax</option>{taxRates.map((tax) => <option key={getId(tax)} value={getId(tax)}>{tax.name} ({Number(tax.ratePercent) || 0}%)</option>)}</select></label>
+                               <label><span className={LABEL_CLASS}>Tax Rate</span><select className={CONTROL_CLASS} value={form.taxRateId} onChange={(event) => setForm((previous) => ({ ...previous, taxRateId: event.target.value }))} disabled={isSaving}><option value="">No tax</option>{taxRateOptions.map((tax) => <option key={getId(tax)} value={getId(tax)}>{tax.name} ({Number(tax.ratePercent) || 0}%){tax.isActive === false ? ' · inactive' : ''}</option>)}</select></label>
 
                 <div><span className={LABEL_CLASS}>Total Including Tax</span><p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold tabular-nums text-slate-900">{formatCurrency(totalAmount)}</p></div>
 
@@ -540,7 +619,7 @@ export const ExpensesManagementView = () => {
               {formError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />{formError}</p>}
               <p className="rounded-lg bg-cyan-50 px-3 py-2 text-xs text-cyan-800">The server verifies the selected account balance before saving and posts the expense journal automatically.</p>
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">{formatCurrency(totalAmount)} total</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeForm} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-cyan-700 hover:bg-cyan-800 focus:ring-cyan-500/30">Save Expense</Button></div></div>
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">{formatCurrency(totalAmount)} total</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeForm} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-cyan-700 hover:bg-cyan-800 focus:ring-cyan-500/30">{editingExpense ? 'Save Changes' : 'Save Expense'}</Button></div></div>
           </form>
         </aside>
       </div>}
@@ -626,6 +705,7 @@ export const ExpensesManagementView = () => {
           </div>
         )}
       </Modal>
+      {confirmationDialog}
     </section>
   );
 };
