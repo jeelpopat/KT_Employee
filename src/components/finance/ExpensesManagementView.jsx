@@ -240,6 +240,18 @@ export const ExpensesManagementView = () => {
   const selectedAccount = paymentAccounts.find((account) => getId(account) === form.bankAccountId);
   const selectedFinancialYear = financialYears.find((year) => getId(year) === form.financialYearId);
   const selectedTax = taxRates.find((tax) => getId(tax) === form.taxRateId);
+  const previousCategories = useMemo(() => {
+    const seen = new Set();
+    return expenses.reduce((categories, expense) => {
+      const category = String(expense.category || '').trim();
+      const normalizedCategory = category.toLowerCase();
+      if (category && !seen.has(normalizedCategory)) {
+        seen.add(normalizedCategory);
+        categories.push(category);
+      }
+      return categories;
+    }, []);
+  }, [expenses]);
   const amount = roundMoney(form.amount);
   const taxAmount = roundMoney(amount * (Number(selectedTax?.ratePercent) || 0) / 100);
   const totalAmount = roundMoney(amount + taxAmount);
@@ -506,15 +518,22 @@ export const ExpensesManagementView = () => {
               <div className="grid gap-3 sm:grid-cols-2">
                 <label><span className={LABEL_CLASS}>Expense Date <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} type="date" value={form.expenseDate} onChange={(event) => setForm((previous) => ({ ...previous, expenseDate: event.target.value }))} required disabled={isSaving} /></label>
                 <label><span className={LABEL_CLASS}>Financial Year <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={form.financialYearId} onChange={(event) => setForm((previous) => ({ ...previous, financialYearId: event.target.value }))} required disabled={isSaving}><option value="">Select open financial year</option>{financialYears.map((year) => <option key={getId(year)} value={getId(year)}>{year.yearLabel}</option>)}</select></label>
-                <label><span className={LABEL_CLASS}>Category <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} value={form.category} onChange={(event) => setForm((previous) => ({ ...previous, category: event.target.value }))} maxLength={100} placeholder="Travel, rent, utilities..." required disabled={isSaving} /></label>
                 <label><span className={LABEL_CLASS}>Vendor / Supplier</span><select className={CONTROL_CLASS} value={form.vendorId} onChange={(event) => setForm((previous) => ({ ...previous, vendorId: event.target.value }))} disabled={isSaving}><option value="">No vendor</option>{suppliers.map((supplier) => <option key={getId(supplier)} value={getId(supplier)}>{supplier.name}</option>)}</select></label>
-                <label className="sm:col-span-2"><span className={LABEL_CLASS}>Description <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} maxLength={500} required disabled={isSaving} /></label>
                 <label><span className={LABEL_CLASS}>Expense Amount <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm((previous) => ({ ...previous, amount: event.target.value }))} required disabled={isSaving} /></label>
-                <label><span className={LABEL_CLASS}>Tax Rate</span><select className={CONTROL_CLASS} value={form.taxRateId} onChange={(event) => setForm((previous) => ({ ...previous, taxRateId: event.target.value }))} disabled={isSaving}><option value="">No tax</option>{taxRates.map((tax) => <option key={getId(tax)} value={getId(tax)}>{tax.name} ({Number(tax.ratePercent) || 0}%)</option>)}</select></label>
+                               <label><span className={LABEL_CLASS}>Tax Rate</span><select className={CONTROL_CLASS} value={form.taxRateId} onChange={(event) => setForm((previous) => ({ ...previous, taxRateId: event.target.value }))} disabled={isSaving}><option value="">No tax</option>{taxRates.map((tax) => <option key={getId(tax)} value={getId(tax)}>{tax.name} ({Number(tax.ratePercent) || 0}%)</option>)}</select></label>
+
+                <div><span className={LABEL_CLASS}>Total Including Tax</span><p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold tabular-nums text-slate-900">{formatCurrency(totalAmount)}</p></div>
+
+                <label className="sm:col-span-2"><span className={LABEL_CLASS}>Category <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} value={form.category} onChange={(event) => setForm((previous) => ({ ...previous, category: event.target.value }))} maxLength={100} placeholder="Travel, rent, utilities..." required disabled={isSaving} />
+                  {previousCategories.length > 0 && <span className="mt-2 block text-[11px] text-slate-500">Previously used categories — click to reuse:</span>}
+                  {previousCategories.length > 0 && <div className="mt-1 flex max-h-20 flex-wrap gap-1.5 overflow-y-auto" aria-label="Previously used expense categories">
+                    {previousCategories.map((category) => <button key={category.toLowerCase()} type="button" className={`rounded-full border px-2.5 py-1 text-[11px] transition ${form.category.trim().toLowerCase() === category.toLowerCase() ? 'border-cyan-300 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-600 hover:border-cyan-300 hover:bg-cyan-50'}`} onClick={() => setForm((previous) => ({ ...previous, category }))} disabled={isSaving}>{category}</button>)}
+                  </div>}
+                </label>
+                <label className="sm:col-span-2"><span className={LABEL_CLASS}>Description <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} maxLength={500} required disabled={isSaving} /></label>
                 <label className="sm:col-span-2"><span className={LABEL_CLASS}>Pay From <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={form.bankAccountId} onChange={(event) => setForm((previous) => ({ ...previous, bankAccountId: event.target.value }))} required disabled={isSaving}><option value="">Select bank / cash account</option>{paymentAccounts.map((account) => <option key={getId(account)} value={getId(account)}>{account.accountName} · {account.accountType} · Available {formatCurrency(account.currentBalance ?? account.balance)}</option>)}</select>{selectedAccount && <span className="mt-1 block text-[11px] text-slate-500">Payment mode: {paymentModeFor(selectedAccount)} · Available balance: {formatCurrency(selectedAccount.currentBalance ?? selectedAccount.balance)}</span>}</label>
                 <label className="sm:col-span-2"><span className={LABEL_CLASS}>Expense Ledger</span><select className={CONTROL_CLASS} value={form.expenseAccountId} onChange={(event) => setForm((previous) => ({ ...previous, expenseAccountId: event.target.value }))} disabled={isSaving}><option value="">Auto-create / map from category</option>{expenseAccounts.map((account) => <option key={getId(account)} value={getId(account)}>{account.code} · {account.name}</option>)}</select></label>
                 <label><span className={LABEL_CLASS}>Reference</span><input className={CONTROL_CLASS} value={form.reference} onChange={(event) => setForm((previous) => ({ ...previous, reference: event.target.value }))} maxLength={200} disabled={isSaving} /></label>
-                <div><span className={LABEL_CLASS}>Total Including Tax</span><p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold tabular-nums text-slate-900">{formatCurrency(totalAmount)}</p></div>
                 <label className="sm:col-span-2"><span className={LABEL_CLASS}>Notes</span><textarea className={`${CONTROL_CLASS} min-h-20 resize-y`} value={form.notes} onChange={(event) => setForm((previous) => ({ ...previous, notes: event.target.value }))} maxLength={5000} disabled={isSaving} /></label>
               </div>
               {setupError && <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{setupError}</p>}
