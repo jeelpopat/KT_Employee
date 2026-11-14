@@ -37,6 +37,10 @@ const GSTReturnsManagementView = lazy(() => import('./GSTReturnsManagementView.j
   .then((module) => ({ default: module.GSTReturnsManagementView })));
 const FinanceSalariesManagementView = lazy(() => import('./FinanceSalariesManagementView.jsx')
   .then((module) => ({ default: module.FinanceSalariesManagementView })));
+const FinanceReportsView = lazy(() => import('./FinanceReportsView.jsx')
+  .then((module) => ({ default: module.FinanceReportsView })));
+const FinanceUserManagementView = lazy(() => import('./FinanceUserManagementView.jsx')
+  .then((module) => ({ default: module.FinanceUserManagementView })));
 
 const formatModuleTitle = (pathname) => {
   const moduleSlug = pathname.split('/').filter(Boolean).pop();
@@ -64,6 +68,9 @@ export const FinancePanel = () => {
   }
   if (pathname === '/finance/financial-year') {
     return <FinancialYearManagementView />;
+  }
+  if (pathname === '/finance/user-management') {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading User Management…</p>}><FinanceUserManagementView /></Suspense>;
   }
   if (pathname === '/finance/customers') {
     return <CustomersManagementView />;
@@ -130,6 +137,9 @@ export const FinancePanel = () => {
   }
   if (pathname === '/finance/notifications') {
     return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Notifications…</p>}><FinanceNotificationsView /></Suspense>;
+  }
+  if (pathname.startsWith('/finance/reports/')) {
+    return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Report…</p>}><FinanceReportsView key={pathname} /></Suspense>;
   }
   if (pathname === '/finance/audit-logs') {
     return <Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading Audit Logs…</p>}><AuditLogsView /></Suspense>;

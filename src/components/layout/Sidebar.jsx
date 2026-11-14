@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeftRight, Banknote, Bell, BookOpen, Building2, CalendarDays, CircleDollarSign,
-  FileMinus, FileText, GitBranch, Landmark, Package, Percent, Receipt,
-  ScrollText, ShoppingCart, Truck, UserRound, Users
+  FileMinus, FileText, GitBranch, HandCoins, Landmark, Package, Percent, Receipt,
+  ReceiptText, Scale, ScrollText, ShoppingCart, TrendingUp, Truck, UserRound, Users
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { tabToPath } from '../../utils/navigation.js';
@@ -675,55 +675,69 @@ export const Sidebar = ({ onSignOut }) => {
       items: [
         { tab: 'finance-customers', label: 'Customers', path: '/finance/customers', icon: UserRound },
         { tab: 'finance-suppliers', label: 'Suppliers', path: '/finance/suppliers', icon: Truck },
-        { tab: 'finance-products-services', label: 'Product & Service', path: '/finance/products-services', icon: Package },
+        { tab: 'finance-products-services', label: 'Products & Services', path: '/finance/products-services', icon: Package },
         { tab: 'finance-tax-master', label: 'Tax Master', path: '/finance/tax-master', icon: Percent },
-        { tab: 'finance-bank-cash-accounts', label: 'Bank & Cash Account', path: '/finance/bank-cash-accounts', icon: Landmark },
+        { tab: 'finance-bank-cash-accounts', label: 'Bank & Cash Accounts', path: '/finance/bank-cash-accounts', icon: Landmark },
         { tab: 'finance-account-transfer', label: 'Account Transfer', path: '/finance/account-transfer', icon: ArrowLeftRight },
-        { tab: 'finance-coa', label: 'Charts Of Account (COA)', path: '/finance/coa', icon: BookOpen },
+        { tab: 'finance-coa', label: 'Chart of Accounts (COA)', path: '/finance/coa', icon: BookOpen },
       ]
     },
     {
-      title: 'PURCHASE',
+      title: 'PURCHASE & PAYABLES',
       items: [
-        { tab: 'finance-purchase-orders', label: 'Purchase Order', path: '/finance/purchase-orders', icon: ShoppingCart },
-        { tab: 'finance-purchase-bills', label: 'Purchase Bill', path: '/finance/purchase-bills', icon: Receipt },
+        { tab: 'finance-purchase-orders', label: 'Purchase Orders', path: '/finance/purchase-orders', icon: ShoppingCart },
+        { tab: 'finance-purchase-bills', label: 'Purchase Bills', path: '/finance/purchase-bills', icon: Receipt },
+        { tab: 'finance-debit-notes', label: 'Debit Notes', path: '/finance/debit-notes', icon: FileMinus },
       ]
     },
     {
       title: 'SALES & RECEIVABLES',
       items: [
-        { tab: 'finance-sales-invoices', label: 'Sales Invoice', path: '/finance/sales-invoices', icon: FileText },
+        { tab: 'finance-sales-invoices', label: 'Sales Invoices', path: '/finance/sales-invoices', icon: FileText },
         { tab: 'finance-customer-payments', label: 'Customer Payments', path: '/finance/customer-payments', icon: Banknote },
-        { tab: 'finance-income', label: 'Income', path: '/finance/income', icon: CircleDollarSign },
+        { tab: 'finance-income', label: 'Other Income', path: '/finance/income', icon: CircleDollarSign },
         { tab: 'finance-credit-notes', label: 'Credit Notes', path: '/finance/credit-notes', icon: FileMinus },
       ]
     },
     {
-      title: 'LENDING',
+      title: 'LOANS & FINANCING',
       items: [
-        { tab: 'finance-lending', label: 'Lending', path: '/finance/lending', icon: Landmark },
+        { tab: 'finance-lending', label: 'Lending / Money Given', path: '/finance/lending', icon: HandCoins },
+        { tab: 'finance-loans', label: 'Borrowings / Loans Taken', path: '/finance/loans', icon: Landmark },
       ]
     },
     {
-      title: 'EXPENSE & PAYROLL',
+      title: 'EXPENSES & PAYROLL',
       items: [
         { tab: 'finance-expenses', label: 'Expenses', path: '/finance/expenses', icon: Receipt },
-        { tab: 'finance-salaries', label: 'Salaries', path: '/finance/salaries', icon: Banknote },
-        { tab: 'finance-fixed-assets', label: 'Fixed Assets', path: '/finance/fixed-assets', icon: Landmark },
+        { tab: 'finance-salaries', label: 'Salary & Payroll', path: '/finance/salaries', icon: Banknote },
       ]
     },
     {
-      title: 'ACCOUNTING',
+      title: 'ASSETS & DEPRECIATION',
+      items: [
+        { tab: 'finance-fixed-assets', label: 'Fixed Assets', path: '/finance/fixed-assets', icon: Building2 },
+      ]
+    },
+    {
+      title: 'ACCOUNTING & JOURNALS',
       items: [
         { tab: 'finance-journal-entries', label: 'Journal Entries', path: '/finance/journal-entries', icon: BookOpen },
-        { tab: 'finance-debit-notes', label: 'Debit Notes', path: '/finance/debit-notes', icon: FileMinus },
-        { tab: 'finance-loans', label: 'Borrowings', path: '/finance/loans', icon: Banknote },
       ]
     },
     {
       title: 'TAX & COMPLIANCE',
       items: [
         { tab: 'finance-gst-returns', label: 'GST Returns', path: '/finance/gst-returns', icon: FileText },
+      ]
+    },
+    {
+      title: 'REPORTS',
+      items: [
+        { tab: 'finance-profit-loss', label: 'Profit & Loss', path: '/finance/reports/profit-loss', icon: TrendingUp },
+        { tab: 'finance-balance-sheet', label: 'Balance Sheet', path: '/finance/reports/balance-sheet', icon: Scale },
+        { tab: 'finance-trial-balance', label: 'Trial Balance', path: '/finance/reports/trial-balance', icon: BookOpen },
+        { tab: 'finance-gst-report', label: 'GST Report', path: '/finance/reports/gst-report', icon: ReceiptText },
       ]
     },
     {
@@ -734,9 +748,9 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: 'ACCOUNT',
+      title: 'MY ACCOUNT',
       items: [
-        { tab: 'profile', label: 'Profile', icon: ProfileIcon },
+        { tab: 'profile', label: 'My Profile', icon: ProfileIcon },
       ]
     }
   ];
