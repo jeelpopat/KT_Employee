@@ -6,14 +6,17 @@ import {
   CircleDollarSign,
   Download,
   LoaderCircle,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
+  Trash2,
   Wallet,
   X,
 } from 'lucide-react';
 import api from '../../api/axios.js';
 import { Button } from '../common/Button.jsx';
+import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 
@@ -74,10 +77,13 @@ const accountTypesForMode = {
 
 export const IncomeManagementView = () => {
   const { user } = useApp();
+  const { confirm, confirmationDialog } = useConfirm();
   const preferredCompanyId = getUserCompanyId(user);
   const activeAccess = user?.companyAccess?.find((access) => access?.isActive && getId(access.companyId) === preferredCompanyId);
   const userBranchId = getId(activeAccess?.branchId) || getId(user?.branchId);
   const role = String(activeAccess?.role || user?.role || '').trim().toLowerCase().replace(/_/g, ' ');
+  const normalizedRole = role.replace(/[\s-]+/g, '');
+  const canManageIncome = ['admin', 'superadmin', 'ca'].includes(normalizedRole);
   const canSelectAllBranches = ['admin', 'super admin', 'superadmin'].includes(role) || user?.companyCreated === true;
 
   const [companyId, setCompanyId] = useState(preferredCompanyId);
@@ -100,6 +106,8 @@ export const IncomeManagementView = () => {
   const [financialYears, setFinancialYears] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [editingIncome, setEditingIncome] = useState(null);
+  const [deletingIncomeId, setDeletingIncomeId] = useState('');
   const [loadError, setLoadError] = useState('');
   const [setupError, setSetupError] = useState('');
   const [formError, setFormError] = useState('');
@@ -235,13 +243,40 @@ export const IncomeManagementView = () => {
   const openForm = () => {
     const today = new Date().toISOString().slice(0, 10);
     const year = financialYears.find((item) => today >= dateInputValue(item.startDate) && today <= dateInputValue(item.endDate)) || financialYears[0];
+    setEditingIncome(null);
     setForm({ ...EMPTY_FORM, financialYearId: getId(year), bankAccountId: '' });
+    setFormError('');
+    setIsFormOpen(true);
+  };
+  const openEditForm = (income) => {
+    const incomeBranchId = getId(income.branchId);
+    if (!incomeBranchId) {
+      showToast('This income entry is not assigned to a branch and cannot be edited.', 'error');
+      return;
+    }
+    setEditingIncome(income);
+    if (incomeBranchId !== formBranchId) {
+      setFormBranchId(incomeBranchId);
+      setIsLoadingSetup(true);
+    }
+    setForm({
+      ...EMPTY_FORM,
+      financialYearId: getId(income.financialYearId),
+      incomeType: income.incomeType || 'service',
+      title: income.title || '',
+      amount: String(income.amount ?? ''),
+      receivedDate: dateInputValue(income.receivedDate),
+      paymentMode: income.paymentMode || 'bank',
+      bankAccountId: getId(income.bankAccountId),
+      description: income.description || '',
+    });
     setFormError('');
     setIsFormOpen(true);
   };
   const closeForm = () => {
     if (!isSaving) {
       setIsFormOpen(false);
+      setEditingIncome(null);
       setFormError('');
     }
   };
@@ -276,7 +311,7 @@ export const IncomeManagementView = () => {
     }
     setIsSaving(true);
     try {
-      const response = await api.post('/api/expense/income/create', {
+      const payload = {
         companyId: activeCompanyId,
         branchId: formBranchId,
         financialYearId: form.financialYearId,
@@ -287,19 +322,56 @@ export const IncomeManagementView = () => {
         paymentMode: form.paymentMode,
         bankAccountId: form.bankAccountId,
         description: form.description.trim(),
-      });
+      };
+      const response = editingIncome
+        ? await api.put(`/api/expense/update/income/${encodeURIComponent(getId(editingIncome))}`, payload)
+        : await api.post('/api/expense/income/create', payload);
       if (response.data?.success === false || !response.data?.data) {
-        throw new Error(response.data?.message || 'Income was not recorded.');
+        throw new Error(response.data?.message || `Income was not ${editingIncome ? 'updated' : 'recorded'}.`);
       }
-      showToast('Income recorded and journal posted.', 'success');
+      showToast(
+        editingIncome ? 'Income updated and accounting journal reposted.' : 'Income recorded and journal posted.',
+        'success',
+      );
       setIsFormOpen(false);
+      setEditingIncome(null);
       setReloadKey((value) => value + 1);
     } catch (error) {
-      const message = getErrorMessage(error, 'Could not record income.');
+      const message = getErrorMessage(error, `Could not ${editingIncome ? 'update' : 'record'} income.`);
       setFormError(message);
       showToast(message, 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+  const handleDeleteIncome = async (income) => {
+    const incomeId = getId(income);
+    const confirmed = await confirm({
+      title: 'Delete this income entry?',
+      message: `This will remove "${income.title}" from the income register and reverse its accounting journal. This action cannot be undone.`,
+      confirmLabel: 'Delete income',
+      danger: true,
+    });
+    if (!confirmed) return;
+
+    setDeletingIncomeId(incomeId);
+    try {
+      const params = new URLSearchParams({
+        companyId: activeCompanyId,
+        branchId: getId(income.branchId),
+      });
+      const response = await api.delete(
+        `/api/expense/income/delete/${encodeURIComponent(incomeId)}?${params.toString()}`,
+      );
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message || 'Income was not deleted.');
+      }
+      showToast(response.data?.message || 'Income deleted and accounting journal reversed.', 'success');
+      setReloadKey((value) => value + 1);
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Could not delete income.'), 'error');
+    } finally {
+      setDeletingIncomeId('');
     }
   };
   const exportCsv = () => {
@@ -398,17 +470,21 @@ export const IncomeManagementView = () => {
           <span className="text-sm font-semibold text-[#034665]">{formatCurrency(totalIncome)}</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Date</th><th className="px-4 py-3">Income</th><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Payment</th><th className="px-5 py-3 text-right">Amount</th></tr></thead>
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Date</th><th className="px-4 py-3">Income</th><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Payment</th><th className="px-5 py-3 text-right">Amount</th>{canManageIncome && <th className="px-5 py-3 text-right">Actions</th>}</tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {isLoadingIncomes ? <tr><td colSpan="5" className="px-5 py-14 text-center text-sm text-slate-500"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin text-[#068DCB]" />Loading income…</td></tr>
-                : visibleIncomes.length === 0 ? <tr><td colSpan="5" className="px-5 py-14 text-center"><CircleDollarSign className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm font-medium text-slate-700">No income found</p><p className="mt-1 text-xs text-slate-500">Change the filters or record an income receipt.</p></td></tr>
+              {isLoadingIncomes ? <tr><td colSpan={canManageIncome ? 6 : 5} className="px-5 py-14 text-center text-sm text-slate-500"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin text-[#068DCB]" />Loading income…</td></tr>
+                : visibleIncomes.length === 0 ? <tr><td colSpan={canManageIncome ? 6 : 5} className="px-5 py-14 text-center"><CircleDollarSign className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm font-medium text-slate-700">No income found</p><p className="mt-1 text-xs text-slate-500">Change the filters or record an income receipt.</p></td></tr>
                   : visibleIncomes.map((income) => <tr key={getId(income)} className="transition-colors hover:bg-cyan-50/50">
                     <td className="whitespace-nowrap px-5 py-3.5 text-xs font-medium text-slate-600">{formatDate(income.receivedDate)}</td>
                     <td className="max-w-[360px] px-4 py-3.5"><p className="truncate font-semibold text-slate-900">{income.title}</p><p className="mt-0.5 truncate text-xs capitalize text-slate-500">{income.incomeType}{income.description ? ` · ${income.description}` : ''}</p></td>
                     <td className="px-4 py-3.5 text-xs text-slate-600">{branchNames.get(getId(income.branchId)) || (getId(income.branchId) ? 'Branch' : 'Unassigned')}</td>
                     <td className="px-4 py-3.5"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-600">{income.paymentMode || '—'}</span></td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-right font-bold tabular-nums text-slate-900">{formatCurrency(income.amount)}</td>
+                    {canManageIncome && (!userBranchId || canSelectAllBranches || getId(income.branchId) === userBranchId) && <td className="px-5 py-3.5"><div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" leftIcon={Pencil} onClick={() => openEditForm(income)} isDisabled={Boolean(deletingIncomeId)} title="Edit income entry">Edit</Button>
+                      <Button variant="danger" size="sm" leftIcon={Trash2} onClick={() => handleDeleteIncome(income)} isLoading={deletingIncomeId === getId(income)} isDisabled={Boolean(deletingIncomeId) && deletingIncomeId !== getId(income)} title="Delete income and reverse its journal">Delete</Button>
+                    </div></td>}
                   </tr>)}
             </tbody>
           </table>
@@ -419,11 +495,11 @@ export const IncomeManagementView = () => {
       {isFormOpen && <div className="fixed inset-x-0 bottom-0 top-[64px] z-[70]">
         <button type="button" className="absolute inset-0 h-full w-full cursor-default bg-slate-950/25" aria-label="Close income form" onClick={closeForm} />
         <aside role="dialog" aria-modal="true" aria-labelledby="create-income-title" className="absolute inset-y-0 right-0 flex w-full max-w-[620px] flex-col border-l border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h2 id="create-income-title" className="text-base font-bold text-slate-900">Record income</h2><p className="mt-0.5 text-[11px] text-slate-500">The receipt will post to your selected bank or cash account.</p></div><button type="button" onClick={closeForm} disabled={isSaving} aria-label="Close income form" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h2 id="create-income-title" className="text-base font-bold text-slate-900">{editingIncome ? 'Edit income' : 'Record income'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{editingIncome ? 'The old journal will be reversed and reposted with your changes.' : 'The receipt will post to your selected bank or cash account.'}</p></div><button type="button" onClick={closeForm} disabled={isSaving} aria-label="Close income form" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
           <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label><span className={LABEL_CLASS}>Branch <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={formBranchId} onChange={(event) => { setIsLoadingSetup(true); setSetupError(''); setFormBranchId(event.target.value); setForm((current) => ({ ...current, financialYearId: '', bankAccountId: '' })); }} required disabled={isSaving || isLoadingBranches}><option value="">Select branch</option>{selectableBranches.map((branch) => <option key={getId(branch)} value={getId(branch)}>{branch.branchName || branch.name}</option>)}</select></label>
+                <label><span className={LABEL_CLASS}>Branch <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={formBranchId} onChange={(event) => { setIsLoadingSetup(true); setSetupError(''); setFormBranchId(event.target.value); setForm((current) => ({ ...current, financialYearId: '', bankAccountId: '' })); }} required disabled={isSaving || isLoadingBranches || Boolean(editingIncome)}><option value="">Select branch</option>{selectableBranches.map((branch) => <option key={getId(branch)} value={getId(branch)}>{branch.branchName || branch.name}</option>)}</select></label>
                 <label><span className={LABEL_CLASS}>Received date <span className="text-rose-500">*</span></span><input className={CONTROL_CLASS} type="date" value={form.receivedDate} onChange={(event) => setForm((current) => ({ ...current, receivedDate: event.target.value }))} required disabled={isSaving} /></label>
                 <label><span className={LABEL_CLASS}>Financial year <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={form.financialYearId} onChange={(event) => setForm((current) => ({ ...current, financialYearId: event.target.value }))} required disabled={isSaving || isLoadingSetup}><option value="">Select open financial year</option>{financialYears.map((year) => <option key={getId(year)} value={getId(year)}>{year.yearLabel}</option>)}</select></label>
                 <label><span className={LABEL_CLASS}>Income type <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={form.incomeType} onChange={(event) => setForm((current) => ({ ...current, incomeType: event.target.value }))} disabled={isSaving}><option value="service">Service</option><option value="product">Product</option><option value="project">Project</option><option value="other">Other</option></select></label>
@@ -434,14 +510,15 @@ export const IncomeManagementView = () => {
                 <label className="sm:col-span-2"><span className={LABEL_CLASS}>Description</span><textarea className={`${CONTROL_CLASS} min-h-20 resize-y`} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={1000} disabled={isSaving} /></label>
               </div>
               {setupError && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{setupError}</p>}
-              {!isLoadingSetup && formBranchId && financialYears.length === 0 && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Create an open financial year for this branch before recording income.</p>}
+              {!isLoadingSetup && formBranchId && financialYears.length === 0 && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{editingIncome ? 'This income cannot be edited because its financial year is locked or unavailable.' : 'Create an open financial year for this branch before recording income.'}</p>}
               {!isLoadingSetup && formBranchId && availableAccounts.length === 0 && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">No payment account is available for this payment mode and branch.</p>}
               {formError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />{formError}</p>}
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">{selectedAccount?.accountName || 'Choose a deposit account'}</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeForm} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-[#045d86] hover:bg-[#034665] focus:ring-cyan-500/30">Save income</Button></div></div>
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">{selectedAccount?.accountName || 'Choose a deposit account'}</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeForm} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} isDisabled={isLoadingSetup} className="bg-[#045d86] hover:bg-[#034665] focus:ring-cyan-500/30">{editingIncome ? 'Save changes' : 'Save income'}</Button></div></div>
           </form>
         </aside>
       </div>}
+      {confirmationDialog}
     </section>
   );
 };
