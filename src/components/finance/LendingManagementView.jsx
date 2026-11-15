@@ -8,9 +8,11 @@ import {
   History,
   Landmark,
   LoaderCircle,
+  Pencil,
   Percent,
   Plus,
   RefreshCw,
+  Trash2,
   Search,
   UserRound,
   X,
@@ -298,6 +300,40 @@ export const LendingManagementView = () => {
     setPanelError('');
     setDrawerMode('create');
   };
+  const openEdit = (lending) => {
+    setSelectedLending(lending);
+    setFormBranchId(getId(lending.branchId));
+    setLoanForm({
+      ...EMPTY_LOAN,
+      financialYearId: getId(lending.financialYearId),
+      customerId: getId(lending.customerId),
+      loanReference: lending.loanReference || '',
+      principalAmount: lending.principalAmount || '',
+      annualInterestRatePercent: lending.annualInterestRatePercent || '',
+      startDate: dateInputValue(lending.startDate),
+      maturityDate: dateInputValue(lending.maturityDate),
+      disbursementBankAccountId: getId(lending.disbursementBankAccountId),
+      notes: lending.notes || '',
+    });
+    setPanelError('');
+    setDrawerMode('edit');
+  };
+  const handleDelete = async (lending) => {
+    if (!window.confirm('Delete this lending entry?')) return;
+    try {
+      const response = await api.delete(`/api/lending/${encodeURIComponent(getId(lending))}?companyId=${encodeURIComponent(activeCompanyId)}`);
+      if (response.data?.success === false) throw new Error(response.data?.message || 'Lending entry could not be deleted.');
+      showToast('Lending entry deleted.', 'success');
+      setDrawerMode('');
+      setSelectedLending(null);
+      setPage(1);
+      setReloadKey((value) => value + 1);
+    } catch (error) {
+      const message = getErrorMessage(error, 'Could not delete this lending record.');
+      setPanelError(message);
+      showToast(message, 'error');
+    }
+  };
   const openRepayment = (lending) => {
     setSelectedLending(lending);
     if (getId(lending.branchId) !== formBranchId) setIsLoadingSetup(true);
@@ -367,6 +403,53 @@ export const LendingManagementView = () => {
       setReloadKey((value) => value + 1);
     } catch (error) {
       const message = getErrorMessage(error, 'Could not create lending record.');
+      setPanelError(message);
+      showToast(message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  const handleUpdate = async (event) => {
+    event.preventDefault();
+    setPanelError('');
+    if (!selectedLending || !activeCompanyId || !formBranchId || !loanForm.financialYearId || !loanForm.customerId || !loanForm.disbursementBankAccountId) {
+      setPanelError('Choose a branch, customer, open financial year and bank/cash account.');
+      return;
+    }
+    if (numberValue(loanForm.principalAmount) <= 0) {
+      setPanelError('Principal amount must be greater than zero.');
+      return;
+    }
+    if (loanForm.maturityDate && loanForm.maturityDate <= loanForm.startDate) {
+      setPanelError('Maturity date must be after the lending start date.');
+      return;
+    }
+    if (selectedYear && (loanForm.startDate < dateInputValue(selectedYear.startDate) || loanForm.startDate > dateInputValue(selectedYear.endDate))) {
+      setPanelError('Lending start date must fall within the selected financial year.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const response = await api.put(`/api/lending/${encodeURIComponent(getId(selectedLending))}`, {
+        companyId: activeCompanyId,
+        branchId: formBranchId,
+        financialYearId: loanForm.financialYearId,
+        customerId: loanForm.customerId,
+        loanReference: loanForm.loanReference.trim(),
+        principalAmount: numberValue(loanForm.principalAmount),
+        annualInterestRatePercent: numberValue(loanForm.annualInterestRatePercent),
+        startDate: loanForm.startDate,
+        maturityDate: loanForm.maturityDate || null,
+        disbursementBankAccountId: loanForm.disbursementBankAccountId,
+        notes: loanForm.notes.trim(),
+      });
+      if (response.data?.success === false || !response.data?.data) throw new Error(response.data?.message || 'Lending record was not updated.');
+      showToast('Lending entry updated.', 'success');
+      setDrawerMode('');
+      setSelectedLending(null);
+      setReloadKey((value) => value + 1);
+    } catch (error) {
+      const message = getErrorMessage(error, 'Could not update lending record.');
       setPanelError(message);
       showToast(message, 'error');
     } finally {
@@ -507,7 +590,7 @@ export const LendingManagementView = () => {
                     <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-700">{formatCurrency(lending.principalAmount)}</td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold tabular-nums text-slate-900">{formatCurrency(lending.principalOutstanding)}</td>
                     <td className="px-4 py-3.5 text-center"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${lending.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{lending.status === 'ACTIVE' ? 'Active' : 'Paid off'}</span></td>
-                    <td className="px-5 py-3.5"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" title="View lending details" aria-label="View lending details" onClick={() => openDetails(lending)}><Eye className="h-4 w-4 text-slate-500" /></Button>{lending.status === 'ACTIVE' && <Button variant="ghost" size="sm" title="Record repayment" aria-label="Record repayment" onClick={() => openRepayment(lending)}><Banknote className="h-4 w-4 text-[#045d86]" /></Button>}</div></td>
+                    <td className="px-5 py-3.5"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" title="View lending details" aria-label="View lending details" onClick={() => openDetails(lending)}><Eye className="h-4 w-4 text-slate-500" /></Button><Button variant="ghost" size="sm" title="Edit lending entry" aria-label="Edit lending entry" onClick={() => openEdit(lending)}><Pencil className="h-4 w-4 text-[#034665]" /></Button><Button variant="ghost" size="sm" title="Delete lending entry" aria-label="Delete lending entry" onClick={() => handleDelete(lending)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>{lending.status === 'ACTIVE' && <Button variant="ghost" size="sm" title="Record repayment" aria-label="Record repayment" onClick={() => openRepayment(lending)}><Banknote className="h-4 w-4 text-[#045d86]" /></Button>}</div></td>
                   </tr>)}
             </tbody>
           </table>
@@ -518,9 +601,9 @@ export const LendingManagementView = () => {
       {drawerMode && <div className="fixed inset-x-0 bottom-0 top-[64px] z-[70]">
         <button type="button" className="absolute inset-0 h-full w-full cursor-default bg-slate-950/25" aria-label="Close lending panel" onClick={closeDrawer} />
         <aside role="dialog" aria-modal="true" aria-labelledby="lending-drawer-title" className="absolute inset-y-0 right-0 flex w-full max-w-[600px] flex-col border-l border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-lg bg-[#edf4f8] text-[#034665]">{drawerMode === 'details' ? <History className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</span><div><h2 id="lending-drawer-title" className="text-base font-bold text-slate-900">{drawerMode === 'create' ? 'Give a customer loan' : drawerMode === 'repayment' ? 'Record repayment' : 'Lending details'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{selectedLending ? `${selectedLending.customerName} · ${formatCurrency(selectedLending.principalOutstanding)} outstanding` : 'New customer lending record'}</p></div></div><button type="button" onClick={closeDrawer} disabled={isSaving} aria-label="Close lending panel" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-lg bg-[#edf4f8] text-[#034665]">{drawerMode === 'details' ? <History className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</span><div><h2 id="lending-drawer-title" className="text-base font-bold text-slate-900">{drawerMode === 'create' ? 'Give a customer loan' : drawerMode === 'edit' ? 'Edit customer loan' : drawerMode === 'repayment' ? 'Record repayment' : 'Lending details'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{selectedLending ? `${selectedLending.customerName} · ${formatCurrency(selectedLending.principalOutstanding)} outstanding` : 'New customer lending record'}</p></div></div><button type="button" onClick={closeDrawer} disabled={isSaving} aria-label="Close lending panel" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
 
-          {drawerMode === 'create' && <form onSubmit={handleCreate} className="flex min-h-0 flex-1 flex-col"><div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {(drawerMode === 'create' || drawerMode === 'edit') && <form onSubmit={drawerMode === 'edit' ? handleUpdate : handleCreate} className="flex min-h-0 flex-1 flex-col"><div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <label><span className={LABEL_CLASS}>Branch <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={formBranchId} onChange={(event) => { setFormBranchId(event.target.value); setLoanForm((current) => ({ ...current, customerId: '', financialYearId: '', disbursementBankAccountId: '' })); }} required><option value="">Select branch</option>{selectableBranches.map((branch) => <option key={getId(branch)} value={getId(branch)}>{branch.branchName || branch.name}</option>)}</select></label>
               <label><span className={LABEL_CLASS}>Customer <span className="text-rose-500">*</span></span><select className={CONTROL_CLASS} value={loanForm.customerId} onChange={(event) => setLoanForm((current) => ({ ...current, customerId: event.target.value }))} required disabled={isLoadingSetup}><option value="">Select customer</option>{customers.map((customer) => <option key={getId(customer)} value={getId(customer)}>{customer.name || customer.customerName}</option>)}</select></label>
@@ -537,7 +620,7 @@ export const LendingManagementView = () => {
             {!isLoadingSetup && formBranchId && customers.length === 0 && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Add an active customer for this branch before creating a lending record.</p>}
             {panelError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />{panelError}</p>}
             <p className="rounded-lg bg-[#edf4f8] px-3 py-2 text-xs text-[#034665]">Disbursement is posted as a debit to loan receivable and a credit to the selected bank/cash account.</p>
-          </div><div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">{selectedAccount?.accountName || 'Select a disbursement account'}</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeDrawer} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-[#045d86] hover:bg-[#034665] focus:ring-cyan-500/30">Save loan</Button></div></div></form>}
+          </div><div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">{selectedAccount?.accountName || 'Select a disbursement account'}</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeDrawer} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-[#045d86] hover:bg-[#034665] focus:ring-cyan-500/30">{drawerMode === 'edit' ? 'Save changes' : 'Save loan'}</Button></div></div></form>}
 
           {drawerMode === 'repayment' && <form onSubmit={handleRepayment} className="flex min-h-0 flex-1 flex-col"><div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="grid grid-cols-2 gap-3 rounded-xl bg-[#edf4f8] p-3 text-xs"><div><p className="text-[#034665]">Principal outstanding</p><p className="mt-1 font-bold text-slate-900">{formatCurrency(selectedLending?.principalOutstanding)}</p></div><div><p className="text-[#034665]">Interest rate</p><p className="mt-1 font-bold text-slate-900">{numberValue(selectedLending?.annualInterestRatePercent)}% p.a.</p></div></div>

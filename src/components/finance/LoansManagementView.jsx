@@ -10,9 +10,11 @@ import {
   Eye,
   History,
   Landmark,
+  Pencil,
   Percent,
   Plus,
   RotateCw,
+  Trash2,
   Search,
   UserRound,
   Wallet,
@@ -73,6 +75,11 @@ const formatDate = (value) => {
   if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+};
+const dateInputValue = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
 };
 
 export const LoansManagementView = () => {
@@ -266,6 +273,45 @@ export const LoansManagementView = () => {
     setPanelError('');
     setDrawerMode('create');
   };
+  const openEdit = (loan) => {
+    setSelectedLoan(loan);
+    setLoanForm({
+      ...EMPTY_LOAN,
+      financialYearId: getId(loan.financialYearId),
+      lenderType: loan.lenderType || 'PERSON',
+      lenderName: loan.lenderName || '',
+      lenderPhone: loan.lenderPhone || '',
+      lenderEmail: loan.lenderEmail || '',
+      lenderBankName: loan.lenderBankName || '',
+      lenderAccountNumber: loan.lenderAccountNumber || '',
+      lenderIfscCode: loan.lenderIfscCode || '',
+      loanReference: loan.loanReference || '',
+      principalAmount: loan.principalAmount || '',
+      annualInterestRatePercent: loan.annualInterestRatePercent || '',
+      startDate: dateInputValue(loan.startDate),
+      maturityDate: dateInputValue(loan.maturityDate),
+      disbursementBankAccountId: getId(loan.disbursementBankAccountId),
+      notes: loan.notes || '',
+    });
+    setPanelError('');
+    setDrawerMode('edit');
+  };
+  const handleDelete = async (loan) => {
+    if (!window.confirm('Delete this borrowing entry?')) return;
+    try {
+      const response = await api.delete(`/api/loan/${encodeURIComponent(getId(loan))}?companyId=${encodeURIComponent(companyId)}`);
+      if (response.data?.success === false) throw new Error(response.data?.message || 'Borrowing entry could not be deleted.');
+      showToast('Borrowing entry deleted.', 'success');
+      setDrawerMode('');
+      setSelectedLoan(null);
+      setPage(1);
+      setReloadKey((value) => value + 1);
+    } catch (error) {
+      const message = getErrorMessage(error, 'Could not delete this borrowing.');
+      setPanelError(message);
+      showToast(message, 'error');
+    }
+  };
   const openRepayment = (loan) => {
     const today = new Date().toISOString().slice(0, 10);
     const year = financialYears.find((item) => today >= new Date(item.startDate).toISOString().slice(0, 10) && today <= new Date(item.endDate).toISOString().slice(0, 10)) || financialYears[0];
@@ -332,6 +378,52 @@ export const LoansManagementView = () => {
       setReloadKey((value) => value + 1);
     } catch (error) {
       const message = getErrorMessage(error, 'Could not register this loan.');
+      setPanelError(message);
+      showToast(message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  const handleUpdate = async (event) => {
+    event.preventDefault();
+    setPanelError('');
+    if (!selectedLoan || !companyId || !branchId || branchId === 'all') {
+      setPanelError('Select a valid loan and branch before updating it.');
+      return;
+    }
+    if (!loanForm.financialYearId || !loanForm.disbursementBankAccountId) {
+      setPanelError('Select a financial year and the company bank/cash account receiving the loan.');
+      return;
+    }
+    const payload = {
+      companyId,
+      branchId,
+      financialYearId: loanForm.financialYearId,
+      lenderType: loanForm.lenderType,
+      lenderName: loanForm.lenderName.trim(),
+      lenderPhone: loanForm.lenderPhone.trim(),
+      lenderEmail: loanForm.lenderEmail.trim(),
+      lenderBankName: loanForm.lenderType === 'BANK' ? loanForm.lenderName.trim() : '',
+      lenderAccountNumber: loanForm.lenderType === 'BANK' ? loanForm.lenderAccountNumber.trim() : '',
+      lenderIfscCode: loanForm.lenderType === 'BANK' ? loanForm.lenderIfscCode.trim().toUpperCase() : '',
+      loanReference: loanForm.loanReference.trim(),
+      principalAmount: numberValue(loanForm.principalAmount),
+      annualInterestRatePercent: numberValue(loanForm.annualInterestRatePercent),
+      startDate: loanForm.startDate,
+      maturityDate: loanForm.maturityDate || null,
+      disbursementBankAccountId: loanForm.disbursementBankAccountId,
+      notes: loanForm.notes.trim(),
+    };
+    setIsSaving(true);
+    try {
+      const response = await api.put(`/api/loan/${encodeURIComponent(getId(selectedLoan))}`, payload);
+      if (response.data?.success === false || !response.data?.data) throw new Error(response.data?.message || 'Loan was not updated.');
+      showToast('Borrowing entry updated.', 'success');
+      setDrawerMode('');
+      setSelectedLoan(null);
+      setReloadKey((value) => value + 1);
+    } catch (error) {
+      const message = getErrorMessage(error, 'Could not update this loan.');
       setPanelError(message);
       showToast(message, 'error');
     } finally {
@@ -452,7 +544,7 @@ export const LoansManagementView = () => {
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-900">{formatCurrency(loan.principalOutstanding)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-slate-700">{numberValue(loan.annualInterestRatePercent)}% <span className="text-[10px] text-slate-400">p.a.</span></td>
                     <td className="px-4 py-3 text-center"><span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${loan.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{loan.status === 'ACTIVE' ? 'Active' : 'Paid off'}</span></td>
-                    <td className="px-4 py-3"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" title="View loan and repayment history" aria-label="View loan details" onClick={() => openDetails(loan)}><Eye className="h-4 w-4 text-slate-500" /></Button>{loan.status === 'ACTIVE' && <Button variant="ghost" size="sm" title="Record repayment" aria-label="Record repayment" onClick={() => openRepayment(loan)}><Banknote className="h-4 w-4 text-indigo-700" /></Button>}</div></td>
+                    <td className="px-4 py-3"><div className="flex justify-end gap-1"><Button variant="ghost" size="sm" title="View loan and repayment history" aria-label="View loan details" onClick={() => openDetails(loan)}><Eye className="h-4 w-4 text-slate-500" /></Button><Button variant="ghost" size="sm" title="Edit loan entry" aria-label="Edit loan entry" onClick={() => openEdit(loan)}><Pencil className="h-4 w-4 text-sky-700" /></Button><Button variant="ghost" size="sm" title="Delete loan entry" aria-label="Delete loan entry" onClick={() => handleDelete(loan)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>{loan.status === 'ACTIVE' && <Button variant="ghost" size="sm" title="Record repayment" aria-label="Record repayment" onClick={() => openRepayment(loan)}><Banknote className="h-4 w-4 text-indigo-700" /></Button>}</div></td>
                   </tr>
                 ))}
           </tbody>
@@ -468,9 +560,9 @@ export const LoansManagementView = () => {
       {drawerMode && <div className="fixed inset-x-0 bottom-0 top-[72px] z-[70]">
         <button type="button" className="absolute inset-0 h-full w-full cursor-default bg-slate-950/25" aria-label="Close loan panel" onClick={closeDrawer} />
         <aside role="dialog" aria-modal="true" aria-labelledby="loan-drawer-title" className="absolute inset-y-0 right-0 flex w-full max-w-[560px] flex-col border-l border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">{drawerMode === 'details' ? <History className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</div><div><h2 id="loan-drawer-title" className="text-base font-bold text-slate-900">{drawerMode === 'create' ? 'Register Loan' : drawerMode === 'repayment' ? 'Record Repayment' : 'Loan Details'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{selectedLoan ? `${selectedLoan.lenderName} · ${formatCurrency(selectedLoan.principalOutstanding)} outstanding` : 'New lender and loan information'}</p></div></div><button type="button" onClick={closeDrawer} disabled={isSaving} aria-label="Close loan panel" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">{drawerMode === 'details' ? <History className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}</div><div><h2 id="loan-drawer-title" className="text-base font-bold text-slate-900">{drawerMode === 'create' ? 'Register Loan' : drawerMode === 'edit' ? 'Edit Loan' : drawerMode === 'repayment' ? 'Record Repayment' : 'Loan Details'}</h2><p className="mt-0.5 text-[11px] text-slate-500">{selectedLoan ? `${selectedLoan.lenderName} · ${formatCurrency(selectedLoan.principalOutstanding)} outstanding` : 'New lender and loan information'}</p></div></div><button type="button" onClick={closeDrawer} disabled={isSaving} aria-label="Close loan panel" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"><X className="h-4 w-4" /></button></div>
 
-          {drawerMode === 'create' && <form onSubmit={handleCreate} className="flex min-h-0 flex-1 flex-col">
+          {(drawerMode === 'create' || drawerMode === 'edit') && <form onSubmit={drawerMode === 'edit' ? handleUpdate : handleCreate} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label><span className={fieldLabelClass}>Lender type <span className="text-rose-500">*</span></span><select className={controlClass} value={loanForm.lenderType} onChange={(event) => setLoanForm((previous) => ({ ...previous, lenderType: event.target.value, lenderAccountNumber: '', lenderIfscCode: '' }))}><option value="PERSON">Person</option><option value="BANK">Bank / financial institution</option></select></label>
@@ -493,7 +585,7 @@ export const LoansManagementView = () => {
               <div className="flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /><p>Registering the loan records the receipt and posts a journal: debit the selected bank/cash account and credit a loan liability ledger.</p></div>
               {panelError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />{panelError}</p>}
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">Lender bank account number is masked in views.</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeDrawer} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-indigo-700 hover:bg-indigo-800 focus:ring-indigo-500/30">Register Loan</Button></div></div>
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4"><span className="text-xs text-slate-500">Lender bank account number is masked in views.</span><div className="flex gap-2"><Button variant="outline" type="button" onClick={closeDrawer} isDisabled={isSaving}>Cancel</Button><Button type="submit" isLoading={isSaving} className="bg-indigo-700 hover:bg-indigo-800 focus:ring-indigo-500/30">{drawerMode === 'edit' ? 'Save changes' : 'Register Loan'}</Button></div></div>
           </form>}
 
           {drawerMode === 'repayment' && <form onSubmit={handleRepayment} className="flex min-h-0 flex-1 flex-col">

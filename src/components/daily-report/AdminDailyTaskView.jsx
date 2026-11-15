@@ -29,6 +29,84 @@ export const AdminDailyTaskView = () => {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const startEditing = (report) => {
+    setEditingId(report._id);
+    setEditDraft({
+      todaysWork: report.todaysWork || '',
+      pendingWork: report.pendingWork || '',
+      tomorrowPlan: report.tomorrowPlan || '',
+      issuesFaced: report.issuesFaced || '',
+      hoursWorked: report.hoursWorked ?? '',
+      remarks: report.remarks || '',
+    });
+    setEditError('');
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditDraft(null);
+    setEditError('');
+  };
+
+  const handleEditChange = (field, value) => {
+    setEditDraft((current) => ({ ...(current || {}), [field]: value }));
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editDraft) return;
+
+    const nextHours = Number(editDraft.hoursWorked);
+    if (!Number.isFinite(nextHours) || nextHours <= 0) {
+      setEditError('Hours worked must be greater than 0.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setEditError('');
+
+    try {
+      const payload = {
+        todaysWork: editDraft.todaysWork?.trim(),
+        pendingWork: editDraft.pendingWork?.trim() || '',
+        tomorrowPlan: editDraft.tomorrowPlan?.trim() || '',
+        issuesFaced: editDraft.issuesFaced?.trim() || '',
+        remarks: editDraft.remarks?.trim() || '',
+        hoursWorked: nextHours,
+      };
+
+      const response = await api.put(`/api/dailyUpdate/update/${editingId}`, payload);
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to save the daily report.');
+      }
+
+      setReports((current) =>
+        current.map((report) =>
+          report._id === editingId
+            ? {
+                ...report,
+                ...payload,
+                updatedAt: new Date().toISOString(),
+              }
+            : report
+        )
+      );
+      cancelEditing();
+      await fetchReports();
+    } catch (error) {
+      setEditError(
+        error.response?.data?.message ||
+        error.message ||
+        'The report could not be updated right now.'
+      );
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   const fetchReports = useCallback(async () => {
     setIsLoading(true);
@@ -201,28 +279,125 @@ export const AdminDailyTaskView = () => {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 text-xs sm:grid-cols-2">
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <h3 className="mb-1 font-semibold text-slate-700">Today&apos;s Work</h3>
-                      <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{report.todaysWork || '—'}</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <h3 className="mb-1 font-semibold text-slate-700">Tomorrow&apos;s Plan</h3>
-                      <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{report.tomorrowPlan || '—'}</p>
-                    </div>
-                    {report.pendingWork && (
-                      <div className="rounded-lg border border-amber-100 bg-amber-50/60 p-3">
-                        <h3 className="mb-1 font-semibold text-amber-800">Pending Work</h3>
-                        <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{report.pendingWork}</p>
+                  {editingId === report._id ? (
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1 text-[11px] text-slate-600">
+                          <span className="font-semibold text-slate-700">Hours Worked</span>
+                          <input
+                            type="number"
+                            min="0.5"
+                            step="0.5"
+                            value={editDraft?.hoursWorked ?? ''}
+                            onChange={(event) => handleEditChange('hoursWorked', event.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] text-slate-600">
+                          <span className="font-semibold text-slate-700">Remarks</span>
+                          <input
+                            type="text"
+                            value={editDraft?.remarks ?? ''}
+                            onChange={(event) => handleEditChange('remarks', event.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] text-slate-600 sm:col-span-2">
+                          <span className="font-semibold text-slate-700">Today&apos;s Work</span>
+                          <textarea
+                            rows={3}
+                            value={editDraft?.todaysWork ?? ''}
+                            onChange={(event) => handleEditChange('todaysWork', event.target.value)}
+                            className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] text-slate-600">
+                          <span className="font-semibold text-slate-700">Pending Work</span>
+                          <textarea
+                            rows={2}
+                            value={editDraft?.pendingWork ?? ''}
+                            onChange={(event) => handleEditChange('pendingWork', event.target.value)}
+                            className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] text-slate-600">
+                          <span className="font-semibold text-slate-700">Tomorrow&apos;s Plan</span>
+                          <textarea
+                            rows={2}
+                            value={editDraft?.tomorrowPlan ?? ''}
+                            onChange={(event) => handleEditChange('tomorrowPlan', event.target.value)}
+                            className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] text-slate-600 sm:col-span-2">
+                          <span className="font-semibold text-slate-700">Issues Faced</span>
+                          <textarea
+                            rows={2}
+                            value={editDraft?.issuesFaced ?? ''}
+                            onChange={(event) => handleEditChange('issuesFaced', event.target.value)}
+                            className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400"
+                          />
+                        </label>
                       </div>
-                    )}
-                    {report.issuesFaced && (
-                      <div className="rounded-lg border border-rose-100 bg-rose-50/60 p-3">
-                        <h3 className="mb-1 font-semibold text-rose-800">Issues Faced</h3>
-                        <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{report.issuesFaced}</p>
+
+                      {editError && (
+                        <p className="mt-3 text-[11px] font-medium text-rose-700">{editError}</p>
+                      )}
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={saveEdit}
+                          disabled={isSavingEdit}
+                          className="rounded-lg bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSavingEdit ? 'Saving…' : 'Save Changes'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEditing}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          Cancel
+                        </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => startEditing(report)}
+                        className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
+
+                  {!editingId && (
+                    <div className="grid gap-3 text-xs sm:grid-cols-2">
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <h3 className="mb-1 font-semibold text-slate-700">Today&apos;s Work</h3>
+                        <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{report.todaysWork || '—'}</p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <h3 className="mb-1 font-semibold text-slate-700">Tomorrow&apos;s Plan</h3>
+                        <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{report.tomorrowPlan || '—'}</p>
+                      </div>
+                      {report.pendingWork && (
+                        <div className="rounded-lg border border-amber-100 bg-amber-50/60 p-3">
+                          <h3 className="mb-1 font-semibold text-amber-800">Pending Work</h3>
+                          <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{report.pendingWork}</p>
+                        </div>
+                      )}
+                      {report.issuesFaced && (
+                        <div className="rounded-lg border border-rose-100 bg-rose-50/60 p-3">
+                          <h3 className="mb-1 font-semibold text-rose-800">Issues Faced</h3>
+                          <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{report.issuesFaced}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </article>
               );
             })}

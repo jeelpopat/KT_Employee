@@ -634,6 +634,8 @@ const mapRequest = (item, index) => {
     return "pending";
   })();
 
+  const isAutoApprovedRequest = Boolean(item.autoApproved || item.isAutoApproved || item.autoApprovedCheckIn);
+
   return {
     raw: item,
     id:
@@ -673,6 +675,7 @@ const mapRequest = (item, index) => {
       "",
 
     approvalStatus: resolvedApprovalStatus,
+    autoApproved: isAutoApprovedRequest,
 
     avatarColor:
       item.avatarColor ||
@@ -1413,13 +1416,13 @@ export default function CheckInRequest() {
   // ============================================================
   // STATUS BADGE RENDERER (Matches AttendanceLogs & Performance)
   // ============================================================
-  const renderStatusBadge = (status) => {
+  const renderStatusBadge = (status, autoApproved = false) => {
     const norm = String(status || "").toLowerCase().trim();
     if (norm === "approved") {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] select-none whitespace-nowrap font-poppins">
           <CheckCircle2 className="h-3 w-3 text-[#059669]" />
-          Approved
+          {autoApproved ? "Auto_Approved" : "Approved"}
         </span>
       );
     }
@@ -1873,7 +1876,7 @@ export default function CheckInRequest() {
 
                     {/* Status */}
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      {renderStatusBadge(req.approvalStatus)}
+                      {renderStatusBadge(req.approvalStatus, Boolean(req.autoApproved))}
                     </td>
 
                     {/* Action */}
@@ -1904,7 +1907,7 @@ export default function CheckInRequest() {
                       ) : String(req.approvalStatus || "").toLowerCase().trim() === "approved" ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-md select-none">
                           <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                          <span>Approved</span>
+                          <span>{req.autoApproved ? "Auto_Approved" : "Approved"}</span>
                         </span>
                       ) : (
                         <span
