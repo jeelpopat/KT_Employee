@@ -10,10 +10,12 @@ import {
   Clock3,
   Eye,
   MapPin,
+  Pencil,
   Plus,
   RotateCw,
   Search,
   ShieldCheck,
+  Trash2,
   X,
 } from 'lucide-react';
 import api from '../../api/axios.js';
@@ -93,8 +95,10 @@ export const AccountTransferManagementView = () => {
   ));
   const userBranchId = getId(activeCompanyAccess?.branchId) || getId(user?.branchId);
   const userRole = String(activeCompanyAccess?.role || user?.role || '').trim().toLowerCase();
-  const hasElevatedBranchAccess = ['admin', 'superadmin'].includes(userRole) ||
+  const normalizedUserRole = userRole.replace(/[\s_-]+/g, '');
+  const hasElevatedBranchAccess = ['admin', 'superadmin'].includes(normalizedUserRole) ||
     user?.companyCreated === true;
+  const canManageTransfers = ['admin', 'superadmin', 'ca'].includes(normalizedUserRole);
 
   const [companyId, setCompanyId] = useState(preferredCompanyId);
   const [companies, setCompanies] = useState([]);
@@ -117,11 +121,14 @@ export const AccountTransferManagementView = () => {
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [formError, setFormError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [viewingTransaction, setViewingTransaction] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
 
   useEffect(() => {
     if (preferredCompanyId) return undefined;
@@ -362,17 +369,23 @@ export const AccountTransferManagementView = () => {
     setFormError('');
     setLoadError('');
     try {
-      const response = await api.post(endpoint, payload);
+      const response = editingTransaction
+        ? await api.put(`/api/bank-account/transfers/${encodeURIComponent(getTransferId(editingTransaction))}`, payload)
+        : await api.post(endpoint, payload);
       if (response.data?.success === false || !response.data?.data) {
-        throw new Error(response.data?.message || 'Transaction was not posted.');
+        throw new Error(response.data?.message || `Transaction was not ${editingTransaction ? 'updated' : 'posted'}.`);
       }
-      showToast(response.data.message || 'Transaction posted successfully.', 'success');
+      showToast(
+        response.data.message || (editingTransaction ? 'Transaction updated successfully.' : 'Transaction posted successfully.'),
+        'success',
+      );
+      setEditingTransaction(null);
       setForm({ ...EMPTY_FORM, transferDate: today() });
       setIsLoadingAccounts(true);
       setIsLoadingTransactions(true);
       setReloadKey((previous) => previous + 1);
     } catch (error) {
-      const message = getErrorMessage(error, 'Could not post this transaction.');
+      const message = getErrorMessage(error, `Could not ${editingTransaction ? 'update' : 'post'} this transaction.`);
       setFormError(message);
       showToast(message, 'error');
     } finally {
@@ -406,7 +419,64 @@ export const AccountTransferManagementView = () => {
     }
   };
 
+  const openEditTransaction = (transaction) => {
+    setEditingTransaction(transaction);
+    setOperation(transaction.transferType === 'FUND_PLUS'
+      ? 'fund-plus'
+      : transaction.transferType === 'FUND_MINUS' ? 'fund-minus' : 'transfer');
+    setForm({
+      fromAccountId: getId(transaction.fromAccountId),
+      toAccountId: getId(transaction.toAccountId),
+      contraAccountId: getId(transaction.contraAccountId),
+      amount: String(transaction.amount ?? ''),
+      transferDate: transaction.transferDate
+        ? new Date(transaction.transferDate).toISOString().slice(0, 10)
+        : today(),
+      paymentMode: transaction.paymentMode || 'Other',
+      referenceNo: transaction.referenceNo || '',
+      narration: transaction.narration || '',
+    });
+    setFormError('');
+  };
+
+  const closeEditTransaction = () => {
+    if (isSaving) return;
+    setEditingTransaction(null);
+    setForm({ ...EMPTY_FORM, transferDate: today() });
+    setFormError('');
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setLoadError('');
+    try {
+      const params = new URLSearchParams({ companyId });
+      if (getId(deleteTarget.branchId)) params.set('branchId', getId(deleteTarget.branchId));
+      const response = await api.delete(
+        `/api/bank-account/transfers/${encodeURIComponent(getTransferId(deleteTarget))}?${params.toString()}`,
+      );
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message || 'Transaction was not deleted.');
+      }
+      showToast(response.data?.message || 'Transaction deleted and journal reversed.', 'success');
+      setDeleteTarget(null);
+      setIsLoadingAccounts(true);
+      setIsLoadingTransactions(true);
+      setReloadKey((previous) => previous + 1);
+    } catch (error) {
+      const message = getErrorMessage(error, 'Could not delete this transaction.');
+      setLoadError(message);
+      showToast(message, 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const changeCompany = (nextCompanyId) => {
+    setEditingTransaction(null);
+    setForm({ ...EMPTY_FORM, transferDate: today() });
+    setFormError('');
     setCompanyId(nextCompanyId);
     setBranches([]);
     setBranchId('');
@@ -421,6 +491,9 @@ export const AccountTransferManagementView = () => {
   };
 
   const changeBranch = (nextBranchId) => {
+    setEditingTransaction(null);
+    setForm({ ...EMPTY_FORM, transferDate: today() });
+    setFormError('');
     setBranchId(nextBranchId);
     setIsLoadingAccounts(Boolean(companyId));
     setIsLoadingLedgers(Boolean(companyId));
@@ -538,8 +611,8 @@ export const AccountTransferManagementView = () => {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
           <div className="border-b border-slate-100 p-4 sm:px-5">
-            <h2 className="text-sm font-semibold text-slate-900">Post a transaction</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Choose a movement type and enter the transaction details.</p>
+            <h2 className="text-sm font-semibold text-slate-900">{editingTransaction ? 'Edit movement' : 'Post a transaction'}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">{editingTransaction ? 'The previous journal will be reversed and reposted with your changes.' : 'Choose a movement type and enter the transaction details.'}</p>
           </div>
           <div className="grid grid-cols-3 gap-1 border-b border-slate-100 bg-slate-50/70 p-2">
             {[
@@ -550,7 +623,7 @@ export const AccountTransferManagementView = () => {
               const Icon = tab.icon;
               const selected = operation === tab.value;
               return (
-                <button key={tab.value} type="button" onClick={() => { setOperation(tab.value); setFormError(''); }} className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-xs font-semibold transition ${selected ? 'bg-white text-[#034665] shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white/70 hover:text-slate-700'}`}>
+                <button key={tab.value} type="button" disabled={Boolean(editingTransaction)} onClick={() => { setOperation(tab.value); setFormError(''); }} className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${selected ? 'bg-white text-[#034665] shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-white/70 hover:text-slate-700'}`}>
                   <Icon size={14} />{tab.label}
                 </button>
               );
@@ -637,10 +710,13 @@ export const AccountTransferManagementView = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                  <p className="flex items-center gap-1.5 text-[11px] text-slate-500"><ShieldCheck size={14} className="text-[#068DCB]" />A balanced journal entry will be created.</p>
-                  <Button type="submit" leftIcon={operation === 'transfer' ? ArrowLeftRight : Plus} isLoading={isSaving} isDisabled={!companyId || isLoading || (operation !== 'transfer' && ledgerAccounts.length === 0)}>
-                    {operation === 'transfer' ? 'Post transfer' : operation === 'fund-plus' ? 'Record fund plus' : 'Record fund minus'}
-                  </Button>
+                  <p className="flex items-center gap-1.5 text-[11px] text-slate-500"><ShieldCheck size={14} className="text-[#068DCB]" />{editingTransaction ? 'Your changes will be posted as a balanced journal.' : 'A balanced journal entry will be created.'}</p>
+                  <div className="flex gap-2">
+                    {editingTransaction && <Button type="button" variant="outline" onClick={closeEditTransaction} isDisabled={isSaving}>Cancel edit</Button>}
+                    <Button type="submit" leftIcon={editingTransaction ? Pencil : operation === 'transfer' ? ArrowLeftRight : Plus} isLoading={isSaving} isDisabled={!companyId || isLoading || (operation !== 'transfer' && ledgerAccounts.length === 0)}>
+                      {editingTransaction ? 'Save changes' : operation === 'transfer' ? 'Post transfer' : operation === 'fund-plus' ? 'Record fund plus' : 'Record fund minus'}
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
@@ -649,7 +725,7 @@ export const AccountTransferManagementView = () => {
 
         <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
           <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:px-5">
-            <div><h2 className="text-sm font-semibold text-slate-900">Movement history</h2><p className="mt-0.5 text-xs text-slate-500">Review, filter or reverse completed transactions.</p></div>
+            <div><h2 className="text-sm font-semibold text-slate-900">Movement history</h2><p className="mt-0.5 text-xs text-slate-500">Review, edit, cancel or delete account movements.</p></div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="relative sm:col-span-2">
                 <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -706,7 +782,9 @@ export const AccountTransferManagementView = () => {
                       </div>
                       <div className="mt-2 flex justify-end gap-1">
                         <button type="button" onClick={() => setViewingTransaction(transaction)} aria-label={`View ${transactionLabel(transaction.transferType)} details`} title="View details" className="rounded-lg p-1.5 text-slate-500 transition hover:bg-blue-50 hover:text-blue-700"><Eye size={14} /></button>
-                        {transaction.status !== 'Cancelled' && <button type="button" onClick={() => setCancelTarget(transaction)} aria-label={`Reverse ${transactionLabel(transaction.transferType)}`} title="Cancel and reverse" className="rounded-lg p-1.5 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700"><X size={14} /></button>}
+                        {canManageTransfers && transaction.status !== 'Cancelled' && <button type="button" onClick={() => openEditTransaction(transaction)} aria-label={`Edit ${transactionLabel(transaction.transferType)}`} title="Edit movement" className="rounded-lg p-1.5 text-slate-500 transition hover:bg-cyan-50 hover:text-cyan-800"><Pencil size={14} /></button>}
+                        {canManageTransfers && transaction.status !== 'Cancelled' && <button type="button" onClick={() => setCancelTarget(transaction)} aria-label={`Cancel ${transactionLabel(transaction.transferType)}`} title="Cancel and reverse" className="rounded-lg p-1.5 text-slate-500 transition hover:bg-amber-50 hover:text-amber-700"><X size={14} /></button>}
+                        {canManageTransfers && <button type="button" onClick={() => setDeleteTarget(transaction)} aria-label={`Delete ${transactionLabel(transaction.transferType)}`} title="Delete movement" className="rounded-lg p-1.5 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700"><Trash2 size={14} /></button>}
                       </div>
                     </article>
                   );
@@ -745,6 +823,15 @@ export const AccountTransferManagementView = () => {
         </>
       )}>
         <p className="text-sm leading-6 text-slate-600">This does not delete the original transaction. It creates a reversing journal entry and marks the movement as Cancelled.</p>
+      </Modal>
+
+      <Modal isOpen={Boolean(deleteTarget)} onClose={() => { if (!isDeleting) setDeleteTarget(null); }} title="Delete this movement?" subtitle={deleteTarget ? `${transactionLabel(deleteTarget.transferType)} · ${formatCurrency(deleteTarget.amount)}` : ''} size="sm" closeOnBackdrop={!isDeleting} footer={(
+        <>
+          <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} isDisabled={isDeleting}>Keep movement</Button>
+          <Button type="button" variant="danger" leftIcon={Trash2} onClick={handleDelete} isLoading={isDeleting}>Delete movement</Button>
+        </>
+      )}>
+        <p className="text-sm leading-6 text-slate-600">This removes the movement from the active history and reverses its journal. The record remains archived for audit purposes.</p>
       </Modal>
     </section>
   );
