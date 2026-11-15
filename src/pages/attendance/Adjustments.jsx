@@ -837,13 +837,6 @@ export default function Adjustments() {
   // ============================================================
 
   const addSession = () => {
-    if (
-      sessionCount >= 2
-    ) {
-      showToast("Maximum 2 sessions allowed", "warning");
-      return;
-    }
-
     setFormData(
       (prev) => ({
         ...prev,
@@ -2396,16 +2389,14 @@ export default function Adjustments() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {sessionCount < 2 && (
-                    <button
-                      type="button"
-                      onClick={addSession}
-                      className="text-white text-xs font-medium px-4 py-1.5 rounded-md transition-all font-poppins cursor-pointer shadow-xs hover:opacity-95"
-                      style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
-                    >
-                      Add Sessions
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={addSession}
+                    className="text-white text-xs font-medium px-4 py-1.5 rounded-md transition-all font-poppins cursor-pointer shadow-xs hover:opacity-95"
+                    style={{ background: 'linear-gradient(93.63deg, #034665 9.04%, #068DCB 92.43%)' }}
+                  >
+                    Add Sessions
+                  </button>
 
                   <button
                     type="button"
