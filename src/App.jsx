@@ -350,14 +350,10 @@ export default function App() {
     }
   }, []);
 
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-    if (!token || isTokenExpired(token)) {
-      return false;
-    }
-    return false;
+    return Boolean(token && !isTokenExpired(token));
   });
 
   const [authView, setAuthView] = useState(() => {
