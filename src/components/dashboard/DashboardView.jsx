@@ -1055,12 +1055,11 @@ export const DashboardView = () => {
   }, [setGlobalAttendanceStatus]);
 
   // Lightweight attendance-only query (called on interval and after actions)
-  const fetchTodayAttendance = useCallback(async (resolvedUserId) => {
+  const fetchTodayAttendance = useCallback(async (resolvedUserId, fallbackAttendance) => {
     try {
       let todayRecord = null;
       let segments = [];
       let todayDoc = null;
-      let timelineItem = null;
       let storedUser = null;
       try {
         storedUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
@@ -1133,7 +1132,7 @@ export const DashboardView = () => {
 
       // 1. Fetch Authoritative Attendance Document - ALWAYS (bypasses cache)
       try {
-        const todayRes = await api.get('/api/attendance/today', { skipCache: true });
+        const todayRes = await api.get('/api/attendance/today', { ttl: 0 });
         const tData = todayRes.data?.attendance || todayRes.data?.data?.attendance || todayRes.data?.data || todayRes.data;
         if (tData && (tData.checkInTime || tData.status || tData.approvalStatus || tData.adminStatus || tData._id) &&
           isUnscopedOrCurrentUsersAttendance(tData)) {
@@ -1146,265 +1145,35 @@ export const DashboardView = () => {
         console.warn("Authoritative attendance today fetch notice:", todayErr.message);
       }
 
-      // 1b. Fallback: If not found from /api/attendance/today, query /api/employee-panel/dashboard todayAttendance
       if (!todayDoc) {
-        try {
-          const dashRes = await api.get('/api/employee-panel/dashboard', { skipCache: true });
-          const dAtt = dashRes.data?.data?.todayAttendance || dashRes.data?.todayAttendance;
-          if (dAtt && (dAtt.checkInTime || dAtt.status) && isUnscopedOrCurrentUsersAttendance(dAtt)) {
-            if (isTodayDate(dAtt.date) || isTodayDate(dAtt.createdAt) || (dAtt.checkInTime && isTodayDate(dAtt.checkInTime))) {
-              todayDoc = {
-                ...dAtt,
-                date: dAtt.date || new Date().toISOString().split('T')[0],
-                totalWorkTime: dashRes.data?.data?.statistics?.todayWorkingHours || dAtt.currentWorkingHours || 0
-              };
-            }
-          }
-        } catch (dErr) {}
+        const dashboardAttendance = fallbackAttendance;
+        if (dashboardAttendance &&
+          (dashboardAttendance.checkInTime || dashboardAttendance.status) &&
+          isUnscopedOrCurrentUsersAttendance(dashboardAttendance) &&
+          (!dashboardAttendance.date ||
+            isTodayDate(dashboardAttendance.date) ||
+            isTodayDate(dashboardAttendance.createdAt) ||
+            (dashboardAttendance.checkInTime && isTodayDate(dashboardAttendance.checkInTime)))) {
+          todayDoc = {
+            ...dashboardAttendance,
+            date: dashboardAttendance.date || new Date().toISOString().split('T')[0],
+            totalWorkTime: dashboardAttendance.totalWorkTime ??
+              dashboardAttendance.currentWorkingHours ??
+              0
+          };
+        }
       }
 
-      // 1c. Fallback: If still not found, check /api/attendance/:id if active attendance ID is cached
-      if (!todayDoc) {
-        try {
-          const cachedAttId = localStorage.getItem('kt_current_attendance_id');
-          if (cachedAttId && /^[0-9a-fA-F]{24}$/.test(cachedAttId)) {
-            const attByIdRes = await api.get(`/api/attendance/${cachedAttId}`, { skipCache: true });
-            const attData = attByIdRes.data?.attendance || attByIdRes.data?.data || attByIdRes.data;
-            if (attData && (attData.checkInTime || attData.status) && isCurrentUsersAttendance(attData)) {
-              if (isTodayDate(attData.date) || isTodayDate(attData.createdAt) || (attData.checkInTime && isTodayDate(attData.checkInTime))) {
-                todayDoc = attData;
-              } else {
-                localStorage.removeItem('kt_current_attendance_id');
-              }
-            } else if (attData) {
-              localStorage.removeItem('kt_current_attendance_id');
-            }
-          }
-        } catch (idErr) {}
-      }
+      segments = todayDoc?.timelineSegments || [];
 
-      // 2. Fetch Timeline - Matches AttendanceView.jsx query protocol to reliably retrieve today's record
-      try {
-        let tlList = [];
-        try {
-          const tlRes = await api.get('/api/employee-panel/attendance/timeline?filter=today', { skipCache: true });
-          tlList = tlRes.data?.data || tlRes.data?.timeline || [];
-        } catch (e) {
-          tlList = [];
-        }
-
-        // Timeline responses may include multiple employees; only use the signed-in user's record.
-        let found = Array.isArray(tlList) 
-          ? tlList.find(r =>
-            isCurrentUsersAttendance(r) &&
-            (isTodayDate(r.date) || isTodayDate(r.createdAt) || (r.checkInTime && isTodayDate(r.checkInTime)))
-          )
-          : null;
-
-        // Fallback: If not found with ?filter=today, fetch ?filter=last10days (which is the default in AttendanceView)
-        if (!found) {
-          try {
-            const tlRes10 = await api.get('/api/employee-panel/attendance/timeline?filter=last10days', { skipCache: true });
-            const list10 = tlRes10.data?.data || tlRes10.data?.timeline || [];
-            if (Array.isArray(list10)) {
-              found = list10.find(r =>
-                isCurrentUsersAttendance(r) &&
-                (isTodayDate(r.date) || isTodayDate(r.createdAt) || (r.checkInTime && isTodayDate(r.checkInTime)))
-              );
-            }
-          } catch (e10) {
-            console.warn("Timeline last10days fallback notice:", e10.message);
-          }
-        }
-
-        if (found) {
-          timelineItem = found;
-          segments = found.timelineSegments || [];
-        }
-      } catch (tlErr) {
-        console.warn("Timeline today fetch notice:", tlErr.message);
-      }
-
-      // 3. Query organizational attendance logs (/api/attendance/admin/all) which holds authoritative verified records for today
-      let adminRecord = null;
-      try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const todayDateStr = `${year}-${month}-${day}`;
-
-        let aList = [];
-        try {
-          const aRes = await api.get(`/api/attendance/admin/all?date=${encodeURIComponent(todayDateStr)}&_t=${Date.now()}`, { skipCache: true });
-          aList = Array.isArray(aRes.data) ? aRes.data : (aRes.data?.data || aRes.data?.attendance || aRes.data?.logs || aRes.data?.records || []);
-        } catch (e1) {
-          try {
-            const aResAll = await api.get('/api/attendance/admin/all', { skipCache: true });
-            aList = Array.isArray(aResAll.data) ? aResAll.data : (aResAll.data?.data || aResAll.data?.attendance || aResAll.data?.logs || aResAll.data?.records || []);
-          } catch (e2) {}
-        }
-
-        if (Array.isArray(aList) && aList.length > 0) {
-          let storedUser = null;
-          try {
-            storedUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
-          } catch (e) {}
-
-          let tokenUserId = null;
-          try {
-            const token = localStorage.getItem('auth_token');
-            if (token && token.includes('.')) {
-              const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-              tokenUserId = payload.id || payload._id || payload.userId;
-            }
-          } catch (e) {}
-
-          const candIds = [
-            resolvedUserId,
-            actualUserIdRef.current,
-            user?._id,
-            user?.id,
-            user?.employeeId,
-            user?.employee?._id,
-            user?.employee?.id,
-            user?.employee?.employeeId,
-            user?.user?._id,
-            user?.user?.id,
-            storedUser?._id,
-            storedUser?.id,
-            storedUser?.employee?._id,
-            storedUser?.employeeId,
-            storedUser?.user?._id,
-            tokenUserId
-          ].filter(Boolean).map(x => String(x).toLowerCase().trim());
-
-          const candEmails = [
-            user?.email,
-            user?.user?.email,
-            user?.employee?.email,
-            storedUser?.email,
-            storedUser?.user?.email,
-            storedUser?.employee?.email
-          ].filter(Boolean).map(x => String(x).toLowerCase().trim());
-
-          const matchedAdmin = aList.find(item => {
-            if (!item) return false;
-            // Record MUST be strictly for today
-            const isItemToday = isTodayDate(item.date) || isTodayDate(item.attendanceDate) || isTodayDate(item.createdAt);
-            if (!isItemToday) return false;
-
-            // Only consider if item has an actual check-in or is active
-            const hasCheckIn = Boolean(
-              item.checkInTime || item.punchIn || item.checkIn || item.approvedCheckInTime
-            );
-            const statusL = String(item.status || item.attendanceStatus || '').toLowerCase();
-            if (!hasCheckIn && ['not_checked_in', 'not-checked-in', 'absent', 'none', 'idle'].includes(statusL)) {
-              return false;
-            }
-
-            // Strictly match user identity - NEVER match item._id (which is attendance record ID!)
-            const itemUserIds = [
-              item.employeeId,
-              item.employeeID,
-              item.userId,
-              typeof item.employee === 'object' ? item.employee?._id : item.employee,
-              typeof item.employee === 'object' ? item.employee?.id : null,
-              typeof item.employee === 'object' ? item.employee?.employeeId : null,
-              typeof item.user === 'object' ? item.user?._id : item.user,
-              typeof item.user === 'object' ? item.user?.id : null,
-              typeof item.userId === 'object' ? item.userId?._id : null
-            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
-
-            if (candIds.length > 0 && itemUserIds.some(id => candIds.includes(id))) return true;
-
-            const itemEmails = [
-              item.email,
-              item.employeeEmail,
-              typeof item.employee === 'object' ? item.employee?.email : null,
-              typeof item.user === 'object' ? item.user?.email : null,
-              typeof item.userId === 'object' ? item.userId?.email : null
-            ].filter(Boolean).map(x => String(x).toLowerCase().trim());
-
-            if (candEmails.length > 0 && itemEmails.some(em => candEmails.includes(em))) return true;
-
-            // Strict exact full-name match only (no substring/partial matching!)
-            const candNames = [
-              user?.name,
-              user?.fullName,
-              user?.employeeName,
-              user?.employee?.name,
-              user?.employee?.fullName,
-              user?.user?.name,
-              user?.user?.fullName,
-              storedUser?.name,
-              storedUser?.fullName,
-              storedUser?.employee?.name,
-              storedUser?.employeeName
-            ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
-
-            const itemNames = [
-              item.name,
-              item.employeeName,
-              typeof item.employee === 'object' ? (item.employee?.name || item.employee?.fullName) : null,
-              typeof item.user === 'object' ? (item.user?.name || item.user?.fullName) : null
-            ].filter(Boolean).map(x => String(x).toLowerCase().replace(/\s+/g, ' ').trim());
-
-            return candNames.length > 0 && itemNames.some(nm => candNames.some(c => c === nm));
-          });
-
-          if (matchedAdmin) {
-            adminRecord = matchedAdmin;
-          }
-        }
-      } catch (adminErr) {
-        console.warn("Admin all attendance lookup notice:", adminErr.message);
-      }
-
-      // 4. Query /api/attendance/pending ONLY for TODAY'S pending check-in requests
-      let pendingDoc = null;
-      try {
-        const pendRes = await api.get('/api/attendance/pending', { skipCache: true });
-        const pList = pendRes.data?.pendingRequests || pendRes.data?.requests || pendRes.data?.data || pendRes.data?.attendance || (Array.isArray(pendRes.data) ? pendRes.data : []);
-        if (Array.isArray(pList) && pList.length > 0) {
-          const effId = resolvedUserId || actualUserIdRef.current || user?.employee?._id || user?._id || user?.id || user?.user?._id;
-          const effEmail = (user?.email || user?.user?.email || '').toLowerCase().trim();
-          const myPending = pList.find(item => {
-            const isRecToday = isTodayDate(item.date) || isTodayDate(item.checkInTime) || isTodayDate(item.createdAt);
-            if (!isRecToday) return false;
-            const iUserId = item.userId?._id || item.userId?.id || item.userId || item.employee?._id || item.employee || item.employeeId;
-            const iEmail = (item.email || item.userId?.email || item.user?.email || item.employee?.email || '').toLowerCase().trim();
-            return (effId && iUserId && String(iUserId).toLowerCase() === String(effId).toLowerCase()) ||
-                   (effEmail && iEmail && iEmail === effEmail);
-          });
-          if (myPending) {
-            // ONLY consider pending if user does NOT already have an active/present session
-            const hasActiveWork = [todayDoc, timelineItem, adminRecord].some(isAttendanceApproved);
-            if (!hasActiveWork) {
-              pendingDoc = myPending;
-              if (!todayDoc) todayDoc = {};
-              todayDoc.approvalStatus = 'pending';
-              todayDoc.status = 'pending';
-              if (myPending.checkInTime && !todayDoc.checkInTime) {
-                todayDoc.checkInTime = myPending.checkInTime;
-              }
-            }
-          }
-        }
-      } catch (pendErr) {
-        // Ignored if /api/attendance/pending is restricted or empty
-      }
-
-      // 5. Merge all sources: todayDoc, timelineItem, adminRecord (preserving all break data, times, and segments)
+      // Reconcile the authenticated attendance record with locally saved adjustment breaks.
       const rawBreaks = [
         ...asBreakArray(todayDoc?.breaks),
-        ...asBreakArray(timelineItem?.breaks),
-        ...asBreakArray(adminRecord?.breaks),
-        ...[todayDoc, timelineItem, adminRecord]
+        ...[todayDoc]
           .filter(Boolean)
           .map(getTopLevelBreak)
           .filter(b => b.startTime || b.endTime),
-        ...[todayDoc, timelineItem, adminRecord]
+        ...[todayDoc]
           .filter(record => Array.isArray(record?.sessions))
           .flatMap(record => record.sessions.map(normalizeBreakRecord).filter(b => b.startTime || b.endTime))
       ];
@@ -1421,10 +1190,7 @@ export const DashboardView = () => {
           return secondUpdatedAt - firstUpdatedAt;
         });
 
-      const rawBreakDuration = todayDoc?.totalBreakTime ??
-        timelineItem?.totalBreakTime ??
-        adminRecord?.totalBreakTime ??
-        adminRecord?.breakDuration;
+      const rawBreakDuration = todayDoc?.totalBreakTime ?? todayDoc?.breakDuration;
       const reportedBreakMinutes =
         Math.round(parseFloat(String(rawBreakDuration || 0).replace(/[^\d.-]/g, '')) || 0);
       const getCompleteBreakMinutes = (records) => getUniqueBreaks(records).reduce((total, record) => {
@@ -1505,7 +1271,11 @@ export const DashboardView = () => {
         );
       }
 
-      const mergedCheckIn = todayDoc?.approvedCheckInTime || todayDoc?.checkInTime || todayDoc?.checkInTimeDisplay || todayDoc?.approvedCheckInTimeDisplay || timelineItem?.approvedCheckInTime || timelineItem?.checkInTime || timelineItem?.checkInTimeDisplay || adminRecord?.approvedCheckInTime || adminRecord?.checkInTime || adminRecord?.punchIn || adminRecord?.checkIn || todayDoc?.inTime || timelineItem?.inTime;
+      const mergedCheckIn = todayDoc?.approvedCheckInTime ||
+        todayDoc?.checkInTime ||
+        todayDoc?.checkInTimeDisplay ||
+        todayDoc?.approvedCheckInTimeDisplay ||
+        todayDoc?.inTime;
 
       // Authoritative null checkout preservation: if todayDoc explicitly has checkOutTime (even if null), honor it!
       let mergedCheckOut = null;
@@ -1513,46 +1283,42 @@ export const DashboardView = () => {
         mergedCheckOut = todayDoc.checkOutTime;
       } else if (todayDoc && Object.prototype.hasOwnProperty.call(todayDoc, 'checkOutTimeDisplay')) {
         mergedCheckOut = todayDoc.checkOutTimeDisplay;
-      } else if (timelineItem && Object.prototype.hasOwnProperty.call(timelineItem, 'checkOutTime')) {
-        mergedCheckOut = timelineItem.checkOutTime;
       } else {
-        mergedCheckOut = adminRecord?.checkOutTime || adminRecord?.punchOut || adminRecord?.checkOut || todayDoc?.outTime || timelineItem?.outTime || null;
+        mergedCheckOut = todayDoc?.outTime || null;
       }
 
-      const approvedRecord = [todayDoc, timelineItem, adminRecord].find(isAttendanceApproved);
+      const approvedRecord = isAttendanceApproved(todayDoc) ? todayDoc : null;
       const mergedStatus = approvedRecord
         ? 'approved'
-        : todayDoc?.status || timelineItem?.status || adminRecord?.status || adminRecord?.attendanceStatus;
+        : todayDoc?.status || todayDoc?.attendanceStatus;
 
       const mergedSource = {
-        date: todayDoc?.date || timelineItem?.date || adminRecord?.date || new Date().toISOString().split('T')[0],
-        ...(adminRecord || {}),
-        ...(timelineItem || {}),
+        date: todayDoc?.date || new Date().toISOString().split('T')[0],
         ...(todayDoc || {}),
-        date: todayDoc?.date || timelineItem?.date || adminRecord?.date || new Date().toISOString().split('T')[0],
+        date: todayDoc?.date || new Date().toISOString().split('T')[0],
         status: mergedStatus,
         approvalStatus: approvedRecord
           ? 'approved'
-          : todayDoc?.approvalStatus || timelineItem?.approvalStatus || adminRecord?.approvalStatus,
+          : todayDoc?.approvalStatus,
         adminStatus: approvedRecord
           ? 'approved'
-          : todayDoc?.adminStatus || timelineItem?.adminStatus || adminRecord?.adminStatus,
+          : todayDoc?.adminStatus,
         checkInStatus: approvedRecord
           ? 'approved'
-          : todayDoc?.checkInStatus || timelineItem?.checkInStatus || adminRecord?.checkInStatus,
+          : todayDoc?.checkInStatus,
         checkInTime: mergedCheckIn,
         checkOutTime: mergedCheckOut,
         breaks: rawBreaks,
-        totalBreakTime: todayDoc?.totalBreakTime ?? timelineItem?.totalBreakTime ?? adminRecord?.totalBreakTime ?? adminRecord?.breakDuration,
-        rejectionReason: todayDoc?.rejectionReason || timelineItem?.rejectionReason || adminRecord?.rejectionReason || todayDoc?.rejectReason || timelineItem?.rejectReason,
-        isRejected: todayDoc?.isRejected ?? timelineItem?.isRejected ?? adminRecord?.isRejected,
+        totalBreakTime: todayDoc?.totalBreakTime ?? todayDoc?.breakDuration,
+        rejectionReason: todayDoc?.rejectionReason || todayDoc?.rejectReason,
+        isRejected: todayDoc?.isRejected,
         isApproved: approvedRecord
           ? true
-          : todayDoc?.isApproved ?? timelineItem?.isApproved ?? adminRecord?.isApproved,
-        timelineSegments: (segments && segments.length > 0) ? segments : (todayDoc?.timelineSegments || timelineItem?.timelineSegments || adminRecord?.timelineSegments || [])
+          : todayDoc?.isApproved,
+        timelineSegments: segments || todayDoc?.timelineSegments || []
       };
 
-      if (todayDoc || timelineItem || adminRecord) {
+      if (todayDoc) {
         todayRecord = normalizeAttendanceRecord(mergedSource);
       }
 
@@ -1643,7 +1409,7 @@ export const DashboardView = () => {
       });
 
       // 5. Fetch Today Attendance
-      await fetchTodayAttendance(effectiveId);
+      await fetchTodayAttendance(effectiveId, dData.todayAttendance);
     } catch (error) {
       console.error("fetchFullDashboard error:", error);
     }
@@ -1685,7 +1451,6 @@ export const DashboardView = () => {
       if (isMounted) {
         setActualUserId(validUserId);
         actualUserIdRef.current = validUserId;
-        fetchTodayAttendance(validUserId); // Instant attendance fetch
         await fetchFullDashboard(validUserId);
         setIsDataLoading(false);
       }
@@ -1694,12 +1459,6 @@ export const DashboardView = () => {
     bootstrapDashboard();
     return () => { isMounted = false; };
   }, [fetchFullDashboard, fetchTodayAttendance]);
-
-  // Instant attendance fetch on mount (in parallel with bootstrapDashboard)
-  useEffect(() => {
-    const targetId = user?.employee?._id || user?._id || user?.id || user?.user?._id;
-    fetchTodayAttendance(targetId);
-  }, [fetchTodayAttendance, user]);
 
   // Listen to profile photo updates (from ProfileView or other tabs) to refresh dashboard team on leave
   useEffect(() => {

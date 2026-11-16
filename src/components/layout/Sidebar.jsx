@@ -8,100 +8,7 @@ import {
 import { useApp } from '../../context/AppContext.jsx';
 import { tabToPath } from '../../utils/navigation.js';
 import api from '../../api/axios.js';
-import { isFinanceOrExcludedUser, isUnknownEmployeeOrUser } from '../../utils/roleFilters.js';
 import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
-
-const getResponseRecords = (payload, arrayKeys, envelopeKeys = ['data', 'result', 'payload', 'response']) => {
-  if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== 'object') return [];
-
-  for (const key of arrayKeys) {
-    if (Array.isArray(payload[key])) return payload[key];
-  }
-
-  for (const key of envelopeKeys) {
-    const records = getResponseRecords(payload[key], arrayKeys, envelopeKeys);
-    if (records.length > 0) return records;
-  }
-
-  return [];
-};
-
-const getCheckInRequestCount = (payload) => {
-  const pendingCount = payload?.pendingCount ?? payload?.summary?.pendingCount ?? payload?.data?.pendingCount;
-  if (Number.isFinite(Number(pendingCount))) return Number(pendingCount);
-
-  const records = getResponseRecords(payload, [
-    'pendingRequests',
-    'pending',
-    'requests',
-    'checkInRequests',
-    'attendanceRequests',
-    'attendance',
-    'logs',
-    'records',
-    'items',
-  ], ['data', 'result', 'payload', 'response', 'attendance', 'requests']);
-
-  return records.filter((record) => {
-    if (!record || isFinanceOrExcludedUser(record) || isUnknownEmployeeOrUser(record)) return false;
-    const status = String(record.approvalStatus || record.status || '').trim().toLowerCase();
-    return !['approved', 'approve', 'accepted', 'rejected', 'reject', 'denied'].includes(status);
-  }).length;
-};
-
-const getLeaveRequestCount = (payload) => {
-  const records = getResponseRecords(payload, ['leaves', 'data', 'requests', 'result']);
-
-  return records.filter((leave) => {
-    if (!leave || isFinanceOrExcludedUser(leave) || isUnknownEmployeeOrUser(leave)) return false;
-    const employee = leave.employeeId && typeof leave.employeeId === 'object'
-      ? leave.employeeId
-      : leave.employee || leave.user || leave.userId;
-    if (employee && (isFinanceOrExcludedUser(employee) || isUnknownEmployeeOrUser(employee))) return false;
-
-    const normalizeStatusValue = (status) => String(status || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
-    const isApproved = (status) => ['approved', 'approve', 'accepted'].includes(normalizeStatusValue(status));
-    const isRejected = (status) => ['rejected', 'reject', 'denied'].includes(normalizeStatusValue(status));
-    const applicantRole = String(
-      leave.role?.roleName ||
-      leave.role?.name ||
-      leave.role ||
-      leave.applicantRole ||
-      employee?.role?.roleName ||
-      employee?.role?.name ||
-      employee?.role ||
-      ''
-    ).toLowerCase().replace(/[_\-\s]+/g, '');
-    const teamLeadStatus = leave.teamLeadStatus || '';
-    const hrStatus = leave.hrStatus || leave.hrApprovalStatus || '';
-    const adminStatus = leave.adminStatus || (
-      applicantRole === 'hr' ? leave.status || leave.approvalStatus : ''
-    );
-
-    if ([teamLeadStatus, hrStatus, adminStatus].some(isRejected)) return false;
-    if (applicantRole === 'hr' && isApproved(adminStatus)) return false;
-    if (['employee', 'teamlead'].includes(applicantRole) && isApproved(hrStatus)) return false;
-    return true;
-  }).length;
-};
-
-const getEmployeeRequestCount = (payload) => {
-  const users = getResponseRecords(payload, ['users', 'data', 'requests', 'result']);
-  return users.filter((user) => {
-    if (!user || isUnknownEmployeeOrUser(user)) return false;
-    return !(user.isApproved === true || user.approved === true || user.status === 'approved');
-  }).length;
-};
-
-const getDeductionRequestCount = (payload) => {
-  const records = getResponseRecords(payload, ['deductions', 'data', 'records', 'items', 'result']);
-  return records.filter((record) => {
-    if (!record) return false;
-    const status = String(record.status || '').trim().toLowerCase();
-    return status === 'pending';
-  }).length;
-};
 
 // ==========================================================
 // EXACT REFERENCE ICONS MATCHING USER SCREENSHOT (media_1792663861944.png)
@@ -361,39 +268,34 @@ export const Sidebar = ({ onSignOut }) => {
     const refreshRequestCounts = async () => {
       if (isRefreshing) return;
       isRefreshing = true;
-      const results = await Promise.allSettled([
-        api.get(`/api/attendance/pending?_t=${Date.now()}`, { skipCache: true }),
-        api.get(`/api/leave/all?_t=${Date.now()}`, { skipCache: true }),
-        api.get(`/api/users/all?_t=${Date.now()}`, { skipCache: true }),
-        api.get(`/api/employee-deductions?status=Pending&_t=${Date.now()}`, { skipCache: true }).catch(() => api.get(`/api/deductions?status=Pending&_t=${Date.now()}`, { skipCache: true }))
-      ]);
-
-      isRefreshing = false;
-      if (!isMounted) return;
-
-      const countUpdates = {};
-      const countGetters = [getCheckInRequestCount, getLeaveRequestCount, getEmployeeRequestCount, getDeductionRequestCount];
-      const countKeys = ['checkIn', 'leave', 'employee', 'deduction'];
-
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          countUpdates[countKeys[index]] = countGetters[index](result.value.data);
-        } else {
-          console.warn(`Could not refresh sidebar ${countKeys[index]} request count:`, result.reason?.message || result.reason);
+      try {
+        const response = await api.get('/api/leave/sidebar-counts', { ttl: 0 });
+        const counts = response.data?.data;
+        const countKeys = ['checkIn', 'leave', 'employee', 'deduction'];
+        if (!counts || countKeys.some((key) => !Number.isFinite(Number(counts[key])))) {
+          throw new TypeError('Sidebar counts response is incomplete.');
         }
-      });
 
-      if (Object.keys(countUpdates).length > 0) {
-        setRequestCountState((previous) => ({
-          ...(previous.role === userRole ? previous : { checkIn: 0, leave: 0, employee: 0, deduction: 0 }),
-          ...countUpdates,
-          role: userRole,
-        }));
+        if (isMounted) {
+          setRequestCountState({
+            role: userRole,
+            checkIn: Number(counts.checkIn),
+            leave: Number(counts.leave),
+            employee: Number(counts.employee),
+            deduction: Number(counts.deduction),
+          });
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.warn('Could not refresh sidebar request counts:', error?.message || error);
+        }
+      } finally {
+        isRefreshing = false;
       }
     };
 
     refreshRequestCounts();
-    const intervalId = window.setInterval(refreshRequestCounts, 6000);
+    const intervalId = window.setInterval(refreshRequestCounts, 30000);
     const handleFocus = () => refreshRequestCounts();
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') refreshRequestCounts();
