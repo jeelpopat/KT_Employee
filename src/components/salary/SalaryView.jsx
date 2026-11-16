@@ -1917,6 +1917,7 @@ export const SalaryView = () => {
         allowance: 0,
         fixedBonus: 0,
         fixedDeduction: 0,
+        deductionItems: [],
         tdsPercentage: 0,
         grossSalary: 0,
         tdsAmount: 0,
@@ -1932,12 +1933,24 @@ export const SalaryView = () => {
     const allowance = Number(mySalaryStructure.allowance) || 0;
     const fixedBonus = Number(mySalaryStructure.fixedBonus) || 0;
     const fixedDeduction = Number(mySalaryStructure.fixedDeduction) || 0;
+    const pfDeduction = Number(mySalaryStructure.pfDeduction) || 0;
+    const esicDeduction = Number(mySalaryStructure.esicDeduction) || 0;
+    const professionalTax = Number(mySalaryStructure.professionalTax) || 0;
+    const otherDeductions = Number(mySalaryStructure.otherDeductions) || 0;
     const tdsPercentage = Number(mySalaryStructure.tdsPercentage) || 0;
 
     const calculatedGross = basic + hra + allowance + fixedBonus;
     const grossSalary = Number(mySalaryStructure.grossSalary != null ? mySalaryStructure.grossSalary : calculatedGross);
-    const tdsAmount = (grossSalary * tdsPercentage) / 100;
-    const totalDeductions = fixedDeduction + tdsAmount;
+    const tdsAmount = Number(mySalaryStructure.tds) || (grossSalary * tdsPercentage) / 100;
+    const deductionItems = [
+      { label: 'Fixed deduction', amount: fixedDeduction },
+      { label: 'Provident Fund (PF)', amount: pfDeduction },
+      { label: 'ESIC', amount: esicDeduction },
+      { label: 'Professional Tax', amount: professionalTax },
+      { label: tdsPercentage > 0 ? `TDS (${tdsPercentage}%)` : 'TDS / Income Tax', amount: tdsAmount },
+      { label: 'Other deductions', amount: otherDeductions }
+    ];
+    const totalDeductions = deductionItems.reduce((total, item) => total + item.amount, 0);
     const netSalary = Number(mySalaryStructure.netSalary != null ? mySalaryStructure.netSalary : Math.max(0, grossSalary - totalDeductions));
     const annualCtc = grossSalary * 12;
 
@@ -1948,9 +1961,14 @@ export const SalaryView = () => {
       allowance,
       fixedBonus,
       fixedDeduction,
-      tdsPercentage,
-      grossSalary,
+      pfDeduction,
+      esicDeduction,
+      professionalTax,
       tdsAmount,
+      tdsPercentage,
+      otherDeductions,
+      deductionItems,
+      grossSalary,
       totalDeductions,
       netSalary,
       annualCtc,
@@ -2661,6 +2679,29 @@ export const SalaryView = () => {
             ))}
           </div>
 
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">My Monthly Salary Deductions</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Deductions in your current salary structure</p>
+              </div>
+              <span className="text-sm font-bold text-rose-600">
+                -{formatINR(employeeMetrics.totalDeductions)}
+              </span>
+            </div>
+            {!employeeMetrics.hasStructure ? (
+              <p className="text-xs text-slate-400">No salary structure is currently available.</p>
+            ) : (
+              <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                {employeeMetrics.deductionItems.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-3 text-xs">
+                    <span className="text-slate-500">{item.label}</span>
+                    <span className="font-mono font-semibold text-rose-600">-{formatINR(item.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Processed Monthly Payroll Statements (GET /api/payroll) */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
