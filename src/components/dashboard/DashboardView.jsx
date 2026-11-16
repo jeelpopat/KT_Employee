@@ -26,7 +26,6 @@ import {
   alignBreakRecordsToShift
 } from '../../utils/timelineUtils.js';
 import { filterOutFinanceUsers, filterOutUnknownUsers } from '../../utils/roleFilters.js';
-import { getHalfDayType, isHalfDayLeave } from '../../utils/leaveUtils.js';
 import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 const parseBirthdayDate = (value) => {
@@ -1581,273 +1580,69 @@ export const DashboardView = () => {
         const dashRes = await api.get('/api/employee-panel/dashboard');
         dData = dashRes.data?.data || dashRes.data || {};
         setUpcomingBirthdays(getCurrentMonthBirthdaysFromUsers(dData.upcomingBirthdays || []));
-        if (dData.stats?.leaveBalance !== undefined) {
-          setLeaveBalance(`${dData.stats.leaveBalance} Days`);
+        if (dData.leaveSummary?.remainingLeave !== undefined) {
+          setLeaveBalance(`${dData.leaveSummary.remainingLeave} Days`);
         }
       } catch (dashErr) {
         console.warn("Dashboard stats fetch:", dashErr);
       }
 
-      // 2. Fetch User Directory (fresh without stale cache)
-      const uMap = {};
-      try {
-        const uRes = await api.get('/api/users/all', { skipCache: true });
-        const rawUsers =
-          uRes.data?.users ||
-          uRes.data?.data?.users ||
-          uRes.data?.data?.employees ||
-          uRes.data?.employees ||
-          uRes.data?.data ||
-          (Array.isArray(uRes.data) ? uRes.data : []);
-        if (Array.isArray(rawUsers)) {
-          setUpcomingBirthdays(getCurrentMonthBirthdaysFromUsers(rawUsers));
-          rawUsers.forEach(u => {
-            const photo = cleanPhotoUrl(
-              u.profilePhoto || u.profileImage || u.photoUrl || u.avatar || u.image || u.photo ||
-              u.employee?.profilePhoto || u.employee?.profileImage || u.employee?.photoUrl || u.employee?.avatar || u.employee?.image || u.employee?.photo ||
-              u.user?.profilePhoto || u.user?.photoUrl || u.user?.avatar ||
-              u.profile?.profilePhoto || u.profile?.photoUrl || u.profile?.avatar || ''
-            );
-            const enriched = { ...u, resolvedPhoto: photo };
-
-            const registerKey = (val) => {
-              if (!val) return;
-              if (typeof val === 'object') {
-                if (val._id) uMap[String(val._id).toLowerCase()] = enriched;
-                if (val.id) uMap[String(val.id).toLowerCase()] = enriched;
-                if (val.employeeId) uMap[String(val.employeeId).toLowerCase()] = enriched;
-                if (val.email) uMap[val.email.toLowerCase().trim()] = enriched;
-                if (val.name) uMap[val.name.toLowerCase().replace(/\s+/g, ' ').trim()] = enriched;
-                if (val.fullName) uMap[val.fullName.toLowerCase().replace(/\s+/g, ' ').trim()] = enriched;
-                return;
-              }
-              const str = String(val).trim();
-              if (str) uMap[str.toLowerCase()] = enriched;
-            };
-
-            registerKey(u._id);
-            registerKey(u.id);
-            registerKey(u.employeeId);
-            registerKey(u.email);
-            registerKey(u.name);
-            registerKey(u.fullName);
-            registerKey(u.employeeName);
-            if (u.firstName || u.lastName) {
-              registerKey(`${u.firstName || ''} ${u.lastName || ''}`.replace(/\s+/g, ' ').trim());
-            }
-            if (u.employee) registerKey(u.employee);
-            if (u.user) registerKey(u.user);
-          });
-        }
-      } catch (uErr) {
-        console.warn("Users directory fetch notice for dashboard:", uErr.message);
-      }
-
-      // Build extraPhotoMap from localStorage & uploaded /api/document records
+      // Use the compact dashboard response rather than downloading every user and document.
       const extraPhotoMap = {};
       try {
         const savedPhotos = JSON.parse(localStorage.getItem('kt_employee_photos') || '{}');
         Object.assign(extraPhotoMap, savedPhotos);
-      } catch (e) {}
-
-      try {
-        const docRes = await api.get('/api/document');
-        const docList = docRes.data?.data || docRes.data || [];
-        if (Array.isArray(docList)) {
-          docList.forEach(d => {
-            const isPhotoDoc = (
-              String(d.title || '').toLowerCase().includes('photo') ||
-              String(d.fileName || '').toLowerCase().match(/\.(jpg|jpeg|png|webp)$/i) ||
-              String(d.fileType || '').toLowerCase().startsWith('image/')
-            );
-            const fileUrl = cleanPhotoUrl(d.fileUrl || d.url || d.path);
-            if (isPhotoDoc && fileUrl) {
-              if (d.referenceId) extraPhotoMap[String(d.referenceId).toLowerCase().trim()] = fileUrl;
-              if (d.uploadedBy) extraPhotoMap[String(d.uploadedBy).toLowerCase().trim()] = fileUrl;
-            }
-          });
-        }
-      } catch (dErr) {
-        // Document fetch fallback
+      } catch (error) {
+        console.warn('Could not read cached employee photos:', error);
       }
 
-      // 3. Resolve Team Members On Leave
-      // Fetch /api/leave/all to get approved leaves with full employee populate & photos
-      let allLeaves = [];
-      try {
-        const lRes = await api.get('/api/leave/all', { skipCache: true });
-        allLeaves = lRes.data?.data || lRes.data?.leaves || lRes.data?.history || (Array.isArray(lRes.data) ? lRes.data : []);
-      } catch (lErr) {
-        console.warn("Active leaves fetch notice:", lErr.message);
-      }
-
-      const todayIso = new Date().toISOString().split('T')[0];
-      const todayLocal = new Date().toLocaleDateString('en-CA');
-      const activeLeaves = Array.isArray(allLeaves) ? allLeaves.filter(l => {
-        const status = String(l.status || '').toLowerCase().trim();
-        const tlStatus = String(l.teamLeadStatus || '').toLowerCase().trim();
-        const isApproved = status.includes('approved') || tlStatus === 'approved';
-        if (!isApproved) return false;
-        const s = (l.startDate || '').split('T')[0];
-        const e = (l.endDate || '').split('T')[0] || s;
-        return (s <= todayIso && e >= todayIso) || (s <= todayLocal && e >= todayLocal);
-      }) : [];
-
+      // 3. Resolve Team Members On Leave from the dashboard's bounded result.
       let resolvedTeamOnLeave = [];
       const dashList = Array.isArray(dData.teamMembersOnLeave) ? dData.teamMembersOnLeave : [];
 
-      if (dashList.length > 0) {
-        resolvedTeamOnLeave = dashList.map(t => {
-          // Cross-reference with matching active leave if available
-          const matchedLeave = activeLeaves.find(l => {
-            const lEmpId = String(typeof l.employeeId === 'object' ? l.employeeId?._id : l.employeeId || l.applicantId || '').toLowerCase();
-            const tId = String(t._id || t.id || (typeof t.employeeId === 'object' ? t.employeeId?._id : t.employeeId) || '').toLowerCase();
-            if (lEmpId && tId && (lEmpId === tId)) return true;
-            const lName = (l.applicantName || l.employeeName || (typeof l.employeeId === 'object' ? l.employeeId?.name : '') || '').toLowerCase().trim();
-            const tName = (t.name || t.fullName || '').toLowerCase().trim();
-            return lName && tName && (lName === tName);
-          });
-
-          let photo = resolveEmployeePhoto(t, uMap, extraPhotoMap);
-          if (!photo && matchedLeave) {
-            photo = resolveEmployeePhoto(matchedLeave, uMap, extraPhotoMap);
-          }
-          if (!photo) {
-            photo = cleanPhotoUrl(t.profilePhoto || t.photoUrl || t.avatar || '');
-          }
-
-          return {
-            ...t,
-            profilePhoto: photo
-          };
-        });
-      }
-
-      // If dashboard API returned no team leaves, use resolved active leaves from /api/leave/all
-      if (resolvedTeamOnLeave.length === 0 && activeLeaves.length > 0) {
-        resolvedTeamOnLeave = activeLeaves.map(l => {
-          const emp = (typeof l.employeeId === 'object' && l.employeeId !== null) ? l.employeeId :
-                      (typeof l.employee === 'object' && l.employee !== null) ? l.employee :
-                      (typeof l.user === 'object' && l.user !== null) ? l.user : null;
-          const idStr = String((typeof l.employeeId === 'string' ? l.employeeId : '') ||
-                               (typeof l.employee === 'string' ? l.employee : '') ||
-                               (typeof l.user === 'string' ? l.user : '') ||
-                               (typeof l.applicantId === 'string' ? l.applicantId : '') ||
-                               emp?._id || '').toLowerCase();
-          const emailStr = (l.applicantEmail || l.employeeEmail || l.email || emp?.email || '').toLowerCase().trim();
-          const nameStr = (l.applicantName || l.employeeName || l.name || emp?.name || '').toLowerCase().trim();
-          const matched = (idStr && uMap[idStr]) || (emailStr && uMap[emailStr]) || (nameStr && uMap[nameStr]) || null;
-          const rawName = emp?.name || emp?.fullName || matched?.name || matched?.fullName || l.applicantName || l.employeeName || 'Team Member';
-          const name = rawName.split(' ').map(p => p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '').join(' ').trim();
-          const rawDesig = emp?.designation || matched?.designation || matched?.role || l.applicantRole || 'Employee';
-          const designation = typeof rawDesig === 'object' ? (rawDesig.roleName || rawDesig.name || 'Employee') : String(rawDesig);
-
-          let photo = resolveEmployeePhoto(l, uMap, extraPhotoMap);
-          if (!photo && emp) {
-            photo = resolveEmployeePhoto(emp, uMap, extraPhotoMap);
-          }
-          if (!photo && matched) {
-            photo = resolveEmployeePhoto(matched, uMap, extraPhotoMap);
-          }
-          if (!photo) {
-            photo = cleanPhotoUrl(l.profilePhoto || l.photoUrl || '');
-          }
-
-          const isHalf = isHalfDayLeave(l);
-          const halfDayType = getHalfDayType(l);
-          const leaveDisplay = isHalf
-            ? `Half Day${halfDayType === 'second-half' ? ' (2nd Half)' : halfDayType === 'first-half' ? ' (1st Half)' : ''}`
-            : 'Full Day';
-          return {
-            _id: l._id || idStr,
-            name,
-            designation,
-            profilePhoto: photo,
-            leaveType: leaveDisplay
-          };
-        });
-      }
+      resolvedTeamOnLeave = dashList.map((item) => ({
+        ...item,
+        profilePhoto: resolveEmployeePhoto(item, {}, extraPhotoMap) ||
+          cleanPhotoUrl(item.profilePhoto || item.photoUrl || item.avatar || '')
+      }));
       setTeamOnLeave(resolvedTeamOnLeave);
 
-      // 4. Fetch Announcements & Holidays (cached in axios)
+      // 4. Fetch announcements separately; the dashboard already includes holidays.
       try {
         const annRes = await api.get('/api/notification/announcement/all');
         if (annRes.data?.success && annRes.data?.data) setAnnouncements(annRes.data.data);
       } catch (e) { }
 
-      try {
-        const holRes = await api.get('/api/holiday/current-month', { skipCache: true });
-        const holidayPayload = holRes.data;
-        const holidayList = Array.isArray(holidayPayload)
-          ? holidayPayload
-          : holidayPayload?.holidays ||
-            holidayPayload?.data?.holidays ||
-            holidayPayload?.data ||
-            holidayPayload?.currentMonthHolidays ||
-            holidayPayload?.result;
+      const holidayList = Array.isArray(dData.upcomingHolidays) ? dData.upcomingHolidays : [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      setHolidays(holidayList
+        .map((holiday) => ({
+          ...holiday,
+          holidayDate: holiday.holidayDate || holiday.date,
+          holidayName: holiday.holidayName || holiday.name || 'Holiday',
+        }))
+        .filter((holiday) => {
+          const dateParts = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(holiday.holidayDate || ''));
+          if (!dateParts) return false;
+          const [, year, month, day] = dateParts;
+          const holidayDate = new Date(Number(year), Number(month) - 1, Number(day));
+          return holidayDate.getFullYear() === currentYear &&
+            holidayDate.getMonth() === currentMonth &&
+            holidayDate >= today;
+        })
+        .sort((a, b) => String(a.holidayDate).localeCompare(String(b.holidayDate))));
 
-        if (!Array.isArray(holidayList)) {
-          console.warn('Unexpected current-month holidays response:', holidayPayload);
-          setHolidays([]);
-        } else {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const currentMonth = today.getMonth();
-          const currentYear = today.getFullYear();
+      const statistics = dData.statistics || {};
+      setTasksStats({
+        todo: Number(statistics.pendingTasks) || 0,
+        inProgress: Number(statistics.tasksInProgress) || 0,
+        completed: Number(statistics.completedTasks) || 0,
+      });
 
-          setHolidays(holidayList
-            .map((holiday) => ({
-              ...holiday,
-              holidayDate: holiday.holidayDate || holiday.date,
-              holidayName: holiday.holidayName || holiday.name || 'Holiday',
-            }))
-            .filter((holiday) => {
-              const dateParts = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(holiday.holidayDate || ''));
-              if (!dateParts) return false;
-
-              const [, year, month, day] = dateParts;
-              const holidayDate = new Date(Number(year), Number(month) - 1, Number(day));
-              return holidayDate.getFullYear() === currentYear &&
-                holidayDate.getMonth() === currentMonth &&
-                holidayDate >= today;
-            })
-            .sort((a, b) => String(a.holidayDate).localeCompare(String(b.holidayDate))));
-        }
-      } catch (holidayErr) {
-        console.warn('Current-month holidays fetch failed:', holidayErr);
-        setHolidays([]);
-      }
-
-      // 5. Fetch Tasks stats once
-      try {
-        let tasksList = [];
-        try {
-          const allRes = await api.get('/api/task/all');
-          tasksList = allRes.data?.data || allRes.data?.tasks || [];
-        } catch (allErr) {
-          if (effectiveId) {
-            const taskRes = await api.get(`/api/task/employee/${effectiveId}`);
-            tasksList = taskRes.data?.tasks || taskRes.data?.data || [];
-          }
-        }
-        if (Array.isArray(tasksList)) {
-          const norm = (s) => {
-            const str = String(s || '').toLowerCase().trim().replace(/[- ]/g, '_');
-            if (['pending', 'assigned', 'to_do', 'todo'].includes(str)) return 'todo';
-            if (['in_progress', 'testing', 'review', 'in_review'].includes(str)) return 'inProgress';
-            if (['completed', 'done'].includes(str)) return 'completed';
-            if (['cancelled', 'canceled'].includes(str)) return 'cancelled';
-            return 'todo';
-          };
-          setTasksStats({
-            todo: tasksList.filter(t => norm(t.status) === 'todo').length,
-            inProgress: tasksList.filter(t => norm(t.status) === 'inProgress').length,
-            completed: tasksList.filter(t => norm(t.status) === 'completed').length,
-          });
-        }
-      } catch (e) { console.warn("Tasks sync failed:", e); }
-
-      // 6. Fetch Today Attendance
+      // 5. Fetch Today Attendance
       await fetchTodayAttendance(effectiveId);
     } catch (error) {
       console.error("fetchFullDashboard error:", error);
@@ -1925,8 +1720,8 @@ export const DashboardView = () => {
       }
     };
 
-    // Auto-refresh every 12 seconds silently in the background
-    const interval = setInterval(refreshDashboardSilently, 12000);
+    // Refresh non-attendance dashboard data every minute.
+    const interval = setInterval(refreshDashboardSilently, 60000);
 
     const handleFocus = () => refreshDashboardSilently();
     const handleVisibility = () => {
