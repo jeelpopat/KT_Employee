@@ -368,6 +368,43 @@ export const filterOutUnknownUsers = (list) => {
   return list.filter((item) => !isUnknownEmployeeOrUser(item));
 };
 
+export const isUserActive = (entity) => {
+  if (!entity) return false;
+
+  const candidates = [
+    entity,
+    entity.user,
+    entity.employee,
+    entity.profile,
+    entity.userId,
+    entity.employeeId,
+    entity.userID,
+    entity.employeeID,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'object') {
+      if (typeof candidate.isActive === 'boolean') {
+        return candidate.isActive !== false;
+      }
+
+      const statusField = candidate.employeeStatus || candidate.employmentStatus || candidate.status;
+      if (statusField != null) {
+        const normalized = String(statusField).trim().toLowerCase();
+        if (['active', 'enabled', 'working', 'present'].includes(normalized)) return true;
+        if (['inactive', 'inactive employee', 'disabled', 'terminated', 'deactivated', 'blocked'].includes(normalized)) return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+export const filterOutInactiveUsers = (list) => {
+  if (!Array.isArray(list)) return [];
+  return list.filter((item) => isUserActive(item));
+};
+
 /**
  * Checks if a user, employee, or record has an HR role, designation, department, or email.
  */

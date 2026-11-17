@@ -4,6 +4,7 @@ import axios from "axios";
 import { AlertTriangle, ArrowRight, Crown, X } from "lucide-react";
 import {
   isFinanceOrExcludedUser,
+  filterOutInactiveUsers,
   isUnknownEmployeeOrUser,
   isHrRoleOrUser,
   isStrictEmployeeRole
@@ -1465,7 +1466,7 @@ const getDesignation = (lead) => {
         return Boolean(name && isValidName(name));
       });
 
-      setTeamLeads(cleanedLeads);
+      setTeamLeads(filterOutInactiveUsers(cleanedLeads));
       setAssignedEmployees(employeeAssignments);
 
     } catch (error) {
@@ -1500,12 +1501,12 @@ const getDesignation = (lead) => {
         throw new Error('Employee and user directory endpoints returned no employee records.');
       }
 
-      const validEmployees = allEmployees.filter((emp) => {
+      const validEmployees = filterOutInactiveUsers(allEmployees.filter((emp) => {
         if (!emp || isFinanceOrExcludedUser(emp) || isUnknownEmployeeOrUser(emp) || isHrRoleOrUser(emp)) return false;
         const name = getEmployeeName(emp);
         if (!name || isInvalidName(name)) return false;
         return true;
-      });
+      }));
       const distinctEmployeesList = getDistinctAssignedEmployees(validEmployees, validEmployees);
       setEmployees(distinctEmployeesList);
       return distinctEmployeesList;

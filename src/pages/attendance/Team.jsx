@@ -37,6 +37,7 @@ import {
   isFinanceOrExcludedUser,
   filterOutFinanceUsers,
   filterOutUnknownUsers,
+  filterOutInactiveUsers,
   isUnknownEmployeeOrUser,
   isHrRoleOrUser,
   isStrictEmployeeRole
@@ -829,7 +830,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       const res = await axios.get(EMPLOYEE_URL);
       const empData = res.data.data || res.data.employees || res.data || [];
       const list = Array.isArray(empData) ? empData : [];
-      setEmployees(filterOutUnknownUsers(filterOutFinanceUsers(list)));
+      setEmployees(filterOutInactiveUsers(filterOutUnknownUsers(filterOutFinanceUsers(list))));
     } catch (error) {
       console.error("Employees fetch error:", error);
       setEmployees([]);
@@ -842,7 +843,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       const userData = res.data.data || res.data.users || res.data || [];
       const list = Array.isArray(userData) ? userData : [];
       setRawUsers(list);
-      setUsers(filterOutUnknownUsers(filterOutFinanceUsers(list)));
+      setUsers(filterOutInactiveUsers(filterOutUnknownUsers(filterOutFinanceUsers(list))));
     } catch (error) {
       console.error("Users fetch error:", error);
       setRawUsers([]);
@@ -897,7 +898,7 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
         );
       };
 
-      const userTeamLeads = (Array.isArray(allUsers) ? allUsers : []).filter(isTeamLeadUser);
+      const userTeamLeads = filterOutInactiveUsers((Array.isArray(allUsers) ? allUsers : []).filter(isTeamLeadUser));
 
       // Optional: check teamLead/team for assigned employees if available
       let teamLeadsData = [];
@@ -929,8 +930,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
             return (docId && String(docId) === String(u._id)) || (docEmail && docEmail.toLowerCase() === (u.email || '').toLowerCase());
           });
 
-          const employees = (matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || [])
-            .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e) && !isHrRoleOrUser(e));
+          const employees = filterOutInactiveUsers((matchingDoc?.teamLead?.employees || matchingDoc?.employees || matchingDoc?.teamLead?.teamMembers || [])
+            .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e) && !isHrRoleOrUser(e)));
 
           optionsMap.set(dedupeKey, {
             _id: String(u._id || idKey),
@@ -973,8 +974,8 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
           return;
         }
 
-        const employees = (teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || [])
-          .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e) && !isHrRoleOrUser(e));
+        const employees = filterOutInactiveUsers((teamLeadRecord?.employees || lead?.employees || teamLeadRecord?.teamMembers || [])
+          .filter((e) => e && !isFinanceOrExcludedUser(e) && !isUnknownEmployeeOrUser(e) && !isHrRoleOrUser(e)));
 
         optionsMap.set(dedupeKey, {
           _id: String(leadId),

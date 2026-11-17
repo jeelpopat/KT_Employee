@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Clock3, FileText, RefreshCw, Search } from 'lucide-react';
 import api from '../../api/axios.js';
 import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
+import { filterOutInactiveUsers, isFinanceOrExcludedUser } from '../../utils/roleFilters.js';
 
 const formatDate = (value) => {
   if (!value) return '—';
@@ -116,7 +117,16 @@ export const AdminDailyTaskView = () => {
       if (!response.data?.success || !Array.isArray(response.data.data)) {
         throw new Error(response.data?.message || 'The server returned an invalid daily report list.');
       }
-      setReports(response.data.data);
+
+      const visibleReports = filterOutInactiveUsers(
+        response.data.data.filter((report) => {
+          if (!report) return false;
+          const employee = report.employeeId || report.user || report.employee || report.userId || report.userID;
+          return !isFinanceOrExcludedUser(employee) && !isFinanceOrExcludedUser(report);
+        })
+      );
+
+      setReports(visibleReports);
     } catch (error) {
       console.error('Failed to load employee daily reports:', error);
       setErrorMessage(
