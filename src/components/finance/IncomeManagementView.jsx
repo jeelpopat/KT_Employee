@@ -297,8 +297,16 @@ export const IncomeManagementView = () => {
     event.preventDefault();
     setFormError('');
     const amount = numberValue(form.amount);
-    if (!activeCompanyId || !formBranchId || !selectedYear || !selectedAccount) {
-      setFormError('Choose a branch, open financial year and compatible payment account.');
+    if (!activeCompanyId || !formBranchId) {
+      setFormError('Choose a branch before recording income.');
+      return;
+    }
+    if (!selectedYear) {
+      setFormError('Create or select an open financial year for this branch before recording income.');
+      return;
+    }
+    if (!selectedAccount) {
+      setFormError('Add or select a compatible bank or cash account before recording income.');
       return;
     }
     if (amount <= 0 || !form.title.trim()) {
@@ -429,7 +437,7 @@ export const IncomeManagementView = () => {
           <div className="relative z-10 flex flex-wrap gap-2">
             <Button variant="outline" leftIcon={RefreshCw} onClick={() => { setIsLoadingIncomes(true); setIsLoadingSetup(Boolean(formBranchId)); setReloadKey((value) => value + 1); }} isDisabled={!activeCompanyId} className="border-white/25 bg-white/15 text-white hover:bg-white/20">Refresh</Button>
             <Button leftIcon={Download} onClick={exportCsv} isLoading={isExporting} isDisabled={!visibleIncomes.length} className="bg-white text-[#034665] shadow-md hover:bg-cyan-50">Export</Button>
-            <Button leftIcon={Plus} onClick={openForm} isDisabled={!activeCompanyId || !formBranchId || !financialYears.length || !bankAccounts.length || isLoadingSetup} className="bg-cyan-300 text-[#034665] hover:bg-cyan-200">Record income</Button>
+            {canManageIncome && <Button leftIcon={Plus} onClick={openForm} isDisabled={!activeCompanyId || isLoadingBranches} className="bg-cyan-300 text-[#034665] hover:bg-cyan-200">Record income</Button>}
           </div>
         </div>
       </header>
@@ -510,6 +518,7 @@ export const IncomeManagementView = () => {
                 <label className="sm:col-span-2"><span className={LABEL_CLASS}>Description</span><textarea className={`${CONTROL_CLASS} min-h-20 resize-y`} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={1000} disabled={isSaving} /></label>
               </div>
               {setupError && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{setupError}</p>}
+              {!isLoadingBranches && !formBranchId && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Create a branch before recording income.</p>}
               {!isLoadingSetup && formBranchId && financialYears.length === 0 && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{editingIncome ? 'This income cannot be edited because its financial year is locked or unavailable.' : 'Create an open financial year for this branch before recording income.'}</p>}
               {!isLoadingSetup && formBranchId && availableAccounts.length === 0 && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">No payment account is available for this payment mode and branch.</p>}
               {formError && <p role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />{formError}</p>}

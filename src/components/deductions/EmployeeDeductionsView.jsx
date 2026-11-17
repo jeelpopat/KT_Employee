@@ -396,15 +396,14 @@ export const EmployeeDeductionsView = () => {
     );
   }, [addForm.employeeId, usersList, myTeamMembers]);
 
-  // Detect if selected employee already has an active deduction of the same type for the selected period
+  // Detect if selected employee already has an active deduction of the same type on this incident date
   const existingEmployeeDeduction = useMemo(() => {
-    if (!addForm.employeeId || !addForm.deductionMasterId || !addForm.month || !addForm.year) {
+    if (!addForm.employeeId || !addForm.deductionMasterId || !addForm.incidentDate) {
       return null;
     }
     const targetUserId = String(selectedEmpUser?._id || selectedEmpUser?.id || addForm.employeeId).toLowerCase();
     const targetMasterId = String(addForm.deductionMasterId).toLowerCase();
-    const targetMonth = Number(addForm.month);
-    const targetYear = Number(addForm.year);
+    const targetIncidentDate = String(addForm.incidentDate).slice(0, 10);
 
     return (
       deductions.find((d) => {
@@ -424,19 +423,18 @@ export const EmployeeDeductionsView = () => {
           d.deductionMasterId ||
           ''
         ).toLowerCase();
-        const dMonth = Number(d.month);
-        const dYear = Number(d.year);
+        const dIncidentDate = String(d.incidentDate || d.createdAt || '').slice(0, 10);
         const dStatus = String(d.status || '').toLowerCase();
 
         const isSameEmp = dEmpId === targetUserId;
         const isSameMaster = dMasterId === targetMasterId;
-        const isSamePeriod = dMonth === targetMonth && dYear === targetYear;
+        const isSameDate = dIncidentDate === targetIncidentDate;
         const isActiveDeduction = !['cancelled', 'rejected'].includes(dStatus);
 
-        return isSameEmp && isSameMaster && isSamePeriod && isActiveDeduction;
+        return isSameEmp && isSameMaster && isSameDate && isActiveDeduction;
       }) || null
     );
-  }, [addForm.employeeId, addForm.deductionMasterId, addForm.month, addForm.year, deductions, editingDeductionId, selectedEmpUser]);
+  }, [addForm.employeeId, addForm.deductionMasterId, addForm.incidentDate, deductions, editingDeductionId, selectedEmpUser]);
 
   // Automatically resolve Reporting Team Leader for selected employee
   const resolvedReportingTL = useMemo(() => {
@@ -727,7 +725,7 @@ export const EmployeeDeductionsView = () => {
     if (!addForm.month || !addForm.year) errors.payrollMonth = 'Applicable payroll period is required';
 
     if (existingEmployeeDeduction) {
-      errors.employeeId = `A deduction of this type already exists for ${selectedEmpUser?.name || 'this employee'} for ${MONTH_NAMES[existingEmployeeDeduction.month - 1]} ${existingEmployeeDeduction.year} (Record ID: ${existingEmployeeDeduction.deductionRecordId}, Status: ${existingEmployeeDeduction.status}). Please choose a different employee.`;
+      errors.incidentDate = `A deduction of this type already exists for ${selectedEmpUser?.name || 'this employee'} on ${addForm.incidentDate} (Record ID: ${existingEmployeeDeduction.deductionRecordId}, Status: ${existingEmployeeDeduction.status}). Choose a different incident date.`;
     }
 
     setAddFormErrors(errors);
@@ -1078,7 +1076,7 @@ export const EmployeeDeductionsView = () => {
                     onChange={(e) => setAddForm({ ...addForm, employeeId: e.target.value })}
                     disabled={Boolean(editingDeductionId)}
                     className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition ${
-                      addFormErrors.employeeId || existingEmployeeDeduction ? 'border-amber-300 bg-amber-50/20' : 'border-slate-300'
+                      addFormErrors.employeeId ? 'border-amber-300 bg-amber-50/20' : 'border-slate-300'
                     }`}
                   >
                     <option value="">-- Choose Employee --</option>
@@ -1149,10 +1147,10 @@ export const EmployeeDeductionsView = () => {
                         Existing Deduction Detected For This Employee
                       </span>
                       <span className="text-xs text-amber-800 leading-relaxed block mt-1">
-                        A deduction of type <strong>"{selectedMasterDoc?.name || 'this type'}"</strong> already exists for <strong>{selectedEmpUser?.name || 'this employee'}</strong> for {MONTH_NAMES[existingEmployeeDeduction.month - 1]} {existingEmployeeDeduction.year} (Record ID: <code className="font-mono font-semibold bg-white px-1.5 py-0.5 rounded border border-amber-200">{existingEmployeeDeduction.deductionRecordId}</code>, Status: <strong>{existingEmployeeDeduction.status}</strong>).
+                        A deduction of type <strong>"{selectedMasterDoc?.name || 'this type'}"</strong> already exists for <strong>{selectedEmpUser?.name || 'this employee'}</strong> on {addForm.incidentDate} (Record ID: <code className="font-mono font-semibold bg-white px-1.5 py-0.5 rounded border border-amber-200">{existingEmployeeDeduction.deductionRecordId}</code>, Status: <strong>{existingEmployeeDeduction.status}</strong>).
                         <br />
                         <span className="font-semibold text-amber-950 mt-1 block">
-                          To apply this deduction to another staff member, select a different employee from the dropdown.
+                          Only one deduction of this type is allowed per employee per date. Choose a different incident date.
                         </span>
                       </span>
                     </div>
