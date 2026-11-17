@@ -143,7 +143,7 @@ export const ProjectView = () => {
   // Role detection: employees cannot create, edit, or delete projects, nor view client details or budgets
   const rawRole = userRole || deriveUserRole(user);
   const normalizedRole = String(rawRole || '').toLowerCase().trim();
-  const isAdmin = isAdminRole(normalizedRole, user);
+  const isAdmin = isAdminRole(normalizedRole, user) || normalizedRole === 'hr';
   const isTL = !isAdmin && isTeamLeadRole(normalizedRole, user);
   const isEmployee = !isAdmin && !isTL && normalizedRole === 'employee';
   const userIdentifiers = useMemo(() => {

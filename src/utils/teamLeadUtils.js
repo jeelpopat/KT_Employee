@@ -643,11 +643,13 @@ export const isTeamLeadRole = (role, user = null) => {
 };
 
 /**
- * Checks whether role corresponds to Admin
+ * Checks whether role corresponds to Admin or HR management access.
+ * HR should be treated as an admin-style manager for cross-functional views
+ * such as project management and organization-wide operations.
  */
 export const isAdminRole = (role, user = null) => {
   const normalized = String(role || '').toLowerCase().trim();
-  return normalized === 'admin';
+  return normalized === 'admin' || normalized === 'hr';
 };
 
 /**
