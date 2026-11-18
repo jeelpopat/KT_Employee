@@ -159,8 +159,8 @@ const getAttendanceClassification = (...values) => {
 };
 
 // --- Geofencing Configuration (Office Location & 50 Meter Radius) ---
-const TARGET_LAT = 23.057808;
-const TARGET_LNG = 72.538926;
+const TARGET_LAT = 23.058290;
+const TARGET_LNG = 72.539190;
 const GEOFENCE_RADIUS_METERS = 50; // Allowed strictly within 50 meters
 const AUTO_CHECKOUT_RADIUS_METERS = 50; // Auto checkout outside 50 meters
 
@@ -1529,7 +1529,7 @@ export const DashboardView = () => {
           // Send background check-out to backend
           try {
             await api.post('/api/attendance/check-out', { latitude: TARGET_LAT, longitude: TARGET_LNG })
-              .catch(() => api.post('/api/attendance/check-out', { latitude: 23.057808, longitude: 72.538926 }))
+              .catch(() => api.post('/api/attendance/check-out', { latitude: 23.058290, longitude: 72.539190 }))
               .catch(() => {});
           } catch (e) { }
 
@@ -1648,8 +1648,8 @@ export const DashboardView = () => {
                   isAutoCheckout: true,
                   reason: 'Geofence breach (>50m)'
                 }).catch(() => api.post('/api/attendance/check-out', {
-                  latitude: 23.057808,
-                  longitude: 72.538926,
+                  latitude: 23.058290,
+                  longitude: 72.539190,
                   isAutoCheckout: true,
                   reason: 'Geofence breach (>50m)'
                 })).catch(() => {});
@@ -1908,8 +1908,8 @@ export const DashboardView = () => {
     }
 
     // Remote backend office anchor reference coordinates (Render server)
-    const BACKEND_OFFICE_REF_LAT = 23.057808;
-    const BACKEND_OFFICE_REF_LNG = 72.538926;
+    const BACKEND_OFFICE_REF_LAT = 23.058290;
+    const BACKEND_OFFICE_REF_LNG = 72.539190;
 
     // Payload variants:
     // 1st: Exact user GPS coords (or TARGET_LAT/TARGET_LNG)

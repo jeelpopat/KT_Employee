@@ -93,8 +93,8 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
   );
 });
 
-export const TARGET_LAT = 23.057808;
-export const TARGET_LNG = 72.538926;
+export const TARGET_LAT = 23.058290;
+export const TARGET_LNG = 72.539190;
 export const GEOFENCE_RADIUS_METERS = 50;
 export const AUTO_CHECKOUT_RADIUS_METERS = 50;
 
@@ -137,7 +137,7 @@ const attendanceRequest = (method, url, location) => {
       return api({
         method,
         url,
-        data: { latitude: 23.057808, longitude: 72.538926 }
+        data: { latitude: 23.058290, longitude: 72.539190 }
       });
     }
     throw err;
