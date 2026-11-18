@@ -1068,8 +1068,8 @@ export const Header = ({ onSignOut }) => {
 
         {/* Right: Actions, Notifications, Profile & Mobile Menu */}
         <div className="flex shrink-0 items-center gap-1 sm:gap-4 font-poppins">
-          {/* Active monitoring badge for employees and team leads */}
-          {userRole !== 'hr' && userRole !== 'admin' && attendanceStatus === 'checked_in' && (
+          {/* Active monitoring badge button for employees and team leads (Commented out) */}
+          {/* {userRole !== 'hr' && userRole !== 'admin' && attendanceStatus === 'checked_in' && (
             <button
               type="button"
               onClick={() => setCurrentTab('admin-screenshots')}
@@ -1079,7 +1079,7 @@ export const Header = ({ onSignOut }) => {
               <Camera size={14} className="text-emerald-600" />
               <span>Monitoring Active</span>
             </button>
-          )}
+          )} */}
 
           {/* Admin Announcement Trigger Button - Exact match to reference screenshot */}
           {(userRole === 'admin' || userRole === 'hr') && (

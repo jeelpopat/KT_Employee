@@ -1026,8 +1026,10 @@ export const isScreenCaptureActive = () => {
   return tracks.length > 0 && tracks[0].readyState === 'live';
 };
 
-// 5. Start real employee device screen capture via Web Screen Capture API (getDisplayMedia)
+// 5. Start real employee device screen capture via Web Screen Capture API (getDisplayMedia) - Disabled / Commented out
 export const startScreenCapture = async () => {
+  return null;
+  /*
   if (isScreenCaptureActive()) {
     return activeScreenStream;
   }
@@ -1080,6 +1082,7 @@ export const startScreenCapture = async () => {
     notifyStreamChange(false);
     throw err;
   }
+  */
 };
 
 // Stop real device screen capture

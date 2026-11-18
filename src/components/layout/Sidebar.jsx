@@ -411,7 +411,7 @@ export const Sidebar = ({ onSignOut }) => {
     {
       title: "MONITORING AND SECURITY",
       items: [
-        { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
+        // { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
         { tab: 'admin-audit-logs', label: 'Audit Logs', icon: AuditLogsIcon },
       ]
     },
@@ -467,7 +467,7 @@ export const Sidebar = ({ onSignOut }) => {
     {
       title: "MONITORING AND SECURITY",
       items: [
-        { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
+        // { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
         { tab: 'admin-audit-logs', label: 'Audit Logs', icon: AuditLogsIcon },
       ]
     },

@@ -476,7 +476,7 @@ export const AppProvider = ({ children }) => {
     return localStorage.getItem('kt_session_end_time') || null;
   });
 
-  // Background Screenshot Monitoring Config & Engine (Every 5 min default, Cloudinary Vault)
+  // Background Screenshot Monitoring Config & Engine (Disabled - kept for state safety)
   const [screenshotConfig, setScreenshotConfig] = useState({
     intervalSeconds: 300, // 5 Minutes default
     intervalMinutes: 5,
@@ -484,10 +484,11 @@ export const AppProvider = ({ children }) => {
     pauseOnBreak: true,
     retentionDays: 30,
     allowEmployeeView: false,
-    isEnabled: true
+    isEnabled: false
   });
 
-  // Load the saved monitoring interval for every role so automatic captures share the configured cadence.
+  // Load the saved monitoring interval for every role so automatic captures share the configured cadence. (Commented out)
+  /*
   useEffect(() => {
     const applySettings = (settings) => {
       if (!settings?.intervalSeconds) return;
@@ -524,6 +525,7 @@ export const AppProvider = ({ children }) => {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+  */
 
   const [screenshots, setScreenshots] = useState([]);
   const [latestScreenshot, setLatestScreenshot] = useState(null);
@@ -531,13 +533,15 @@ export const AppProvider = ({ children }) => {
   const [sequenceCounter, setSequenceCounter] = useState(1);
   const [isScreenSharingActive, setIsScreenSharingActive] = useState(false);
 
-  // Sync real screen capture stream state across components
+  // Sync real screen capture stream state across components (Commented out)
+  /*
   useEffect(() => {
     const unsub = addScreenStreamListener((active) => {
       setIsScreenSharingActive(active);
     });
     return unsub;
   }, []);
+  */
 
   // 5-Minute Continuous Inactivity Detection System
   const [inactivitySeconds, setInactivitySeconds] = useState(0);
@@ -837,10 +841,13 @@ export const AppProvider = ({ children }) => {
     triggerInactivityAlert();
   };
 
-  // 3. Real Device Screen Screenshot Interval Capture Ticker (Default: Every 5 Minutes)
+  // 3. Real Device Screen Screenshot Interval Capture Ticker (Disabled / Commented out)
   const isCapturingRef = useRef(false);
 
-  const captureAndUploadScreenshot = useCallback(async (isManualTrigger = false) => {
+  // Automatic and manual screenshot capture disabled - keeping original code commented out
+  const captureAndUploadScreenshot = useCallback(async (_isManualTrigger = false) => {
+    return null;
+    /*
     // For automated background interval: skip if employee is on break or not in active work session
     if (!isManualTrigger) {
       if (attendanceStatus === 'on_break' || attendanceStatus !== 'checked_in') {
@@ -1057,8 +1064,11 @@ export const AppProvider = ({ children }) => {
     } finally {
       isCapturingRef.current = false;
     }
-  }, [attendanceStatus, screenshotConfig.isEnabled, user, sessionId, sequenceCounter]);
+    */
+  }, []);
 
+  // Automatic screenshot capture interval ticker (Commented out)
+  /*
   useEffect(() => {
     // Strictly pause countdown and do not capture screenshots when on break or not checked in
     if (attendanceStatus !== 'checked_in') {
@@ -1078,6 +1088,7 @@ export const AppProvider = ({ children }) => {
 
     return () => clearInterval(intervalTimer);
   }, [attendanceStatus, screenshotConfig.intervalSeconds, captureAndUploadScreenshot]);
+  */
 
   // Actions
   const handleCheckIn = () => {
@@ -1111,7 +1122,8 @@ export const AppProvider = ({ children }) => {
     const newNotif = {
       id: `notif-${Date.now()}`,
       title: 'Checked In Successfully',
-      message: `Session ${newSessionId} started at ${formattedCheckIn}. Background work monitoring active (5 min interval).`,
+      // message: `Session ${newSessionId} started at ${formattedCheckIn}. Background work monitoring active (5 min interval).`,
+      message: `Session ${newSessionId} started at ${formattedCheckIn}.`,
       time: 'Just now',
       isRead: false,
       type: 'attendance'
@@ -1129,7 +1141,8 @@ export const AppProvider = ({ children }) => {
     const newNotif = {
       id: `notif-${Date.now()}`,
       title: 'Break Started',
-      message: `Started break at ${formattedTime}. Background monitoring paused according to company policy.`,
+      // message: `Started break at ${formattedTime}. Background monitoring paused according to company policy.`,
+      message: `Started break at ${formattedTime}.`,
       time: 'Just now',
       isRead: false,
       type: 'attendance'
@@ -1146,7 +1159,8 @@ export const AppProvider = ({ children }) => {
     const newNotif = {
       id: `notif-${Date.now()}`,
       title: 'Break Ended',
-      message: `Ended break at ${formattedTime}. Background work monitoring resumed.`,
+      // message: `Ended break at ${formattedTime}. Background work monitoring resumed.`,
+      message: `Ended break at ${formattedTime}. Work session resumed.`,
       time: 'Just now',
       isRead: false,
       type: 'attendance'

@@ -24,7 +24,7 @@ const AdminDailyTaskView = lazy(() => import('./components/daily-report/AdminDai
 const TaskManagementView = lazy(() => import('./components/tasks/TaskManagementView.jsx').then(m => ({ default: m.TaskManagementView })));
 const LeaveManagementView = lazy(() => import('./components/leave/LeaveManagementView.jsx').then(m => ({ default: m.LeaveManagementView })));
 const ProfileView = lazy(() => import('./components/profile/ProfileView.jsx').then(m => ({ default: m.ProfileView })));
-const AdminScreenshotPortal = lazy(() => import('./components/screenshots/AdminScreenshotPortal.jsx').then(m => ({ default: m.AdminScreenshotPortal })));
+// const AdminScreenshotPortal = lazy(() => import('./components/screenshots/AdminScreenshotPortal.jsx').then(m => ({ default: m.AdminScreenshotPortal })));
 const InactivityAlertModal = lazy(() => import('./components/alerts/InactivityAlertModal.jsx').then(m => ({ default: m.InactivityAlertModal })));
 const HolidayCalendarView = lazy(() => import('./components/holiday/HolidayCalendarView.jsx').then(m => ({ default: m.HolidayCalendarView })));
 const ResetPasswordView = lazy(() => import('./pages/ResetPassword.jsx'));
@@ -181,7 +181,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'tasks': return <TaskManagementView />;
       case 'leave': return <LeaveManagementView />;
       case 'profile': return <ProfileView />;
-      case 'admin-screenshots': return (userRole === 'admin' || userRole === 'hr') ? <AdminScreenshotPortal /> : <DashboardView />;
+      // case 'admin-screenshots': return (userRole === 'admin' || userRole === 'hr') ? <AdminScreenshotPortal /> : <DashboardView />;
 
       // Role-Specific & Standard Modules
       case 'admin-salary':
@@ -209,6 +209,9 @@ const MainLayout = ({ handleSignOut }) => {
     }
   };
 
+  // Screen monitoring requirement disabled / commented out
+  const requiresEmployeeScreenCapture = false;
+  /*
   const requiresEmployeeScreenCapture =
     (userRole === 'employee' || userRole === 'team_leader') &&
     !isScreenSharingActive &&
@@ -237,10 +240,11 @@ const MainLayout = ({ handleSignOut }) => {
       setStartingScreenCapture(false);
     }
   };
+  */
 
   return (
     <div className="min-h-screen bg-[#F4F4F4] text-slate-900 font-sans" style={{ backgroundColor: '#F4F4F4' }}>
-      <div inert={requiresEmployeeScreenCapture}>
+      <div>
         <Suspense fallback={<div className="h-16 border-b border-[#083b4e]" style={{ background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }} />}>
           <Header onSignOut={handleLayoutSignOut} />
         </Suspense>
@@ -263,7 +267,10 @@ const MainLayout = ({ handleSignOut }) => {
           <InactivityAlertModal />
         </Suspense>
       </div>
-      {requiresEmployeeScreenCapture && (
+      {/* Screen monitoring pop-up modal commented out
+      {/* Screen monitoring pop-up modal commented out
+      {/* Screen monitoring modal disabled / commented out */}
+      {/* {requiresEmployeeScreenCapture && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
           role="dialog"
@@ -317,7 +324,8 @@ const MainLayout = ({ handleSignOut }) => {
             </div>
           </div>
         </div>
-      )}
+      )} */}
+
     </div>
   );
 };
