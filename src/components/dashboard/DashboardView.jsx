@@ -158,11 +158,11 @@ const getAttendanceClassification = (...values) => {
   };
 };
 
-// --- Geofencing Configuration (Office Location & 20 Meter Strict Radius) ---
-const TARGET_LAT = 23.05829;
-const TARGET_LNG = 72.53919;
-const GEOFENCE_RADIUS_METERS = 20; // Allowed strictly within 20 meters
-const AUTO_CHECKOUT_RADIUS_METERS = 20; // Auto checkout outside 20 meters
+// --- Geofencing Configuration (Office Location & 50 Meter Radius) ---
+const TARGET_LAT = 23.057808;
+const TARGET_LNG = 72.538926;
+const GEOFENCE_RADIUS_METERS = 50; // Allowed strictly within 50 meters
+const AUTO_CHECKOUT_RADIUS_METERS = 50; // Auto checkout outside 50 meters
 
 const getUniqueBreaks = (breaks) => {
   const uniqueBreaks = [];
@@ -1542,8 +1542,8 @@ export const DashboardView = () => {
     return () => clearInterval(autoTimer);
   }, [fetchTodayAttendance, setGlobalAttendanceStatus]);
 
-  // --- Continuous Geofence Auto-Checkout Monitor (20m Perimeter) ---
-  // If user is checked in and moves outside 20m radius -> AUTO CHECKOUT
+  // --- Continuous Geofence Auto-Checkout Monitor (50m Perimeter) ---
+  // If user is checked in and moves outside 50m radius -> AUTO CHECKOUT
   // CRITICAL REQUIREMENT: When user takes a break and goes downstairs/niche -> DO NOT AUTO CHECKOUT!
   const consecutiveBreachCountRef = useRef(0);
   const isPerformingAutoCheckoutRef = useRef(false);
@@ -1574,7 +1574,7 @@ export const DashboardView = () => {
         return;
       }
 
-      // 2. Only active workers (checked_in) are subject to 20m perimeter enforcement
+      // 2. Only active workers (checked_in) are subject to 50m perimeter enforcement
       const isWorking = (
         attendanceStatusRef.current === 'checked_in' ||
         (localStorage.getItem('kt_checked_in_' + todayStr) === 'true' &&
@@ -1609,12 +1609,12 @@ export const DashboardView = () => {
 
           if (dist > AUTO_CHECKOUT_RADIUS_METERS) {
             consecutiveBreachCountRef.current += 1;
-            console.warn(`[GEOFENCE ALERT] Out of 20m office bounds: ${dist.toFixed(1)}m (Breach ${consecutiveBreachCountRef.current}/2)`);
+            console.warn(`[GEOFENCE ALERT] Out of 50m office bounds: ${dist.toFixed(1)}m (Breach ${consecutiveBreachCountRef.current}/2)`);
 
             // Verify with 2 consecutive checks or high confidence fix
-            if (consecutiveBreachCountRef.current >= 2 || (accuracy && accuracy <= 20 && dist > 35)) {
+            if (consecutiveBreachCountRef.current >= 2 || (accuracy && accuracy <= 20 && dist > 55)) {
               isPerformingAutoCheckoutRef.current = true;
-              console.warn(`[GEOFENCE AUTO-CHECKOUT] Outside 20m perimeter (${dist.toFixed(1)}m). Triggering automatic checkout.`);
+              console.warn(`[GEOFENCE AUTO-CHECKOUT] Outside 50m perimeter (${dist.toFixed(1)}m). Triggering automatic checkout.`);
 
               const nowIso = new Date().toISOString();
               const nowLocal = formatISOToLocalTime(nowIso);
@@ -1634,7 +1634,7 @@ export const DashboardView = () => {
               setCheckOutTimeDisplay(nowLocal);
               setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
 
-              const checkoutReason = `Auto-Checkout: You moved outside the 20m office perimeter (${Math.round(dist)}m away). Automatic checkout recorded.`;
+              const checkoutReason = `Auto-Checkout: You moved outside the 50m office perimeter (${Math.round(dist)}m away). Automatic checkout recorded.`;
               setGeoError(checkoutReason);
               try {
                 showToast(checkoutReason, 'warning');
@@ -1646,12 +1646,12 @@ export const DashboardView = () => {
                   latitude: Number(latitude),
                   longitude: Number(longitude),
                   isAutoCheckout: true,
-                  reason: 'Geofence breach (>20m)'
+                  reason: 'Geofence breach (>50m)'
                 }).catch(() => api.post('/api/attendance/check-out', {
                   latitude: 23.057808,
                   longitude: 72.538926,
                   isAutoCheckout: true,
-                  reason: 'Geofence breach (>20m)'
+                  reason: 'Geofence breach (>50m)'
                 })).catch(() => {});
               } catch (e) {}
 
@@ -1660,7 +1660,7 @@ export const DashboardView = () => {
               consecutiveBreachCountRef.current = 0;
             }
           } else {
-            // Inside 20m
+            // Inside 50m
             consecutiveBreachCountRef.current = 0;
           }
         },
@@ -1732,26 +1732,26 @@ export const DashboardView = () => {
 
       console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
 
-      // Check-in strictly requires <= 20 meters
+      // Check-in strictly requires <= 50 meters
       if (actionType === 'check_in') {
         if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
           actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
         } else {
           setGeoError(
-            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Check-in is strictly allowed within 20 meters of office premises.`
+            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Check-in is strictly allowed within 50 meters of office premises.`
           );
           setIsActionLoading(false);
         }
         return;
       }
 
-      // Resuming work requires returning within 20 meters of office
+      // Resuming work requires returning within 50 meters of office
       if (actionType === 'break_end') {
         if (distanceMeters <= GEOFENCE_RADIUS_METERS) {
           actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
         } else {
           setGeoError(
-            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return to the office within 20 meters to resume work.`
+            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return to the office within 50 meters to resume work.`
           );
           setIsActionLoading(false);
         }

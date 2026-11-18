@@ -1309,11 +1309,11 @@ export const AppProvider = ({ children }) => {
 
           if (dist > AUTO_CHECKOUT_RADIUS_METERS) {
             consecutiveGeofenceBreachesRef.current += 1;
-            console.warn(`[GEOFENCE ALERT] AppContext | Out of 20m office perimeter: ${dist.toFixed(1)}m (Breach ${consecutiveGeofenceBreachesRef.current}/2)`);
+            console.warn(`[GEOFENCE ALERT] AppContext | Out of 50m office perimeter: ${dist.toFixed(1)}m (Breach ${consecutiveGeofenceBreachesRef.current}/2)`);
 
-            if (consecutiveGeofenceBreachesRef.current >= 2 || (accuracy && accuracy <= 20 && dist > 35)) {
+            if (consecutiveGeofenceBreachesRef.current >= 2 || (accuracy && accuracy <= 20 && dist > 55)) {
               isAutoCheckingOutRef.current = true;
-              console.warn(`[GEOFENCE AUTO-CHECKOUT] AppContext | Confirmed exit beyond 20m. Triggering auto-checkout.`);
+              console.warn(`[GEOFENCE AUTO-CHECKOUT] AppContext | Confirmed exit beyond 50m. Triggering auto-checkout.`);
 
               const nowFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -1329,7 +1329,7 @@ export const AppProvider = ({ children }) => {
 
               handleCheckOut();
 
-              const checkoutReason = `Auto-Checkout: You moved outside the 20m office perimeter (${Math.round(dist)}m away). Automatic checkout recorded.`;
+              const checkoutReason = `Auto-Checkout: You moved outside the 50m office perimeter (${Math.round(dist)}m away). Automatic checkout recorded.`;
               try {
                 showToast(checkoutReason, 'warning');
               } catch (e) {}
@@ -1340,12 +1340,12 @@ export const AppProvider = ({ children }) => {
                   latitude: Number(latitude),
                   longitude: Number(longitude),
                   isAutoCheckout: true,
-                  reason: 'Geofence breach (>20m)'
+                  reason: 'Geofence breach (>50m)'
                 }).catch(() => api.post('/api/attendance/check-out', {
                   latitude: 23.057808,
                   longitude: 72.538926,
                   isAutoCheckout: true,
-                  reason: 'Geofence breach (>20m)'
+                  reason: 'Geofence breach (>50m)'
                 })).catch(() => {});
               } catch (e) {}
 
