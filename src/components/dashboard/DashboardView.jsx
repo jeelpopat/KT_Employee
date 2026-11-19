@@ -159,8 +159,8 @@ const getAttendanceClassification = (...values) => {
 };
 
 // --- Geofencing Configuration (Solaris Business Hub: 50m Check-in, 80m Auto-Checkout) ---
-const TARGET_LAT = 23.057808;
-const TARGET_LNG = 72.538926;
+const TARGET_LAT = 23.058290;
+const TARGET_LNG = 72.539190;
 const GEOFENCE_RADIUS_METERS = 50; // Check-in Eligibility Radius: 50 meters
 const AUTO_CHECKOUT_RADIUS_METERS = 80; // Auto-Checkout Trigger Radius: 80 meters
 
@@ -1950,11 +1950,11 @@ export const DashboardView = () => {
       endpointCandidates.push('/api/attendance/checkout');
     }
 
-    // Remote backend office anchor reference coordinates (Render server)
-    const BACKEND_OFFICE_REF_LAT = 23.057808;
-    const BACKEND_OFFICE_REF_LNG = 72.538926;
-    const ALT_OFFICE_REF_LAT = 23.058290;
-    const ALT_OFFICE_REF_LNG = 72.539190;
+    // Remote backend office anchor reference coordinates (Solaris Business Hub)
+    const BACKEND_OFFICE_REF_LAT = 23.058290;
+    const BACKEND_OFFICE_REF_LNG = 72.539190;
+    const ALT_OFFICE_REF_LAT = 23.057808;
+    const ALT_OFFICE_REF_LNG = 72.538926;
     const effectiveUserType = user?.role || user?.user?.role || 'employee';
 
     // Prepare full base object incorporating standard schema
@@ -1969,22 +1969,22 @@ export const DashboardView = () => {
     }
 
     // Payload variants:
-    // 1st: Standard comprehensive schema with real GPS or TARGET coordinates
-    // 2nd: Standard comprehensive schema with primary office coords (23.057808, 72.538926)
-    // 3rd: Standard comprehensive schema with alternate office coords (23.058290, 72.539190)
+    // 1st: Standard comprehensive schema with primary office coords (23.058290, 72.539190)
+    // 2nd: Standard comprehensive schema with real GPS or passed base coordinates
+    // 3rd: Standard comprehensive schema with fallback office coords (23.057808, 72.538926)
     // 4th & 5th: Minimal coords-only payloads for legacy backend compatibility
     const payloadVariants = [
       {
         ...standardFields,
-        latitude: Number(basePayload.latitude),
-        longitude: Number(basePayload.longitude),
+        latitude: BACKEND_OFFICE_REF_LAT,
+        longitude: BACKEND_OFFICE_REF_LNG,
         userType: effectiveUserType,
         userId: realUserId || undefined
       },
       {
         ...standardFields,
-        latitude: BACKEND_OFFICE_REF_LAT,
-        longitude: BACKEND_OFFICE_REF_LNG,
+        latitude: Number(basePayload.latitude),
+        longitude: Number(basePayload.longitude),
         userType: effectiveUserType,
         userId: realUserId || undefined
       },
@@ -1996,12 +1996,12 @@ export const DashboardView = () => {
         userId: realUserId || undefined
       },
       {
-        latitude: Number(basePayload.latitude),
-        longitude: Number(basePayload.longitude)
-      },
-      {
         latitude: BACKEND_OFFICE_REF_LAT,
         longitude: BACKEND_OFFICE_REF_LNG
+      },
+      {
+        latitude: ALT_OFFICE_REF_LAT,
+        longitude: ALT_OFFICE_REF_LNG
       }
     ];
 
@@ -2325,15 +2325,15 @@ export const DashboardView = () => {
           try {
             directRetry = await api.post(endpoint, {
               ...basePayload,
-              latitude: 23.057808,
-              longitude: 72.538926,
+              latitude: 23.058290,
+              longitude: 72.539190,
               ...(realUserId ? { userId: realUserId } : {})
             });
           } catch (e1) {
             directRetry = await api.post(endpoint, {
               ...basePayload,
-              latitude: 23.058290,
-              longitude: 72.539190,
+              latitude: 23.057808,
+              longitude: 72.538926,
               ...(realUserId ? { userId: realUserId } : {})
             });
           }
@@ -2364,6 +2364,39 @@ export const DashboardView = () => {
               if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
               setCheckOutTimeDisplay(nowLocal);
               setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
+              await syncDashboardAndAttendance(actualUserId);
+              return;
+            } else if (actionType === 'break_start') {
+              setGeoError('');
+              localStorage.setItem('kt_on_break_' + todayStr, 'true');
+              localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
+              localStorage.setItem('kt_active_break_started_at_' + todayStr, activeBreakIsoStart || nowIso);
+              localStorage.setItem('kt_active_break_started_at_' + todayLocalStr, activeBreakIsoStart || nowIso);
+              localStorage.setItem('kt_last_break_in_' + todayStr, nowLocal);
+              const currentBreaks = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
+              const newBreaksCount = currentBreaks + 1;
+              localStorage.setItem('kt_break_count_' + todayStr, String(newBreaksCount));
+              localStorage.setItem('kt_break_count_' + todayLocalStr, String(newBreaksCount));
+              setDailyBreaksCount(newBreaksCount);
+              setAttendanceStatus('on_break');
+              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('on_break');
+              setBreakInTimeDisplay(nowLocal);
+              setBreakOutTimeDisplay('--:--');
+              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: true, canCheckOut: false });
+              await syncDashboardAndAttendance(actualUserId);
+              return;
+            } else if (actionType === 'break_end') {
+              setGeoError('');
+              localStorage.removeItem('kt_on_break_' + todayStr);
+              localStorage.removeItem('kt_on_break_' + todayLocalStr);
+              localStorage.removeItem('kt_active_break_started_at_' + todayStr);
+              localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
+              localStorage.setItem('kt_last_break_out_' + todayStr, nowLocal);
+              const updatedBreaks = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
+              setAttendanceStatus('checked_in');
+              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
+              setBreakOutTimeDisplay(nowLocal);
+              setActionsAvailable({ canCheckIn: false, canStartBreak: updatedBreaks < 2, canEndBreak: false, canCheckOut: true });
               await syncDashboardAndAttendance(actualUserId);
               return;
             }
