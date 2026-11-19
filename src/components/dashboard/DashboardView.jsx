@@ -159,8 +159,8 @@ const getAttendanceClassification = (...values) => {
 };
 
 // --- Geofencing Configuration (Solaris Business Hub: 50m Check-in, 80m Auto-Checkout) ---
-const TARGET_LAT = 23.058290;
-const TARGET_LNG = 72.539190;
+const TARGET_LAT = 23.05829;
+const TARGET_LNG = 72.53919;
 const GEOFENCE_RADIUS_METERS = 50; // Check-in Eligibility Radius: 50 meters
 const AUTO_CHECKOUT_RADIUS_METERS = 80; // Auto-Checkout Trigger Radius: 80 meters
 
@@ -1529,7 +1529,7 @@ export const DashboardView = () => {
           // Send background check-out to backend
           try {
             await api.post('/api/attendance/check-out', { latitude: TARGET_LAT, longitude: TARGET_LNG })
-              .catch(() => api.post('/api/attendance/check-out', { latitude: 23.058290, longitude: 72.539190 }))
+              .catch(() => api.post('/api/attendance/check-out', { latitude: 23.05829, longitude: 72.53919 }))
               .catch(() => {});
           } catch (e) { }
 
@@ -1699,8 +1699,8 @@ export const DashboardView = () => {
                 }).catch(() => api.post('/api/attendance/check-out', {
                   userId: realUid,
                   userType: effRole,
-                  latitude: 23.058290,
-                  longitude: 72.539190,
+                  latitude: 23.05829,
+                  longitude: 72.53919,
                   checkoutType: 'OUTSIDE_GEOFENCE',
                   remarks: 'Auto Checkout: Outside 80m office radius'
                 })).catch(() => {});
@@ -1962,8 +1962,8 @@ export const DashboardView = () => {
     }
 
     // Remote backend office anchor reference coordinates (Solaris Business Hub)
-    const BACKEND_OFFICE_REF_LAT = 23.058290;
-    const BACKEND_OFFICE_REF_LNG = 72.539190;
+    const BACKEND_OFFICE_REF_LAT = 23.05829;
+    const BACKEND_OFFICE_REF_LNG = 72.53919;
     const ALT_OFFICE_REF_LAT = 23.057808;
     const ALT_OFFICE_REF_LNG = 72.538926;
     const effectiveUserType = user?.role || user?.user?.role || 'employee';
@@ -1980,7 +1980,7 @@ export const DashboardView = () => {
     }
 
     // Payload variants:
-    // 1st: Standard comprehensive schema with primary office coords (23.058290, 72.539190)
+    // 1st: Standard comprehensive schema with primary office coords (23.05829, 72.53919)
     // 2nd: Standard comprehensive schema with real GPS or passed base coordinates
     // 3rd: Standard comprehensive schema with fallback office coords (23.057808, 72.538926)
     // 4th & 5th: Minimal coords-only payloads for legacy backend compatibility
@@ -2339,8 +2339,8 @@ export const DashboardView = () => {
           try {
             directRetry = await api.post(endpoint, {
               ...basePayload,
-              latitude: 23.058290,
-              longitude: 72.539190,
+              latitude: 23.05829,
+              longitude: 72.53919,
               ...(realUserId ? { userId: realUserId } : {})
             });
           } catch (e1) {

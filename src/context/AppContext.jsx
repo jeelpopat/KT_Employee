@@ -1392,8 +1392,8 @@ export const AppProvider = ({ children }) => {
                 }).catch(() => api.post('/api/attendance/check-out', {
                   userId: actualUserId,
                   userType: effRole,
-                  latitude: 23.058290,
-                  longitude: 72.539190,
+                  latitude: 23.05829,
+                  longitude: 72.53919,
                   checkoutType: 'OUTSIDE_GEOFENCE',
                   remarks: 'Auto Checkout: Outside 80m office radius'
                 })).catch(() => api.post('/api/attendance/check-out', {
