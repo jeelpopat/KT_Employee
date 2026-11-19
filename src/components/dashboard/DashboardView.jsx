@@ -1581,14 +1581,25 @@ export const DashboardView = () => {
         return;
       }
 
-      // 2. Check-in Grace Period Check: 5 minutes (300 seconds) after check-in, auto-checkout is strictly blocked!
+      // 2. Check-in & Post-Break Grace Period Check: 5 minutes (300s) after check-in or break-out, auto-checkout is strictly blocked!
       const checkInTs = parseInt(
         localStorage.getItem('kt_check_in_ts_' + todayStr) ||
         localStorage.getItem('kt_check_in_ts_' + todayLocalStr) ||
         '0',
         10
       );
-      if (checkInTs && (Date.now() - checkInTs < 300 * 1000)) {
+      const resumeWorkTs = parseInt(
+        localStorage.getItem('kt_resume_work_ts_' + todayStr) ||
+        localStorage.getItem('kt_resume_work_ts_' + todayLocalStr) ||
+        '0',
+        10
+      );
+      const isWithinGracePeriod = Boolean(
+        (checkInTs && (Date.now() - checkInTs < 300 * 1000)) ||
+        (resumeWorkTs && (Date.now() - resumeWorkTs < 300 * 1000))
+      );
+
+      if (isWithinGracePeriod) {
         consecutiveBreachCountRef.current = 0;
         firstBreachTimeRef.current = null;
         return;
@@ -2144,11 +2155,14 @@ export const DashboardView = () => {
           setBreakOutTimeDisplay('--:--');
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: true, canCheckOut: false });
         } else if (actionType === 'break_end') {
+          const nowTs = String(Date.now());
           localStorage.removeItem('kt_on_break_' + todayStr);
           localStorage.removeItem('kt_on_break_' + todayLocalStr);
           localStorage.removeItem('kt_active_break_started_at_' + todayStr);
           localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
           localStorage.setItem('kt_last_break_out_' + todayStr, nowLocal);
+          localStorage.setItem('kt_resume_work_ts_' + todayStr, nowTs);
+          localStorage.setItem('kt_resume_work_ts_' + todayLocalStr, nowTs);
           const updatedBreaks = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
           setAttendanceStatus('checked_in');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
@@ -2387,11 +2401,14 @@ export const DashboardView = () => {
               return;
             } else if (actionType === 'break_end') {
               setGeoError('');
+              const nowTs = String(Date.now());
               localStorage.removeItem('kt_on_break_' + todayStr);
               localStorage.removeItem('kt_on_break_' + todayLocalStr);
               localStorage.removeItem('kt_active_break_started_at_' + todayStr);
               localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
               localStorage.setItem('kt_last_break_out_' + todayStr, nowLocal);
+              localStorage.setItem('kt_resume_work_ts_' + todayStr, nowTs);
+              localStorage.setItem('kt_resume_work_ts_' + todayLocalStr, nowTs);
               const updatedBreaks = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
               setAttendanceStatus('checked_in');
               if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');

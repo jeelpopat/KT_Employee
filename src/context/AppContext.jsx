@@ -1281,14 +1281,25 @@ export const AppProvider = ({ children }) => {
         return;
       }
 
-      // 2. Check-in Grace Period Check: 5 minutes (300 seconds) after check-in, auto-checkout is blocked!
+      // 2. Check-in & Post-Break Grace Period Check: 5 minutes (300s) after check-in or break-out, auto-checkout is blocked!
       const checkInTs = parseInt(
         localStorage.getItem('kt_check_in_ts_' + todayStr) ||
         localStorage.getItem('kt_check_in_ts_' + todayLocalStr) ||
         '0',
         10
       );
-      if (checkInTs && (Date.now() - checkInTs < 300 * 1000)) {
+      const resumeWorkTs = parseInt(
+        localStorage.getItem('kt_resume_work_ts_' + todayStr) ||
+        localStorage.getItem('kt_resume_work_ts_' + todayLocalStr) ||
+        '0',
+        10
+      );
+      const isWithinGracePeriod = Boolean(
+        (checkInTs && (Date.now() - checkInTs < 300 * 1000)) ||
+        (resumeWorkTs && (Date.now() - resumeWorkTs < 300 * 1000))
+      );
+
+      if (isWithinGracePeriod) {
         consecutiveGeofenceBreachesRef.current = 0;
         firstGeofenceBreachTimeRef.current = null;
         return;
