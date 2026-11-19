@@ -1080,6 +1080,8 @@ export const DashboardView = () => {
   // Lightweight attendance-only query (called on interval and after actions)
   const fetchTodayAttendance = useCallback(async (resolvedUserId, fallbackAttendance) => {
     try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayLocalStr = new Date().toLocaleDateString('en-CA');
       let todayRecord = null;
       let segments = [];
       let todayDoc = null;
