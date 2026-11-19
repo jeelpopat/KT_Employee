@@ -1471,11 +1471,20 @@ export const DashboardView = () => {
 
   // --- Auto-refresh interval & focus listeners for Employee and TL Dashboard ---
   useEffect(() => {
-    const refreshDashboardSilently = () => {
+    let isRefreshing = false;
+    let lastRefreshAt = 0;
+    const refreshDashboardSilently = async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
       const targetId = actualUserIdRef.current || user?.employee?._id || user?._id || user?.id || user?.user?._id;
-      if (targetId) {
-        fetchFullDashboard(targetId);
+      const now = Date.now();
+      if (!targetId || isRefreshing || now - lastRefreshAt < 5000) return;
+
+      isRefreshing = true;
+      lastRefreshAt = now;
+      try {
+        await fetchFullDashboard(targetId);
+      } finally {
+        isRefreshing = false;
       }
     };
 
