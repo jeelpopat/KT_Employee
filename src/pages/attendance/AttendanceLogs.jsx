@@ -403,12 +403,16 @@ const normalizeStatus = (item) => {
   const checkOutVal = item?.checkOutTime || item?.checkOut || item?.punchOut;
   const isCheckedOut = Boolean(checkOutVal) || totalHours > 0;
 
+  if (isCheckedOut && totalHours > 0 && totalHours < 4) {
+    return 'absent';
+  }
+
   if (
     rawStatus === 'half-day' ||
     rawStatus === 'halfday' ||
     rawStatus === 'half day' ||
     item?.isHalfDay === true ||
-    (isCheckedOut && totalHours > 0 && totalHours < 8)
+    (isCheckedOut && totalHours >= 4 && totalHours < 8)
   ) {
     return 'half day';
   }
@@ -425,6 +429,9 @@ const normalizeStatus = (item) => {
   }
 
   if (totalHours >= 8) {
+    if (checkInMinutes !== null && checkInMinutes > (10 * 60 + 10)) {
+      return 'late'; // Converted from Half Day to Present + Late if 8h completed
+    }
     return 'on time';
   }
 
