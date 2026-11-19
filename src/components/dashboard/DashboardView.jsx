@@ -507,6 +507,27 @@ export const DashboardView = () => {
     const localOnBreak = localStorage.getItem('kt_on_break_' + todayStr) === 'true' || localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true';
     const localBreakStartedAt = localStorage.getItem('kt_active_break_started_at_' + todayStr) ||
       localStorage.getItem('kt_active_break_started_at_' + todayLocalStr);
+
+    const resumeWorkTs = parseInt(
+      localStorage.getItem('kt_resume_work_ts_' + todayStr) ||
+      localStorage.getItem('kt_resume_work_ts_' + todayLocalStr) ||
+      '0',
+      10
+    );
+    const isManualCheckout = localStorage.getItem('kt_manual_checkout_' + todayStr) === 'true' ||
+      localStorage.getItem('kt_manual_checkout_' + todayLocalStr) === 'true';
+    const isWithinPostBreakGrace = Boolean(
+      resumeWorkTs && (Date.now() - resumeWorkTs < 5 * 60 * 1000)
+    );
+
+    // If within 5 minutes of resuming work from break, ignore any premature checkout flags
+    if (isWithinPostBreakGrace && !isManualCheckout) {
+      localStorage.removeItem('kt_checked_out_' + todayStr);
+      localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+      localStorage.removeItem('kt_auto_checked_out_' + todayStr);
+      localStorage.removeItem('kt_auto_checked_out_' + todayLocalStr);
+      localStorage.removeItem('kt_check_out_time_str');
+    }
     const rawCheckIn = ta?.approvedCheckInTime || ta?.checkInTime || ta?.checkInTimeDisplay || ta?.approvedCheckInTimeDisplay || ta?.inTime || ta?.checkIn || ta?.punchIn;
     const rawCheckOut = ta?.checkOutTime || ta?.checkOutTimeDisplay || ta?.outTime || ta?.checkOut || ta?.punchOut;
     const statusLower = String(ta?.status || '').toLowerCase().trim();
@@ -751,6 +772,7 @@ export const DashboardView = () => {
     const hasCheckedOut = Boolean(
       !isRejected &&
       hasCheckedIn &&
+      !(isWithinPostBreakGrace && !isManualCheckout) &&
       !isBackendConfirmedUncheckedOut && (
         shouldAutoCheckOut ||
         ta?.isAutoCheckedOut === true ||
@@ -845,6 +867,7 @@ export const DashboardView = () => {
       !isRejected &&
       hasCheckedIn &&
       !hasCheckedOut &&
+      !(isWithinPostBreakGrace && !isManualCheckout) &&
       !isBackendConfirmedBreakEnded && (
         isBreakExplicitActive ||
         (localOnBreak && !ta)
@@ -1277,9 +1300,33 @@ export const DashboardView = () => {
         todayDoc?.approvedCheckInTimeDisplay ||
         todayDoc?.inTime;
 
+      const resumeWorkTs = parseInt(
+        localStorage.getItem('kt_resume_work_ts_' + todayStr) ||
+        localStorage.getItem('kt_resume_work_ts_' + todayLocalStr) ||
+        '0',
+        10
+      );
+      const isManualCheckout = localStorage.getItem('kt_manual_checkout_' + todayStr) === 'true' ||
+        localStorage.getItem('kt_manual_checkout_' + todayLocalStr) === 'true';
+      const isPostBreakGrace = Boolean(
+        resumeWorkTs && (Date.now() - resumeWorkTs < 5 * 60 * 1000)
+      );
+
       // Authoritative null checkout preservation: if todayDoc explicitly has checkOutTime (even if null), honor it!
+      // If employee broke out within 5 minutes, ignore premature backend checkout
       let mergedCheckOut = null;
-      if (todayDoc && Object.prototype.hasOwnProperty.call(todayDoc, 'checkOutTime')) {
+      if (isPostBreakGrace && !isManualCheckout) {
+        mergedCheckOut = null;
+        if (todayDoc) {
+          todayDoc.checkOutTime = null;
+          todayDoc.checkOutTimeDisplay = null;
+          todayDoc.outTime = null;
+          todayDoc.isAutoCheckedOut = false;
+          if (todayDoc.status === 'checked_out') {
+            todayDoc.status = 'checked_in';
+          }
+        }
+      } else if (todayDoc && Object.prototype.hasOwnProperty.call(todayDoc, 'checkOutTime')) {
         mergedCheckOut = todayDoc.checkOutTime;
       } else if (todayDoc && Object.prototype.hasOwnProperty.call(todayDoc, 'checkOutTimeDisplay')) {
         mergedCheckOut = todayDoc.checkOutTimeDisplay;
@@ -2169,6 +2216,15 @@ export const DashboardView = () => {
           localStorage.removeItem('kt_on_break_' + todayLocalStr);
           localStorage.removeItem('kt_active_break_started_at_' + todayStr);
           localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
+          localStorage.removeItem('kt_checked_out_' + todayStr);
+          localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+          localStorage.removeItem('kt_auto_checked_out_' + todayStr);
+          localStorage.removeItem('kt_auto_checked_out_' + todayLocalStr);
+          localStorage.removeItem('kt_check_out_time_str');
+          localStorage.removeItem('kt_manual_checkout_' + todayStr);
+          localStorage.removeItem('kt_manual_checkout_' + todayLocalStr);
+          localStorage.setItem('kt_checked_in_' + todayStr, 'true');
+          localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
           localStorage.setItem('kt_last_break_out_' + todayStr, nowLocal);
           localStorage.setItem('kt_resume_work_ts_' + todayStr, nowTs);
           localStorage.setItem('kt_resume_work_ts_' + todayLocalStr, nowTs);
@@ -2176,6 +2232,7 @@ export const DashboardView = () => {
           setAttendanceStatus('checked_in');
           if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
           setBreakOutTimeDisplay(nowLocal);
+          setCheckOutTimeDisplay('--:--');
           setActionsAvailable({ canCheckIn: false, canStartBreak: updatedBreaks < 2, canEndBreak: false, canCheckOut: true });
         } else if (actionType === 'check_out') {
           localStorage.setItem('kt_checked_out_' + todayStr, 'true');
@@ -2245,17 +2302,34 @@ export const DashboardView = () => {
         setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: true, canCheckOut: false });
         setGeoError('');
         await syncDashboardAndAttendance(actualUserId);
-      } else if ((actionType === 'break_end' && isNotOnBreak) || isNotOnBreak) {
-        // User is not on break: return to checked in
+      } else if (actionType === 'break_end') {
+        // User broke out / resumed work: ALWAYS return to checked in and ignore premature backend checkout messages for 5 mins
+        const nowTs = String(Date.now());
         localStorage.removeItem('kt_on_break_' + todayStr);
         localStorage.removeItem('kt_on_break_' + todayLocalStr);
+        localStorage.removeItem('kt_active_break_started_at_' + todayStr);
+        localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
+        localStorage.removeItem('kt_checked_out_' + todayStr);
+        localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+        localStorage.removeItem('kt_auto_checked_out_' + todayStr);
+        localStorage.removeItem('kt_auto_checked_out_' + todayLocalStr);
+        localStorage.removeItem('kt_check_out_time_str');
+        localStorage.removeItem('kt_manual_checkout_' + todayStr);
+        localStorage.removeItem('kt_manual_checkout_' + todayLocalStr);
+        localStorage.setItem('kt_checked_in_' + todayStr, 'true');
+        localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
+        localStorage.setItem('kt_last_break_out_' + todayStr, nowLocal);
+        localStorage.setItem('kt_resume_work_ts_' + todayStr, nowTs);
+        localStorage.setItem('kt_resume_work_ts_' + todayLocalStr, nowTs);
         const curB = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
         setAttendanceStatus('checked_in');
         if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
+        setBreakOutTimeDisplay(nowLocal);
+        setCheckOutTimeDisplay('--:--');
         setActionsAvailable({ canCheckIn: false, canStartBreak: curB < 2, canEndBreak: false, canCheckOut: true });
         setGeoError('');
         await syncDashboardAndAttendance(actualUserId);
-      } else if ((actionType === 'check_out' && isAlreadyCheckedOut) || isAlreadyCheckedOut) {
+      } else if (actionType === 'check_out' && isAlreadyCheckedOut) {
         localStorage.setItem('kt_checked_out_' + todayStr, 'true');
         localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
         localStorage.removeItem('kt_on_break_' + todayStr);
@@ -2415,6 +2489,15 @@ export const DashboardView = () => {
               localStorage.removeItem('kt_on_break_' + todayLocalStr);
               localStorage.removeItem('kt_active_break_started_at_' + todayStr);
               localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
+              localStorage.removeItem('kt_checked_out_' + todayStr);
+              localStorage.removeItem('kt_checked_out_' + todayLocalStr);
+              localStorage.removeItem('kt_auto_checked_out_' + todayStr);
+              localStorage.removeItem('kt_auto_checked_out_' + todayLocalStr);
+              localStorage.removeItem('kt_check_out_time_str');
+              localStorage.removeItem('kt_manual_checkout_' + todayStr);
+              localStorage.removeItem('kt_manual_checkout_' + todayLocalStr);
+              localStorage.setItem('kt_checked_in_' + todayStr, 'true');
+              localStorage.setItem('kt_checked_in_' + todayLocalStr, 'true');
               localStorage.setItem('kt_last_break_out_' + todayStr, nowLocal);
               localStorage.setItem('kt_resume_work_ts_' + todayStr, nowTs);
               localStorage.setItem('kt_resume_work_ts_' + todayLocalStr, nowTs);
@@ -2422,6 +2505,7 @@ export const DashboardView = () => {
               setAttendanceStatus('checked_in');
               if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
               setBreakOutTimeDisplay(nowLocal);
+              setCheckOutTimeDisplay('--:--');
               setActionsAvailable({ canCheckIn: false, canStartBreak: updatedBreaks < 2, canEndBreak: false, canCheckOut: true });
               await syncDashboardAndAttendance(actualUserId);
               return;
@@ -2443,6 +2527,12 @@ export const DashboardView = () => {
   // --- Strict Mapped Action Payloads (matching attendanceService protocol) ---
   const onCheckInClick = () => {
     if (!actionsAvailable.canCheckIn) return;
+    const todayKey = new Date().toISOString().split('T')[0];
+    const todayLocal = new Date().toLocaleDateString('en-CA');
+    localStorage.removeItem('kt_manual_checkout_' + todayKey);
+    localStorage.removeItem('kt_manual_checkout_' + todayLocal);
+    localStorage.removeItem('kt_resume_work_ts_' + todayKey);
+    localStorage.removeItem('kt_resume_work_ts_' + todayLocal);
     verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
@@ -2490,6 +2580,10 @@ export const DashboardView = () => {
 
   const onCheckOutClick = () => {
     if (!actionsAvailable.canCheckOut) return;
+    const todayKey = new Date().toISOString().split('T')[0];
+    const todayLocal = new Date().toLocaleDateString('en-CA');
+    localStorage.setItem('kt_manual_checkout_' + todayKey, 'true');
+    localStorage.setItem('kt_manual_checkout_' + todayLocal, 'true');
     verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
