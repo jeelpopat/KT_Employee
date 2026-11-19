@@ -1542,9 +1542,6 @@ export const DashboardView = () => {
     return () => clearInterval(autoTimer);
   }, [fetchTodayAttendance, setGlobalAttendanceStatus]);
 
-<<<<<<< Updated upstream
-  useEffect(() => {
-=======
   // --- Continuous Geofence Auto-Checkout Monitor (80m Perimeter) ---
   // Parameters per specification:
   // - Trigger Radius: 80 meters
@@ -1719,16 +1716,17 @@ export const DashboardView = () => {
     const geofenceInterval = setInterval(checkGeofenceAutoCheckout, 9000);
 
     // Also listen to external auto-checkout events dispatched by AppContext or tabs
->>>>>>> Stashed changes
+
     const handleExternalAutoCheckout = () => {
       fetchTodayAttendance(actualUserIdRef.current);
     };
     window.addEventListener('kt_auto_checkout_triggered', handleExternalAutoCheckout);
 
     return () => {
+      clearInterval(geofenceInterval);
       window.removeEventListener('kt_auto_checkout_triggered', handleExternalAutoCheckout);
     };
-  }, [fetchTodayAttendance]);
+  }, [fetchTodayAttendance, setGlobalAttendanceStatus]);
 
   // --- Robust Geolocation & Verification ---
   const verifyLocationAndExecute = (actionCallback, actionType = 'check_in') => {
