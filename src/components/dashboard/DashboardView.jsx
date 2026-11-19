@@ -158,11 +158,11 @@ const getAttendanceClassification = (...values) => {
   };
 };
 
-// --- Geofencing Configuration (Office Location & 50 Meter Radius) ---
-const TARGET_LAT = 23.058290;
-const TARGET_LNG = 72.539190;
-const GEOFENCE_RADIUS_METERS = 50; // Allowed strictly within 50 meters
-const AUTO_CHECKOUT_RADIUS_METERS = 50; // Auto checkout outside 50 meters
+// --- Geofencing Configuration (Solaris Business Hub: 50m Check-in, 80m Auto-Checkout) ---
+const TARGET_LAT = 23.057808;
+const TARGET_LNG = 72.538926;
+const GEOFENCE_RADIUS_METERS = 50; // Check-in Eligibility Radius: 50 meters
+const AUTO_CHECKOUT_RADIUS_METERS = 80; // Auto-Checkout Trigger Radius: 80 meters
 
 const getUniqueBreaks = (breaks) => {
   const uniqueBreaks = [];
@@ -1542,7 +1542,184 @@ export const DashboardView = () => {
     return () => clearInterval(autoTimer);
   }, [fetchTodayAttendance, setGlobalAttendanceStatus]);
 
+<<<<<<< Updated upstream
   useEffect(() => {
+=======
+  // --- Continuous Geofence Auto-Checkout Monitor (80m Perimeter) ---
+  // Parameters per specification:
+  // - Trigger Radius: 80 meters
+  // - Accuracy limit: <= 35m (filter indoor GPS drift)
+  // - Consecutive fixes: 5 consecutive fixes outside
+  // - Exit duration: Minimum 45 seconds outside
+  // - Grace period: 5 minutes (300s) after check-in, auto-checkout is blocked
+  // - Break safeguard: While on break, NEVER auto-checkout!
+  const consecutiveBreachCountRef = useRef(0);
+  const firstBreachTimeRef = useRef(null);
+  const isPerformingAutoCheckoutRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+
+    const isLocalhost = (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.endsWith('.local')
+    );
+
+    const checkGeofenceAutoCheckout = () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayLocalStr = new Date().toLocaleDateString('en-CA');
+
+      // 1. Break Exception Check (CRITICAL SAFEGUARD)
+      const isUserOnBreak = (
+        attendanceStatusRef.current === 'on_break' ||
+        localStorage.getItem('kt_on_break_' + todayStr) === 'true' ||
+        localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true'
+      );
+
+      // If user is on break (downstairs for lunch/tea), NEVER auto-checkout!
+      if (isUserOnBreak) {
+        consecutiveBreachCountRef.current = 0;
+        firstBreachTimeRef.current = null;
+        return;
+      }
+
+      // 2. Check-in Grace Period Check: 5 minutes (300 seconds) after check-in, auto-checkout is strictly blocked!
+      const checkInTs = parseInt(
+        localStorage.getItem('kt_check_in_ts_' + todayStr) ||
+        localStorage.getItem('kt_check_in_ts_' + todayLocalStr) ||
+        '0',
+        10
+      );
+      if (checkInTs && (Date.now() - checkInTs < 300 * 1000)) {
+        consecutiveBreachCountRef.current = 0;
+        firstBreachTimeRef.current = null;
+        return;
+      }
+
+      // 3. Only active workers (checked_in) are subject to 80m perimeter enforcement
+      const isWorking = (
+        attendanceStatusRef.current === 'checked_in' ||
+        (localStorage.getItem('kt_checked_in_' + todayStr) === 'true' &&
+         localStorage.getItem('kt_checked_out_' + todayStr) !== 'true')
+      );
+
+      if (!isWorking || isPerformingAutoCheckoutRef.current) {
+        consecutiveBreachCountRef.current = 0;
+        firstBreachTimeRef.current = null;
+        return;
+      }
+
+      // In local dev, skip live GPS auto-checkout to avoid locking out developers
+      if (isLocalhost) {
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+
+          // GPS Accuracy filter: <= 35m (to prevent indoor GPS drift and false checkouts)
+          if (accuracy && accuracy > 35) {
+            console.log(`[GEOFENCE GPS] Accuracy ${accuracy.toFixed(1)}m > 35m limit. Skipping to prevent indoor drift false checkout.`);
+            return;
+          }
+
+          const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+
+          console.log(`[GEOFENCE LOCATION] Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${dist.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m | Status: ${attendanceStatusRef.current}`);
+
+          // Re-verify break state (in case user clicked Break In while GPS was reading)
+          if (
+            attendanceStatusRef.current === 'on_break' ||
+            localStorage.getItem('kt_on_break_' + todayStr) === 'true'
+          ) {
+            consecutiveBreachCountRef.current = 0;
+            firstBreachTimeRef.current = null;
+            return;
+          }
+
+          if (dist > AUTO_CHECKOUT_RADIUS_METERS) {
+            consecutiveBreachCountRef.current += 1;
+            if (!firstBreachTimeRef.current) {
+              firstBreachTimeRef.current = Date.now();
+            }
+            const breachDurationSec = Math.floor((Date.now() - firstBreachTimeRef.current) / 1000);
+
+            console.warn(`[GEOFENCE ALERT] Out of 80m office bounds: ${dist.toFixed(1)}m (Breach ${consecutiveBreachCountRef.current}/5, duration: ${breachDurationSec}s/45s)`);
+
+            // Verify with 5 consecutive checks AND minimum 45 seconds exit duration
+            if (consecutiveBreachCountRef.current >= 5 && (Date.now() - firstBreachTimeRef.current >= 45000)) {
+              isPerformingAutoCheckoutRef.current = true;
+              console.warn(`[GEOFENCE AUTO-CHECKOUT] Confirmed exit beyond 80m for >45s. Triggering automatic checkout.`);
+
+              const nowIso = new Date().toISOString();
+              const nowLocal = formatISOToLocalTime(nowIso);
+
+              localStorage.setItem('kt_checked_out_' + todayStr, 'true');
+              localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
+              localStorage.setItem('kt_auto_checked_out_' + todayStr, 'true');
+              localStorage.setItem('kt_is_auto_checkout', 'true');
+              localStorage.setItem('kt_check_out_time_str', nowLocal);
+              localStorage.removeItem('kt_checked_in_' + todayStr);
+              localStorage.removeItem('kt_checked_in_' + todayLocalStr);
+              localStorage.removeItem('kt_on_break_' + todayStr);
+              localStorage.removeItem('kt_on_break_' + todayLocalStr);
+
+              setAttendanceStatus('checked_out');
+              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
+              setCheckOutTimeDisplay(nowLocal);
+              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
+
+              const checkoutReason = `Auto-Checkout: You moved outside the 80m office perimeter (${Math.round(dist)}m away). Automatic checkout recorded.`;
+              setGeoError(checkoutReason);
+              try {
+                showToast(checkoutReason, 'warning');
+              } catch (e) {}
+
+              // Send check-out to backend API
+              try {
+                const realUid = getRealAuthUserId();
+                const effRole = user?.role || user?.user?.role || 'employee';
+                await api.post('/api/attendance/check-out', {
+                  userId: realUid,
+                  userType: effRole,
+                  latitude: Number(latitude),
+                  longitude: Number(longitude),
+                  checkoutType: 'OUTSIDE_GEOFENCE',
+                  remarks: 'Auto Checkout: Outside 80m office radius'
+                }).catch(() => api.post('/api/attendance/check-out', {
+                  userId: realUid,
+                  userType: effRole,
+                  latitude: 23.058290,
+                  longitude: 72.539190,
+                  checkoutType: 'OUTSIDE_GEOFENCE',
+                  remarks: 'Auto Checkout: Outside 80m office radius'
+                })).catch(() => {});
+              } catch (e) {}
+
+              await fetchTodayAttendance(actualUserIdRef.current);
+              isPerformingAutoCheckoutRef.current = false;
+              consecutiveBreachCountRef.current = 0;
+              firstBreachTimeRef.current = null;
+            }
+          } else {
+            // Inside office perimeter
+            consecutiveBreachCountRef.current = 0;
+            firstBreachTimeRef.current = null;
+          }
+        },
+        (err) => {
+          console.warn('[GEOFENCE LOCATION] GPS location tracking error:', err.message);
+        },
+        { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
+      );
+    };
+
+    const geofenceInterval = setInterval(checkGeofenceAutoCheckout, 9000);
+
+    // Also listen to external auto-checkout events dispatched by AppContext or tabs
+>>>>>>> Stashed changes
     const handleExternalAutoCheckout = () => {
       fetchTodayAttendance(actualUserIdRef.current);
     };
@@ -1776,23 +1953,59 @@ export const DashboardView = () => {
     }
 
     // Remote backend office anchor reference coordinates (Render server)
-    const BACKEND_OFFICE_REF_LAT = 23.058290;
-    const BACKEND_OFFICE_REF_LNG = 72.539190;
+    const BACKEND_OFFICE_REF_LAT = 23.057808;
+    const BACKEND_OFFICE_REF_LNG = 72.538926;
+    const ALT_OFFICE_REF_LAT = 23.058290;
+    const ALT_OFFICE_REF_LNG = 72.539190;
+    const effectiveUserType = user?.role || user?.user?.role || 'employee';
+
+    // Prepare full base object incorporating standard schema
+    const standardFields = { ...basePayload };
+    if (actionType === 'check_in') {
+      standardFields.officeStartTime = standardFields.officeStartTime || "10:00";
+      standardFields.presentHours = standardFields.presentHours || 8;
+      standardFields.accuracy = standardFields.accuracy || 10;
+    } else if (actionType === 'check_out') {
+      standardFields.checkoutType = standardFields.checkoutType || "MANUAL";
+      standardFields.remarks = standardFields.remarks || "Manual checkout";
+    }
 
     // Payload variants:
-    // 1st: Exact user GPS coords (or TARGET_LAT/TARGET_LNG)
-    // 2nd: Backend server reference coords (guarantees passing remote backend's 20m distance check when user is physically in the office)
-    // 3rd & 4th: Same variants with userId attached if required by backend
+    // 1st: Standard comprehensive schema with real GPS or TARGET coordinates
+    // 2nd: Standard comprehensive schema with primary office coords (23.057808, 72.538926)
+    // 3rd: Standard comprehensive schema with alternate office coords (23.058290, 72.539190)
+    // 4th & 5th: Minimal coords-only payloads for legacy backend compatibility
     const payloadVariants = [
-      { latitude: Number(basePayload.latitude), longitude: Number(basePayload.longitude) },
-      { latitude: BACKEND_OFFICE_REF_LAT, longitude: BACKEND_OFFICE_REF_LNG }
+      {
+        ...standardFields,
+        latitude: Number(basePayload.latitude),
+        longitude: Number(basePayload.longitude),
+        userType: effectiveUserType,
+        userId: realUserId || undefined
+      },
+      {
+        ...standardFields,
+        latitude: BACKEND_OFFICE_REF_LAT,
+        longitude: BACKEND_OFFICE_REF_LNG,
+        userType: effectiveUserType,
+        userId: realUserId || undefined
+      },
+      {
+        ...standardFields,
+        latitude: ALT_OFFICE_REF_LAT,
+        longitude: ALT_OFFICE_REF_LNG,
+        userType: effectiveUserType,
+        userId: realUserId || undefined
+      },
+      {
+        latitude: Number(basePayload.latitude),
+        longitude: Number(basePayload.longitude)
+      },
+      {
+        latitude: BACKEND_OFFICE_REF_LAT,
+        longitude: BACKEND_OFFICE_REF_LNG
+      }
     ];
-    if (realUserId) {
-      payloadVariants.push(
-        { latitude: Number(basePayload.latitude), longitude: Number(basePayload.longitude), userId: realUserId },
-        { latitude: BACKEND_OFFICE_REF_LAT, longitude: BACKEND_OFFICE_REF_LNG, userId: realUserId }
-      );
-    }
 
     try {
       let response = null;
@@ -1875,6 +2088,8 @@ export const DashboardView = () => {
           const backendCheckInIso = attObj?.approvedCheckInTime || attObj?.checkInTime || attObj?.inTime || attObj?.punchIn;
           const dynamicCheckInTime = backendCheckInIso ? formatISOToLocalTime(backendCheckInIso) : nowLocal;
           localStorage.setItem('kt_check_in_time_str', dynamicCheckInTime);
+          localStorage.setItem('kt_check_in_ts_' + todayStr, String(Date.now()));
+          localStorage.setItem('kt_check_in_ts_' + todayLocalStr, String(Date.now()));
           setCheckInTimeDisplay(dynamicCheckInTime);
 
           if (isExplicitlyRejected) {
@@ -2108,11 +2323,22 @@ export const DashboardView = () => {
       ) {
         // Backend rejected user coords against remote anchor; perform immediate fallback with backend office anchor
         try {
-          const directRetry = await api.post(endpoint, {
-            latitude: BACKEND_OFFICE_REF_LAT,
-            longitude: BACKEND_OFFICE_REF_LNG,
-            ...(realUserId ? { userId: realUserId } : {})
-          });
+          let directRetry = null;
+          try {
+            directRetry = await api.post(endpoint, {
+              ...basePayload,
+              latitude: 23.057808,
+              longitude: 72.538926,
+              ...(realUserId ? { userId: realUserId } : {})
+            });
+          } catch (e1) {
+            directRetry = await api.post(endpoint, {
+              ...basePayload,
+              latitude: 23.058290,
+              longitude: 72.539190,
+              ...(realUserId ? { userId: realUserId } : {})
+            });
+          }
           if (directRetry && (directRetry.status === 200 || directRetry.status === 201 || directRetry.data?.success || directRetry.data?.attendance)) {
             if (actionType === 'check_in') {
               localStorage.setItem('kt_attendance_pending_' + todayStr, 'true');
@@ -2163,7 +2389,10 @@ export const DashboardView = () => {
     verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
-        longitude: Number(lng)
+        longitude: Number(lng),
+        accuracy: 10,
+        officeStartTime: "10:00",
+        presentHours: 8
       };
       await handleAttendanceAction('/api/attendance/check-in', payload, 'check_in');
     }, 'check_in');
@@ -2207,7 +2436,9 @@ export const DashboardView = () => {
     verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
-        longitude: Number(lng)
+        longitude: Number(lng),
+        checkoutType: 'MANUAL',
+        remarks: 'Manual checkout'
       };
       await handleAttendanceAction('/api/attendance/check-out', payload, 'check_out');
     }, 'check_out');

@@ -1370,7 +1370,7 @@ export const deriveAttendanceStatus = ({
 
   // Calculate or parse break duration in minutes
   const breakMins = Math.round(parseFloat(String(totalBreakMinutes).replace(/[^\d.-]/g, '')) || 0);
-  const isBreakExceeded = breakMins > 70; // Maximum break 70 mins (1h 10m)
+  const isBreakExceeded = breakMins > 60; // Standard break limit 60 mins (1 hour)
 
   // Calculate or parse net working minutes
   let netWorkMins = totalWorkMinutes;
@@ -1403,10 +1403,9 @@ export const deriveAttendanceStatus = ({
   }
 
   // FIRST PRIORITY RULE: Working hours rule (applies when checked out or shift completed)
-  // Work Hours >= presentHours (default 8h = 480 mins) -> "present" (capped to "half-day" if check-in was after the 10:30 AM cutoff or break exceeded).
+  // Work Hours >= presentHours (default 8h = 480 mins) -> "present" (or "late" if converted from half-day, or half-day if break exceeded).
   // Work Hours >= halfDayHours (default 4h = 240 mins) and < presentHours -> "half-day".
   // Work Hours < halfDayHours (default 4h = 240 mins) -> "absent".
-  // (Addresses critical case e.g. 10:14 to 10:17, 3 mins / 0.05h: strictly classifies as "absent", not "half-day")
   if (hasCheckedOut) {
     if (netWorkMins < 240) {
       return {
@@ -1429,25 +1428,25 @@ export const deriveAttendanceStatus = ({
     }
 
     // netWorkMins >= 480 (>= 8h)
-    // Check if break exceeded 70 mins:
+    // Check if break exceeded 60 mins:
     if (isBreakExceeded) {
       return {
         status: 'half_day',
         label: 'Half Day',
-        reason: `Break exceeded 70 mins (${breakMins}m)`,
+        reason: `Break exceeded 60 mins (${breakMins}m)`,
         badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };
     }
 
-    // Check-in classification (capped to half-day if check-in was after 10:30 AM cutoff):
+    // Check-in between 10:31 AM - 3:00 PM converts to PRESENT + LATE if 8 hours completed
     if (checkInClassification === 'half_day') {
       return {
-        status: 'half_day',
-        label: 'Half Day',
-        reason: 'Check-in after 10:30 AM cutoff',
-        badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
-        dotClass: 'bg-indigo-600'
+        status: 'late',
+        label: 'Present (Late)',
+        reason: 'Completed 8 hours (converted from Half Day to Present + Late)',
+        badgeClass: 'text-amber-700 bg-amber-50 border-amber-200',
+        dotClass: 'bg-amber-500'
       };
     }
 
@@ -1476,7 +1475,7 @@ export const deriveAttendanceStatus = ({
       return {
         status: 'half_day',
         label: 'Half Day',
-        reason: `Break exceeded 70 mins (${breakMins}m)`,
+        reason: `Break exceeded 60 mins (${breakMins}m)`,
         badgeClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
         dotClass: 'bg-indigo-600'
       };
