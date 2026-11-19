@@ -4,7 +4,7 @@ import { BASE_URL } from "../api/config";
 import { createPortal } from "react-dom";
 import {
   Mail, Phone, MessageCircle, X, Send, Users, Activity,
-  Sparkles, Clock, ChevronRight, User,
+  Sparkles, Clock, ChevronRight, ChevronLeft, User,
   Briefcase, Star, Heart, Search,
   Share2, CheckCircle,
   ArrowRight, Copy, Check, Trash2
@@ -353,47 +353,55 @@ export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterService, setFilterService] = useState("all");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [services, setServices] = useState(["all"]);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, pages: 0, total: 0 });
 
   useEffect(() => {
-    fetchContacts();
-  }, []);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      fetchContacts(controller.signal);
+    }, 250);
 
-  const fetchContacts = async () => {
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [searchTerm, filterService, page]);
+
+  const fetchContacts = async (signal) => {
     try {
       setLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "30",
+        search: searchTerm.trim(),
+        service: filterService,
+      });
       const response = await fetch(
-        `${BASE_URL}/api/contact`
+        `${BASE_URL}/api/contact?${params}`,
+        { signal }
       );
       const result = await response.json();
 
       if (result.success && Array.isArray(result.data)) {
         setContacts(result.data);
+        setServices(["all", ...(result.services || [])]);
+        setPagination(result.pagination || { page: 1, pages: 0, total: result.data.length });
       } else {
         setContacts([]);
+        setPagination({ page: 1, pages: 0, total: 0 });
       }
     } catch (error) {
-      console.error("Error fetching contacts:", error);
-      setContacts([]);
+      if (error.name !== "AbortError") {
+        console.error("Error fetching contacts:", error);
+        setContacts([]);
+        setPagination({ page: 1, pages: 0, total: 0 });
+      }
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   };
-
-  // Filter contacts
-  const filteredContacts = contacts.filter(contact => {
-    const matchesSearch =
-      contact.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.service?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesFilter = filterService === "all" || contact.service?.toLowerCase() === filterService;
-
-    return matchesSearch && matchesFilter;
-  });
-
-  // Get unique services for filter
-  const services = ["all", ...new Set(contacts.map(c => c.service?.toLowerCase()).filter(Boolean))];
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
@@ -421,7 +429,7 @@ export default function Contacts() {
             </div>
             <div>
               <p className="text-[10px] sm:text-xs text-slate-400 font-medium">Total</p>
-              <p className="text-sm sm:text-base font-bold text-slate-900">{filteredContacts.length}</p>
+              <p className="text-sm sm:text-base font-bold text-slate-900">{pagination.total}</p>
             </div>
           </div>
 
@@ -447,7 +455,10 @@ export default function Contacts() {
             type="text"
             placeholder="Search contacts..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
             className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0088cc]/20 focus:border-[#0088cc] transition-all text-xs sm:text-sm"
           />
         </div>
@@ -466,7 +477,10 @@ export default function Contacts() {
                 {services.map((service) => (
                   <button
                     key={service}
-                    onClick={() => setFilterService(service)}
+                    onClick={() => {
+                      setFilterService(service);
+                      setPage(1);
+                    }}
                     className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
                       filterService === service
                         ? "btn-brand-primary text-white shadow-xs font-semibold"
@@ -493,6 +507,7 @@ export default function Contacts() {
                       key={service}
                       onClick={() => {
                         setFilterService(service);
+                        setPage(1);
                         setMobileMenuOpen(false);
                       }}
                       className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
@@ -517,7 +532,7 @@ export default function Contacts() {
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden p-4 sm:p-5 lg:p-6">
           {loading ? (
             <TableSkeleton rows={6} cols={5} />
-          ) : filteredContacts.length === 0 ? (
+          ) : contacts.length === 0 ? (
             <div className="text-center py-12 sm:py-16 md:py-20">
               <div className="inline-flex p-4 sm:p-5 md:p-6 rounded-3xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 mb-4">
                 <Mail className="h-10 w-10 sm:h-12 sm:w-12 text-indigo-400" />
@@ -529,7 +544,7 @@ export default function Contacts() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-              {filteredContacts.map((contact, index) => (
+              {contacts.map((contact, index) => (
                 <ContactCard
                   key={contact._id}
                   contact={contact}
@@ -537,6 +552,31 @@ export default function Contacts() {
                   index={index}
                 />
               ))}
+            </div>
+          )}
+          {pagination.pages > 1 && (
+            <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+              <p className="text-xs sm:text-sm text-slate-500">
+                Page {pagination.page} of {pagination.pages} · {pagination.total} contacts
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={page >= pagination.pages || loading}
+                  onClick={() => setPage((current) => Math.min(current + 1, pagination.pages))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           )}
         </div>
