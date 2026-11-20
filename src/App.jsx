@@ -19,6 +19,7 @@ const Header = lazy(() => import('./components/layout/Header.jsx').then(m => ({ 
 const FinancePanel = lazy(() => import('./components/finance/FinancePanel.jsx').then(m => ({ default: m.FinancePanel })));
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView.jsx').then(m => ({ default: m.DashboardView })));
 const AttendanceView = lazy(() => import('./components/attendance/AttendanceView.jsx').then(m => ({ default: m.AttendanceView })));
+const MyAttendanceView = lazy(() => import('./components/attendance/MyAttendanceView.jsx').then(m => ({ default: m.MyAttendanceView })));
 const DailyReportView = lazy(() => import('./components/daily-report/DailyReportView.jsx').then(m => ({ default: m.DailyReportView })));
 const AdminDailyTaskView = lazy(() => import('./components/daily-report/AdminDailyTaskView.jsx').then(m => ({ default: m.AdminDailyTaskView })));
 const TaskManagementView = lazy(() => import('./components/tasks/TaskManagementView.jsx').then(m => ({ default: m.TaskManagementView })));
@@ -176,7 +177,7 @@ const MainLayout = ({ handleSignOut }) => {
 
       // Existing Modules
       case 'dashboard': return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;
-      case 'attendance': return <AttendanceView />;
+      case 'attendance': return userRole === 'hr' ? <MyAttendanceView /> : <AttendanceView />;
       case 'daily-report': return <DailyReportView />;
       case 'tasks': return <TaskManagementView />;
       case 'leave': return <LeaveManagementView />;

@@ -215,7 +215,7 @@ const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   return R * c; // Distance in meters
 };
 
-export const DashboardView = () => {
+export const DashboardView = ({ attendanceOnly = false } = {}) => {
   const { user, userRole, setAttendanceStatus: setGlobalAttendanceStatus } = useApp();
 
   const isTeamLeader = 
@@ -1451,26 +1451,65 @@ export const DashboardView = () => {
       if (isMounted) {
         setActualUserId(validUserId);
         actualUserIdRef.current = validUserId;
-        await fetchFullDashboard(validUserId);
+        if (attendanceOnly) {
+          await fetchTodayAttendance(validUserId);
+        } else {
+          await fetchFullDashboard(validUserId);
+        }
         setIsDataLoading(false);
       }
     };
 
     bootstrapDashboard();
     return () => { isMounted = false; };
-  }, [fetchFullDashboard, fetchTodayAttendance]);
+  }, [attendanceOnly, fetchFullDashboard, fetchTodayAttendance]);
 
   // Listen to profile photo updates (from ProfileView or other tabs) to refresh dashboard team on leave
   useEffect(() => {
+    if (attendanceOnly) return undefined;
     const handlePhotoUpdated = () => {
       fetchFullDashboard(actualUserIdRef.current);
     };
     window.addEventListener('kt_profile_photo_updated', handlePhotoUpdated);
     return () => window.removeEventListener('kt_profile_photo_updated', handlePhotoUpdated);
-  }, [fetchFullDashboard]);
+  }, [attendanceOnly, fetchFullDashboard]);
 
   // --- Auto-refresh interval & focus listeners for Employee and TL Dashboard ---
   useEffect(() => {
+    if (attendanceOnly) {
+      let isRefreshing = false;
+      const refreshAttendance = async () => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        const targetId = actualUserIdRef.current || user?.employee?._id || user?._id || user?.id || user?.user?._id;
+        if (!targetId || isRefreshing) return;
+
+        isRefreshing = true;
+        try {
+          await fetchTodayAttendance(targetId);
+        } finally {
+          isRefreshing = false;
+        }
+      };
+
+      const interval = setInterval(refreshAttendance, 12000);
+      const handleFocus = () => refreshAttendance();
+      const handleVisibility = () => {
+        if (document.visibilityState === 'visible') refreshAttendance();
+      };
+      const handleAttendanceUpdate = () => refreshAttendance();
+
+      window.addEventListener('focus', handleFocus);
+      window.addEventListener('attendance_updated', handleAttendanceUpdate);
+      document.addEventListener('visibilitychange', handleVisibility);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('attendance_updated', handleAttendanceUpdate);
+        document.removeEventListener('visibilitychange', handleVisibility);
+      };
+    }
+
     let isRefreshing = false;
     let lastRefreshAt = 0;
     const refreshDashboardSilently = async () => {
@@ -1506,7 +1545,7 @@ export const DashboardView = () => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [fetchFullDashboard, user]);
+  }, [attendanceOnly, fetchFullDashboard, fetchTodayAttendance, user]);
 
   // --- Auto Check-Out Monitor: If employee has not checked out until 11:59 PM, auto check out time 7:00 PM at that day ---
   useEffect(() => {
@@ -1958,14 +1997,12 @@ export const DashboardView = () => {
 
     const realUserId = getRealAuthUserId();
 
-    // Fallback URL candidates if 404
+    // Break Out must never fall back to a legacy URL that may map to checkout.
     const endpointCandidates = [endpoint];
     if (endpoint === '/api/attendance/check-in') {
       endpointCandidates.push('/api/attendance/checkin');
     } else if (endpoint === '/api/attendance/break/start') {
       endpointCandidates.push('/api/attendance/break-in', '/api/attendance/break/in');
-    } else if (endpoint === '/api/attendance/break/end') {
-      endpointCandidates.push('/api/attendance/break-out', '/api/attendance/break/out');
     } else if (endpoint === '/api/attendance/check-out') {
       endpointCandidates.push('/api/attendance/checkout');
     }
@@ -2539,7 +2576,7 @@ export const DashboardView = () => {
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-poppins ">
 
       {/* Modern Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#034665] via-[#045d86] to-[#068DCB] p-5 sm:p-6 text-white shadow-lg">
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#034665] via-[#045d86] to-[#068DCB] p-5 sm:p-6 text-white shadow-lg ${attendanceOnly ? 'hidden' : ''}`}>
         <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-cyan-400/15 blur-2xl pointer-events-none" />
 
@@ -2590,7 +2627,7 @@ export const DashboardView = () => {
       </div>
 
       {/* KPI Cards (4 Modern Enterprise Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 ${attendanceOnly ? 'hidden' : ''}`}>
         {(isTeamLeader ? [
           {
             label: 'Shift Time Logged',
@@ -2698,12 +2735,12 @@ export const DashboardView = () => {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 ${attendanceOnly ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-6`}>
 
         {/* TIME & ATTENDANCE - QUICK ACTIONS & TIMELINE */}
         <div 
           ref={quickActionsRef}
-          className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl overflow-hidden transition-all shadow-xs p-4 sm:p-5 flex flex-col justify-between"
+          className={`${attendanceOnly ? 'lg:col-span-1' : 'lg:col-span-2'} bg-white border border-slate-200/80 rounded-xl overflow-hidden transition-all shadow-xs p-4 sm:p-5 flex flex-col justify-between`}
         >
 
           {geoError && (
@@ -2741,6 +2778,19 @@ export const DashboardView = () => {
                 )}
               </div>
             </div>
+
+            {attendanceOnly && (
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Working hours</p>
+                  <p className="mt-1 text-sm font-bold text-slate-800">{formatHoursAndMinutes(totalWorkTimeDisplay)}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Break duration</p>
+                  <p className="mt-1 text-sm font-bold text-slate-800">{totalBreakTimeDisplay}</p>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-between items-center px-2">
               {/* Check In */}
@@ -2851,7 +2901,7 @@ export const DashboardView = () => {
 
         {/* VERTICAL ANNOUNCEMENTS LIST */}
         <div 
-          className="bg-white border border-slate-200/80 rounded-xl flex flex-col h-full overflow-hidden shadow-xs transition-all duration-200"
+          className={`bg-white border border-slate-200/80 rounded-xl flex flex-col h-full overflow-hidden shadow-xs transition-all duration-200 ${attendanceOnly ? 'hidden' : ''}`}
           style={quickActionsHeight && typeof window !== 'undefined' && window.innerWidth >= 1024 ? { height: `${quickActionsHeight}px`, maxHeight: `${quickActionsHeight}px` } : undefined}
         >
           <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-4 shrink-0">
@@ -2894,7 +2944,7 @@ export const DashboardView = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 ${attendanceOnly ? 'hidden' : ''}`}>
 
         {/* HOLIDAYS - HORIZONTAL DESIGN */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs">
