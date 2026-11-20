@@ -713,8 +713,8 @@ export const LeaveManagementView = () => {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Leave Management</h2>
-              <p className="text-xs sm:text-sm text-slate-500">Apply for leave, track requests, and check quotas</p>
+              <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">Leave Management</h2>
+              {/* <p className="text-xs sm:text-sm text-slate-500">Apply for leave, track requests, and check quotas</p> */}
             </div>
               
             <div className="flex items-center justify-end gap-2">

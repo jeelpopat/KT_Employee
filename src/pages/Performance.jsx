@@ -2325,8 +2325,8 @@ const Performance = () => {
         {/* Header Row: Title & Action Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-poppins">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#e8f1f5] text-[#034665] flex items-center justify-center shrink-0">
-              <FileText size={18} strokeWidth={2} />
+            <div className="w-8 h-8 rounded-lg bg-[#e8f1f5] text-[#034665] flex items-center justify-center shrink-0">
+              <FileText size={16} strokeWidth={2} />
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900 font-poppins">
@@ -2336,13 +2336,13 @@ const Performance = () => {
                     ? "Team Performance History"
                     : "My Performance History"}
               </h3>
-              <p className="text-xs text-slate-500 font-normal font-poppins mt-0.5">
+              {/* <p className="text-xs text-slate-500 font-normal font-poppins mt-0.5">
                 {canViewAllPerformances
                   ? "View and manage employee performance records"
                   : isTL && tlViewScope === "team"
                     ? "Performance evaluations and review remarks for your team members"
                     : "Personal performance evaluations and review remarks"}
-              </p>
+              </p> */}
             </div>
           </div>
 

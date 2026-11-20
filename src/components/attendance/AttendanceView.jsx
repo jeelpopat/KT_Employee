@@ -318,17 +318,33 @@ export const AttendanceView = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
         {[
-          { label: 'Total Hours', value: `${summaryStats.totalWorkingHours.toFixed(1)}h`, accent: 'border-l-indigo-600' },
-          { label: 'Present Days', value: summaryStats.presentDays, accent: 'border-l-emerald-500' },
-          { label: 'Absent Days', value: summaryStats.absentDays, accent: 'border-l-rose-500' },
-          { label: 'Half Days', value: summaryStats.halfDays, accent: 'border-l-purple-500' },
+          { label: 'Total Hours', value: `${summaryStats.totalWorkingHours.toFixed(1)}h` },
+          { label: 'Present Days', value: summaryStats.presentDays },
+          { label: 'Absent Days', value: summaryStats.absentDays },
+          { label: 'Half Days', value: summaryStats.halfDays },
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
-            <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900">{item.value}</p>
+          <div
+            key={idx}
+            className="relative flex items-center h-[60px] w-full"
+          >
+            {/* Left card for the border */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+              style={{ background: "#034665", opacity: 1 }}
+            />
+            {/* Inner card */}
+            <div
+              className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+              style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+            >
+              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none truncate mr-1">
+                {item.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2 shrink-0">
+                {item.value}
+              </p>
             </div>
           </div>
         ))}

@@ -408,62 +408,36 @@ export const DeductionMasterView = () => {
       </div>
 
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Total Types
-            </span>
-            <span className="text-xl sm:text-2xl font-bold text-slate-900 mt-1 block">
-              {stats.total}
-            </span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
+        {[
+          { label: "Total Types", value: stats.total },
+          { label: "Active Masters", value: stats.active },
+          { label: "Inactive / Archived", value: stats.inactive },
+          { label: "Statutory & Compliant", value: stats.permissible }
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            className="relative flex items-center h-[60px] w-full"
+          >
+            {/* Left card for the border */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+              style={{ background: "#034665", opacity: 1 }}
+            />
+            {/* Inner card */}
+            <div
+              className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+              style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+            >
+              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none truncate mr-1">
+                {item.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2 shrink-0">
+                {item.value}
+              </p>
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600">
-            <Layers size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Active Masters
-            </span>
-            <span className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1 block">
-              {stats.active}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-            <CheckCircle2 size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Inactive / Archived
-            </span>
-            <span className="text-xl sm:text-2xl font-bold text-slate-500 mt-1 block">
-              {stats.inactive}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">
-            <XCircle size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Statutory &amp; Compliant
-            </span>
-            <span className="text-xl sm:text-2xl font-bold text-indigo-600 mt-1 block">
-              {stats.permissible}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-            <ShieldCheck size={20} />
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Main Card with Filters and Data Table */}
