@@ -14,6 +14,7 @@ import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 import { tabToPath, pathToTab } from '../../utils/navigation.js';
 import { useConfirm } from '../common/ConfirmDialog.jsx';
 import { showToast } from '../common/Toast.jsx';
+import { getWebPushToken } from '../../services/webPushNotifications.js';
 
 let notificationAudio;
 
@@ -154,6 +155,42 @@ export const Header = ({ onSignOut }) => {
       ? Notification.permission
       : 'unsupported'
   ));
+  const [pushSetupStatus, setPushSetupStatus] = useState('idle');
+  const pushTokenRegistrationRef = useRef(null);
+  const notificationUserId = user?.id || user?._id || user?.userId || user?.employeeId;
+
+  const registerWebPushToken = useCallback(async () => {
+    if (!pushTokenRegistrationRef.current) {
+      pushTokenRegistrationRef.current = (async () => {
+        const token = await getWebPushToken();
+        await api.post('/api/notification/register-token', {
+          token,
+          deviceType: 'web',
+        });
+      })();
+    }
+
+    try {
+      await pushTokenRegistrationRef.current;
+      setPushSetupStatus('ready');
+    } finally {
+      pushTokenRegistrationRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (desktopNotificationPermission !== 'granted' || !notificationUserId) return undefined;
+
+    let cancelled = false;
+    registerWebPushToken().catch((error) => {
+      console.error('Could not register browser push notifications:', error);
+      if (!cancelled) setPushSetupStatus('failed');
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopNotificationPermission, notificationUserId, registerWebPushToken]);
 
   // --- Click Outside Event Listener ---
   useEffect(() => {
@@ -269,7 +306,7 @@ export const Header = ({ onSignOut }) => {
         });
         if (response.ok) {
           const data = await response.json();
-          if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          if (data.success && Array.isArray(data.data)) {
             unifiedList = data.data;
             backendSucceeded = true;
           }
@@ -793,16 +830,21 @@ export const Header = ({ onSignOut }) => {
     }
 
     try {
-      const permission = await Notification.requestPermission();
+      const permission = desktopNotificationPermission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
       setDesktopNotificationPermission(permission);
       if (permission === 'granted') {
+        setPushSetupStatus('loading');
+        await registerWebPushToken();
         showToast('Desktop notifications enabled.', 'success');
       } else {
         showToast('Desktop notifications are disabled. In-app notifications will still work.', 'warning');
       }
     } catch (error) {
       console.error('Could not request desktop notification permission:', error);
-      showToast('Could not enable desktop notifications.', 'error');
+      setPushSetupStatus('failed');
+      showToast(error.message || 'Could not enable desktop notifications.', 'error');
     }
   };
 
@@ -1125,7 +1167,11 @@ export const Header = ({ onSignOut }) => {
                 <div className="flex items-center justify-between gap-3 px-3.5 py-2 border-b border-slate-100 bg-white">
                   <span className="text-[11px] text-slate-600">
                     {desktopNotificationPermission === 'granted'
-                      ? 'Desktop notifications enabled'
+                      ? pushSetupStatus === 'ready'
+                        ? 'Background push notifications enabled'
+                        : pushSetupStatus === 'failed'
+                          ? 'Push setup failed — retry below'
+                          : 'Setting up background notifications'
                       : desktopNotificationPermission === 'denied'
                         ? 'Blocked in browser settings'
                         : desktopNotificationPermission === 'unsupported'
@@ -1135,10 +1181,21 @@ export const Header = ({ onSignOut }) => {
                   <button
                     type="button"
                     onClick={handleEnableDesktopNotifications}
-                    disabled={desktopNotificationPermission === 'granted' || desktopNotificationPermission === 'denied' || desktopNotificationPermission === 'unsupported'}
+                    disabled={
+                      desktopNotificationPermission === 'denied' ||
+                      desktopNotificationPermission === 'unsupported' ||
+                      pushSetupStatus === 'ready' ||
+                      pushSetupStatus === 'loading'
+                    }
                     className="rounded-md bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {desktopNotificationPermission === 'granted' ? 'Enabled' : 'Enable Desktop Notifications'}
+                    {pushSetupStatus === 'loading'
+                      ? 'Setting up...'
+                      : pushSetupStatus === 'ready'
+                        ? 'Enabled'
+                        : desktopNotificationPermission === 'granted'
+                          ? 'Retry Push Setup'
+                          : 'Enable Desktop Notifications'}
                   </button>
                 </div>
                 {isAdmin ? (
