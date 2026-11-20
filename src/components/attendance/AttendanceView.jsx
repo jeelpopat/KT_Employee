@@ -221,7 +221,7 @@ export const AttendanceView = () => {
       }
 
       const sortedRecords = [...mergedRecords].sort((a, b) => new Date(b.date || b.checkInTime) - new Date(a.date || a.checkInTime));
-      // Normalize all records: if employee has not checked out until 11:59 PM, auto check out time 7:00 PM at that day
+      // Normalize records without inventing a checkout time.
       const normalizedRecords = sortedRecords.map(normalizeAttendanceRecord);
       setAttendanceRecords(normalizedRecords);
 
@@ -595,7 +595,7 @@ export const AttendanceView = () => {
                         }
                       } else {
                         if (record.isAutoCheckedOut) {
-                          return <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold uppercase tracking-wider">Checked Out (7:00 PM)</span>;
+                          return <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold uppercase tracking-wider">Auto Checked Out</span>;
                         }
                         return (
                           <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${derived.badgeClass || 'bg-slate-100 text-slate-700'}`}>

@@ -13,12 +13,10 @@ import {
   getQuickActionStatusConfig,
   deriveAttendanceStatus,
   isTodayDate,
-  isPastDate,
   formatISOToLocalTime,
   calculateWorkingHours,
   formatHoursAndMinutes,
   normalizeAttendanceRecord,
-  getAutoCheckOutTimeForDate,
   formatMinutesToTimeStr,
   convertUTCMinutesToLocal,
   parseTimeToMinutes,
@@ -718,27 +716,6 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       localStorage.removeItem('kt_check_out_time_str');
     }
 
-    // AUTO CHECK-OUT RULE: 11:59 PM auto check out time 7:00 PM at that day
-    const nowClock = new Date();
-    const isPast1159PMToday = nowClock.getHours() === 23 && nowClock.getMinutes() >= 59;
-    const shouldAutoCheckOut = Boolean(
-      !isRejected &&
-      hasCheckedIn &&
-      isPast1159PMToday &&
-      !localCheckedOut &&
-      !hasValidCheckOutTime &&
-      !isCheckedOutStatus
-    );
-
-    if (shouldAutoCheckOut) {
-      localStorage.setItem('kt_checked_out_' + todayStr, 'true');
-      localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
-      const autoEndStr = ta?.officeEndTime ? formatISOToLocalTime(ta.officeEndTime) : (rawCheckOut ? formatISOToLocalTime(rawCheckOut) : formatISOToLocalTime("19:00"));
-      localStorage.setItem('kt_check_out_time_str', autoEndStr);
-      localStorage.removeItem('kt_on_break_' + todayStr);
-      localStorage.removeItem('kt_on_break_' + todayLocalStr);
-    }
-
     // Check-out Recognition
     // If backend confirms employee is checked in and has NO valid checkout time, trust the backend: NOT checked out!
     const isBackendConfirmedUncheckedOut = Boolean(
@@ -752,7 +729,6 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       !isRejected &&
       hasCheckedIn &&
       !isBackendConfirmedUncheckedOut && (
-        shouldAutoCheckOut ||
         ta?.isAutoCheckedOut === true ||
         isCheckedOutStatus ||
         (hasValidCheckOutTime && !localOnBreak && statusLower !== 'on_break') ||
@@ -930,7 +906,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     }
 
     if (hasCheckedOut) {
-      if (shouldAutoCheckOut || ta?.isAutoCheckedOut) {
+      if (ta?.isAutoCheckedOut === true) {
         const autoOut = ta?.officeEndTime ? formatISOToLocalTime(ta.officeEndTime) : (localStorage.getItem('kt_check_out_time_str') || (rawCheckOut ? formatISOToLocalTime(rawCheckOut) : '--:--'));
         setCheckOutTimeDisplay(autoOut !== '--:--' ? autoOut : '--:--');
       } else if (rawCheckOut && hasValidCheckOutTime) {
@@ -1547,245 +1523,15 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     };
   }, [attendanceOnly, fetchFullDashboard, fetchTodayAttendance, user]);
 
-  // --- Auto Check-Out Monitor: If employee has not checked out until 11:59 PM, auto check out time 7:00 PM at that day ---
+  // Keep the dashboard in sync with the app-wide geofence monitor.
   useEffect(() => {
-    const checkAutoCheckoutThreshold = async () => {
-      const nowClock = new Date();
-      const hrs = nowClock.getHours();
-      const mins = nowClock.getMinutes();
-
-      // Trigger condition: 11:59 PM (23:59)
-      if (hrs === 23 && mins >= 59) {
-        const todayStr = nowClock.toISOString().split('T')[0];
-        const todayLocalStr = nowClock.toLocaleDateString('en-CA');
-        const alreadyDone = localStorage.getItem('kt_auto_checked_out_' + todayStr) === 'true';
-
-        if (!alreadyDone && attendanceStatusRef.current !== 'checked_out' && attendanceStatusRef.current !== 'not_checked_in') {
-          localStorage.setItem('kt_auto_checked_out_' + todayStr, 'true');
-          localStorage.setItem('kt_checked_out_' + todayStr, 'true');
-          localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
-          const autoEndTimeStr = formatISOToLocalTime("19:00");
-          localStorage.setItem('kt_check_out_time_str', autoEndTimeStr);
-          localStorage.removeItem('kt_on_break_' + todayStr);
-          localStorage.removeItem('kt_on_break_' + todayLocalStr);
-
-          setAttendanceStatus('checked_out');
-          if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
-          setCheckOutTimeDisplay(autoEndTimeStr);
-          setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
-
-          // Send background check-out to backend
-          try {
-            await api.post('/api/attendance/check-out', { latitude: TARGET_LAT, longitude: TARGET_LNG })
-              .catch(() => api.post('/api/attendance/check-out', { latitude: 23.05829, longitude: 72.53919 }))
-              .catch(() => {});
-          } catch (e) { }
-
-          await fetchTodayAttendance(actualUserIdRef.current);
-        }
-      }
-    };
-
-    const autoTimer = setInterval(checkAutoCheckoutThreshold, 30000);
-    return () => clearInterval(autoTimer);
-  }, [fetchTodayAttendance, setGlobalAttendanceStatus]);
-
-  // --- Continuous Geofence Auto-Checkout Monitor (80m Perimeter) ---
-  // Parameters per specification:
-  // - Trigger Radius: 80 meters
-  // - Accuracy limit: <= 35m (filter indoor GPS drift)
-  // - Consecutive fixes: 5 consecutive fixes outside
-  // - Exit duration: Minimum 45 seconds outside
-  // - Grace period: 5 minutes (300s) after check-in, auto-checkout is blocked
-  // - Break safeguard: While on break, NEVER auto-checkout!
-  const consecutiveBreachCountRef = useRef(0);
-  const firstBreachTimeRef = useRef(null);
-  const isPerformingAutoCheckoutRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !navigator.geolocation) return;
-
-    const isLocalhost = (
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.endsWith('.local')
-    );
-
-    const checkGeofenceAutoCheckout = () => {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const todayLocalStr = new Date().toLocaleDateString('en-CA');
-
-      // 1. Break Exception Check (CRITICAL SAFEGUARD)
-      const isUserOnBreak = (
-        attendanceStatusRef.current === 'on_break' ||
-        localStorage.getItem('kt_on_break_' + todayStr) === 'true' ||
-        localStorage.getItem('kt_on_break_' + todayLocalStr) === 'true'
-      );
-
-      // If user is on break (downstairs for lunch/tea), NEVER auto-checkout!
-      if (isUserOnBreak) {
-        consecutiveBreachCountRef.current = 0;
-        firstBreachTimeRef.current = null;
-        return;
-      }
-
-      // 2. Check-in & Post-Break Grace Period Check: 5 minutes (300s) after check-in or break-out, auto-checkout is strictly blocked!
-      const checkInTs = parseInt(
-        localStorage.getItem('kt_check_in_ts_' + todayStr) ||
-        localStorage.getItem('kt_check_in_ts_' + todayLocalStr) ||
-        '0',
-        10
-      );
-      const resumeWorkTs = parseInt(
-        localStorage.getItem('kt_resume_work_ts_' + todayStr) ||
-        localStorage.getItem('kt_resume_work_ts_' + todayLocalStr) ||
-        '0',
-        10
-      );
-      const isWithinGracePeriod = Boolean(
-        (checkInTs && (Date.now() - checkInTs < 300 * 1000)) ||
-        (resumeWorkTs && (Date.now() - resumeWorkTs < 300 * 1000))
-      );
-
-      if (isWithinGracePeriod) {
-        consecutiveBreachCountRef.current = 0;
-        firstBreachTimeRef.current = null;
-        return;
-      }
-
-      // 3. Only active workers (checked_in) are subject to 80m perimeter enforcement
-      const isWorking = (
-        attendanceStatusRef.current === 'checked_in' ||
-        (localStorage.getItem('kt_checked_in_' + todayStr) === 'true' &&
-         localStorage.getItem('kt_checked_out_' + todayStr) !== 'true')
-      );
-
-      if (!isWorking || isPerformingAutoCheckoutRef.current) {
-        consecutiveBreachCountRef.current = 0;
-        firstBreachTimeRef.current = null;
-        return;
-      }
-
-      // In local dev, skip live GPS auto-checkout to avoid locking out developers
-      if (isLocalhost) {
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude, accuracy } = position.coords;
-
-          // GPS Accuracy filter: <= 35m (to prevent indoor GPS drift and false checkouts)
-          if (accuracy && accuracy > 35) {
-            console.log(`[GEOFENCE GPS] Accuracy ${accuracy.toFixed(1)}m > 35m limit. Skipping to prevent indoor drift false checkout.`);
-            return;
-          }
-
-          const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
-
-          console.log(`[GEOFENCE LOCATION] Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${dist.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m | Status: ${attendanceStatusRef.current}`);
-
-          // Re-verify break state (in case user clicked Break In while GPS was reading)
-          if (
-            attendanceStatusRef.current === 'on_break' ||
-            localStorage.getItem('kt_on_break_' + todayStr) === 'true'
-          ) {
-            consecutiveBreachCountRef.current = 0;
-            firstBreachTimeRef.current = null;
-            return;
-          }
-
-          if (dist > AUTO_CHECKOUT_RADIUS_METERS) {
-            consecutiveBreachCountRef.current += 1;
-            if (!firstBreachTimeRef.current) {
-              firstBreachTimeRef.current = Date.now();
-            }
-            const breachDurationSec = Math.floor((Date.now() - firstBreachTimeRef.current) / 1000);
-
-            console.warn(`[GEOFENCE ALERT] Out of 80m office bounds: ${dist.toFixed(1)}m (Breach ${consecutiveBreachCountRef.current}/5, duration: ${breachDurationSec}s/45s)`);
-
-            // Verify with 5 consecutive checks AND minimum 45 seconds exit duration
-            if (consecutiveBreachCountRef.current >= 5 && (Date.now() - firstBreachTimeRef.current >= 45000)) {
-              isPerformingAutoCheckoutRef.current = true;
-              console.warn(`[GEOFENCE AUTO-CHECKOUT] Confirmed exit beyond 80m for >45s. Triggering automatic checkout.`);
-
-              const nowIso = new Date().toISOString();
-              const nowLocal = formatISOToLocalTime(nowIso);
-
-              localStorage.setItem('kt_checked_out_' + todayStr, 'true');
-              localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
-              localStorage.setItem('kt_auto_checked_out_' + todayStr, 'true');
-              localStorage.setItem('kt_is_auto_checkout', 'true');
-              localStorage.setItem('kt_check_out_time_str', nowLocal);
-              localStorage.removeItem('kt_checked_in_' + todayStr);
-              localStorage.removeItem('kt_checked_in_' + todayLocalStr);
-              localStorage.removeItem('kt_on_break_' + todayStr);
-              localStorage.removeItem('kt_on_break_' + todayLocalStr);
-
-              setAttendanceStatus('checked_out');
-              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
-              setCheckOutTimeDisplay(nowLocal);
-              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
-
-              const checkoutReason = `Auto-Checkout: You moved outside the 80m office perimeter (${Math.round(dist)}m away). Automatic checkout recorded.`;
-              setGeoError(checkoutReason);
-              try {
-                showToast(checkoutReason, 'warning');
-              } catch (e) {}
-
-              // Send check-out to backend API
-              try {
-                const realUid = getRealAuthUserId();
-                const effRole = user?.role || user?.user?.role || 'employee';
-                await api.post('/api/attendance/check-out', {
-                  userId: realUid,
-                  userType: effRole,
-                  latitude: Number(latitude),
-                  longitude: Number(longitude),
-                  checkoutType: 'OUTSIDE_GEOFENCE',
-                  remarks: 'Auto Checkout: Outside 80m office radius'
-                }).catch(() => api.post('/api/attendance/check-out', {
-                  userId: realUid,
-                  userType: effRole,
-                  latitude: 23.05829,
-                  longitude: 72.53919,
-                  checkoutType: 'OUTSIDE_GEOFENCE',
-                  remarks: 'Auto Checkout: Outside 80m office radius'
-                })).catch(() => {});
-              } catch (e) {}
-
-              await fetchTodayAttendance(actualUserIdRef.current);
-              isPerformingAutoCheckoutRef.current = false;
-              consecutiveBreachCountRef.current = 0;
-              firstBreachTimeRef.current = null;
-            }
-          } else {
-            // Inside office perimeter
-            consecutiveBreachCountRef.current = 0;
-            firstBreachTimeRef.current = null;
-          }
-        },
-        (err) => {
-          console.warn('[GEOFENCE LOCATION] GPS location tracking error:', err.message);
-        },
-        { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
-      );
-    };
-
-    const geofenceInterval = setInterval(checkGeofenceAutoCheckout, 9000);
-
-    // Also listen to external auto-checkout events dispatched by AppContext or tabs
-
     const handleExternalAutoCheckout = () => {
       fetchTodayAttendance(actualUserIdRef.current);
     };
     window.addEventListener('kt_auto_checkout_triggered', handleExternalAutoCheckout);
 
-    return () => {
-      clearInterval(geofenceInterval);
-      window.removeEventListener('kt_auto_checkout_triggered', handleExternalAutoCheckout);
-    };
-  }, [fetchTodayAttendance, setGlobalAttendanceStatus]);
+    return () => window.removeEventListener('kt_auto_checkout_triggered', handleExternalAutoCheckout);
+  }, [fetchTodayAttendance]);
 
   // --- Robust Geolocation & Verification ---
   const verifyLocationAndExecute = (actionCallback, actionType = 'check_in') => {
@@ -2267,12 +2013,12 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
         lowerMsg.includes('shift completed') ||
         lowerMsg.includes('already signed out');
 
-      if ((actionType === 'check_in' && isAlreadyCheckedIn) || isAlreadyCheckedIn) {
+      if (actionType === 'check_in' && isAlreadyCheckedIn) {
         const existingAttendance = await syncDashboardAndAttendance(actualUserId || realUserId);
         if (!existingAttendance) {
           setGeoError('A check-in record already exists, but its approval status could not be verified. Please refresh or contact an admin.');
         }
-      } else if ((actionType === 'break_start' && isAlreadyOnBreak) || isAlreadyOnBreak) {
+      } else if (actionType === 'break_start' && isAlreadyOnBreak) {
         // User is already on break: activate ONLY Break Out
         localStorage.setItem('kt_on_break_' + todayStr, 'true');
         localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
@@ -2282,17 +2028,25 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
         setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: true, canCheckOut: false });
         setGeoError('');
         await syncDashboardAndAttendance(actualUserId);
-      } else if ((actionType === 'break_end' && isNotOnBreak) || isNotOnBreak) {
-        // User is not on break: return to checked in
+      } else if (actionType === 'break_end' && isNotOnBreak) {
+        // Recover to working state and give the geofence monitor the normal break-out grace period.
+        const resumeWorkTs = String(Date.now());
+        const breakOutTime = formatISOToLocalTime(new Date().toISOString());
         localStorage.removeItem('kt_on_break_' + todayStr);
         localStorage.removeItem('kt_on_break_' + todayLocalStr);
+        localStorage.removeItem('kt_active_break_started_at_' + todayStr);
+        localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
+        localStorage.setItem('kt_last_break_out_' + todayStr, breakOutTime);
+        localStorage.setItem('kt_resume_work_ts_' + todayStr, resumeWorkTs);
+        localStorage.setItem('kt_resume_work_ts_' + todayLocalStr, resumeWorkTs);
         const curB = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
         setAttendanceStatus('checked_in');
         if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
+        setBreakOutTimeDisplay(breakOutTime);
         setActionsAvailable({ canCheckIn: false, canStartBreak: curB < 2, canEndBreak: false, canCheckOut: true });
         setGeoError('');
         await syncDashboardAndAttendance(actualUserId);
-      } else if ((actionType === 'check_out' && isAlreadyCheckedOut) || isAlreadyCheckedOut) {
+      } else if (actionType === 'check_out' && isAlreadyCheckedOut) {
         localStorage.setItem('kt_checked_out_' + todayStr, 'true');
         localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
         localStorage.removeItem('kt_on_break_' + todayStr);
@@ -2516,12 +2270,23 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
   const onResumeWorkClick = () => {
     if (!actionsAvailable.canEndBreak) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayLocalStr = new Date().toLocaleDateString('en-CA');
+    const breakOutActionTimestamp = String(Date.now());
+    localStorage.setItem('kt_break_out_action_ts_' + todayStr, breakOutActionTimestamp);
+    localStorage.setItem('kt_break_out_action_ts_' + todayLocalStr, breakOutActionTimestamp);
+
     verifyLocationAndExecute(async (lat, lng) => {
-      const payload = {
-        latitude: Number(lat),
-        longitude: Number(lng)
-      };
-      await handleAttendanceAction('/api/attendance/break/end', payload, 'break_end');
+      try {
+        const payload = {
+          latitude: Number(lat),
+          longitude: Number(lng)
+        };
+        await handleAttendanceAction('/api/attendance/break/end', payload, 'break_end');
+      } finally {
+        localStorage.removeItem('kt_break_out_action_ts_' + todayStr);
+        localStorage.removeItem('kt_break_out_action_ts_' + todayLocalStr);
+      }
     }, 'break_end');
   };
 
@@ -2827,6 +2592,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
               {/* Break Out */}
               <button
+                type="button"
                 onClick={onResumeWorkClick}
                 disabled={isActionLoading || !actionsAvailable.canEndBreak}
                 className={`flex flex-col items-center gap-2 transition-all active:scale-95 ${!actionsAvailable.canEndBreak ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}

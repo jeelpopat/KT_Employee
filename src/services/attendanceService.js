@@ -98,6 +98,13 @@ export const TARGET_LNG = 72.53919;
 export const GEOFENCE_RADIUS_METERS = 50;
 export const AUTO_CHECKOUT_RADIUS_METERS = 80;
 
+export const isBeyondAutoCheckoutRadius = (distanceMeters, accuracyMeters) => (
+  Number.isFinite(distanceMeters) &&
+  Number.isFinite(accuracyMeters) &&
+  accuracyMeters >= 0 &&
+  distanceMeters - accuracyMeters > AUTO_CHECKOUT_RADIUS_METERS
+);
+
 export const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   const R = 6371000;
   const dLat = (lat2 - lat1) * (Math.PI / 180);

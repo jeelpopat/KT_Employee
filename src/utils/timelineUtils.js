@@ -135,43 +135,6 @@ export const formatISOToLocalTime = (isoStr) => {
 };
 
 /**
- * Returns 7:00 PM (19:00:00) on the given date (or today) for auto check-out.
- */
-export const getAutoCheckOutTimeForDate = (dateVal) => {
-  const d = dateVal ? new Date(dateVal) : new Date();
-  const base = isNaN(d.getTime()) ? new Date() : new Date(d);
-  base.setHours(19, 0, 0, 0); // 7:00 PM local
-  return {
-    iso: base.toISOString(),
-    timeStr: '07:00 PM',
-    minutes: 19 * 60 // 1140 minutes
-  };
-};
-
-/**
- * Determines whether auto check-out rule applies for a record:
- * If employees have not checked out until 11:59 PM, auto check out time is 7:00 PM at that day.
- */
-export const isAutoCheckOutApplicable = (dateVal) => {
-  if (!dateVal) return false;
-  const now = new Date();
-  const isPast = isPastDate(dateVal);
-  const isToday = isTodayDate(dateVal);
-
-  if (isPast) {
-    // Midnight (11:59 PM) of that past day has already passed
-    return true;
-  }
-
-  if (isToday) {
-    // For today: check if 11:59 PM (23:59) has been reached
-    return now.getHours() === 23 && now.getMinutes() >= 59;
-  }
-
-  return false;
-};
-
-/**
  * Calculate working hours formatted as "Xh Ym"
  * Guarantees both X (hours) and Y (minutes) are strictly integers, never floats.
  */
@@ -250,15 +213,10 @@ export const formatHoursAndMinutes = (val) => {
 };
 
 /**
- * Normalizes an attendance record:
- * - If employee checked in and NOT checked out until 11:59 PM, auto check out time is set to 7:00 PM at that day!
+ * Normalizes attendance records without inventing timestamps absent from the backend.
  */
 export const normalizeAttendanceRecord = (record) => {
   if (!record) return record;
-
-  const now = new Date();
-  const recDateStr = record.date || record.checkInTime || record.createdAt;
-  const isToday = isTodayDate(record.date) || isTodayDate(record.checkInTime) || isTodayDate(record.createdAt) || isTodayDate(recDateStr);
 
   const rawCheckIn = record.checkInTime || record.inTime || record.checkIn;
   const statusStr = String(record.status || '').toLowerCase().trim();
@@ -292,57 +250,6 @@ export const normalizeAttendanceRecord = (record) => {
     (rawCheckIn && rawCheckIn !== '--:--' && rawCheckIn !== 'null' && rawCheckIn !== 'undefined') ||
     ['present', 'late', 'half day', 'checked_in', 'on_break', 'completed'].includes(statusStr)
   );
-
-  const rawCheckOut = record.checkOutTime || record.outTime || record.checkOut;
-  const hasExistingCheckOut = Boolean(
-    rawCheckOut &&
-    rawCheckOut !== '--:--' &&
-    rawCheckOut !== '00:00:00' &&
-    rawCheckOut !== '00:00' &&
-    rawCheckOut !== 'null' &&
-    rawCheckOut !== 'undefined' &&
-    rawCheckOut !== ''
-  );
-
-  // Auto check-out condition:
-  // - Strictly past day: midnight has already elapsed.
-  // - Strictly today: current time >= 23:59 (11:59 PM).
-  // If employee is actively working today before 11:59 PM, auto check-out MUST NOT trigger!
-  const isPast = !isToday && (isPastDate(record.date) || isPastDate(record.createdAt) || isPastDate(recDateStr));
-  const isPast1159PM = isPast || (isToday && now.getHours() === 23 && now.getMinutes() >= 59);
-
-  if (hasCheckIn && !hasExistingCheckOut && isPast1159PM) {
-    let baseDate = new Date(recDateStr || Date.now());
-    if (isNaN(baseDate.getTime())) baseDate = new Date();
-
-    // Auto check out at 7:00 PM (19:00:00) on that day
-    baseDate.setHours(19, 0, 0, 0);
-    const autoCheckOutIso = baseDate.toISOString();
-    const autoCheckOutDisplay = '07:00 PM';
-
-    // Calculate total working hours up to 7:00 PM (1140 mins) minus break
-    const startMins = parseTimeToMinutes(rawCheckIn);
-    let hrs = 9;
-    let mins = 0;
-    if (startMins !== null) {
-      const endMins = 19 * 60; // 1140 mins (7:00 PM)
-      const rawBreak = parseFloat(String(record.totalBreakTime || record.breakDuration || 0).replace(/[^\d.-]/g, '')) || 0;
-      const breakMins = Math.round(rawBreak);
-      const netMins = Math.max(0, Math.round(endMins - startMins - breakMins));
-      hrs = Math.floor(netMins / 60);
-      mins = netMins % 60;
-    }
-
-    return {
-      ...record,
-      checkOutTime: autoCheckOutIso,
-      checkOutTimeDisplay: autoCheckOutDisplay,
-      isAutoCheckedOut: true,
-      totalWorkTime: hrs,
-      totalWorkTimeDisplay: `${hrs}h ${mins}m`,
-      status: (statusStr && statusStr !== 'not_checked_in') ? statusStr : 'present'
-    };
-  }
 
   return record;
 };

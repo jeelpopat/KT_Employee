@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
-import { performAutoCheckout, clearAuth, isTokenExpired, validateUserSession, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
+import { clearAuth, isTokenExpired, validateUserSession, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
 import { BASE_URL } from './api/config.js';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { PublicInfoView } from './components/auth/PublicInfoView.jsx';
@@ -399,7 +399,6 @@ export default function App() {
 
       if (isTokenExpired(token)) {
         if (isMounted) {
-          await performAutoCheckout(token);
           clearAuth();
           setIsAuthenticated(false);
           setIsCheckingAuth(false);
@@ -463,7 +462,6 @@ export default function App() {
   const handleSignOut = async () => {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     try {
-      await performAutoCheckout(token);
       if (token) {
         await fetch(`${BASE_URL}/api/users/logout`, {
           method: 'POST',
