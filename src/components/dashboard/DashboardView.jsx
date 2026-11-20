@@ -2020,10 +2020,10 @@ export const DashboardView = () => {
     }
 
     // Remote backend office anchor reference coordinates (Solaris Business Hub)
-    const BACKEND_OFFICE_REF_LAT = 23.05829;
-    const BACKEND_OFFICE_REF_LNG = 72.53919;
-    const ALT_OFFICE_REF_LAT = 23.057808;
-    const ALT_OFFICE_REF_LNG = 72.538926;
+    const BACKEND_OFFICE_REF_LAT = 23.057808;
+    const BACKEND_OFFICE_REF_LNG = 72.538926;
+    const ALT_OFFICE_REF_LAT = 23.05829;
+    const ALT_OFFICE_REF_LNG = 72.53919;
     const effectiveUserType = user?.role || user?.user?.role || 'employee';
 
     // Prepare full base object incorporating standard schema
