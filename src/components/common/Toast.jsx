@@ -250,21 +250,21 @@ export const RefreshFeedback = () => {
     };
   }, []);
 
-  if (!lastSyncedAt && !isSyncing) return null;
-  const lastSyncedLabel = lastSyncedAt
-    ? `Last synced ${new Date(lastSyncedAt).toLocaleTimeString()}`
-    : 'Waiting for first update';
+  // if (!lastSyncedAt && !isSyncing) return null;
+  // const lastSyncedLabel = lastSyncedAt
+  //   ? `Last synced ${new Date(lastSyncedAt).toLocaleTimeString()}`
+  //   : 'Waiting for first update';
 
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="pointer-events-none inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-2.5 py-1 text-[10px] font-medium leading-4 text-slate-600 shadow-xs"
-    >
-      <RefreshCw size={12} className={isSyncing ? 'animate-spin text-sky-600' : 'text-emerald-600'} />
-      <span>{isSyncing ? 'Syncing data...' : `Data sync · ${lastSyncedLabel}`}</span>
-    </div>
-  );
+  // return (
+  //   <div
+  //     role="status"
+  //     aria-live="polite"
+  //     className="pointer-events-none inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-2.5 py-1 text-[10px] font-medium leading-4 text-slate-600 shadow-xs"
+  //   >
+  //     <RefreshCw size={12} className={isSyncing ? 'animate-spin text-sky-600' : 'text-emerald-600'} />
+  //     <span>{isSyncing ? 'Syncing data...' : `Data sync · ${lastSyncedLabel}`}</span>
+  //   </div>
+  // );
 };
 
 export default Toast;

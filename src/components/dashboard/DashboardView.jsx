@@ -2536,7 +2536,7 @@ export const DashboardView = () => {
   });
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-poppins">
+    <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6 font-poppins ">
 
       {/* Modern Welcome Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#034665] via-[#045d86] to-[#068DCB] p-5 sm:p-6 text-white shadow-lg">
@@ -2549,12 +2549,12 @@ export const DashboardView = () => {
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/15 backdrop-blur-md text-white border border-white/20 tracking-wide uppercase">
                 {isTeamLeader ? (
                   <>
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                    {/* <ShieldCheck className="w-3.5 h-3.5 text-amber-300" /> */}
                     Team Leader Operations Portal
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+                    {/* <Sparkles className="w-3.5 h-3.5 text-cyan-300" /> */}
                     Employee Workspace
                   </>
                 )}
@@ -2564,7 +2564,8 @@ export const DashboardView = () => {
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-              Welcome back, {user?.name || liveFirstName || 'Team Member'} 👋
+              Welcome back, {user?.name || liveFirstName || 'Team Member'} 
+              {/* 👋 */}
             </h1>
             <p className="text-xs sm:text-sm text-cyan-100/90 mt-0.5 max-w-xl">
               {isTeamLeader
@@ -2966,15 +2967,15 @@ export const DashboardView = () => {
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs xl:col-span-1 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+              <div className="flex items-center justify-center text-amber-600 shrink-0">
                 <Users size={16} className="text-amber-600" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Team On Leave</h3>
-                <p className="text-[10px] text-slate-500">Supervised team members on approved leave today</p>
+                <h3 className="text-sm font-semibold text-slate-900">Team On Leave</h3>
+                {/* <p className="text-[10px] text-slate-500">Supervised team members on approved leave today</p> */}
               </div>
             </div>
-            <span className="bg-amber-50 text-amber-700 border border-amber-200/70 px-2 py-0.5 rounded-full text-[10px] font-bold">
+            <span className="bg-amber-50 text-amber-700 border border-amber-200/70 px-2 py-0.5 rounded-full text-[10px] font-semibold">
               {teamOnLeave.length} On Leave
             </span>
           </div>
@@ -2990,7 +2991,7 @@ export const DashboardView = () => {
             ) : (
               teamOnLeave.map((t, i) => {
                 return (
-                  <div key={t._id || i} className="flex flex-col items-center min-w-[96px] text-center group cursor-pointer p-2 rounded-xl hover:bg-slate-50 transition-all">
+                  <div key={t._id || i} className="flex flex-col items-center min-w-[96px] text-center group cursor-pointer pb-2 rounded-xl hover:bg-slate-50 transition-all">
                     <div className="relative mb-2">
                       <EmployeeAvatar
                         employee={t}
