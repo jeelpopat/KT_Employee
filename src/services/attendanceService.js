@@ -147,17 +147,19 @@ const attendanceRequest = (method, url, location) => {
       throw new Error('A fresh device location is required for this attendance action.');
     }
 
-    const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
-    const accuracy = Number(location.accuracy);
-    const adjustedDistance = Number.isFinite(accuracy)
-      ? getAccuracyAdjustedDistanceInMeters(dist, accuracy)
-      : dist;
-    if (adjustedDistance === null) {
-      throw new Error('GPS accuracy is too low. Move to an open area and try again.');
-    }
-    if (!isWithinOfficeRadius(adjustedDistance)) {
-      const actionName = isCheckIn ? 'Check-in' : isBreakStart ? 'Starting a break' : 'Resuming work';
-      throw new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`);
+    if (!isCheckIn) {
+      const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+      const accuracy = Number(location.accuracy);
+      const adjustedDistance = Number.isFinite(accuracy)
+        ? getAccuracyAdjustedDistanceInMeters(dist, accuracy)
+        : dist;
+      if (adjustedDistance === null) {
+        throw new Error('GPS accuracy is too low. Move to an open area and try again.');
+      }
+      if (!isWithinOfficeRadius(adjustedDistance)) {
+        const actionName = isBreakStart ? 'Starting a break' : 'Resuming work';
+        throw new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`);
+      }
     }
   }
 

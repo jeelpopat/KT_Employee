@@ -1537,7 +1537,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
       const accuracyAdjustedDistance = getAccuracyAdjustedDistanceInMeters(distanceMeters, accuracy);
       const requiresOfficeProximity = (
-        actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end'
+        actionType === 'break_start' || actionType === 'break_end'
       );
 
       try {
@@ -1966,11 +1966,11 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
   // --- Strict Mapped Action Payloads (matching attendanceService protocol) ---
   const onCheckInClick = () => {
     if (!actionsAvailable.canCheckIn) return;
-    verifyLocationAndExecute(async (lat, lng) => {
+    verifyLocationAndExecute(async (lat, lng, accuracy) => {
       const payload = {
         latitude: Number(lat),
         longitude: Number(lng),
-        accuracy: 10,
+        accuracy,
         officeStartTime: "10:00",
         presentHours: 8
       };
