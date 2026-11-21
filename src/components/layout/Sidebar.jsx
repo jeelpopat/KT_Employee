@@ -440,6 +440,12 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
+      title: "HR RESOURCES",
+      items: [
+        { tab: 'hr-policies', label: 'Company Policies', icon: BookOpen },
+      ]
+    },
+    {
       title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
@@ -509,6 +515,12 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
+      title: "POLICIES",
+      items: [
+        { tab: 'team-lead-policies', label: 'Team Lead Policies', icon: BookOpen },
+      ]
+    },
+    {
       title: "MY WORKSPACE",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
@@ -555,6 +567,12 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'holiday', label: 'Holidays', icon: HolidaysIcon },
         { tab: 'team-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'employees', label: 'Employees', icon: EmployeeIcon },
+      ]
+    },
+    {
+      title: "POLICIES",
+      items: [
+        { tab: 'employee-policies', label: 'Employee Policies', icon: BookOpen },
       ]
     },
     {

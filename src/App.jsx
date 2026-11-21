@@ -50,6 +50,7 @@ const AdminPortfolioLeadsView = lazy(() => import('./pages/PortfolioLeads.jsx'))
 const AdminContactsView = lazy(() => import('./pages/Contacts.jsx'));
 const AdminSettingsView = lazy(() => import('./pages/Setting.jsx'));
 const AuditLogsView = lazy(() => import('./pages/AuditLogs.jsx'));
+const HRPoliciesView = lazy(() => import('./pages/hr/HRPoliciesView.jsx'));
 
 // Lazy-load role & placeholder views
 const SalaryView = lazy(() => import('./components/salary/SalaryView.jsx').then(m => ({ default: m.SalaryView })));
@@ -174,6 +175,11 @@ const MainLayout = ({ handleSignOut }) => {
       case 'admin-contacts': return <AdminContactsView />;
       case 'admin-audit-logs':
         return (userRole === 'admin' || userRole === 'hr') ? <AuditLogsView /> : <AdminDashboardView />;
+      case 'hr-policies': return userRole === 'hr' ? <HRPoliciesView /> : <AdminDashboardView />;
+      case 'employee-policies':
+        return userRole === 'employee' ? <HRPoliciesView audience="employee" /> : <AdminDashboardView />;
+      case 'team-lead-policies':
+        return userRole === 'team_leader' ? <HRPoliciesView audience="team-lead" /> : <AdminDashboardView />;
 
       // Existing Modules
       case 'dashboard': return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;
