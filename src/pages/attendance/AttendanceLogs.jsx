@@ -2684,9 +2684,9 @@ export default function AttendanceLogs() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap font-poppins">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap font-poppins">
           {/* DATE NAVIGATION CONTROLS (FOR DAILY & PAST DATE CHECK) */}
-          <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-lg border border-slate-300/80 shadow-2xs">
+          <div className="flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             {/* Previous Day */}
             <button
               type="button"
@@ -2765,74 +2765,58 @@ export default function AttendanceLogs() {
             </button>
           </div>
 
-          {/* TOTAL COUNT */}
-          <div className="h-9 bg-white border border-slate-300 rounded-md px-3 shadow-2xs flex items-center gap-1.5 font-poppins">
-            <Users size={14} className="text-slate-600" />
-            <span className="text-xs font-semibold text-slate-800">{logs.length}</span>
-          </div>
+          <div className="hidden sm:block h-8 w-px bg-slate-300" aria-hidden="true" />
 
-          {/* SYNC / REFRESH */}
-          <button
-            type="button"
-            onClick={() => fetchLogs()}
-            disabled={loading}
-            title="Refresh attendance records"
-            className="h-9 w-9 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer font-poppins"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin text-[#0088cc]' : 'text-slate-600'} />
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* TOTAL COUNT */}
+            <div className="h-9 bg-white border border-slate-300 rounded-md px-3 shadow-2xs flex items-center gap-1.5 font-poppins">
+              <Users size={14} className="text-slate-600" />
+              <span className="text-xs font-semibold text-slate-800">{logs.length}</span>
+            </div>
 
-          {/* LEAVE & ABSENCE POLICY */}
-          <button
-            type="button"
-            onClick={() => setShowPolicyModal(true)}
-            title="View HRMS Unpaid Leave & Absence Policy"
-            className="h-9 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer font-poppins"
-          >
-            <FileText size={14} className="text-[#034665]" />
-            <span className="hidden sm:inline">Leave Policy</span>
-          </button>
-
-          {/* DAILY FINALIZATION QUICK TRIGGER */}
-          {canManageFinalization && (
+            {/* SYNC / REFRESH */}
             <button
               type="button"
-              onClick={() => {
-                setViewMode('scheduler');
-                fetchSchedulerLogs(1);
-                fetchFinalizePreview(finalizeTargetDate || selectedDate || getTodayLocal());
-              }}
-              title="Daily Attendance Finalization & 4:00 PM IST Scheduler"
-              className="h-9 px-3 bg-white border border-[#034665]/30 hover:bg-sky-50 text-[#034665] rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer font-poppins"
+              onClick={() => fetchLogs()}
+              disabled={loading}
+              title="Refresh attendance records"
+              className="h-9 w-9 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer font-poppins"
             >
-              <ShieldCheck size={15} className="text-[#034665]" />
-              <span className="hidden md:inline">Daily Finalization</span>
-              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-emerald-100 text-emerald-800">
-                16:00 IST
-              </span>
+              <RefreshCw size={13} className={loading ? 'animate-spin text-[#0088cc]' : 'text-slate-600'} />
             </button>
-          )}
 
-          {/* EXPORT EXCEL */}
-          <button
-            type="button"
-            onClick={() => setShowExportOptions(true)}
-            className="h-9 px-3.5 text-white rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer font-poppins"
-            style={{ background: '#034665' }}
-          >
-            <FileSpreadsheet size={15} />
-            <span>Export Excel</span>
-          </button>
+            {/* LEAVE & ABSENCE POLICY */}
+            <button
+              type="button"
+              onClick={() => setShowPolicyModal(true)}
+              title="View HRMS Unpaid Leave & Absence Policy"
+              className="h-9 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer font-poppins"
+            >
+              <FileText size={14} className="text-[#034665]" />
+              <span className="hidden sm:inline">Leave Policy</span>
+            </button>
+
+            {/* EXPORT EXCEL */}
+            <button
+              type="button"
+              onClick={() => setShowExportOptions(true)}
+              className="h-9 px-3.5 text-white rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer font-poppins"
+              style={{ background: '#034665' }}
+            >
+              <FileSpreadsheet size={15} />
+              <span>Export Excel</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* VIEW MODE TABS: DAILY LOGS vs HISTORICAL LOG EXPLORER (OLD LOGS) */}
       <div className="border-b border-slate-200">
-        <div className="flex w-full items-center gap-3 overflow-x-auto whitespace-nowrap pb-px sm:gap-4">
+        <div className="flex w-full flex-nowrap items-center gap-3 overflow-x-auto whitespace-nowrap pb-px sm:gap-4">
           <button
             type="button"
             onClick={() => setViewMode('daily')}
-            className={`flex shrink-0 items-center gap-2 px-3 py-2.5 text-xs sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex min-w-[220px] flex-1 items-center justify-center gap-2 px-3 py-2.5 text-xs lg:min-w-0 sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
               viewMode === 'daily'
                 ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2850,7 +2834,7 @@ export default function AttendanceLogs() {
                 fetchHistoryRangeLogs();
               }
             }}
-            className={`flex shrink-0 items-center gap-2 px-3 py-2.5 text-xs sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex min-w-[220px] flex-1 items-center justify-center gap-2 px-3 py-2.5 text-xs lg:min-w-0 sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
               viewMode === 'history'
                 ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2872,7 +2856,7 @@ export default function AttendanceLogs() {
                   fetchFinalizePreview(finalizeTargetDate || selectedDate || getTodayLocal());
                 }
               }}
-              className={`flex shrink-0 items-center gap-2 px-3 py-2.5 text-xs sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              className={`flex min-w-[220px] flex-1 items-center justify-center gap-2 px-3 py-2.5 text-xs lg:min-w-0 sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
                 viewMode === 'scheduler'
                   ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                   : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
