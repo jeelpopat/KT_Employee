@@ -10,9 +10,12 @@ import api, { BASE_URL } from '../../api/axios.js';
 import { showToast } from '../common/Toast.jsx';
 import {
   calculateDistanceInMeters,
-  getOfficeGeofenceSettings,
+  getAccuracyAdjustedDistanceInMeters,
+  GEOFENCE_RADIUS_METERS,
   getGPSLocation,
-  isWithinOfficeRadius
+  isWithinOfficeRadius,
+  TARGET_LAT,
+  TARGET_LNG
 } from '../../services/attendanceService.js';
 import {
   computeNineHourTimeline,
@@ -1530,24 +1533,31 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     setIsActionLoading(true);
 
     try {
-      const office = await getOfficeGeofenceSettings();
       const { latitude, longitude, accuracy } = await getGPSLocation();
-      const geofenceRadiusMeters = office.radiusMeters;
-      const distanceMeters = calculateDistanceInMeters(latitude, longitude, office.latitude, office.longitude);
+      const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+      const accuracyAdjustedDistance = getAccuracyAdjustedDistanceInMeters(distanceMeters, accuracy);
+      const requiresOfficeProximity = (
+        actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end'
+      );
 
       try {
         localStorage.setItem('kt_last_gps_accuracy', String(accuracy || 0));
       } catch (e) {}
 
-      console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Distance: ${distanceMeters.toFixed(1)}m | Allowed Radius: ${geofenceRadiusMeters.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
+      console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | Accuracy-adjusted Distance: ${accuracyAdjustedDistance?.toFixed(1) ?? 'unavailable'}m | Allowed Radius: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
+
+      if (requiresOfficeProximity && accuracyAdjustedDistance === null) {
+        setGeoError('GPS accuracy is too low. Move to an open area and try again.');
+        return;
+      }
 
       if (
-        (actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end') &&
-        !isWithinOfficeRadius(distanceMeters, geofenceRadiusMeters)
+        requiresOfficeProximity &&
+        !isWithinOfficeRadius(accuracyAdjustedDistance)
       ) {
         const message = actionType === 'break_end'
-          ? `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return within ${geofenceRadiusMeters} meters of the office to resume work.`
-          : `Office Location Error: You are ${Math.round(distanceMeters)}m away. ${actionType === 'break_start' ? 'Starting a break' : 'Check-in'} is allowed only within ${geofenceRadiusMeters} meters of the office.`;
+          ? `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return within ${GEOFENCE_RADIUS_METERS} meters of the office to resume work.`
+          : `Office Location Error: You are ${Math.round(distanceMeters)}m away. ${actionType === 'break_start' ? 'Starting a break' : 'Check-in'} is allowed only within ${GEOFENCE_RADIUS_METERS} meters of the office.`;
         setGeoError(message);
         return;
       }
