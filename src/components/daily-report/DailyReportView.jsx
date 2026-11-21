@@ -801,7 +801,7 @@ export const DailyReportView = () => {
                 {historyReports.length} {historyReports.length === 1 ? 'Report' : 'Reports'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/list</p>
+            {/* <p className="text-xs text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/list</p> */}
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
