@@ -834,6 +834,7 @@ export const AppProvider = ({ children }) => {
       window.dispatchEvent(new Event('attendance_updated'));
     } catch (error) {
       console.error('Could not start break from inactivity alert:', error);
+      setIsInactivityAlertOpen(false);
       showToast(getAttendanceErrorMessage(error), 'error');
     }
   };

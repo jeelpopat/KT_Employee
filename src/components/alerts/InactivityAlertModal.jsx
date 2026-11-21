@@ -1,8 +1,9 @@
-import React from 'react';
-import { AlertTriangle, CheckCircle2, Coffee, BellRing } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, CheckCircle2, Coffee, BellRing, Loader2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 
 export const InactivityAlertModal = () => {
+  const [isResponding, setIsResponding] = useState(false);
   const {
     isInactivityAlertOpen,
     handleAcknowledgeWorking,
@@ -10,6 +11,23 @@ export const InactivityAlertModal = () => {
   } = useApp();
 
   if (!isInactivityAlertOpen) return null;
+
+  const handleWorking = () => {
+    if (isResponding) return;
+    setIsResponding(true);
+    handleAcknowledgeWorking();
+    setIsResponding(false);
+  };
+
+  const handleBreak = async () => {
+    if (isResponding) return;
+    setIsResponding(true);
+    try {
+      await handleInactivityStartBreak();
+    } finally {
+      setIsResponding(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -52,16 +70,19 @@ export const InactivityAlertModal = () => {
 
           <button
             type="button"
-            onClick={handleInactivityStartBreak}
+            onClick={handleBreak}
+            disabled={isResponding}
+            aria-busy={isResponding}
             className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
-            <Coffee size={14} />
-            <span>I Am in Break</span>
+            {isResponding ? <Loader2 size={14} className="animate-spin" /> : <Coffee size={14} />}
+            <span>{isResponding ? 'Processing...' : 'I Am in Break'}</span>
           </button>
 
           <button
             type="button"
-            onClick={handleAcknowledgeWorking}
+            onClick={handleWorking}
+            disabled={isResponding}
             className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
             <CheckCircle2 size={14} />
