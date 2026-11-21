@@ -1630,6 +1630,12 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
         return;
       }
 
+      if (actionType === 'break_end') {
+        setGeoError("Could not get a fresh device location. Turn on location services and try again.");
+        setIsActionLoading(false);
+        return;
+      }
+
       // 2. Check if recent valid location fix exists from earlier today (within 30 minutes)
       try {
         const savedLat = parseFloat(localStorage.getItem('kt_last_gps_lat'));
@@ -1685,8 +1691,10 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       handleLocationFailure(err);
     };
 
+    const maximumLocationAge = actionType === 'break_end' ? 0 : 60000;
+
     // Multi-tier resilient acquisition:
-    // Stage 1: Quick attempt with 60s cache allowed (instant 0ms response if location was queried recently)
+    // Stage 1: Quick attempt with a recent cached fix when the action permits it.
     navigator.geolocation.getCurrentPosition(
       onPos,
       (err1) => {
@@ -1703,7 +1711,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
               watchId = navigator.geolocation.watchPosition(
                 onPos,
                 (err3) => onFinalFail(err2 || err1),
-                { enableHighAccuracy: false, timeout: 4000, maximumAge: 300000 }
+                { enableHighAccuracy: false, timeout: 4000, maximumAge: maximumLocationAge }
               );
 
               setTimeout(() => {
@@ -1713,10 +1721,10 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
               onFinalFail(err2 || err1);
             }
           },
-          { enableHighAccuracy: false, timeout: 3500, maximumAge: 300000 }
+          { enableHighAccuracy: false, timeout: 3500, maximumAge: maximumLocationAge }
         );
       },
-      { enableHighAccuracy: true, timeout: 2500, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 2500, maximumAge: maximumLocationAge }
     );
   };
 
@@ -2290,11 +2298,11 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     localStorage.setItem('kt_break_out_action_ts_' + todayStr, breakOutActionTimestamp);
     localStorage.setItem('kt_break_out_action_ts_' + todayLocalStr, breakOutActionTimestamp);
 
-    verifyLocationAndExecute(async () => {
+    verifyLocationAndExecute(async (lat, lng) => {
       try {
         const payload = {
-          latitude: BREAK_END_TARGET_LAT,
-          longitude: BREAK_END_TARGET_LNG
+          latitude: Number(lat),
+          longitude: Number(lng)
         };
         await handleAttendanceAction('/api/attendance/break/end', payload, 'break_end');
       } finally {
