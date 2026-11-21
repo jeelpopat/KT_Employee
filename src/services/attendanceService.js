@@ -1,5 +1,10 @@
 import api from '../api/axios.js';
 
+const OFFICE_SETTINGS_CACHE_MS = 30 * 1000;
+let officeSettingsCache = null;
+let officeSettingsCacheExpiresAt = 0;
+let officeSettingsRequest = null;
+
 export const getGPSLocation = () => new Promise((resolve, reject) => {
   if (!window.isSecureContext && window.location.hostname !== 'localhost') {
     reject(new Error('GPS requires HTTPS on this device. Open the app using an HTTPS URL or localhost.'));
@@ -83,16 +88,75 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
   );
 });
 
-export const TARGET_LAT = 23.057808;
-export const TARGET_LNG = 72.538926;
 export const GEOFENCE_RADIUS_METERS = 20;
 export const BREAK_END_GEOFENCE_RADIUS_METERS = GEOFENCE_RADIUS_METERS;
 export const AUTO_CHECKOUT_RADIUS_METERS = 80;
 
-export const isWithinOfficeRadius = (distanceMeters) => (
+export const normalizeOfficeSettings = (responseData) => {
+  let settings = responseData;
+  while (settings && typeof settings === 'object') {
+    const nestedSettings = settings.settings || settings.officeSettings || settings.data;
+    if (!nestedSettings || nestedSettings === settings) break;
+    settings = nestedSettings;
+  }
+  return settings && typeof settings === 'object' ? settings : {};
+};
+
+export const invalidateOfficeSettingsCache = () => {
+  officeSettingsCache = null;
+  officeSettingsCacheExpiresAt = 0;
+  officeSettingsRequest = null;
+};
+
+export const getOfficeSettings = async () => {
+  if (officeSettingsCache && Date.now() < officeSettingsCacheExpiresAt) {
+    return officeSettingsCache;
+  }
+
+  if (!officeSettingsRequest) {
+    officeSettingsRequest = api.get('/api/office/settings')
+      .then(({ data }) => {
+        const settings = normalizeOfficeSettings(data);
+        officeSettingsCache = settings;
+        officeSettingsCacheExpiresAt = Date.now() + OFFICE_SETTINGS_CACHE_MS;
+        return settings;
+      })
+      .finally(() => {
+        officeSettingsRequest = null;
+      });
+  }
+
+  return officeSettingsRequest;
+};
+
+export const parseOfficeGeofenceSettings = (responseData) => {
+  const settings = normalizeOfficeSettings(responseData);
+  const location = settings.officeLocation || settings.location || settings.coordinates || {};
+  const latitude = Number(settings.latitude ?? settings.officeLatitude ?? location.latitude ?? location.lat);
+  const longitude = Number(settings.longitude ?? settings.officeLongitude ?? location.longitude ?? location.lng);
+  const radiusMeters = Number(settings.radiusMeters ?? settings.geofenceRadiusMeters ?? settings.geofenceRadius ?? settings.radius);
+
+  if (
+    !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+    !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
+    !Number.isFinite(radiusMeters) || radiusMeters <= 0
+  ) {
+    throw new Error('Valid office geofence coordinates and radius were not returned by the server.');
+  }
+
+  return { latitude, longitude, radiusMeters };
+};
+
+export const getOfficeGeofenceSettings = async () => (
+  parseOfficeGeofenceSettings(await getOfficeSettings())
+);
+
+export const isWithinOfficeRadius = (distanceMeters, radiusMeters = GEOFENCE_RADIUS_METERS) => (
   Number.isFinite(distanceMeters) &&
   distanceMeters >= 0 &&
-  distanceMeters <= GEOFENCE_RADIUS_METERS
+  Number.isFinite(radiusMeters) &&
+  radiusMeters > 0 &&
+  distanceMeters <= radiusMeters
 );
 
 export const isBeyondAutoCheckoutRadius = (distanceMeters, accuracyMeters) => (
@@ -114,7 +178,7 @@ export const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
-const attendanceRequest = (method, url, location) => {
+const attendanceRequest = async (method, url, location) => {
   const isCheckIn = url.includes('check-in') || url.includes('checkin');
   const isBreakStart = url.includes('break/start') || url.includes('break-in') || url.includes('break/in');
   const isBreakEnd = url.includes('break/end') || url.includes('break-out');
@@ -128,13 +192,14 @@ const attendanceRequest = (method, url, location) => {
     const latitude = Number(location?.latitude);
     const longitude = Number(location?.longitude);
     if (!hasLocation || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return Promise.reject(new Error('A fresh device location is required for this attendance action.'));
+      throw new Error('A fresh device location is required for this attendance action.');
     }
 
-    const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
-    if (!isWithinOfficeRadius(dist)) {
+    const office = await getOfficeGeofenceSettings();
+    const dist = calculateDistanceInMeters(latitude, longitude, office.latitude, office.longitude);
+    if (!isWithinOfficeRadius(dist, office.radiusMeters)) {
       const actionName = isCheckIn ? 'Check-in' : isBreakStart ? 'Starting a break' : 'Resuming work';
-      return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`));
+      throw new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${office.radiusMeters}m of office coordinates.`);
     }
   }
 

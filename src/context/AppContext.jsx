@@ -5,10 +5,8 @@ import { getProgressForStatus } from '../utils/taskUtils.js';
 import {
   getGPSLocation,
   breakIn,
-  TARGET_LAT,
-  TARGET_LNG,
-  GEOFENCE_RADIUS_METERS,
   AUTO_CHECKOUT_RADIUS_METERS,
+  getOfficeGeofenceSettings,
   calculateDistanceInMeters,
   isBeyondAutoCheckoutRadius,
   getAttendanceErrorMessage
@@ -1353,9 +1351,10 @@ export const AppProvider = ({ children }) => {
               return;
             }
 
-          const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+          const office = await getOfficeGeofenceSettings();
+          const dist = calculateDistanceInMeters(latitude, longitude, office.latitude, office.longitude);
 
-          console.log(`[GEOFENCE LOCATION] AppContext | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${dist.toFixed(1)}m | CheckIn Threshold: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m | Status: ${attendanceStatus}`);
+          console.log(`[GEOFENCE LOCATION] AppContext | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Distance: ${dist.toFixed(1)}m | CheckIn Threshold: ${office.radiusMeters.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m | Status: ${attendanceStatus}`);
 
           // Re-verify break, checkout, and grace state after the asynchronous GPS lookup.
           const isStillOnBreak = (
@@ -1454,6 +1453,9 @@ export const AppProvider = ({ children }) => {
           } else {
             resetGeofenceBreach();
           }
+          } catch (error) {
+            console.error('Office geofence settings could not be loaded:', error);
+            resetGeofenceBreach();
           } finally {
             isGeofenceLocationCheckPendingRef.current = false;
           }

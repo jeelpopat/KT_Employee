@@ -4,7 +4,11 @@ import {
   AlertCircle, Wifi, Compass, Calendar, RotateCcw
 } from "lucide-react";
 import api from "../../api/axios";
-import { GEOFENCE_RADIUS_METERS, TARGET_LAT, TARGET_LNG } from "../../services/attendanceService";
+import {
+  getOfficeSettings,
+  invalidateOfficeSettingsCache,
+  normalizeOfficeSettings
+} from "../../services/attendanceService";
 
 export default function OfficeSettings() {
   const DEFAULT_SETTINGS = {
@@ -15,32 +19,46 @@ export default function OfficeSettings() {
     fullDayHours: 8,
     autoCheckOutTime: "23:59",
     geofenceEnabled: true,
-    latitude: String(TARGET_LAT),
-    longitude: String(TARGET_LNG),
-    radiusMeters: GEOFENCE_RADIUS_METERS,
+    latitude: "",
+    longitude: "",
+    radiusMeters: 20,
     officeWifiSsid: "Kevalon-Office-5G",
     requireWifiForCheckIn: false,
     weekendDays: ["Saturday", "Sunday"]
   };
 
-  const [settings, setSettings] = useState(() => {
-    try {
-      const saved = localStorage.getItem("kt_office_settings");
-      const parsed = saved ? JSON.parse(saved) : {};
-      return {
-        ...DEFAULT_SETTINGS,
-        ...parsed,
-        latitude: String(TARGET_LAT),
-        longitude: String(TARGET_LNG),
-        radiusMeters: GEOFENCE_RADIUS_METERS
-      };
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
+
+  useEffect(() => {
+    let isMounted = true;
+    getOfficeSettings()
+      .then((responseSettings) => {
+        if (!isMounted) return;
+        const serverSettings = normalizeOfficeSettings(responseSettings);
+        setSettings((current) => ({
+          ...current,
+          ...serverSettings,
+          latitude: String(serverSettings.latitude ?? serverSettings.officeLatitude ?? serverSettings.officeLocation?.latitude ?? serverSettings.officeLocation?.lat ?? ""),
+          longitude: String(serverSettings.longitude ?? serverSettings.officeLongitude ?? serverSettings.officeLocation?.longitude ?? serverSettings.officeLocation?.lng ?? ""),
+          radiusMeters: Number(serverSettings.radiusMeters ?? serverSettings.geofenceRadiusMeters ?? serverSettings.geofenceRadius ?? current.radiusMeters)
+        }));
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setFeedback({
+            type: "error",
+            message: error.response?.data?.message || error.message || "Failed to load office settings from the server."
+          });
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleChange = (field, value) => {
     setSettings(prev => ({ ...prev, [field]: value }));
@@ -52,15 +70,8 @@ export default function OfficeSettings() {
     setFeedback({ type: "", message: "" });
 
     try {
-      // 1. Persist to localStorage
-      localStorage.setItem("kt_office_settings", JSON.stringify(settings));
-
-      // 2. Attempt backend persistence
-      try {
-        await api.post("/api/office/settings", settings);
-      } catch (apiErr) {
-        console.warn("Backend office settings endpoint notice (stored locally):", apiErr.message);
-      }
+      await api.post("/api/office/settings", settings);
+      invalidateOfficeSettingsCache();
 
       setFeedback({ type: "success", message: "Office attendance settings updated successfully!" });
       setTimeout(() => setFeedback({ type: "", message: "" }), 4000);
