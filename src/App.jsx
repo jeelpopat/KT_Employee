@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
 import { clearAuth, isTokenExpired, validateUserSession, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
@@ -51,6 +51,9 @@ const AdminContactsView = lazy(() => import('./pages/Contacts.jsx'));
 const AdminSettingsView = lazy(() => import('./pages/Setting.jsx'));
 const AuditLogsView = lazy(() => import('./pages/AuditLogs.jsx'));
 const HRPoliciesView = lazy(() => import('./pages/hr/HRPoliciesView.jsx'));
+const UserGuideView = lazy(() => import('./components/help/UserGuideView.jsx').then(m => ({ default: m.UserGuideView })));
+const WelcomeGuideModal = lazy(() => import('./components/help/UserGuideView.jsx').then(m => ({ default: m.WelcomeGuideModal })));
+const LiveTourOverlay = lazy(() => import('./components/help/UserGuideView.jsx').then(m => ({ default: m.LiveTourOverlay })));
 
 // Lazy-load role & placeholder views
 const SalaryView = lazy(() => import('./components/salary/SalaryView.jsx').then(m => ({ default: m.SalaryView })));
@@ -70,6 +73,7 @@ const DeductionReportsView = lazy(() => import('./components/deductions/Deductio
 
 const MainLayout = ({ handleSignOut }) => {
   const {
+    user,
     currentTab,
     userRole,
     setCurrentTab,
@@ -88,7 +92,41 @@ const MainLayout = ({ handleSignOut }) => {
   const [startingScreenCapture, setStartingScreenCapture] = useState(false);
   const [screenCaptureError, setScreenCaptureError] = useState('');
   const location = useLocation();
+  const navigate = useNavigate();
   const isFinanceRoute = location.pathname === '/finance' || location.pathname.startsWith('/finance/');
+  const userId = user?._id || user?.id || user?.employeeId || user?.email || 'anonymous';
+  const welcomeKey = `crm-welcome:${userRole}:${userId}`;
+  const [showWelcomeGuide, setShowWelcomeGuide] = useState(() => {
+    try {
+      return localStorage.getItem(welcomeKey) !== 'seen';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (location.pathname === '/user-guide') {
+      setShowWelcomeGuide(false);
+      try {
+        localStorage.setItem(welcomeKey, 'seen');
+      } catch (error) {
+        console.warn('Could not save first-login welcome status:', error);
+      }
+    }
+  }, [location.pathname, welcomeKey]);
+
+  const dismissWelcomeGuide = (startLearning) => {
+    try {
+      localStorage.setItem(welcomeKey, 'seen');
+    } catch (error) {
+      console.warn('Could not save first-login welcome status:', error);
+    }
+    setShowWelcomeGuide(false);
+    if (startLearning) {
+      setCurrentTab('user-guide');
+      navigate('/user-guide');
+    }
+  };
 
   useEffect(() => () => stopScreenCapture(), []);
 
@@ -211,6 +249,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'team-deductions':
       case 'my-deductions': return <EmployeeDeductionsView />;
       case 'deduction-reports': return <DeductionReportsView />;
+      case 'user-guide': return <UserGuideView />;
 
       default: return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;
     }
@@ -272,6 +311,17 @@ const MainLayout = ({ handleSignOut }) => {
         </div>
         <Suspense fallback={null}>
           <InactivityAlertModal />
+        </Suspense>
+        {showWelcomeGuide && (
+          <Suspense fallback={null}>
+            <WelcomeGuideModal
+              onStartLearning={() => dismissWelcomeGuide(true)}
+              onExplore={() => dismissWelcomeGuide(false)}
+            />
+          </Suspense>
+        )}
+        <Suspense fallback={null}>
+          <LiveTourOverlay />
         </Suspense>
       </div>
       {/* Screen monitoring pop-up modal commented out

@@ -53,6 +53,7 @@ export const pathToTab = {
   '/deduction-reports': 'deduction-reports',
   '/team-deductions': 'team-deductions',
   '/my-deductions': 'my-deductions',
+  '/user-guide': 'user-guide',
 };
 
 export const tabToPath = {
@@ -106,4 +107,5 @@ export const tabToPath = {
   'deduction-reports': '/deduction-reports',
   'team-deductions': '/team-deductions',
   'my-deductions': '/my-deductions',
+  'user-guide': '/user-guide',
 };
