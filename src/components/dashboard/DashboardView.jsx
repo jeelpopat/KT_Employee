@@ -10,8 +10,8 @@ import api, { BASE_URL } from '../../api/axios.js';
 import { showToast } from '../common/Toast.jsx';
 import {
   BREAK_END_GEOFENCE_RADIUS_METERS,
-  BREAK_END_TARGET_LAT,
-  BREAK_END_TARGET_LNG
+  TARGET_LAT,
+  TARGET_LNG
 } from '../../services/attendanceService.js';
 import {
   computeNineHourTimeline,
@@ -162,8 +162,6 @@ const getAttendanceClassification = (...values) => {
 };
 
 // --- Geofencing Configuration (Solaris Business Hub: 50m Check-in, 80m Auto-Checkout) ---
-const TARGET_LAT = 23.05829;
-const TARGET_LNG = 72.53919;
 const GEOFENCE_RADIUS_METERS = 50; // Check-in Eligibility Radius: 50 meters
 const AUTO_CHECKOUT_RADIUS_METERS = 80; // Auto-Checkout Trigger Radius: 80 meters
 
@@ -1560,9 +1558,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
     // On localhost or local dev, execute instantly with target office coordinates without blocking
     if (isLocalhost) {
-      const targetLat = actionType === 'break_end' ? BREAK_END_TARGET_LAT : TARGET_LAT;
-      const targetLng = actionType === 'break_end' ? BREAK_END_TARGET_LNG : TARGET_LNG;
-      actionCallback(targetLat, targetLng, 0, effectiveUserId);
+      actionCallback(TARGET_LAT, TARGET_LNG, 0, effectiveUserId);
       return;
     }
 
@@ -1575,12 +1571,10 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
     const handleLocationSuccess = (position) => {
       const { latitude, longitude, accuracy } = position.coords;
-      const targetLat = actionType === 'break_end' ? BREAK_END_TARGET_LAT : TARGET_LAT;
-      const targetLng = actionType === 'break_end' ? BREAK_END_TARGET_LNG : TARGET_LNG;
       const geofenceRadiusMeters = actionType === 'break_end'
         ? BREAK_END_GEOFENCE_RADIUS_METERS
         : GEOFENCE_RADIUS_METERS;
-      const distanceMeters = calculateDistanceInMeters(latitude, longitude, targetLat, targetLng);
+      const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
 
       // Cache this successfully acquired location
       try {
@@ -1590,7 +1584,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
         localStorage.setItem('kt_last_gps_ts', String(Date.now()));
       } catch (e) {}
 
-      console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${targetLat}, ${targetLng}) | Distance: ${distanceMeters.toFixed(1)}m | Allowed Radius: ${geofenceRadiusMeters.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
+      console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | Allowed Radius: ${geofenceRadiusMeters.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
 
       // Check-in and break-start require the backend's 50m office radius.
       if (actionType === 'check_in' || actionType === 'break_start') {
