@@ -163,7 +163,7 @@ const getAttendanceClassification = (...values) => {
   };
 };
 
-// --- Geofencing Configuration (backend office center: 30m radius) ---
+// --- Geofencing Configuration (backend office center: 20m radius) ---
 const AUTO_CHECKOUT_RADIUS_METERS = 80; // Auto-Checkout Trigger Radius: 80 meters
 
 const getUniqueBreaks = (breaks) => {
