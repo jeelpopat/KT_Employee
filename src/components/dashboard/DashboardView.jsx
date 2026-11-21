@@ -2380,31 +2380,28 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
                   </>
                 )}
               </span>
-              <span className="text-[11px] text-white/75">
-                • {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
-              </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
               Welcome back, {user?.name || liveFirstName || 'Team Member'} 
               {/* 👋 */}
             </h1>
-            <p className="text-xs sm:text-sm text-cyan-100/90 mt-0.5 max-w-xl">
-              {isTeamLeader
-                ? 'Supervise shift operations, monitor team presence, and track daily deliverables in real time.'
-                : 'Track your daily shift hours, attendance, breaks, and task progression seamlessly.'}
-            </p>
           </div>
 
-          <div className="flex items-center gap-2.5 self-start md:self-center shrink-0">
-            {isTeamLeader && (
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/15 border border-white/25 backdrop-blur-md text-xs font-semibold text-white shadow-xs">
-                <Users className="w-3.5 h-3.5 text-amber-300" />
-                <span>Team On Leave: <strong className="text-amber-200">{teamOnLeave.length}</strong></span>
+          <div className="flex flex-col items-end gap-2 self-end md:self-center shrink-0">
+            <span className="text-[11px] text-white/75">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+            <div className="flex items-center gap-2.5">
+              {isTeamLeader && (
+                <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/15 border border-white/25 backdrop-blur-md text-xs font-semibold text-white shadow-xs">
+                  <Users className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Team On Leave: <strong className="text-amber-200">{teamOnLeave.length}</strong></span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white text-[#034665] text-xs font-bold shadow-md">
+                <Clock className="w-3.5 h-3.5 text-[#068DCB]" />
+                <span>Shift: <strong className="text-slate-900">{formatHoursAndMinutes(totalWorkTimeDisplay)}</strong></span>
               </div>
-            )}
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white text-[#034665] text-xs font-bold shadow-md">
-              <Clock className="w-3.5 h-3.5 text-[#068DCB]" />
-              <span>Shift: <strong className="text-slate-900">{formatHoursAndMinutes(totalWorkTimeDisplay)}</strong></span>
             </div>
           </div>
         </div>
