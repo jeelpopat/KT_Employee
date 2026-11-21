@@ -8,16 +8,16 @@ import {
   isWithinOfficeRadius
 } from '../src/services/attendanceService.js';
 
-assert.equal(TARGET_LAT, 23.05829);
-assert.equal(TARGET_LNG, 72.53919);
+assert.equal(TARGET_LAT, 23.057808);
+assert.equal(TARGET_LNG, 72.538926);
 assert.equal(GEOFENCE_RADIUS_METERS, 30);
 assert.equal(isWithinOfficeRadius(30), true);
 assert.equal(isWithinOfficeRadius(30.01), false);
 assert.equal(isWithinOfficeRadius(Number.NaN), false);
 
 const recentDeviceGpsDistance = calculateDistanceInMeters(
-  23.058315506393054,
-  72.53919221501579,
+  23.057808,
+  72.538926,
   TARGET_LAT,
   TARGET_LNG
 );

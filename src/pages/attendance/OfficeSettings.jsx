@@ -26,7 +26,14 @@ export default function OfficeSettings() {
   const [settings, setSettings] = useState(() => {
     try {
       const saved = localStorage.getItem("kt_office_settings");
-      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+      const parsed = saved ? JSON.parse(saved) : {};
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        latitude: String(TARGET_LAT),
+        longitude: String(TARGET_LNG),
+        radiusMeters: GEOFENCE_RADIUS_METERS
+      };
     } catch {
       return DEFAULT_SETTINGS;
     }
