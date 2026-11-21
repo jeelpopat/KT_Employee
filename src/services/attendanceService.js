@@ -17,15 +17,23 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
   const handleSuccess = ({ coords }) => {
     if (settled) return;
     settled = true;
+    const accuracy = Number(coords.accuracy);
     if (watchId !== null) {
       try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
     }
     try {
       localStorage.setItem('kt_last_gps_lat', String(coords.latitude));
       localStorage.setItem('kt_last_gps_lng', String(coords.longitude));
+      if (Number.isFinite(accuracy) && accuracy >= 0) {
+        localStorage.setItem('kt_last_gps_accuracy', String(accuracy));
+      }
       localStorage.setItem('kt_last_gps_ts', String(Date.now()));
     } catch (e) {}
-    resolve({ latitude: Number(coords.latitude), longitude: Number(coords.longitude) });
+    resolve({
+      latitude: Number(coords.latitude),
+      longitude: Number(coords.longitude),
+      ...(Number.isFinite(accuracy) && accuracy >= 0 ? { accuracy } : {})
+    });
   };
 
   const handleError = (error) => {

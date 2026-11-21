@@ -13,6 +13,7 @@ import {
   GEOFENCE_RADIUS_METERS,
   TARGET_LAT,
   TARGET_LNG,
+  getGPSLocation,
   isWithinOfficeRadius
 } from '../../services/attendanceService.js';
 import {
@@ -1538,126 +1539,40 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
   }, [fetchTodayAttendance]);
 
   // --- Robust Geolocation & Verification ---
-  const verifyLocationAndExecute = (actionCallback, actionType = 'check_in') => {
+  const verifyLocationAndExecute = async (actionCallback, actionType = 'check_in') => {
     setGeoError('');
     setIsActionLoading(true);
 
-    const effectiveUserId = actualUserId || user?.employee?._id || user?._id || user?.id || user?.user?._id;
-
-    if (!navigator.geolocation) {
-      setGeoError("Location tracking is not supported by your browser.");
-      setIsActionLoading(false);
-      return;
-    }
-
-    const handleLocationSuccess = (position) => {
-      const { latitude, longitude, accuracy } = position.coords;
+    try {
+      const { latitude, longitude, accuracy } = await getGPSLocation();
       const geofenceRadiusMeters = actionType === 'break_end'
         ? BREAK_END_GEOFENCE_RADIUS_METERS
         : GEOFENCE_RADIUS_METERS;
       const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
 
-      // Cache this successfully acquired location
       try {
-        localStorage.setItem('kt_last_gps_lat', String(latitude));
-        localStorage.setItem('kt_last_gps_lng', String(longitude));
         localStorage.setItem('kt_last_gps_accuracy', String(accuracy || 0));
-        localStorage.setItem('kt_last_gps_ts', String(Date.now()));
       } catch (e) {}
 
       console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | Allowed Radius: ${geofenceRadiusMeters.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
 
-      // Check-in and break-start require the backend's configured office radius.
-      if (actionType === 'check_in' || actionType === 'break_start') {
-        if (isWithinOfficeRadius(distanceMeters)) {
-          actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
-        } else {
-          const actionLabel = actionType === 'break_start' ? 'Starting a break' : 'Check-in';
-          setGeoError(`Office Location Error: You are ${Math.round(distanceMeters)}m away. ${actionLabel} is allowed only within ${GEOFENCE_RADIUS_METERS} meters of the office.`);
-          setIsActionLoading(false);
-        }
+      if (
+        (actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end') &&
+        !isWithinOfficeRadius(distanceMeters)
+      ) {
+        const message = actionType === 'break_end'
+          ? `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return within ${BREAK_END_GEOFENCE_RADIUS_METERS} meters of the office to resume work.`
+          : `Office Location Error: You are ${Math.round(distanceMeters)}m away. ${actionType === 'break_start' ? 'Starting a break' : 'Check-in'} is allowed only within ${GEOFENCE_RADIUS_METERS} meters of the office.`;
+        setGeoError(message);
         return;
       }
 
-      // Break-end uses the same office center and radius as the backend.
-      if (actionType === 'break_end') {
-        if (isWithinOfficeRadius(distanceMeters)) {
-          actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
-        } else {
-          setGeoError(
-            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return within ${BREAK_END_GEOFENCE_RADIUS_METERS} meters of the office to resume work.`
-          );
-          setIsActionLoading(false);
-        }
-        return;
-      }
-
-      // Break start and check out are always allowed
-      actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
-    };
-
-    const handleLocationFailure = (error) => {
-      if (error?.code === 1) {
-        setGeoError("Location permission denied. Please allow location access in your browser settings.");
-      } else {
-        setGeoError("Could not get a fresh device location. Turn on location services and try again.");
-      }
+      await actionCallback(latitude, longitude, accuracy);
+    } catch (error) {
+      setGeoError(error?.message || 'Could not get a fresh device location. Turn on location services and try again.');
+    } finally {
       setIsActionLoading(false);
-    };
-
-    let settled = false;
-    let watchId = null;
-
-    const onPos = (pos) => {
-      if (settled) return;
-      settled = true;
-      if (watchId !== null) {
-        try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
-      }
-      handleLocationSuccess(pos);
-    };
-
-    const onFinalFail = (err) => {
-      if (settled) return;
-      settled = true;
-      if (watchId !== null) {
-        try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
-      }
-      handleLocationFailure(err);
-    };
-
-    // Every attendance action must use a fresh device GPS fix.
-    navigator.geolocation.getCurrentPosition(
-      onPos,
-      (err1) => {
-        if (err1.code === 1) return onFinalFail(err1); // Permission denied - fail fast
-
-        // Stage 2: Standard accuracy (uses Wi-Fi / cell triangulation - instant on Windows/laptops/desktops)
-        navigator.geolocation.getCurrentPosition(
-          onPos,
-          (err2) => {
-            if (err2.code === 1) return onFinalFail(err2);
-
-            // Stage 3: Watch stream fallback
-            try {
-              watchId = navigator.geolocation.watchPosition(
-                onPos,
-                (err3) => onFinalFail(err2 || err1),
-                { enableHighAccuracy: false, timeout: 4000, maximumAge: 0 }
-              );
-
-              setTimeout(() => {
-                if (!settled) onFinalFail(err2 || err1);
-              }, 3000);
-            } catch (e) {
-              onFinalFail(err2 || err1);
-            }
-          },
-          { enableHighAccuracy: false, timeout: 3500, maximumAge: 0 }
-        );
-      },
-      { enableHighAccuracy: true, timeout: 2500, maximumAge: 0 }
-    );
+    }
   };
 
   // Extract real user ID from JWT token or user profile (never employee document ID)
@@ -1712,7 +1627,6 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     if (actionType === 'check_in') {
       standardFields.officeStartTime = standardFields.officeStartTime || "10:00";
       standardFields.presentHours = standardFields.presentHours || 8;
-      standardFields.accuracy = standardFields.accuracy || 10;
     } else if (actionType === 'check_out') {
       standardFields.checkoutType = standardFields.checkoutType || "MANUAL";
       standardFields.remarks = standardFields.remarks || "Manual checkout";
