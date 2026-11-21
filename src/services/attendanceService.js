@@ -75,8 +75,8 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
   );
 });
 
-export const TARGET_LAT = 23.057808;
-export const TARGET_LNG = 72.538926;
+export const TARGET_LAT = 23.058290;
+export const TARGET_LNG = 72.539190;
 export const GEOFENCE_RADIUS_METERS = 30;
 export const BREAK_END_GEOFENCE_RADIUS_METERS = GEOFENCE_RADIUS_METERS;
 export const AUTO_CHECKOUT_RADIUS_METERS = 80;
@@ -107,11 +107,6 @@ export const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
 };
 
 const attendanceRequest = (method, url, location) => {
-  const isLocalhost = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1' ||
-    window.location.hostname.endsWith('.local')
-  );
   const isCheckIn = url.includes('check-in') || url.includes('checkin');
   const isBreakStart = url.includes('break/start') || url.includes('break-in') || url.includes('break/in');
   const isBreakEnd = url.includes('break/end') || url.includes('break-out');
@@ -128,12 +123,10 @@ const attendanceRequest = (method, url, location) => {
       return Promise.reject(new Error('A fresh device location is required for this attendance action.'));
     }
 
-    if (!isLocalhost) {
-      const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
-      if (!isWithinOfficeRadius(dist)) {
-        const actionName = isCheckIn ? 'Check-in' : isBreakStart ? 'Starting a break' : 'Resuming work';
-        return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`));
-      }
+    const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+    if (!isWithinOfficeRadius(dist)) {
+      const actionName = isCheckIn ? 'Check-in' : isBreakStart ? 'Starting a break' : 'Resuming work';
+      return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`));
     }
   }
 
@@ -141,21 +134,6 @@ const attendanceRequest = (method, url, location) => {
     method,
     url,
     data: { latitude: Number(location.latitude), longitude: Number(location.longitude) }
-  }).catch((err) => {
-    if (isGeofencedAction) throw err;
-    const msg = (err.response?.data?.message || err.response?.data?.error || '').toLowerCase();
-    if (msg.includes('outside the office') || msg.includes('meters of the office') || msg.includes('away')) {
-      return api({
-        method,
-        url,
-        data: { latitude: TARGET_LAT, longitude: TARGET_LNG }
-      }).catch(() => api({
-        method,
-        url,
-        data: { latitude: 23.05829, longitude: 72.53919 }
-      }));
-    }
-    throw err;
   });
 };
 

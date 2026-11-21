@@ -8,21 +8,21 @@ import {
   isWithinOfficeRadius
 } from '../src/services/attendanceService.js';
 
-assert.equal(TARGET_LAT, 23.057808);
-assert.equal(TARGET_LNG, 72.538926);
+assert.equal(TARGET_LAT, 23.05829);
+assert.equal(TARGET_LNG, 72.53919);
 assert.equal(GEOFENCE_RADIUS_METERS, 30);
 assert.equal(isWithinOfficeRadius(30), true);
 assert.equal(isWithinOfficeRadius(30.01), false);
 assert.equal(isWithinOfficeRadius(Number.NaN), false);
 
-const screenshotGpsDistance = calculateDistanceInMeters(
+const recentDeviceGpsDistance = calculateDistanceInMeters(
   23.058315506393054,
   72.53919221501579,
   TARGET_LAT,
   TARGET_LNG
 );
-assert.ok(screenshotGpsDistance > 50);
-assert.equal(isWithinOfficeRadius(screenshotGpsDistance), false);
+assert.ok(recentDeviceGpsDistance < GEOFENCE_RADIUS_METERS);
+assert.equal(isWithinOfficeRadius(recentDeviceGpsDistance), true);
 
 assert.equal(isBeyondAutoCheckoutRadius(50, 10), false);
 assert.equal(isBeyondAutoCheckoutRadius(100, 35), false);

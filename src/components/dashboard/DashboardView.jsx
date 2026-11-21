@@ -1542,28 +1542,8 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     setGeoError('');
     setIsActionLoading(true);
 
-    const isLocalhost = typeof window !== 'undefined' && (
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.startsWith('192.168.') ||
-      window.location.hostname.startsWith('10.') ||
-      window.location.hostname.startsWith('172.') ||
-      window.location.hostname.endsWith('.local') ||
-      window.location.port === '5173' ||
-      window.location.port === '5174' ||
-      window.location.port === '3000' ||
-      window.location.protocol === 'http:'
-    );
-
     const effectiveUserId = actualUserId || user?.employee?._id || user?._id || user?.id || user?.user?._id;
 
-    // On localhost or local dev, execute instantly with target office coordinates without blocking
-    if (isLocalhost) {
-      actionCallback(TARGET_LAT, TARGET_LNG, 0, effectiveUserId);
-      return;
-    }
-
-    // Break actions use fresh device location; each action applies its configured radius.
     if (!navigator.geolocation) {
       setGeoError("Location tracking is not supported by your browser.");
       setIsActionLoading(false);
@@ -1617,50 +1597,11 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     };
 
     const handleLocationFailure = (error) => {
-      // 1. If user explicitly denied browser permission (code 1), show clear permission error
       if (error?.code === 1) {
         setGeoError("Location permission denied. Please allow location access in your browser settings.");
-        setIsActionLoading(false);
-        return;
-      }
-
-      if (actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end') {
+      } else {
         setGeoError("Could not get a fresh device location. Turn on location services and try again.");
-        setIsActionLoading(false);
-        return;
       }
-
-      // 2. Check if recent valid location fix exists from earlier today (within 30 minutes)
-      try {
-        const savedLat = parseFloat(localStorage.getItem('kt_last_gps_lat'));
-        const savedLng = parseFloat(localStorage.getItem('kt_last_gps_lng'));
-        const savedAcc = parseFloat(localStorage.getItem('kt_last_gps_accuracy') || '10');
-        const savedTs = parseInt(localStorage.getItem('kt_last_gps_ts') || '0', 10);
-        const isRecent = Date.now() - savedTs < 30 * 60 * 1000;
-        if (!isNaN(savedLat) && !isNaN(savedLng) && isRecent) {
-          console.warn("[GEOFENCE LOCATION] Fallback to recent validated device location fix:", savedLat, savedLng);
-          handleLocationSuccess({
-            coords: { latitude: savedLat, longitude: savedLng, accuracy: savedAcc }
-          });
-          return;
-        }
-      } catch (e) {}
-
-      // 3. If device location is ON but browser GPS timed out or is unavailable (common on Windows desktop/laptops):
-      // Seamlessly fallback to office coordinates so the in-office employee can check in without any error!
-      if (error?.code === 3 || error?.code === 2 || !error) {
-        console.warn("[GEOFENCE LOCATION] Device location ON but browser GPS timed out on PC/laptop. Applying office coordinates fallback.");
-        handleLocationSuccess({
-          coords: {
-            latitude: TARGET_LAT,
-            longitude: TARGET_LNG,
-            accuracy: 15
-          }
-        });
-        return;
-      }
-
-      setGeoError(error?.message || "Failed to acquire location. Please try again.");
       setIsActionLoading(false);
     };
 
@@ -1685,11 +1626,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       handleLocationFailure(err);
     };
 
-    const requiresFreshLocation = actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end';
-    const maximumLocationAge = requiresFreshLocation ? 0 : 60000;
-
-    // Multi-tier resilient acquisition:
-    // Stage 1: Quick attempt with a recent cached fix when the action permits it.
+    // Every attendance action must use a fresh device GPS fix.
     navigator.geolocation.getCurrentPosition(
       onPos,
       (err1) => {
@@ -1706,7 +1643,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
               watchId = navigator.geolocation.watchPosition(
                 onPos,
                 (err3) => onFinalFail(err2 || err1),
-                { enableHighAccuracy: false, timeout: 4000, maximumAge: maximumLocationAge }
+                { enableHighAccuracy: false, timeout: 4000, maximumAge: 0 }
               );
 
               setTimeout(() => {
@@ -1716,10 +1653,10 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
               onFinalFail(err2 || err1);
             }
           },
-          { enableHighAccuracy: false, timeout: 3500, maximumAge: maximumLocationAge }
+          { enableHighAccuracy: false, timeout: 3500, maximumAge: 0 }
         );
       },
-      { enableHighAccuracy: true, timeout: 2500, maximumAge: maximumLocationAge }
+      { enableHighAccuracy: true, timeout: 2500, maximumAge: 0 }
     );
   };
 
@@ -1768,11 +1705,6 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       endpointCandidates.push('/api/attendance/checkout');
     }
 
-    // Keep manual checkout fallbacks aligned with the backend office center.
-    const BACKEND_OFFICE_REF_LAT = TARGET_LAT;
-    const BACKEND_OFFICE_REF_LNG = TARGET_LNG;
-    const ALT_OFFICE_REF_LAT = 23.05829;
-    const ALT_OFFICE_REF_LNG = 72.53919;
     const effectiveUserType = user?.role || user?.user?.role || 'employee';
 
     // Prepare full base object incorporating standard schema
@@ -1794,34 +1726,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       userId: realUserId || undefined
     };
 
-    // Geofenced actions use one verified device location; never retry with synthetic office coordinates.
-    const payloadVariants = actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end'
-      ? [liveLocationPayload]
-      : [
-          {
-            ...standardFields,
-            latitude: BACKEND_OFFICE_REF_LAT,
-            longitude: BACKEND_OFFICE_REF_LNG,
-            userType: effectiveUserType,
-            userId: realUserId || undefined
-          },
-          liveLocationPayload,
-          {
-            ...standardFields,
-            latitude: ALT_OFFICE_REF_LAT,
-            longitude: ALT_OFFICE_REF_LNG,
-            userType: effectiveUserType,
-            userId: realUserId || undefined
-          },
-          {
-            latitude: BACKEND_OFFICE_REF_LAT,
-            longitude: BACKEND_OFFICE_REF_LNG
-          },
-          {
-            latitude: ALT_OFFICE_REF_LAT,
-            longitude: ALT_OFFICE_REF_LNG
-          }
-        ];
+    const payloadVariants = [liveLocationPayload];
 
     try {
       let response = null;
@@ -1852,7 +1757,6 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
             ) {
               break outerLoop;
             }
-            // If the error was specifically "outside the office", let loop continue to try BACKEND_OFFICE_REF variant
           }
         }
       }
@@ -2141,106 +2045,6 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
           setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
           setGeoError("Your check-in request is pending admin approval. Please wait for admin approval.");
           await syncDashboardAndAttendance(actualUserId);
-        }
-      } else if (
-        actionType !== 'check_in' &&
-        actionType !== 'break_start' &&
-        actionType !== 'break_end' && (
-          lowerMsg.includes('outside the office') ||
-          lowerMsg.includes('office location') ||
-          lowerMsg.includes('meters of the office') ||
-          lowerMsg.includes('away')
-        )
-      ) {
-        // Backend rejected user coords against remote anchor; perform immediate fallback with backend office anchor
-        try {
-          let directRetry = null;
-          try {
-            directRetry = await api.post(endpoint, {
-              ...basePayload,
-              latitude: TARGET_LAT,
-              longitude: TARGET_LNG,
-              ...(realUserId ? { userId: realUserId } : {})
-            });
-          } catch (e1) {
-            directRetry = await api.post(endpoint, {
-              ...basePayload,
-              latitude: ALT_OFFICE_REF_LAT,
-              longitude: ALT_OFFICE_REF_LNG,
-              ...(realUserId ? { userId: realUserId } : {})
-            });
-          }
-          if (directRetry && (directRetry.status === 200 || directRetry.status === 201 || directRetry.data?.success || directRetry.data?.attendance)) {
-            if (actionType === 'check_in') {
-              localStorage.setItem('kt_attendance_pending_' + todayStr, 'true');
-              localStorage.setItem('kt_attendance_pending_' + todayLocalStr, 'true');
-              localStorage.removeItem('kt_attendance_rejected_' + todayStr);
-              localStorage.removeItem('kt_attendance_rejected_' + todayLocalStr);
-              localStorage.removeItem('kt_checked_in_' + todayStr);
-              localStorage.removeItem('kt_checked_in_' + todayLocalStr);
-              localStorage.removeItem('kt_checked_out_' + todayStr);
-              localStorage.removeItem('kt_checked_out_' + todayLocalStr);
-              setAttendanceStatus('pending');
-              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('pending');
-              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
-              setGeoError('Your check-in request is pending admin approval. Please wait for admin approval.');
-              await syncDashboardAndAttendance(actualUserId || realUserId);
-              return;
-            } else if (actionType === 'check_out') {
-              setGeoError('');
-              localStorage.setItem('kt_checked_out_' + todayStr, 'true');
-              localStorage.setItem('kt_checked_out_' + todayLocalStr, 'true');
-              localStorage.removeItem('kt_on_break_' + todayStr);
-              localStorage.removeItem('kt_on_break_' + todayLocalStr);
-              localStorage.setItem('kt_check_out_time_str', nowLocal);
-              setAttendanceStatus('checked_out');
-              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_out');
-              setCheckOutTimeDisplay(nowLocal);
-              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: false, canCheckOut: false });
-              await syncDashboardAndAttendance(actualUserId);
-              return;
-            } else if (actionType === 'break_start') {
-              setGeoError('');
-              localStorage.setItem('kt_on_break_' + todayStr, 'true');
-              localStorage.setItem('kt_on_break_' + todayLocalStr, 'true');
-              localStorage.setItem('kt_active_break_started_at_' + todayStr, activeBreakIsoStart || nowIso);
-              localStorage.setItem('kt_active_break_started_at_' + todayLocalStr, activeBreakIsoStart || nowIso);
-              localStorage.setItem('kt_last_break_in_' + todayStr, nowLocal);
-              const currentBreaks = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
-              const newBreaksCount = currentBreaks + 1;
-              localStorage.setItem('kt_break_count_' + todayStr, String(newBreaksCount));
-              localStorage.setItem('kt_break_count_' + todayLocalStr, String(newBreaksCount));
-              setDailyBreaksCount(newBreaksCount);
-              setAttendanceStatus('on_break');
-              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('on_break');
-              setBreakInTimeDisplay(nowLocal);
-              setBreakOutTimeDisplay('--:--');
-              setActionsAvailable({ canCheckIn: false, canStartBreak: false, canEndBreak: true, canCheckOut: false });
-              await syncDashboardAndAttendance(actualUserId);
-              return;
-            } else if (actionType === 'break_end') {
-              setGeoError('');
-              const nowTs = String(Date.now());
-              localStorage.removeItem('kt_on_break_' + todayStr);
-              localStorage.removeItem('kt_on_break_' + todayLocalStr);
-              localStorage.removeItem('kt_active_break_started_at_' + todayStr);
-              localStorage.removeItem('kt_active_break_started_at_' + todayLocalStr);
-              localStorage.setItem('kt_last_break_out_' + todayStr, nowLocal);
-              localStorage.setItem('kt_resume_work_ts_' + todayStr, nowTs);
-              localStorage.setItem('kt_resume_work_ts_' + todayLocalStr, nowTs);
-              const updatedBreaks = parseInt(localStorage.getItem('kt_break_count_' + todayStr) || '0', 10);
-              setAttendanceStatus('checked_in');
-              if (setGlobalAttendanceStatus) setGlobalAttendanceStatus('checked_in');
-              setBreakOutTimeDisplay(nowLocal);
-              setActionsAvailable({ canCheckIn: false, canStartBreak: updatedBreaks < 2, canEndBreak: false, canCheckOut: true });
-              await syncDashboardAndAttendance(actualUserId);
-              return;
-            }
-          } else {
-            setGeoError(errMsg);
-          }
-        } catch (retryErr) {
-          setGeoError(errMsg);
         }
       } else {
         setGeoError(errMsg);
