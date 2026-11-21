@@ -1,7 +1,6 @@
 import api from '../api/axios.js';
 
 export const MAX_GEOFENCE_GPS_ACCURACY_METERS = 35;
-const ACCURACY_WATCH_TIMEOUT_MS = 15000;
 
 export const getGPSLocation = () => new Promise((resolve, reject) => {
   if (!window.isSecureContext && window.location.hostname !== 'localhost') {
@@ -16,18 +15,11 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
 
   let settled = false;
   let watchId = null;
-  let watchTimeout = null;
 
   const handleSuccess = ({ coords }) => {
     if (settled) return;
-    const accuracy = Number(coords.accuracy);
-    if (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > MAX_GEOFENCE_GPS_ACCURACY_METERS) {
-      startAccuracyWatch();
-      return;
-    }
-
     settled = true;
-    if (watchTimeout !== null) clearTimeout(watchTimeout);
+    const accuracy = Number(coords.accuracy);
     if (watchId !== null) {
       try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
     }
@@ -49,7 +41,6 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
   const handleError = (error) => {
     if (settled) return;
     settled = true;
-    if (watchTimeout !== null) clearTimeout(watchTimeout);
     if (watchId !== null) {
       try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
     }
@@ -60,26 +51,7 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
       return;
     }
 
-    if (error?.code === 3) {
-      reject(new Error('GPS accuracy is too low to verify your location reliably. Please wait for better signal.'));
-      return;
-    }
-
     reject(new Error(error?.message || 'Unable to determine your location.'));
-  };
-
-  const startAccuracyWatch = () => {
-    if (settled || watchId !== null) return;
-    try {
-      watchId = navigator.geolocation.watchPosition(
-        handleSuccess,
-        handleError,
-        { enableHighAccuracy: true, timeout: ACCURACY_WATCH_TIMEOUT_MS, maximumAge: 0 }
-      );
-      watchTimeout = setTimeout(() => handleError({ code: 3 }), ACCURACY_WATCH_TIMEOUT_MS);
-    } catch (error) {
-      handleError(error);
-    }
   };
 
   // Stage 1: Quick high accuracy attempt without a cached location.
@@ -92,7 +64,19 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
         handleSuccess,
         (err2) => {
           if (err2.code === 1) return handleError(err2);
-          startAccuracyWatch();
+          // Stage 3: watchPosition fallback
+          try {
+            watchId = navigator.geolocation.watchPosition(
+              handleSuccess,
+              (err3) => handleError(err2 || err1),
+              { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
+            );
+            setTimeout(() => {
+              if (!settled) handleError(err2 || err1);
+            }, 9000);
+          } catch (e) {
+            handleError(err2 || err1);
+          }
         },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
       );
