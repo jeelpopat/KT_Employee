@@ -48,3 +48,27 @@ export const getLeaveDurationPayload = (isHalfDay, halfDayType, totalDays) => {
     totalDays: halfDay ? 0.5 : Number(totalDays),
   };
 };
+
+export const hasActiveLeaveDateOverlap = (leaves, startDate, endDate = startDate) => {
+  const requestedStart = String(startDate || "").slice(0, 10);
+  const requestedEnd = String(endDate || startDate || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedStart) || !/^\d{4}-\d{2}-\d{2}$/.test(requestedEnd)) {
+    return false;
+  }
+
+  return Array.isArray(leaves) && leaves.some((leave) => {
+    const status = String(leave?.status || leave?.approvalStatus || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_-]+/g, " ");
+    if (status !== "approved" && status !== "pending" && !status.startsWith("pending ")) return false;
+
+    const existingStart = String(leave?.startDate || leave?.fromDate || "").slice(0, 10);
+    const existingEnd = String(leave?.endDate || leave?.toDate || existingStart).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(existingStart) || !/^\d{4}-\d{2}-\d{2}$/.test(existingEnd)) {
+      return false;
+    }
+
+    return existingStart <= requestedEnd && existingEnd >= requestedStart;
+  });
+};
