@@ -1771,42 +1771,42 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       standardFields.remarks = standardFields.remarks || "Manual checkout";
     }
 
-    // Payload variants:
-    // 1st: Standard comprehensive schema with primary office coords (23.05829, 72.53919)
-    // 2nd: Standard comprehensive schema with real GPS or passed base coordinates
-    // 3rd: Standard comprehensive schema with fallback office coords (23.057808, 72.538926)
-    // 4th & 5th: Minimal coords-only payloads for legacy backend compatibility
-    const payloadVariants = [
-      {
-        ...standardFields,
-        latitude: BACKEND_OFFICE_REF_LAT,
-        longitude: BACKEND_OFFICE_REF_LNG,
-        userType: effectiveUserType,
-        userId: realUserId || undefined
-      },
-      {
-        ...standardFields,
-        latitude: Number(basePayload.latitude),
-        longitude: Number(basePayload.longitude),
-        userType: effectiveUserType,
-        userId: realUserId || undefined
-      },
-      {
-        ...standardFields,
-        latitude: ALT_OFFICE_REF_LAT,
-        longitude: ALT_OFFICE_REF_LNG,
-        userType: effectiveUserType,
-        userId: realUserId || undefined
-      },
-      {
-        latitude: BACKEND_OFFICE_REF_LAT,
-        longitude: BACKEND_OFFICE_REF_LNG
-      },
-      {
-        latitude: ALT_OFFICE_REF_LAT,
-        longitude: ALT_OFFICE_REF_LNG
-      }
-    ];
+    const liveLocationPayload = {
+      ...standardFields,
+      latitude: Number(basePayload.latitude),
+      longitude: Number(basePayload.longitude),
+      userType: effectiveUserType,
+      userId: realUserId || undefined
+    };
+
+    // Break-end must use the verified device location, never synthetic office coordinates.
+    const payloadVariants = actionType === 'break_end'
+      ? [liveLocationPayload]
+      : [
+          {
+            ...standardFields,
+            latitude: BACKEND_OFFICE_REF_LAT,
+            longitude: BACKEND_OFFICE_REF_LNG,
+            userType: effectiveUserType,
+            userId: realUserId || undefined
+          },
+          liveLocationPayload,
+          {
+            ...standardFields,
+            latitude: ALT_OFFICE_REF_LAT,
+            longitude: ALT_OFFICE_REF_LNG,
+            userType: effectiveUserType,
+            userId: realUserId || undefined
+          },
+          {
+            latitude: BACKEND_OFFICE_REF_LAT,
+            longitude: BACKEND_OFFICE_REF_LNG
+          },
+          {
+            latitude: ALT_OFFICE_REF_LAT,
+            longitude: ALT_OFFICE_REF_LNG
+          }
+        ];
 
     try {
       let response = null;
@@ -2128,10 +2128,12 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
           await syncDashboardAndAttendance(actualUserId);
         }
       } else if (
-        lowerMsg.includes('outside the office') ||
-        lowerMsg.includes('office location') ||
-        lowerMsg.includes('meters of the office') ||
-        lowerMsg.includes('away')
+        actionType !== 'break_end' && (
+          lowerMsg.includes('outside the office') ||
+          lowerMsg.includes('office location') ||
+          lowerMsg.includes('meters of the office') ||
+          lowerMsg.includes('away')
+        )
       ) {
         // Backend rejected user coords against remote anchor; perform immediate fallback with backend office anchor
         try {
