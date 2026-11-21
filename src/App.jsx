@@ -94,19 +94,38 @@ const MainLayout = ({ handleSignOut }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const isFinanceRoute = location.pathname === '/finance' || location.pathname.startsWith('/finance/');
-  const userId = user?._id || user?.id || user?.employeeId || user?.email || 'anonymous';
+  const userId =
+    user?._id ||
+    user?.id ||
+    user?.employee?._id ||
+    user?.employee?.id ||
+    user?.employeeId ||
+    user?.employee?.employeeID ||
+    user?.employeeID ||
+    user?.profile?.email ||
+    user?.employee?.email ||
+    user?.email ||
+    null;
   const welcomeKey = `crm-welcome:${userRole}:${userId}`;
-  const [showWelcomeGuide, setShowWelcomeGuide] = useState(() => {
-    try {
-      return localStorage.getItem(welcomeKey) !== 'seen';
-    } catch {
-      return false;
+  const [showWelcomeGuide, setShowWelcomeGuide] = useState(false);
+
+  useEffect(() => {
+    if (!userId) {
+      setShowWelcomeGuide(false);
+      return;
     }
-  });
+
+    try {
+      setShowWelcomeGuide(localStorage.getItem(welcomeKey) !== 'seen');
+    } catch {
+      setShowWelcomeGuide(false);
+    }
+  }, [welcomeKey, userId]);
 
   useEffect(() => {
     if (location.pathname === '/user-guide') {
       setShowWelcomeGuide(false);
+      if (!userId) return;
       try {
         localStorage.setItem(welcomeKey, 'seen');
       } catch (error) {
