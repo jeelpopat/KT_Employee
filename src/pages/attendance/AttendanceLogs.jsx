@@ -2827,12 +2827,12 @@ export default function AttendanceLogs() {
       </div>
 
       {/* VIEW MODE TABS: DAILY LOGS vs HISTORICAL LOG EXPLORER (OLD LOGS) */}
-      <div className="flex items-center justify-between border-b border-slate-200 gap-2">
-        <div className="flex items-center gap-2">
+      <div className="border-b border-slate-200">
+        <div className="flex w-full items-center gap-3 overflow-x-auto whitespace-nowrap pb-px sm:gap-4">
           <button
             type="button"
             onClick={() => setViewMode('daily')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex shrink-0 items-center gap-2 px-3 py-2.5 text-xs sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
               viewMode === 'daily'
                 ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2840,9 +2840,6 @@ export default function AttendanceLogs() {
           >
             <CalendarDays size={16} />
             <span>Daily Attendance Logs</span>
-            <span className="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-700 font-bold">
-              {formatIndianDate(selectedDate)}
-            </span>
           </button>
 
           <button
@@ -2853,7 +2850,7 @@ export default function AttendanceLogs() {
                 fetchHistoryRangeLogs();
               }
             }}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex shrink-0 items-center gap-2 px-3 py-2.5 text-xs sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
               viewMode === 'history'
                 ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2861,9 +2858,6 @@ export default function AttendanceLogs() {
           >
             <History size={16} />
             <span>Historical Log Explorer (Old Logs)</span>
-            <span className="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 font-bold">
-              Multi-Date Range
-            </span>
           </button>
 
           {canManageFinalization && (
@@ -2878,7 +2872,7 @@ export default function AttendanceLogs() {
                   fetchFinalizePreview(finalizeTargetDate || selectedDate || getTodayLocal());
                 }
               }}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 px-3 py-2.5 text-xs sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
                 viewMode === 'scheduler'
                   ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                   : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
