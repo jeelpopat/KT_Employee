@@ -41,33 +41,15 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
       return;
     }
 
-    // Recent validated location fix from today
-    try {
-      const savedLat = parseFloat(localStorage.getItem('kt_last_gps_lat'));
-      const savedLng = parseFloat(localStorage.getItem('kt_last_gps_lng'));
-      const savedTs = parseInt(localStorage.getItem('kt_last_gps_ts') || '0', 10);
-      if (!isNaN(savedLat) && !isNaN(savedLng) && (Date.now() - savedTs < 30 * 60 * 1000)) {
-        resolve({ latitude: savedLat, longitude: savedLng });
-        return;
-      }
-    } catch (e) {}
-
-    // On desktop/laptop where location is ON but browser GPS times out, fallback to office location
-    if (error?.code === 3 || error?.code === 2 || !error) {
-      console.warn('[GEOFENCE LOCATION] attendanceService GPS timeout on PC/laptop. Fallback to office location applied.');
-      resolve({ latitude: TARGET_LAT, longitude: TARGET_LNG });
-      return;
-    }
-
     reject(new Error(error?.message || 'Unable to determine your location.'));
   };
 
-  // Stage 1: Quick high accuracy attempt with 4s timeout & 60s cache
+  // Stage 1: Quick high accuracy attempt without a cached location.
   navigator.geolocation.getCurrentPosition(
     handleSuccess,
     (err1) => {
       if (err1.code === 1) return handleError(err1); // Permission denied
-      // Stage 2: Standard accuracy (instant on Windows/WiFi)
+      // Stage 2: Standard accuracy, still requiring a fresh fix.
       navigator.geolocation.getCurrentPosition(
         handleSuccess,
         (err2) => {
@@ -77,27 +59,33 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
             watchId = navigator.geolocation.watchPosition(
               handleSuccess,
               (err3) => handleError(err2 || err1),
-              { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+              { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
             );
             setTimeout(() => {
               if (!settled) handleError(err2 || err1);
-            }, 5000);
+            }, 9000);
           } catch (e) {
             handleError(err2 || err1);
           }
         },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
       );
     },
-    { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
+    { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 }
   );
 });
 
-export const TARGET_LAT = 23.05829;
-export const TARGET_LNG = 72.53919;
-export const GEOFENCE_RADIUS_METERS = 50;
-export const BREAK_END_GEOFENCE_RADIUS_METERS = 20;
+export const TARGET_LAT = 23.057808;
+export const TARGET_LNG = 72.538926;
+export const GEOFENCE_RADIUS_METERS = 30;
+export const BREAK_END_GEOFENCE_RADIUS_METERS = GEOFENCE_RADIUS_METERS;
 export const AUTO_CHECKOUT_RADIUS_METERS = 80;
+
+export const isWithinOfficeRadius = (distanceMeters) => (
+  Number.isFinite(distanceMeters) &&
+  distanceMeters >= 0 &&
+  distanceMeters <= GEOFENCE_RADIUS_METERS
+);
 
 export const isBeyondAutoCheckoutRadius = (distanceMeters, accuracyMeters) => (
   Number.isFinite(distanceMeters) &&
@@ -124,32 +112,47 @@ const attendanceRequest = (method, url, location) => {
     window.location.hostname === '127.0.0.1' ||
     window.location.hostname.endsWith('.local')
   );
+  const isCheckIn = url.includes('check-in') || url.includes('checkin');
+  const isBreakStart = url.includes('break/start') || url.includes('break-in') || url.includes('break/in');
+  const isBreakEnd = url.includes('break/end') || url.includes('break-out');
+  const isGeofencedAction = isCheckIn || isBreakStart || isBreakEnd;
 
-  if (!isLocalhost && location?.latitude && location?.longitude) {
-    const dist = calculateDistanceInMeters(location.latitude, location.longitude, TARGET_LAT, TARGET_LNG);
-    const isCheckIn = url.includes('check-in') || url.includes('checkin');
-    const isBreakEnd = url.includes('break/end') || url.includes('break-out');
-    if ((isCheckIn || isBreakEnd) && dist > GEOFENCE_RADIUS_METERS) {
-      const actionName = isCheckIn ? 'Check-in' : 'Resuming work';
-      return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is strictly allowed within 50m of office coordinates.`));
+  if (isGeofencedAction) {
+    const hasLocation = location?.latitude !== undefined &&
+      location?.latitude !== null &&
+      location?.longitude !== undefined &&
+      location?.longitude !== null;
+    const latitude = Number(location?.latitude);
+    const longitude = Number(location?.longitude);
+    if (!hasLocation || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return Promise.reject(new Error('A fresh device location is required for this attendance action.'));
+    }
+
+    if (!isLocalhost) {
+      const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+      if (!isWithinOfficeRadius(dist)) {
+        const actionName = isCheckIn ? 'Check-in' : isBreakStart ? 'Starting a break' : 'Resuming work';
+        return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`));
+      }
     }
   }
+
   return api({
     method,
     url,
-    data: { latitude: location.latitude, longitude: location.longitude }
+    data: { latitude: Number(location.latitude), longitude: Number(location.longitude) }
   }).catch((err) => {
+    if (isGeofencedAction) throw err;
     const msg = (err.response?.data?.message || err.response?.data?.error || '').toLowerCase();
     if (msg.includes('outside the office') || msg.includes('meters of the office') || msg.includes('away')) {
-      // Backend remote anchor reference coordinates fallback
       return api({
         method,
         url,
-        data: { latitude: 23.05829, longitude: 72.53919 }
+        data: { latitude: TARGET_LAT, longitude: TARGET_LNG }
       }).catch(() => api({
         method,
         url,
-        data: { latitude: 23.057808, longitude: 72.538926 }
+        data: { latitude: 23.05829, longitude: 72.53919 }
       }));
     }
     throw err;

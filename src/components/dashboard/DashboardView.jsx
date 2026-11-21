@@ -10,8 +10,10 @@ import api, { BASE_URL } from '../../api/axios.js';
 import { showToast } from '../common/Toast.jsx';
 import {
   BREAK_END_GEOFENCE_RADIUS_METERS,
+  GEOFENCE_RADIUS_METERS,
   TARGET_LAT,
-  TARGET_LNG
+  TARGET_LNG,
+  isWithinOfficeRadius
 } from '../../services/attendanceService.js';
 import {
   computeNineHourTimeline,
@@ -161,8 +163,7 @@ const getAttendanceClassification = (...values) => {
   };
 };
 
-// --- Geofencing Configuration (Solaris Business Hub: 50m Check-in, 80m Auto-Checkout) ---
-const GEOFENCE_RADIUS_METERS = 50; // Check-in Eligibility Radius: 50 meters
+// --- Geofencing Configuration (backend office center: 30m radius) ---
 const AUTO_CHECKOUT_RADIUS_METERS = 80; // Auto-Checkout Trigger Radius: 80 meters
 
 const getUniqueBreaks = (breaks) => {
@@ -1586,9 +1587,9 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
       console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | Allowed Radius: ${geofenceRadiusMeters.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
 
-      // Check-in and break-start require the backend's 50m office radius.
+      // Check-in and break-start require the backend's configured office radius.
       if (actionType === 'check_in' || actionType === 'break_start') {
-        if (distanceMeters <= geofenceRadiusMeters) {
+        if (isWithinOfficeRadius(distanceMeters)) {
           actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
         } else {
           const actionLabel = actionType === 'break_start' ? 'Starting a break' : 'Check-in';
@@ -1598,9 +1599,9 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
         return;
       }
 
-      // Break-end uses the backend's 20m office anchor.
+      // Break-end uses the same office center and radius as the backend.
       if (actionType === 'break_end') {
-        if (distanceMeters <= geofenceRadiusMeters) {
+        if (isWithinOfficeRadius(distanceMeters)) {
           actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
         } else {
           setGeoError(
@@ -1623,7 +1624,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
         return;
       }
 
-      if (actionType === 'break_start' || actionType === 'break_end') {
+      if (actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end') {
         setGeoError("Could not get a fresh device location. Turn on location services and try again.");
         setIsActionLoading(false);
         return;
@@ -1684,7 +1685,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       handleLocationFailure(err);
     };
 
-    const requiresFreshLocation = actionType === 'break_start' || actionType === 'break_end';
+    const requiresFreshLocation = actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end';
     const maximumLocationAge = requiresFreshLocation ? 0 : 60000;
 
     // Multi-tier resilient acquisition:
@@ -1767,11 +1768,11 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       endpointCandidates.push('/api/attendance/checkout');
     }
 
-    // Remote backend office anchor reference coordinates (Solaris Business Hub)
-    const BACKEND_OFFICE_REF_LAT = 23.05829;
-    const BACKEND_OFFICE_REF_LNG = 72.53919;
-    const ALT_OFFICE_REF_LAT = 23.057808;
-    const ALT_OFFICE_REF_LNG = 72.538926;
+    // Keep manual checkout fallbacks aligned with the backend office center.
+    const BACKEND_OFFICE_REF_LAT = TARGET_LAT;
+    const BACKEND_OFFICE_REF_LNG = TARGET_LNG;
+    const ALT_OFFICE_REF_LAT = 23.05829;
+    const ALT_OFFICE_REF_LNG = 72.53919;
     const effectiveUserType = user?.role || user?.user?.role || 'employee';
 
     // Prepare full base object incorporating standard schema
@@ -1793,8 +1794,8 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       userId: realUserId || undefined
     };
 
-    // Break actions use one verified device location; never retry with synthetic office coordinates.
-    const payloadVariants = actionType === 'break_start' || actionType === 'break_end'
+    // Geofenced actions use one verified device location; never retry with synthetic office coordinates.
+    const payloadVariants = actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end'
       ? [liveLocationPayload]
       : [
           {
@@ -2142,6 +2143,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
           await syncDashboardAndAttendance(actualUserId);
         }
       } else if (
+        actionType !== 'check_in' &&
         actionType !== 'break_start' &&
         actionType !== 'break_end' && (
           lowerMsg.includes('outside the office') ||
@@ -2156,15 +2158,15 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
           try {
             directRetry = await api.post(endpoint, {
               ...basePayload,
-              latitude: 23.05829,
-              longitude: 72.53919,
+              latitude: TARGET_LAT,
+              longitude: TARGET_LNG,
               ...(realUserId ? { userId: realUserId } : {})
             });
           } catch (e1) {
             directRetry = await api.post(endpoint, {
               ...basePayload,
-              latitude: 23.057808,
-              longitude: 72.538926,
+              latitude: ALT_OFFICE_REF_LAT,
+              longitude: ALT_OFFICE_REF_LNG,
               ...(realUserId ? { userId: realUserId } : {})
             });
           }
