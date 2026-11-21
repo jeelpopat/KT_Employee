@@ -96,6 +96,9 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
 export const TARGET_LAT = 23.05829;
 export const TARGET_LNG = 72.53919;
 export const GEOFENCE_RADIUS_METERS = 50;
+export const BREAK_END_TARGET_LAT = 23.057808;
+export const BREAK_END_TARGET_LNG = 72.538926;
+export const BREAK_END_GEOFENCE_RADIUS_METERS = 20;
 export const AUTO_CHECKOUT_RADIUS_METERS = 80;
 
 export const isBeyondAutoCheckoutRadius = (distanceMeters, accuracyMeters) => (
