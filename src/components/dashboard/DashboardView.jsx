@@ -1566,7 +1566,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       return;
     }
 
-    // Production strict 20-meter geofence check
+    // Break actions use fresh device location; each action applies its configured radius.
     if (!navigator.geolocation) {
       setGeoError("Location tracking is not supported by your browser.");
       setIsActionLoading(false);
@@ -1592,14 +1592,13 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
       console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${targetLat}, ${targetLng}) | Distance: ${distanceMeters.toFixed(1)}m | Allowed Radius: ${geofenceRadiusMeters.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
 
-      // Check-in strictly requires <= 50 meters
-      if (actionType === 'check_in') {
+      // Check-in and break-start require the backend's 50m office radius.
+      if (actionType === 'check_in' || actionType === 'break_start') {
         if (distanceMeters <= geofenceRadiusMeters) {
           actionCallback(latitude, longitude, distanceMeters, effectiveUserId);
         } else {
-          setGeoError(
-            `Office Location Error: You are ${Math.round(distanceMeters)}m away. Check-in is strictly allowed within 50 meters of office premises.`
-          );
+          const actionLabel = actionType === 'break_start' ? 'Starting a break' : 'Check-in';
+          setGeoError(`Office Location Error: You are ${Math.round(distanceMeters)}m away. ${actionLabel} is allowed only within ${GEOFENCE_RADIUS_METERS} meters of the office.`);
           setIsActionLoading(false);
         }
         return;
@@ -1630,7 +1629,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
         return;
       }
 
-      if (actionType === 'break_end') {
+      if (actionType === 'break_start' || actionType === 'break_end') {
         setGeoError("Could not get a fresh device location. Turn on location services and try again.");
         setIsActionLoading(false);
         return;
@@ -1691,7 +1690,8 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       handleLocationFailure(err);
     };
 
-    const maximumLocationAge = actionType === 'break_end' ? 0 : 60000;
+    const requiresFreshLocation = actionType === 'break_start' || actionType === 'break_end';
+    const maximumLocationAge = requiresFreshLocation ? 0 : 60000;
 
     // Multi-tier resilient acquisition:
     // Stage 1: Quick attempt with a recent cached fix when the action permits it.
@@ -1799,8 +1799,8 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       userId: realUserId || undefined
     };
 
-    // Break-end must use the verified device location, never synthetic office coordinates.
-    const payloadVariants = actionType === 'break_end'
+    // Break actions use one verified device location; never retry with synthetic office coordinates.
+    const payloadVariants = actionType === 'break_start' || actionType === 'break_end'
       ? [liveLocationPayload]
       : [
           {
@@ -2148,6 +2148,7 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
           await syncDashboardAndAttendance(actualUserId);
         }
       } else if (
+        actionType !== 'break_start' &&
         actionType !== 'break_end' && (
           lowerMsg.includes('outside the office') ||
           lowerMsg.includes('office location') ||
