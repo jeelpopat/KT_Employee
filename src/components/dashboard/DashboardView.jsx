@@ -14,6 +14,7 @@ import {
   GEOFENCE_RADIUS_METERS,
   getGPSLocation,
   isWithinOfficeRadius,
+  roundCoordinate,
   TARGET_LAT,
   TARGET_LNG
 } from '../../services/attendanceService.js';
@@ -1629,8 +1630,8 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
     const liveLocationPayload = {
       ...standardFields,
-      latitude: Number(basePayload.latitude),
-      longitude: Number(basePayload.longitude),
+      latitude: roundCoordinate(basePayload.latitude),
+      longitude: roundCoordinate(basePayload.longitude),
       userType: effectiveUserType,
       userId: realUserId || undefined
     };

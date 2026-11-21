@@ -7,7 +7,8 @@ import {
   getGPSLocation,
   getAccuracyAdjustedDistanceInMeters,
   isBeyondAutoCheckoutRadius,
-  isWithinOfficeRadius
+  isWithinOfficeRadius,
+  roundCoordinate
 } from '../src/services/attendanceService.js';
 
 assert.equal(TARGET_LAT, 23.057808);
@@ -24,6 +25,9 @@ assert.equal(getAccuracyAdjustedDistanceInMeters(63, 35), 28);
 assert.equal(isWithinOfficeRadius(getAccuracyAdjustedDistanceInMeters(63, 35)), false);
 assert.equal(isWithinOfficeRadius(getAccuracyAdjustedDistanceInMeters(50, 35)), true);
 assert.equal(getAccuracyAdjustedDistanceInMeters(63, 35.01), null);
+assert.equal(roundCoordinate(23.05831497317996), 23.05831);
+assert.equal(roundCoordinate(72.53919130210492), 72.53919);
+assert.throws(() => roundCoordinate(Number.NaN), /valid GPS coordinate/);
 
 assert.equal(isBeyondAutoCheckoutRadius(50, 10), false);
 assert.equal(isBeyondAutoCheckoutRadius(100, 35), false);

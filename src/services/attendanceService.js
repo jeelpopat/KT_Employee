@@ -91,6 +91,14 @@ export const GEOFENCE_RADIUS_METERS = 20;
 export const BREAK_END_GEOFENCE_RADIUS_METERS = GEOFENCE_RADIUS_METERS;
 export const AUTO_CHECKOUT_RADIUS_METERS = 80;
 
+export const roundCoordinate = (coordinate) => {
+  const value = Number(coordinate);
+  if (!Number.isFinite(value)) {
+    throw new Error('A valid GPS coordinate is required.');
+  }
+  return Number(value.toFixed(5));
+};
+
 export const isWithinOfficeRadius = (distanceMeters, radiusMeters = GEOFENCE_RADIUS_METERS) => (
   Number.isFinite(distanceMeters) &&
   distanceMeters >= 0 &&
@@ -167,7 +175,10 @@ const attendanceRequest = (method, url, location) => {
   return api({
     method,
     url,
-    data: { latitude: Number(location.latitude), longitude: Number(location.longitude) }
+    data: {
+      latitude: roundCoordinate(location.latitude),
+      longitude: roundCoordinate(location.longitude)
+    }
   });
 };
 
