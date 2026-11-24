@@ -1160,9 +1160,9 @@ const fetchAllMembers = async () => {
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Team Members</h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+            {/* <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
               Manage and overview all staff, team leads, and employees
-            </p>
+            </p> */}
           </div>
         </div>
 

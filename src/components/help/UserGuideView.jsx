@@ -271,7 +271,7 @@ export const UserGuideView = ({ initialTour = false }) => {
               <BookOpen size={15} /> User Guide &amp; Help
             </div>
             <h1 className="mt-1 text-2xl font-bold text-slate-900">How to Use Kevalon CRM</h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-600">Role-specific instructions for the sidebar sections and workflows available to your account.</p>
+            {/* <p className="mt-1 max-w-2xl text-sm text-slate-600">Role-specific instructions for the sidebar sections and workflows available to your account.</p> */}
           </div>
           <button type="button" onClick={startTour} className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white" style={{ background: 'linear-gradient(106.46deg, #034665 -20.74%, #068DCB 92.5%)' }}>
             <Play size={16} /> Start Interactive Tour

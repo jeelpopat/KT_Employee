@@ -657,9 +657,9 @@ export default function Holidays() {
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               Holiday Calendar
             </h1>
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
+            {/* <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
               Manage official holiday schedules and company closure dates
-            </p>
+            </p> */}
           </div>
         </div>
 

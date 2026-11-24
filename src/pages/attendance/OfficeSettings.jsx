@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Building2, Clock, MapPin, Shield, Save, CheckCircle2, 
   AlertCircle, Wifi, Compass, Calendar, RotateCcw
 } from "lucide-react";
+import api from "../../api/axios";
 import { GEOFENCE_RADIUS_METERS, TARGET_LAT, TARGET_LNG } from "../../services/attendanceService";
 
 export default function OfficeSettings() {
@@ -51,7 +52,15 @@ export default function OfficeSettings() {
     setFeedback({ type: "", message: "" });
 
     try {
+      // 1. Persist to localStorage
       localStorage.setItem("kt_office_settings", JSON.stringify(settings));
+
+      // 2. Attempt backend persistence
+      try {
+        await api.post("/api/office/settings", settings);
+      } catch (apiErr) {
+        console.warn("Backend office settings endpoint notice (stored locally):", apiErr.message);
+      }
 
       setFeedback({ type: "success", message: "Office attendance settings updated successfully!" });
       setTimeout(() => setFeedback({ type: "", message: "" }), 4000);

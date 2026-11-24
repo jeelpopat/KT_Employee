@@ -282,7 +282,7 @@ export default function AuditLogs() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Audit Logs</h1>
-            <p className="text-xs text-slate-500 sm:text-sm">Review sensitive changes and who made them.</p>
+            {/* <p className="text-xs text-slate-500 sm:text-sm">Review sensitive changes and who made them.</p> */}
           </div>
         </div>
         <button

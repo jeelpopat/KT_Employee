@@ -9,7 +9,6 @@ import {
   TARGET_LNG,
   GEOFENCE_RADIUS_METERS,
   AUTO_CHECKOUT_RADIUS_METERS,
-  roundCoordinate,
   calculateDistanceInMeters,
   isBeyondAutoCheckoutRadius,
   getAttendanceErrorMessage
@@ -1423,8 +1422,8 @@ export const AppProvider = ({ children }) => {
                 await api.post('/api/attendance/check-out', {
                   userId: actualUserId,
                   userType: effRole,
-                  latitude: roundCoordinate(latitude),
-                  longitude: roundCoordinate(longitude),
+                  latitude: Number(latitude),
+                  longitude: Number(longitude),
                   checkoutType: 'OUTSIDE_GEOFENCE',
                   remarks: 'Auto Checkout: Outside 80m office radius'
                 });

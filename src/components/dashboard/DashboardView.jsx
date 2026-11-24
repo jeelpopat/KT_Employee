@@ -9,14 +9,12 @@ import { useApp, resolveEmployeeName, fetchLiveUserProfile } from '../../context
 import api, { BASE_URL } from '../../api/axios.js';
 import { showToast } from '../common/Toast.jsx';
 import {
-  calculateDistanceInMeters,
-  getAccuracyAdjustedDistanceInMeters,
+  BREAK_END_GEOFENCE_RADIUS_METERS,
   GEOFENCE_RADIUS_METERS,
-  getGPSLocation,
-  isWithinOfficeRadius,
-  roundCoordinate,
   TARGET_LAT,
-  TARGET_LNG
+  TARGET_LNG,
+  getGPSLocation,
+  isWithinOfficeRadius
 } from '../../services/attendanceService.js';
 import {
   computeNineHourTimeline,
@@ -207,6 +205,18 @@ const getTopLevelBreak = (record) => ({
   startTime: record?.breakStart || record?.breakStartTime || record?.breakInTime || record?.breakIn || null,
   endTime: record?.breakEnd || record?.breakEndTime || record?.breakOutTime || record?.breakOut || null
 });
+
+const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
+  const R = 6371000; // Earth radius in meters
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in meters
+};
 
 export const DashboardView = ({ attendanceOnly = false } = {}) => {
   const { user, userRole, setAttendanceStatus: setGlobalAttendanceStatus } = useApp();
@@ -1535,29 +1545,23 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
     try {
       const { latitude, longitude, accuracy } = await getGPSLocation();
+      const geofenceRadiusMeters = actionType === 'break_end'
+        ? BREAK_END_GEOFENCE_RADIUS_METERS
+        : GEOFENCE_RADIUS_METERS;
       const distanceMeters = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
-      const accuracyAdjustedDistance = getAccuracyAdjustedDistanceInMeters(distanceMeters, accuracy);
-      const requiresOfficeProximity = (
-        actionType === 'break_start' || actionType === 'break_end'
-      );
 
       try {
         localStorage.setItem('kt_last_gps_accuracy', String(accuracy || 0));
       } catch (e) {}
 
-      console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | Accuracy-adjusted Distance: ${accuracyAdjustedDistance?.toFixed(1) ?? 'unavailable'}m | Allowed Radius: ${GEOFENCE_RADIUS_METERS.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
-
-      if (requiresOfficeProximity && accuracyAdjustedDistance === null) {
-        setGeoError('GPS accuracy is too low. Move to an open area and try again.');
-        return;
-      }
+      console.log(`[GEOFENCE LOCATION] Action: ${actionType} | Current: (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) | Office: (${TARGET_LAT}, ${TARGET_LNG}) | Distance: ${distanceMeters.toFixed(1)}m | Allowed Radius: ${geofenceRadiusMeters.toFixed(1)}m | AutoCheckout Threshold: ${AUTO_CHECKOUT_RADIUS_METERS.toFixed(1)}m | Accuracy: ${(accuracy || 0).toFixed(1)}m`);
 
       if (
-        requiresOfficeProximity &&
-        !isWithinOfficeRadius(accuracyAdjustedDistance)
+        (actionType === 'check_in' || actionType === 'break_start' || actionType === 'break_end') &&
+        !isWithinOfficeRadius(distanceMeters)
       ) {
         const message = actionType === 'break_end'
-          ? `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return within ${GEOFENCE_RADIUS_METERS} meters of the office to resume work.`
+          ? `Office Location Error: You are ${Math.round(distanceMeters)}m away. Please return within ${BREAK_END_GEOFENCE_RADIUS_METERS} meters of the office to resume work.`
           : `Office Location Error: You are ${Math.round(distanceMeters)}m away. ${actionType === 'break_start' ? 'Starting a break' : 'Check-in'} is allowed only within ${GEOFENCE_RADIUS_METERS} meters of the office.`;
         setGeoError(message);
         return;
@@ -1630,8 +1634,8 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
     const liveLocationPayload = {
       ...standardFields,
-      latitude: roundCoordinate(basePayload.latitude),
-      longitude: roundCoordinate(basePayload.longitude),
+      latitude: Number(basePayload.latitude),
+      longitude: Number(basePayload.longitude),
       userType: effectiveUserType,
       userId: realUserId || undefined
     };
@@ -1967,11 +1971,11 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
   // --- Strict Mapped Action Payloads (matching attendanceService protocol) ---
   const onCheckInClick = () => {
     if (!actionsAvailable.canCheckIn) return;
-    verifyLocationAndExecute(async (lat, lng, accuracy) => {
+    verifyLocationAndExecute(async (lat, lng) => {
       const payload = {
         latitude: Number(lat),
         longitude: Number(lng),
-        accuracy,
+        accuracy: 10,
         officeStartTime: "10:00",
         presentHours: 8
       };

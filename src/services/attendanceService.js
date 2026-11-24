@@ -1,7 +1,5 @@
 import api from '../api/axios.js';
 
-export const MAX_GEOFENCE_GPS_ACCURACY_METERS = 35;
-
 export const getGPSLocation = () => new Promise((resolve, reject) => {
   if (!window.isSecureContext && window.location.hostname !== 'localhost') {
     reject(new Error('GPS requires HTTPS on this device. Open the app using an HTTPS URL or localhost.'));
@@ -91,34 +89,11 @@ export const GEOFENCE_RADIUS_METERS = 20;
 export const BREAK_END_GEOFENCE_RADIUS_METERS = GEOFENCE_RADIUS_METERS;
 export const AUTO_CHECKOUT_RADIUS_METERS = 80;
 
-export const roundCoordinate = (coordinate) => {
-  const value = Number(coordinate);
-  if (!Number.isFinite(value)) {
-    throw new Error('A valid GPS coordinate is required.');
-  }
-  return Number(value.toFixed(5));
-};
-
-export const isWithinOfficeRadius = (distanceMeters, radiusMeters = GEOFENCE_RADIUS_METERS) => (
+export const isWithinOfficeRadius = (distanceMeters) => (
   Number.isFinite(distanceMeters) &&
   distanceMeters >= 0 &&
-  Number.isFinite(radiusMeters) &&
-  radiusMeters > 0 &&
-  distanceMeters <= radiusMeters
+  distanceMeters <= GEOFENCE_RADIUS_METERS
 );
-
-export const getAccuracyAdjustedDistanceInMeters = (distanceMeters, accuracyMeters) => {
-  if (
-    !Number.isFinite(distanceMeters) ||
-    distanceMeters < 0 ||
-    !Number.isFinite(accuracyMeters) ||
-    accuracyMeters < 0 ||
-    accuracyMeters > MAX_GEOFENCE_GPS_ACCURACY_METERS
-  ) {
-    return null;
-  }
-  return Math.max(0, distanceMeters - accuracyMeters);
-};
 
 export const isBeyondAutoCheckoutRadius = (distanceMeters, accuracyMeters) => (
   Number.isFinite(distanceMeters) &&
@@ -153,32 +128,20 @@ const attendanceRequest = (method, url, location) => {
     const latitude = Number(location?.latitude);
     const longitude = Number(location?.longitude);
     if (!hasLocation || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      throw new Error('A fresh device location is required for this attendance action.');
+      return Promise.reject(new Error('A fresh device location is required for this attendance action.'));
     }
 
-    if (!isCheckIn) {
-      const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
-      const accuracy = Number(location.accuracy);
-      const adjustedDistance = Number.isFinite(accuracy)
-        ? getAccuracyAdjustedDistanceInMeters(dist, accuracy)
-        : dist;
-      if (adjustedDistance === null) {
-        throw new Error('GPS accuracy is too low. Move to an open area and try again.');
-      }
-      if (!isWithinOfficeRadius(adjustedDistance)) {
-        const actionName = isBreakStart ? 'Starting a break' : 'Resuming work';
-        throw new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`);
-      }
+    const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
+    if (!isWithinOfficeRadius(dist)) {
+      const actionName = isCheckIn ? 'Check-in' : isBreakStart ? 'Starting a break' : 'Resuming work';
+      return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`));
     }
   }
 
   return api({
     method,
     url,
-    data: {
-      latitude: roundCoordinate(location.latitude),
-      longitude: roundCoordinate(location.longitude)
-    }
+    data: { latitude: Number(location.latitude), longitude: Number(location.longitude) }
   });
 };
 
