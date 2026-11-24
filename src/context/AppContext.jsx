@@ -1230,9 +1230,9 @@ export const AppProvider = ({ children }) => {
     setNotifications(prev => [newNotif, ...prev]);
   };
 
-  // --- App-Wide Background Geofence Auto-Checkout Monitor (80m Perimeter) ---
+  // --- App-Wide Background Geofence Auto-Checkout Monitor (100m Perimeter) ---
   // Specification parameters:
-  // - Trigger Radius: 80 meters
+  // - Trigger Radius: 100 meters
   // - Accuracy limit: <= 35m (filter indoor GPS drift)
   // - Consecutive fixes: 5 consecutive fixes outside
   // - Exit duration: Minimum 45 seconds outside
@@ -1308,7 +1308,7 @@ export const AppProvider = ({ children }) => {
         return;
       }
 
-      // 3. Only active workers (checked_in) are subject to 80m perimeter enforcement
+      // 3. Only active workers (checked_in) are subject to 100m perimeter enforcement
       const isAlreadyCheckedOut = (
         localStorage.getItem('kt_checked_out_' + todayStr) === 'true' ||
         localStorage.getItem('kt_checked_out_' + todayLocalStr) === 'true'
@@ -1408,7 +1408,7 @@ export const AppProvider = ({ children }) => {
             }
             const breachDurationSec = Math.floor((checkedAt - firstGeofenceBreachTimeRef.current) / 1000);
 
-            console.warn(`[GEOFENCE ALERT] AppContext | Out of 80m office perimeter: ${dist.toFixed(1)}m (Breach ${consecutiveGeofenceBreachesRef.current}/5, duration: ${breachDurationSec}s/45s)`);
+            console.warn(`[GEOFENCE ALERT] AppContext | Out of 100m office perimeter: ${dist.toFixed(1)}m (Breach ${consecutiveGeofenceBreachesRef.current}/5, duration: ${breachDurationSec}s/45s)`);
 
             // Verify with 5 consecutive checks AND minimum 45 seconds duration
             if (consecutiveGeofenceBreachesRef.current >= 5 && (checkedAt - firstGeofenceBreachTimeRef.current >= 45000)) {
@@ -1424,7 +1424,7 @@ export const AppProvider = ({ children }) => {
                   latitude: Number(latitude),
                   longitude: Number(longitude),
                   checkoutType: 'OUTSIDE_GEOFENCE',
-                  remarks: 'Auto Checkout: Outside 80m office radius'
+                  remarks: 'Auto Checkout: Outside 100m office radius'
                 });
 
                 localStorage.setItem('kt_checked_out_' + todayStr, 'true');
@@ -1438,7 +1438,7 @@ export const AppProvider = ({ children }) => {
                 localStorage.removeItem('kt_on_break_' + todayLocalStr);
 
                 handleCheckOut();
-                showToast(`Auto-Checkout: You moved outside the 80m office perimeter (${Math.round(dist)}m away).`, 'warning');
+                showToast(`Auto-Checkout: You moved outside the 100m office perimeter (${Math.round(dist)}m away).`, 'warning');
                 window.dispatchEvent(new CustomEvent('kt_auto_checkout_triggered', {
                   detail: { latitude, longitude, distance: dist, timestamp: nowIso }
                 }));

@@ -28,7 +28,8 @@ assert.equal(isWithinOfficeRadius(recentDeviceGpsDistance), true);
 assert.equal(isBeyondAutoCheckoutRadius(50, 10), false);
 assert.equal(isBeyondAutoCheckoutRadius(100, 35), false);
 assert.equal(isBeyondAutoCheckoutRadius(115, 35), false);
-assert.equal(isBeyondAutoCheckoutRadius(116, 35), true);
+assert.equal(isBeyondAutoCheckoutRadius(135, 35), false);
+assert.equal(isBeyondAutoCheckoutRadius(136, 35), true);
 assert.equal(isBeyondAutoCheckoutRadius(116, Number.NaN), false);
 
 console.log('Office geofence and auto-checkout accuracy checks passed.');

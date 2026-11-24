@@ -165,7 +165,7 @@ const getAttendanceClassification = (...values) => {
 };
 
 // --- Geofencing Configuration (backend office center: 20m radius) ---
-const AUTO_CHECKOUT_RADIUS_METERS = 80; // Auto-Checkout Trigger Radius: 80 meters
+const AUTO_CHECKOUT_RADIUS_METERS = 100; // Auto-Checkout Trigger Radius: 100 meters
 
 const getUniqueBreaks = (breaks) => {
   const uniqueBreaks = [];

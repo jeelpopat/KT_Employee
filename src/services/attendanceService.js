@@ -88,7 +88,7 @@ export const TARGET_LAT = 23.057808;
 export const TARGET_LNG = 72.538926;
 export const GEOFENCE_RADIUS_METERS = 20;
 export const BREAK_END_GEOFENCE_RADIUS_METERS = GEOFENCE_RADIUS_METERS;
-export const AUTO_CHECKOUT_RADIUS_METERS = 80;
+export const AUTO_CHECKOUT_RADIUS_METERS = 100;
 
 export const isWithinOfficeRadius = (distanceMeters) => (
   Number.isFinite(distanceMeters) &&
