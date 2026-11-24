@@ -1801,6 +1801,7 @@ export default function LeaveRequest() {
           <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
             Leave Requests
           </h1>
+          
           {/* <p className="text-xs sm:text-[13px] text-slate-500 font-normal font-poppins mt-0.5">
             Review And Manage Leave Applications
           </p> */}

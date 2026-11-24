@@ -8,6 +8,7 @@ import {
   isWithinOfficeRadius
 } from '../src/services/attendanceService.js';
 
+
 assert.equal(TARGET_LAT, 23.057808);
 assert.equal(TARGET_LNG, 72.538926);
 assert.equal(GEOFENCE_RADIUS_METERS, 20);

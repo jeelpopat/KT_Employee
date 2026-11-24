@@ -377,6 +377,7 @@ export const DeductionMasterView = () => {
             </span>
             Deduction Master Catalog
           </h1>
+          
           {/* <p className="text-xs text-slate-500 mt-1">
             Configure standardized deduction categories, calculation rules, statutory legal permissibility, and default amounts.
           </p> */}

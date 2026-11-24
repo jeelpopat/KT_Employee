@@ -184,7 +184,6 @@ export const deriveUserRole = (u) => {
   ) {
     return 'employee';
   }
-
   // 4. Check for Admin (strictly verified by Admin email OR explicit Admin role string - NEVER loose isAdmin flag)
   if (
     emailStr === 'harsh@kevalontechnology.in' ||

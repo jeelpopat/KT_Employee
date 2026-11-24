@@ -270,6 +270,7 @@ export const UserGuideView = ({ initialTour = false }) => {
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#0877a9]">
               <BookOpen size={15} /> User Guide &amp; Help
             </div>
+            
             <h1 className="mt-1 text-2xl font-bold text-slate-900">How to Use Kevalon CRM</h1>
             {/* <p className="mt-1 max-w-2xl text-sm text-slate-600">Role-specific instructions for the sidebar sections and workflows available to your account.</p> */}
           </div>

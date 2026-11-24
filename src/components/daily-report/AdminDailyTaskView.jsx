@@ -182,6 +182,7 @@ export const AdminDailyTaskView = () => {
             Review daily work updates submitted by employees in your company.
           </p> */}
         </div>
+        
         <button
           type="button"
           onClick={fetchReports}

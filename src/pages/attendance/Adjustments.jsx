@@ -2230,6 +2230,7 @@ export default function Adjustments() {
           <h1 className="text-2xl sm:text-[30px] font-bold text-[#0f172a] tracking-tight leading-tight font-poppins">
             Adjustments
           </h1>
+          
           {/* <p className="mt-1 text-xs sm:text-[13px] text-[#64748b] font-poppins">
             Apply Direct Attendance Adjustments And Configure Rules
           </p> */}

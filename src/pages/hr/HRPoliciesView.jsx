@@ -92,6 +92,7 @@ export default function HRPoliciesView({ audience = 'hr' }) {
                   ? 'Team Lead Policy Library'
                   : 'HR Policy Library'}
             </h1>
+            
             <p className="mt-2 text-sm leading-6 text-cyan-50/90">
               {isEmployeeView
                 ? 'Browse shared company and employee policies by topic or search by title, description, or policy number.'

@@ -1561,6 +1561,7 @@ export default function CheckInRequest() {
                 </span>
               )}
             </div>
+            
             <p className="text-xs text-slate-500 font-normal font-poppins mt-0.5">
               {isTeamLead
                 ? "Review and manage attendance punch-in requests for your assigned team members"

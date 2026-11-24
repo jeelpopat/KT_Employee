@@ -21,6 +21,7 @@ export const getGPSLocation = () => new Promise((resolve, reject) => {
     if (watchId !== null) {
       try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
     }
+    
     try {
       localStorage.setItem('kt_last_gps_lat', String(coords.latitude));
       localStorage.setItem('kt_last_gps_lng', String(coords.longitude));
