@@ -1147,9 +1147,6 @@ export default function AttendanceLogs() {
 
   const [showExportOptions, setShowExportOptions] =
     useState(false);
-  const [showPolicyModal, setShowPolicyModal] =
-    useState(false);
-
   const [exportingMonth, setExportingMonth] =
     useState(false);
 
@@ -2684,9 +2681,9 @@ export default function AttendanceLogs() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap font-poppins">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap font-poppins">
           {/* DATE NAVIGATION CONTROLS (FOR DAILY & PAST DATE CHECK) */}
-          <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-lg border border-slate-300/80 shadow-2xs">
+          <div className="flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             {/* Previous Day */}
             <button
               type="button"
@@ -2765,74 +2762,47 @@ export default function AttendanceLogs() {
             </button>
           </div>
 
-          {/* TOTAL COUNT */}
-          <div className="h-9 bg-white border border-slate-300 rounded-md px-3 shadow-2xs flex items-center gap-1.5 font-poppins">
-            <Users size={14} className="text-slate-600" />
-            <span className="text-xs font-semibold text-slate-800">{logs.length}</span>
-          </div>
+          <div className="hidden sm:block h-8 w-px bg-slate-300" aria-hidden="true" />
 
-          {/* SYNC / REFRESH */}
-          <button
-            type="button"
-            onClick={() => fetchLogs()}
-            disabled={loading}
-            title="Refresh attendance records"
-            className="h-9 w-9 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer font-poppins"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin text-[#0088cc]' : 'text-slate-600'} />
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* TOTAL COUNT */}
+            <div className="h-9 bg-white border border-slate-300 rounded-md px-3 shadow-2xs flex items-center gap-1.5 font-poppins">
+              <Users size={14} className="text-slate-600" />
+              <span className="text-xs font-semibold text-slate-800">{logs.length}</span>
+            </div>
 
-          {/* LEAVE & ABSENCE POLICY */}
-          <button
-            type="button"
-            onClick={() => setShowPolicyModal(true)}
-            title="View HRMS Unpaid Leave & Absence Policy"
-            className="h-9 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer font-poppins"
-          >
-            <FileText size={14} className="text-[#034665]" />
-            <span className="hidden sm:inline">Leave Policy</span>
-          </button>
-
-          {/* DAILY FINALIZATION QUICK TRIGGER */}
-          {canManageFinalization && (
+            {/* SYNC / REFRESH */}
             <button
               type="button"
-              onClick={() => {
-                setViewMode('scheduler');
-                fetchSchedulerLogs(1);
-                fetchFinalizePreview(finalizeTargetDate || selectedDate || getTodayLocal());
-              }}
-              title="Daily Attendance Finalization & 4:00 PM IST Scheduler"
-              className="h-9 px-3 bg-white border border-[#034665]/30 hover:bg-sky-50 text-[#034665] rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer font-poppins"
+              onClick={() => fetchLogs()}
+              disabled={loading}
+              title="Refresh attendance records"
+              className="h-9 w-9 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer font-poppins"
             >
-              <ShieldCheck size={15} className="text-[#034665]" />
-              <span className="hidden md:inline">Daily Finalization</span>
-              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-emerald-100 text-emerald-800">
-                16:00 IST
-              </span>
+              <RefreshCw size={13} className={loading ? 'animate-spin text-[#0088cc]' : 'text-slate-600'} />
             </button>
-          )}
 
-          {/* EXPORT EXCEL */}
-          <button
-            type="button"
-            onClick={() => setShowExportOptions(true)}
-            className="h-9 px-3.5 text-white rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer font-poppins"
-            style={{ background: '#034665' }}
-          >
-            <FileSpreadsheet size={15} />
-            <span>Export Excel</span>
-          </button>
+            {/* EXPORT EXCEL */}
+            <button
+              type="button"
+              onClick={() => setShowExportOptions(true)}
+              className="h-9 px-3.5 text-white rounded-md shadow-2xs flex items-center gap-1.5 text-xs font-medium transition-all cursor-pointer font-poppins"
+              style={{ background: '#034665' }}
+            >
+              <FileSpreadsheet size={15} />
+              <span>Export Excel</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* VIEW MODE TABS: DAILY LOGS vs HISTORICAL LOG EXPLORER (OLD LOGS) */}
-      <div className="flex items-center justify-between border-b border-slate-200 gap-2">
-        <div className="flex items-center gap-2">
+      <div className="border-b border-slate-200">
+        <div className="flex w-full flex-nowrap items-center gap-3 overflow-x-auto whitespace-nowrap pb-px sm:gap-4">
           <button
             type="button"
             onClick={() => setViewMode('daily')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex min-w-[220px] flex-1 items-center justify-center gap-2 px-3 py-2.5 text-xs lg:min-w-0 sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
               viewMode === 'daily'
                 ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2840,9 +2810,6 @@ export default function AttendanceLogs() {
           >
             <CalendarDays size={16} />
             <span>Daily Attendance Logs</span>
-            <span className="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-700 font-bold">
-              {formatIndianDate(selectedDate)}
-            </span>
           </button>
 
           <button
@@ -2853,7 +2820,7 @@ export default function AttendanceLogs() {
                 fetchHistoryRangeLogs();
               }
             }}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`flex min-w-[220px] flex-1 items-center justify-center gap-2 px-3 py-2.5 text-xs lg:min-w-0 sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
               viewMode === 'history'
                 ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2861,9 +2828,6 @@ export default function AttendanceLogs() {
           >
             <History size={16} />
             <span>Historical Log Explorer (Old Logs)</span>
-            <span className="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 font-bold">
-              Multi-Date Range
-            </span>
           </button>
 
           {canManageFinalization && (
@@ -2878,7 +2842,7 @@ export default function AttendanceLogs() {
                   fetchFinalizePreview(finalizeTargetDate || selectedDate || getTodayLocal());
                 }
               }}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+              className={`flex min-w-[220px] flex-1 items-center justify-center gap-2 px-3 py-2.5 text-xs lg:min-w-0 sm:px-4 sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
                 viewMode === 'scheduler'
                   ? 'border-[#034665] text-[#034665] bg-sky-50/60 rounded-t-lg'
                   : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2916,94 +2880,6 @@ export default function AttendanceLogs() {
             <CheckCircle2 size={13} />
             <span>Return to Today ({formatIndianDate(getTodayLocal())})</span>
           </button>
-        </div>
-      )}
-
-      {/* POLICY MODAL */}
-      {showPolicyModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 font-poppins"
-          role="presentation"
-          onClick={() => setShowPolicyModal(false)}
-        >
-          <div
-            className="w-full max-w-lg bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden font-poppins"
-            role="dialog"
-            aria-modal="true"
-            aria-label="HRMS Leave & Absence Policy"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <FileText size={17} className="text-[#034665]" />
-                <h3 className="text-sm font-bold text-slate-900">
-                  HRMS Leave & Absence Policy
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPolicyModal(false)}
-                className="p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 rounded-lg cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 text-xs">
-              <p className="text-slate-600 leading-relaxed">
-                Attendance and leave deductions conform to the revised Kevalon Technology HRMS standards:
-              </p>
-
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="py-2.5 px-3">Scenario</th>
-                      <th className="py-2.5 px-3">Actual Unpaid Leave</th>
-                      <th className="py-2.5 px-3">Proposed Disciplinary Penalty</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    <tr>
-                      <td className="py-2 px-3 font-semibold text-slate-900">Approved Full Day</td>
-                      <td className="py-2 px-3 font-mono font-bold text-slate-800">1 day</td>
-                      <td className="py-2 px-3 text-emerald-600 font-medium">— (Authorized)</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-semibold text-slate-900">Approved Half Day</td>
-                      <td className="py-2 px-3 font-mono font-bold text-slate-800">0.5 day</td>
-                      <td className="py-2 px-3 text-emerald-600 font-medium">— (Authorized)</td>
-                    </tr>
-                    <tr className="bg-amber-50/50">
-                      <td className="py-2 px-3 font-semibold text-slate-900">Unauthorized Full Day</td>
-                      <td className="py-2 px-3 font-mono font-bold text-slate-800">1 day</td>
-                      <td className="py-2 px-3 text-amber-700 font-medium">+0.5 day (Proposed separately)</td>
-                    </tr>
-                    <tr className="bg-amber-50/50">
-                      <td className="py-2 px-3 font-semibold text-slate-900">Unauthorized Half Day</td>
-                      <td className="py-2 px-3 font-mono font-bold text-slate-800">0.5 day</td>
-                      <td className="py-2 px-3 text-amber-700 font-medium">+0.5 day (Proposed separately)</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-[11px] text-slate-600 space-y-1.5">
-                <p>• <strong>Authorized Unpaid Leave:</strong> Final HR approval represents Authorized Unpaid Leave (LOP deduction applies, no disciplinary penalty).</p>
-                <p>• <strong>Unauthorized Absence:</strong> The proposed additional 0.5-day-equivalent penalty is tracked separately. Only a legally permissible, authorized penalty may affect net salary.</p>
-              </div>
-            </div>
-
-            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowPolicyModal(false)}
-                className="px-4 py-2 bg-[#034665] text-white text-xs font-semibold rounded-md shadow-xs cursor-pointer hover:bg-[#02334a]"
-              >
-                Close Policy
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

@@ -621,16 +621,16 @@ export const ProjectView = () => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shadow-xs">
+          {/* <div className="p-2 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shadow-xs">
             <FolderKanban size={20} />
-          </div>
+          </div> */}
           <div>
-            <h2 className="text-base font-semibold text-slate-900 tracking-tight">Projects & Teams</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">Projects & Teams</h2>
+            {/* <p className="text-xs text-slate-400">
               Active projects, assigned team members, deliverables, and progress tracking
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -658,17 +658,31 @@ export const ProjectView = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
         {[
-          { label: 'Total Projects', value: totalProjects, accent: 'border-l-indigo-600' },
-          { label: 'Active Projects', value: activeProjects, accent: 'border-l-amber-500' },
-          { label: 'Completed', value: completedProjects, accent: 'border-l-emerald-500' },
-          { label: 'Assigned Members', value: totalUniqueAssignedMembers, accent: 'border-l-purple-500' }
+          { label: 'Total Projects', value: totalProjects },
+          { label: 'Active Projects', value: activeProjects },
+          { label: 'Completed', value: completedProjects },
+          { label: 'Assigned Members', value: totalUniqueAssignedMembers }
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
-            <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900">
+          <div
+            key={idx}
+            className="relative flex items-center h-[60px] w-full"
+          >
+            {/* Left card for the border */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+              style={{ background: "#034665", opacity: 1 }}
+            />
+            {/* Inner card */}
+            <div
+              className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+              style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+            >
+              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none truncate mr-1">
+                {item.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2 shrink-0">
                 {isLoading ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
               </p>
             </div>

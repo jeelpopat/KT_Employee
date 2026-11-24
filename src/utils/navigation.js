@@ -5,6 +5,9 @@ export const pathToTab = {
   '/admin': 'admin-dashboard',
   '/admin/dashboard': 'admin-dashboard',
   '/performance': 'performance',
+  '/hr/policies': 'hr-policies',
+  '/employee/policies': 'employee-policies',
+  '/team-leader/policies': 'team-lead-policies',
   '/attendance/attendance-logs': 'admin-attendance-logs',
   '/attendance/check-in-request': 'admin-checkin-requests',
   '/team-checkin-requests': 'team-checkin-requests',
@@ -50,6 +53,7 @@ export const pathToTab = {
   '/deduction-reports': 'deduction-reports',
   '/team-deductions': 'team-deductions',
   '/my-deductions': 'my-deductions',
+  '/user-guide': 'user-guide',
 };
 
 export const tabToPath = {
@@ -57,6 +61,9 @@ export const tabToPath = {
   'dashboard': '/dashboard',
   'admin-performance': '/performance',
   'performance': '/performance',
+  'hr-policies': '/hr/policies',
+  'employee-policies': '/employee/policies',
+  'team-lead-policies': '/team-leader/policies',
   'admin-attendance-logs': '/attendance/attendance-logs',
   'admin-checkin-requests': '/attendance/check-in-request',
   'team-checkin-requests': '/attendance/check-in-request',
@@ -100,4 +107,5 @@ export const tabToPath = {
   'deduction-reports': '/deduction-reports',
   'team-deductions': '/team-deductions',
   'my-deductions': '/my-deductions',
+  'user-guide': '/user-guide',
 };

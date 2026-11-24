@@ -8,7 +8,7 @@ import api from '../../api/axios.js';
 import { useApp, deriveUserRole } from '../../context/AppContext.jsx';
 import { isEmployeeRole, fetchEmployeeTeamLead } from '../../utils/teamLeadUtils.js';
 import { calculateLeaveDays, expandHolidayDates } from '../../utils/holidayUtils.js';
-import { getHalfDayType, isHalfDayLeave, normalizeHalfDayType } from '../../utils/leaveUtils.js';
+import { getHalfDayType, hasActiveLeaveDateOverlap, isHalfDayLeave, normalizeHalfDayType } from '../../utils/leaveUtils.js';
 import { LeaveDatePicker } from '../common/LeaveDatePicker.jsx';
 import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
@@ -513,6 +513,11 @@ export const LeaveManagementView = () => {
       return;
     }
 
+    if (hasActiveLeaveDateOverlap(leaveRequests, startDate, finalEndDate)) {
+      setFormError('You have already applied for or been approved for leave on this date.');
+      return;
+    }
+
     if (!holidaysLoaded) {
       setFormError(holidayLoadError || 'Company holiday dates are still loading. Please try again.');
       return;
@@ -713,8 +718,8 @@ export const LeaveManagementView = () => {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Leave Management</h2>
-              <p className="text-xs sm:text-sm text-slate-500">Apply for leave, track requests, and check quotas</p>
+              <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">Leave Management</h2>
+              {/* <p className="text-xs sm:text-sm text-slate-500">Apply for leave, track requests, and check quotas</p> */}
             </div>
               
             <div className="flex items-center justify-end gap-2">
@@ -738,30 +743,6 @@ export const LeaveManagementView = () => {
                 {hasNoAssignedTL ? 'Apply Blocked (No TL)' : 'Apply Leave'}
               </button>
             </div>
-          </div>
-
-          {/* HRMS Leave & Absence Policy Table Banner */}
-          <div className="p-3.5 rounded-xl border border-blue-200/90 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-start sm:items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700 shrink-0">
-                <FileText size={16} />
-              </div>
-              <div>
-                <p className="font-bold text-slate-900">
-                  Kevalon HRMS Policy: Unpaid Leave & Absence Standard
-                </p>
-                <p className="text-slate-600 text-[11px] mt-0.5">
-                  Approved Full Day = 1d Unpaid • Approved Half Day = 0.5d Unpaid • Unauthorized = Unpaid + Proposed 0.5d Penalty (tracked separately). Final HR approval represents <strong>Authorized Unpaid Leave</strong>.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsPolicyModalOpen(true)}
-              className="text-indigo-600 hover:text-indigo-800 font-semibold underline text-xs shrink-0 cursor-pointer self-start sm:self-auto"
-            >
-              View Full Policy Table
-            </button>
           </div>
 
           {/* Warning if employee has no assigned TL */}

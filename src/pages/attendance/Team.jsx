@@ -2478,12 +2478,13 @@ const [projectTeamMembers, setProjectTeamMembers] = useState({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
+          
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Task Management
           </h1>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500">
+          {/* <p className="mt-1 text-xs sm:text-sm text-slate-500">
             Organize projects, assign tasks to members and track daily progress
-          </p>
+          </p> */}
         </div>
 
         {activeMainTab === 'projects' && (

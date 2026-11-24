@@ -1,5 +1,4 @@
 import axios from "axios";
-import { stopScreenCapture } from "../services/monitoringService.js";
 import { BASE_URL } from "../api/config.js";
 
 export const SCREEN_CAPTURE_ENABLED_SESSION_KEY = "kt_screen_capture_enabled";
@@ -53,75 +52,6 @@ export const clearAuth = () => {
     console.warn("Could not clear screen capture session state:", error);
   }
   localStorage.clear();
-};
-
-/**
- * Performs auto checkout if user is currently checked in.
- * Calls backend API /api/attendance/check-out with coordinates and cleans up local attendance flags.
- */
-export const performAutoCheckout = async (authToken) => {
-  const token = authToken || localStorage.getItem("auth_token") || localStorage.getItem("token");
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayLocalStr = new Date().toLocaleDateString("en-CA");
-
-  const isCheckedIn = (
-    localStorage.getItem("kt_checked_in_" + todayStr) === "true" ||
-    localStorage.getItem("kt_checked_in_" + todayLocalStr) === "true" ||
-    !!localStorage.getItem("kt_active_session_id") ||
-    !!localStorage.getItem("kt_check_in_time")
-  );
-
-  // If user is checked in, send auto-checkout request to backend API
-  if (isCheckedIn && token) {
-    try {
-      const resp = await fetch(`${BASE_URL}/api/attendance/check-out`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          latitude: 23.05829,
-          longitude: 72.53919
-        })
-      });
-      if (!resp.ok) {
-        await fetch(`${BASE_URL}/api/attendance/check-out`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            latitude: 23.057808,
-            longitude: 72.538926
-          })
-        }).catch(() => {});
-      }
-    } catch (err) {
-      console.warn("Auto-checkout API notification failed:", err);
-    }
-  }
-
-  // Stop screen capture if running
-  try {
-    if (typeof stopScreenCapture === "function") {
-      stopScreenCapture();
-    }
-  } catch (e) { }
-
-  // Clear local check-in & active session flags
-  try {
-    localStorage.removeItem("kt_active_session_id");
-    localStorage.removeItem("kt_check_in_time");
-    localStorage.removeItem("kt_monitoring_start_time");
-    localStorage.removeItem("kt_checked_in_" + todayStr);
-    localStorage.removeItem("kt_checked_in_" + todayLocalStr);
-    localStorage.removeItem("kt_on_break_" + todayStr);
-    localStorage.removeItem("kt_on_break_" + todayLocalStr);
-    localStorage.setItem("kt_checked_out_" + todayStr, "true");
-    localStorage.setItem("kt_checked_out_" + todayLocalStr, "true");
-  } catch (e) { }
 };
 
 /**
@@ -300,7 +230,7 @@ export const deriveUserRoleFromData = (u, raw, authToken, fallbackStoredRole) =>
  * - Checks if user exists in DB
  * - Checks if user is ACTIVE (not inactive, not blocked, not terminated)
  * - Checks if user has the SAME ROLE as stored (detects role changes / demotions / promotions)
- * ONLY runs auto-checkout if user is genuinely unavailable (deleted/401/404/inactive) or role mismatch!
+ * Session validation only handles authentication; attendance checkout is controlled by attendance actions.
  */
 export const validateUserSession = async () => {
   const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
@@ -313,8 +243,7 @@ export const validateUserSession = async () => {
 
   // Check specifically for expired JWT exp
   if (isTokenExpired(token)) {
-    console.warn("Session token expired. Triggering auto-checkout.");
-    await performAutoCheckout(token);
+    console.warn("Session token expired. Ending the authenticated session.");
     clearAuth();
     return { isValid: false, shouldLogout: true, reason: "Session expired" };
   }
@@ -338,16 +267,14 @@ export const validateUserSession = async () => {
 
     // 2a. If server returned 401 Unauthorized or 404 Not Found: User is genuinely NOT AVAILABLE
     if (response.status === 401 || response.status === 404) {
-      console.warn(`User session invalid/not found: Server returned ${response.status}. Triggering auto-checkout.`);
-      await performAutoCheckout(token);
+      console.warn(`User session invalid/not found: Server returned ${response.status}. Ending the authenticated session.`);
       clearAuth();
       return { isValid: false, shouldLogout: true, reason: `User not available (${response.status})` };
     }
 
     // 2b. If server returned 403 Forbidden: User account access denied
     if (response.status === 403) {
-      console.warn("User account access forbidden (403). Triggering auto-checkout.");
-      await performAutoCheckout(token);
+      console.warn("User account access forbidden (403). Ending the authenticated session.");
       clearAuth();
       return { isValid: false, shouldLogout: true, reason: "Access forbidden (403)" };
     }
@@ -368,7 +295,6 @@ export const validateUserSession = async () => {
       result = await response.json();
     } catch (parseError) {
       console.warn("Profile validation failed: backend returned an unreadable user record.", parseError);
-      await performAutoCheckout(token);
       clearAuth();
       return { isValid: false, shouldLogout: true, reason: "User record could not be verified" };
     }
@@ -386,8 +312,7 @@ export const validateUserSession = async () => {
       userObj?.employee?.email
     );
     if (!userObj || !hasUserIdentity) {
-      console.warn("Profile validation failed: backend returned no user record. Triggering auto-checkout.");
-      await performAutoCheckout(token);
+      console.warn("Profile validation failed: backend returned no user record. Ending the authenticated session.");
       clearAuth();
       return { isValid: false, shouldLogout: true, reason: "User record not found" };
     }
@@ -409,8 +334,7 @@ export const validateUserSession = async () => {
     );
 
     if (isInactive) {
-      console.warn("User account is inactive or blocked. Triggering auto-checkout and logout.");
-      await performAutoCheckout(token);
+      console.warn("User account is inactive or blocked. Ending the authenticated session.");
       clearAuth();
       return { isValid: false, shouldLogout: true, reason: "User account is inactive or blocked" };
     }
@@ -447,8 +371,7 @@ export const validateUserSession = async () => {
 
     // 4b. Reject unauthorized roles (e.g. account, ca)
     if (liveRole && !isRoleAllowed(liveRole)) {
-      console.warn(`Unauthorized role session detected (${liveRole}). Triggering auto-checkout and logout.`);
-      await performAutoCheckout(token);
+      console.warn(`Unauthorized role session detected (${liveRole}). Ending the authenticated session.`);
       clearAuth();
       return { isValid: false, shouldLogout: true, reason: `Unauthorized role: ${liveRole}` };
     }
@@ -458,8 +381,7 @@ export const validateUserSession = async () => {
       const normStored = normalizeRole(storedRole);
       const normLive = normalizeRole(liveRole);
       if (normStored && normLive && normStored !== normLive) {
-        console.warn(`Role mismatch detected: Stored [${normStored}] !== Live [${normLive}]. Triggering auto-checkout and logout.`);
-        await performAutoCheckout(token);
+        console.warn(`Role mismatch detected: Stored [${normStored}] !== Live [${normLive}]. Ending the authenticated session.`);
         clearAuth();
         return { isValid: false, shouldLogout: true, reason: `Role changed from ${normStored} to ${normLive}` };
       }
@@ -504,11 +426,10 @@ export const checkIsAuthenticated = () => {
 };
 
 /**
- * Triggers auth logout across the application with auto-checkout
+ * Triggers auth logout across the application without changing attendance status.
  */
 export const triggerLogout = async (reason = "Session terminated") => {
   console.warn("Triggering auto-logout:", reason);
-  await performAutoCheckout();
   clearAuth();
   window.dispatchEvent(new Event("auth-logout"));
 };
@@ -535,7 +456,7 @@ let isInterceptorInitialized = false;
 
 /**
  * Sets up global interceptors for both window.fetch and axios
- * to catch 401 Unauthorized responses (Token Expired) and auto-checkout + auto-logout
+ * to catch 401 Unauthorized responses (Token Expired) and auto-logout
  */
 export const setupAuthInterceptor = () => {
   if (isInterceptorInitialized) return;
@@ -554,7 +475,7 @@ export const setupAuthInterceptor = () => {
       
       const requestUrl = args[0];
       if (response.status === 401 && !isAuthEndpoint(requestUrl) && isStoredTokenExpired()) {
-        console.warn("Session token expired (401). Auto-checking out and redirecting to login...");
+        console.warn("Session token expired (401). Redirecting to login...");
         triggerLogout("401 Unauthorized fetch response");
       }
       return response;

@@ -479,9 +479,10 @@ export const DeductionReportsView = () => {
             </span>
             <span>Employee Deduction Analytics &amp; Reports</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl leading-relaxed">
+          
+          {/* <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl leading-relaxed">
             Audit-ready payroll reports, categorized financial liability metrics, and statutory compliance intelligence across all corporate reporting lines.
-          </p>
+          </p> */}
         </div>
 
         {/* Action Buttons */}

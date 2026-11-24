@@ -1151,9 +1151,10 @@ export default function Employees() {
           <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">
             Employees
           </h1>
-          <p className="text-xs sm:text-[13px] text-slate-500 font-normal font-poppins mt-0.5">
+          
+          {/* <p className="text-xs sm:text-[13px] text-slate-500 font-normal font-poppins mt-0.5">
             View and manage company employees, roles, and profiles
-          </p>
+          </p> */}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5 self-start sm:self-auto flex-wrap">

@@ -334,34 +334,48 @@ export const TaskManagementView = () => {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 sm:space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-xs transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shadow-xs">
-            <CheckSquare size={20} />
-          </div>
+          {/* <div className="p-2 bg-indigo-50 border border-indigo-200/60 text-indigo-600 rounded-lg shadow-xs">
+            <CheckSquare size={16} />
+          </div> */}
           <div>
-            <h2 className="text-base font-semibold text-slate-900 tracking-tight">My Tasks</h2>
-            <p className="text-xs text-slate-400">
+            <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins">My Tasks</h1>
+            {/* <p className="text-xs text-slate-400">
               Personal deliverables and tasks assigned directly to you
-            </p>
+            </p> */}
           </div>
         </div>
       </div>
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 sm:gap-4 font-poppins">
         {[
-          { label: 'Total Assigned', value: totalCount, icon: CheckSquare, accent: 'border-l-indigo-600' },
-          { label: 'To Do', value: pendingCount, icon: Clock, accent: 'border-l-slate-400' },
-          { label: 'In Progress', value: inProgressCount, icon: TrendingUp, accent: 'border-l-blue-500' },
-          { label: 'Testing', value: testingCount, icon: AlertCircle, accent: 'border-l-purple-500' },
-          { label: 'Review', value: reviewCount, icon: AlertCircle, accent: 'border-l-indigo-500' },
-          { label: 'Completed', value: completedCount, icon: FileCheck, accent: 'border-l-emerald-500' }
+          { label: 'Total Assigned', value: totalCount },
+          { label: 'To Do', value: pendingCount },
+          { label: 'In Progress', value: inProgressCount },
+          { label: 'Testing', value: testingCount },
+          { label: 'Review', value: reviewCount },
+          { label: 'Completed', value: completedCount }
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white border border-slate-200/80 border-l-4 ${item.accent} rounded-xl p-4 transition-all shadow-xs`}>
-            <div className="flex items-start justify-between">
-              <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mt-1">{item.label}</p>
-              <p className="text-xl font-bold text-slate-900">
+          <div
+            key={idx}
+            className="relative flex items-center h-[60px] w-full"
+          >
+            {/* Left card for the border */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+              style={{ background: "#034665", opacity: 1 }}
+            />
+            {/* Inner card */}
+            <div
+              className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-3 sm:px-4 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+              style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+            >
+              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none truncate mr-1">
+                {item.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2 shrink-0">
                 {isLoading ? <Loader2 size={18} className="animate-spin text-slate-400" /> : item.value}
               </p>
             </div>

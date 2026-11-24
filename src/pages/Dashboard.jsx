@@ -22,8 +22,6 @@ import {
   Calendar,
   Sparkles,
   RefreshCw,
-  FileCheck2,
-  Check,
   Building2,
   FileText,
   Search
@@ -77,6 +75,9 @@ export default function Dashboard() {
   const [leaves, setLeaves] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showAbsentModal, setShowAbsentModal] = useState(false);
+  const [showPresentModal, setShowPresentModal] = useState(false);
+  const [showTeamLeadsModal, setShowTeamLeadsModal] = useState(false);
+  const [teamLeadRecords, setTeamLeadRecords] = useState([]);
   const [absentPage, setAbsentPage] = useState(1);
   const [absentSearch, setAbsentSearch] = useState("");
   const [selectedLeave, setSelectedLeave] = useState(null);
@@ -95,9 +96,48 @@ export default function Dashboard() {
   const absentCardRef = useRef(null);
   const [absentPosition, setAbsentPosition] = useState(null);
 
+  useEffect(() => {
+    if (!showTeamLeadsModal) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showTeamLeadsModal]);
+
   const isAutoAbsentTimeReached = () => {
     const now = new Date();
     return now.getHours() > 10 || (now.getHours() === 10 && now.getMinutes() >= 30);
+  };
+
+  const renderPresentEmployeeCard = (record, index) => {
+    const displayName = record.employee?.name || record.employeeName || record.user?.name || record.name || "N/A";
+    const role = record.employee?.role || record.role || record.user?.role || record.employee?.designation?.name || "Team Member";
+
+    return (
+      <div
+        key={record._id || record.id || index}
+        className="bg-slate-50/80 hover:bg-white border border-slate-200/70 hover:border-[#068DCB]/40 rounded-xl p-3 flex flex-col items-center justify-center text-center w-full min-w-0 transition-all hover:-translate-y-0.5 hover:shadow-sm"
+      >
+        <EmployeeAvatar
+          employee={record.employee || record.user || record}
+          alt={`${displayName} profile`}
+          className="h-10 w-10 shadow-xs"
+        />
+        <p className="mt-2 text-xs font-bold text-slate-900 truncate w-full" title={displayName}>
+          {displayName}
+        </p>
+        <p className="text-[10px] text-slate-500 font-medium mt-0.5 truncate w-full">
+          {role}
+        </p>
+        <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+          <span className="w-1 h-1 rounded-full bg-emerald-500" />
+          Present
+        </span>
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -330,9 +370,15 @@ export default function Dashboard() {
             !isUnknownEmployeeOrUser({ ...member, name }) &&
             Boolean(email && email !== "N/A" && email.includes("@"));
         });
-      let finalCount = new Set(teamLeadsFromUsers.map((user) =>
-        normalizeId(user._id || user.id || user.email || user.employeeID || user.employeeId)
-      ).filter(Boolean)).size;
+      let teamLeadList = Array.from(new Map(teamLeadsFromUsers.map((teamLead) => {
+        const employee = findEmployee(teamLead);
+        const member = { ...employee, ...teamLead };
+        const id = normalizeId(teamLead._id || teamLead.id || teamLead.email || teamLead.employeeID || teamLead.employeeId);
+        const name = member.name || member.fullName ||
+          [member.firstName, member.lastName].filter(Boolean).join(" ").trim();
+        return [id, { ...member, id, name }];
+      }).filter(([id]) => Boolean(id))).values());
+      let finalCount = teamLeadList.length;
 
       // If users API had 0 team leads, fallback to teamLead/team
       if (finalCount === 0) {
@@ -343,10 +389,17 @@ export default function Dashboard() {
           const data = await response.json();
           const teamLeads = data.teamLeads || data.data || data.teamlead || data.teams || [];
           const filteredTeamLeads = filterOutFinanceUsers(Array.isArray(teamLeads) ? teamLeads : []);
-          finalCount = filteredTeamLeads.length;
+          teamLeadList = filteredTeamLeads.map((teamLead, index) => {
+            const member = teamLead.employee || teamLead.user || teamLead;
+            const name = teamLead.name || teamLead.fullName || member.name || member.fullName ||
+              [member.firstName, member.lastName].filter(Boolean).join(" ").trim();
+            return { ...member, ...teamLead, id: normalizeId(teamLead._id || teamLead.id || teamLead.email || index), name };
+          });
+          finalCount = teamLeadList.length;
         } catch (err) { }
       }
 
+      setTeamLeadRecords(teamLeadList);
       setDashboardCounts((prev) => ({
         ...prev,
         teamLeadCount: finalCount,
@@ -661,6 +714,10 @@ export default function Dashboard() {
     setShowAbsentModal(true);
   };
 
+  const openTeamLeads = () => {
+    setShowTeamLeadsModal(true);
+  };
+
   const handleLeaveStatusClick = (leaveId, status) => {
     setSelectedLeave(leaveId);
     setSelectedStatus(status);
@@ -813,42 +870,39 @@ export default function Dashboard() {
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/15 backdrop-blur-md text-white border border-white/20 tracking-wide uppercase">
-                    <Sparkles className="w-3 h-3 text-amber-300" />
+                    {/* <Sparkles className="w-3 h-3 text-amber-300" /> */}
                     {userRole === 'hr' ? 'HR Management Portal' : 'Executive Administration'}
-                  </span>
-                  <span className="text-[11px] text-white/75">
-                    • {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                   Welcome back, {user?.name || (userRole === 'hr' ? 'HR Director' : 'Administrator')}
                 </h1>
-                <p className="text-xs sm:text-sm text-cyan-100/90 mt-0.5 max-w-xl">
-                  {userRole === 'hr'
-                    ? 'Oversee workforce attendance, leave approvals, and employee records in real-time.'
-                    : 'System-wide overview of organizational performance, team leads, and live attendance.'}
-                </p>
               </div>
 
-              <div className="flex items-center gap-2.5 self-start md:self-center shrink-0">
-                <button
-                  type="button"
-                  onClick={handleManualRefresh}
-                  disabled={isRefreshing}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-xs font-semibold text-white border border-white/25 backdrop-blur-md transition-all cursor-pointer shadow-xs disabled:opacity-50"
-                  title="Refresh Live Dashboard Data"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/attendance/employees')}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-[#034665] hover:bg-cyan-50 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-md"
-                >
-                  <Users className="w-3.5 h-3.5 text-[#034665]" />
-                  <span>Employees</span>
-                </button>
+              <div className="flex flex-col items-start md:items-end gap-1.5 self-start md:self-center shrink-0">
+                <span className="text-[11px] text-white/75">
+                  {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleManualRefresh}
+                    disabled={isRefreshing}
+                    aria-label={isRefreshing ? 'Refreshing dashboard data' : 'Refresh dashboard data'}
+                    className="inline-flex items-center justify-center p-2.5 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-xs font-semibold text-white border border-white/25 backdrop-blur-md transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                    title="Refresh Live Dashboard Data"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/attendance/employees')}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-[#034665] hover:bg-cyan-50 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-md"
+                  >
+                    <Users className="w-3.5 h-3.5 text-[#034665]" />
+                    <span>Employees</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -869,9 +923,6 @@ export default function Dashboard() {
                   <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">
                     {dashboardCounts.employeeCount}
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                    <span className="text-emerald-600 font-semibold">Active roster</span> in system
-                  </p>
                 </div>
                 <div className="w-11 h-11 rounded-xl bg-[#edf4f8] text-[#034665] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-xs">
                   <Users className="w-5 h-5 text-[#034665]" />
@@ -897,9 +948,6 @@ export default function Dashboard() {
                   <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">
                     {dashboardCounts.projectCount}
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                    <span className="text-cyan-600 font-semibold">Organizational</span> pipelines
-                  </p>
                 </div>
                 <div className="w-11 h-11 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-xs">
                   <FolderKanban className="w-5 h-5 text-cyan-600" />
@@ -913,7 +961,15 @@ export default function Dashboard() {
 
             {/* Total Team Leads */}
             <div
-              onClick={() => navigate('/team-lead')}
+              onClick={openTeamLeads}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  openTeamLeads();
+                }
+              }}
               className="group relative bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-0.5 overflow-hidden"
             >
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -925,9 +981,6 @@ export default function Dashboard() {
                   <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">
                     {dashboardCounts.teamLeadCount}
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                    <span className="text-indigo-600 font-semibold">Supervisors</span> & leads
-                  </p>
                 </div>
                 <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-xs">
                   <Building2 className="w-5 h-5 text-indigo-600" />
@@ -954,9 +1007,6 @@ export default function Dashboard() {
                   <h3 className="text-2xl sm:text-3xl font-extrabold text-rose-600 mt-1 tracking-tight">
                     {absentRecords.length}
                   </h3>
-                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                    Click to inspect list
-                  </p>
                 </div>
                 <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-xs">
                   <UserX className="w-5 h-5 text-rose-600" />
@@ -977,25 +1027,19 @@ export default function Dashboard() {
                   <SquareUser className="w-5 h-5 text-[#034665]" />
                 </div>
                 <div>
-                  <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPresentModal(true)}
+                    aria-haspopup="dialog"
+                    className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 hover:text-[#068DCB] transition-colors"
+                  >
                     Present Today
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Live Attendance
-                    </span>
-                  </h2>
-                  <p className="text-[11px] text-slate-500">
-                    Employees clocked in and actively working today
-                  </p>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 self-start sm:self-center">
-                {dashboardCounts.employeeCount > 0 && (
-                  <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
-                    {Math.round((presentRecords.length / Math.max(dashboardCounts.employeeCount, 1)) * 100)}% Turnout
-                  </span>
-                )}
                 <span
                   className="text-white text-xs font-bold px-3 py-1 rounded-lg shadow-xs font-poppins"
                   style={{ background: "linear-gradient(95.91deg, #034665 12.65%, #068DCB 77.27%)" }}
@@ -1005,158 +1049,17 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="overflow-x-auto pb-2 custom-scrollbar">
+            <div className="pb-1">
               {presentRecords.length === 0 ? (
                 <div className="text-center py-8 text-xs text-slate-400 font-poppins bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                   No present records logged today yet.
                 </div>
               ) : (
-                <div className="flex items-center gap-3 pt-0.5">
-                  {presentRecords.map((record, index) => {
-                    const displayName = record.employee?.name || record.employeeName || record.user?.name || record.name || "N/A";
-                    const role = record.employee?.role || record.role || record.user?.role || record.employee?.designation?.name || "Team Member";
-
-                    return (
-                      <div
-                        key={record._id || record.id || index}
-                        className="bg-slate-50/80 hover:bg-white border border-slate-200/70 hover:border-[#068DCB]/40 rounded-xl p-3 flex flex-col items-center justify-center text-center w-32 shrink-0 transition-all hover:-translate-y-0.5 hover:shadow-sm"
-                      >
-                        <EmployeeAvatar
-                          employee={record.employee || record.user || record}
-                          alt={`${displayName} profile`}
-                          className="h-10 w-10 shadow-xs"
-                        />
-                        <p className="mt-2 text-xs font-bold text-slate-900 truncate w-full" title={displayName}>
-                          {displayName}
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-medium mt-0.5 truncate w-full">
-                          {role}
-                        </p>
-                        <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-                          <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                          Present
-                        </span>
-                      </div>
-                    );
-                  })}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 pt-0.5">
+                  {presentRecords.slice(0, 8).map(renderPresentEmployeeCard)}
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Pending Leave Requests / HR Quick Approvals */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-5 font-poppins">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
-                  <FileCheck2 className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                    Pending Leave Requests
-                    {leaves.filter(l => (l.status || l.adminStatus || '').toLowerCase() === 'pending' || (userRole === 'hr' && (l.hrStatus || '').toLowerCase() === 'pending')).length > 0 && (
-                      <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        {leaves.filter(l => (l.status || l.adminStatus || '').toLowerCase() === 'pending' || (userRole === 'hr' && (l.hrStatus || '').toLowerCase() === 'pending')).length} Pending
-                      </span>
-                    )}
-                  </h2>
-                  <p className="text-[11px] text-slate-500">
-                    Review and authorize employee leave applications requiring administrative approval
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => navigate('/leaves')}
-                className="text-xs font-semibold text-[#068DCB] hover:text-[#034665] flex items-center gap-1 self-start sm:self-center transition-colors"
-              >
-                <span>View all leave requests</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {leaves.filter(l => (l.status || l.adminStatus || '').toLowerCase() === 'pending' || (userRole === 'hr' && (l.hrStatus || '').toLowerCase() === 'pending')).length === 0 ? (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-slate-50/70 rounded-xl border border-slate-200/60">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                    <Check className="w-4 h-4 stroke-[2.5]" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">All leave requests are up to date</p>
-                    <p className="text-[11px] text-slate-500">There are no outstanding leave requests requiring action at this moment.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate('/leaves')}
-                  className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors shrink-0 shadow-xs"
-                >
-                  Leave History
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {leaves
-                  .filter(l => (l.status || l.adminStatus || '').toLowerCase() === 'pending' || (userRole === 'hr' && (l.hrStatus || '').toLowerCase() === 'pending'))
-                  .slice(0, 4)
-                  .map((leave) => {
-                    const empName = leave.employeeName || leave.employee?.name || leave.user?.name || leave.name || "Employee";
-                    const leaveType = leave.leaveType || leave.type || "Casual Leave";
-                    const startDate = leave.startDate ? formatShortDate(leave.startDate) : "-";
-                    const endDate = leave.endDate ? formatShortDate(leave.endDate) : startDate;
-                    const reason = leave.reason || leave.description || "Personal reason";
-
-                    return (
-                      <div
-                        key={leave._id || leave.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50/50 transition-colors shadow-xs"
-                      >
-                        <div className="flex items-start gap-3">
-                          <EmployeeAvatar
-                            employee={leave.employee || leave.user || leave.employeeId || leave}
-                            alt={`${empName} profile`}
-                            className="h-9 w-9 border border-amber-200 mt-0.5"
-                          />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-xs sm:text-sm font-bold text-slate-900">{empName}</h4>
-                              <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md">
-                                {leaveType}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
-                              <Clock className="w-3 h-3 text-slate-400" />
-                              <span>{startDate === endDate ? startDate : `${startDate} → ${endDate}`}</span>
-                              <span className="text-slate-300">•</span>
-                              <span className="truncate max-w-xs text-slate-600 italic">"{reason}"</span>
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleLeaveStatusClick(leave._id || leave.id, "approved")}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                          >
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Approve</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleLeaveStatusClick(leave._id || leave.id, "rejected")}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Reject</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
           </div>
 
           {/* Corporate Events & Celebrations (Holidays & Birthdays) */}
@@ -1286,6 +1189,119 @@ export default function Dashboard() {
             </div>
           </div>
 
+
+
+          {showPresentModal && (
+            <div
+              className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in font-poppins"
+              onClick={() => setShowPresentModal(false)}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="present-today-title"
+                onClick={(event) => event.stopPropagation()}
+                className="w-full max-w-4xl max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden font-poppins animate-scale-in flex flex-col"
+              >
+                <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100 shrink-0">
+                  <div className="flex items-center gap-2.5 text-[#034665]">
+                    <SquareUser className="h-5 w-5 text-[#034665]" strokeWidth={2} />
+                    <div>
+                      <h3 id="present-today-title" className="text-base sm:text-lg font-bold text-[#034665]">
+                        Present Today
+                      </h3>
+                      <p className="text-[11px] text-slate-500">{presentRecords.length} employees present</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPresentModal(false)}
+                    className="text-[#034665] hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" strokeWidth={2} />
+                  </button>
+                </div>
+                <div className="p-4 sm:p-5 overflow-y-auto">
+                  {presentRecords.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                      No present records logged today yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {presentRecords.map(renderPresentEmployeeCard)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showTeamLeadsModal && (
+            <div
+              className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in font-poppins"
+              onClick={() => setShowTeamLeadsModal(false)}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="team-leads-title"
+                onClick={(event) => event.stopPropagation()}
+                className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden font-poppins animate-scale-in"
+              >
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5 text-[#034665]">
+                    <Building2 className="h-5 w-5" />
+                    <h3 id="team-leads-title" className="text-base font-bold">Team Leaders</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTeamLeadsModal(false)}
+                    className="text-[#034665] hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="p-4 sm:p-5">
+                  <p className="mb-3 text-xs text-slate-500">
+                    {dashboardCounts.teamLeadCount} team leaders in your organization
+                  </p>
+                  {teamLeadRecords.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      No team leader details available.
+                    </div>
+                  ) : (
+                    <div className="max-h-[55vh] overflow-y-auto overscroll-contain space-y-2">
+                      {teamLeadRecords.map((teamLead, index) => {
+                        const name = teamLead.name || teamLead.fullName ||
+                          [teamLead.firstName, teamLead.lastName].filter(Boolean).join(" ").trim() ||
+                          teamLead.email || "Team Lead";
+                        const role = teamLead.designation?.name || teamLead.role || "Team Lead";
+
+                        return (
+                          <div
+                            key={teamLead.id || teamLead._id || teamLead.email || index}
+                            className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3"
+                          >
+                            <EmployeeAvatar
+                              employee={teamLead}
+                              alt={`${name} profile`}
+                              className="h-10 w-10 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
+                              <p className="truncate text-xs text-slate-500">{role}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
 
           {/* Absent Today Modal matching Image 4 */}

@@ -4,6 +4,8 @@ import {
   AlertCircle, Wifi, Compass, Calendar, RotateCcw
 } from "lucide-react";
 import api from "../../api/axios";
+import { GEOFENCE_RADIUS_METERS, TARGET_LAT, TARGET_LNG } from "../../services/attendanceService";
+
 
 export default function OfficeSettings() {
   const DEFAULT_SETTINGS = {
@@ -14,9 +16,9 @@ export default function OfficeSettings() {
     fullDayHours: 8,
     autoCheckOutTime: "23:59",
     geofenceEnabled: true,
-    latitude: "23.05829",
-    longitude: "72.53919",
-    radiusMeters: 50,
+    latitude: String(TARGET_LAT),
+    longitude: String(TARGET_LNG),
+    radiusMeters: GEOFENCE_RADIUS_METERS,
     officeWifiSsid: "Kevalon-Office-5G",
     requireWifiForCheckIn: false,
     weekendDays: ["Saturday", "Sunday"]
@@ -25,7 +27,14 @@ export default function OfficeSettings() {
   const [settings, setSettings] = useState(() => {
     try {
       const saved = localStorage.getItem("kt_office_settings");
-      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+      const parsed = saved ? JSON.parse(saved) : {};
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        latitude: String(TARGET_LAT),
+        longitude: String(TARGET_LNG),
+        radiusMeters: GEOFENCE_RADIUS_METERS
+      };
     } catch {
       return DEFAULT_SETTINGS;
     }

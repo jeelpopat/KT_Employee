@@ -1,8 +1,8 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Camera, Loader2, Monitor, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AppProvider, useApp, isRoleAllowed, deriveUserRole } from './context/AppContext.jsx';
-import { performAutoCheckout, clearAuth, isTokenExpired, validateUserSession, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
+import { clearAuth, isTokenExpired, validateUserSession, SCREEN_CAPTURE_ENABLED_SESSION_KEY } from './utils/auth.js';
 import { BASE_URL } from './api/config.js';
 import { LoginView } from './components/auth/LoginView.jsx';
 import { PublicInfoView } from './components/auth/PublicInfoView.jsx';
@@ -19,6 +19,7 @@ const Header = lazy(() => import('./components/layout/Header.jsx').then(m => ({ 
 const FinancePanel = lazy(() => import('./components/finance/FinancePanel.jsx').then(m => ({ default: m.FinancePanel })));
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView.jsx').then(m => ({ default: m.DashboardView })));
 const AttendanceView = lazy(() => import('./components/attendance/AttendanceView.jsx').then(m => ({ default: m.AttendanceView })));
+const MyAttendanceView = lazy(() => import('./components/attendance/MyAttendanceView.jsx').then(m => ({ default: m.MyAttendanceView })));
 const DailyReportView = lazy(() => import('./components/daily-report/DailyReportView.jsx').then(m => ({ default: m.DailyReportView })));
 const AdminDailyTaskView = lazy(() => import('./components/daily-report/AdminDailyTaskView.jsx').then(m => ({ default: m.AdminDailyTaskView })));
 const TaskManagementView = lazy(() => import('./components/tasks/TaskManagementView.jsx').then(m => ({ default: m.TaskManagementView })));
@@ -49,6 +50,10 @@ const AdminPortfolioLeadsView = lazy(() => import('./pages/PortfolioLeads.jsx'))
 const AdminContactsView = lazy(() => import('./pages/Contacts.jsx'));
 const AdminSettingsView = lazy(() => import('./pages/Setting.jsx'));
 const AuditLogsView = lazy(() => import('./pages/AuditLogs.jsx'));
+const HRPoliciesView = lazy(() => import('./pages/hr/HRPoliciesView.jsx'));
+const UserGuideView = lazy(() => import('./components/help/UserGuideView.jsx').then(m => ({ default: m.UserGuideView })));
+const WelcomeGuideModal = lazy(() => import('./components/help/UserGuideView.jsx').then(m => ({ default: m.WelcomeGuideModal })));
+const LiveTourOverlay = lazy(() => import('./components/help/UserGuideView.jsx').then(m => ({ default: m.LiveTourOverlay })));
 
 // Lazy-load role & placeholder views
 const SalaryView = lazy(() => import('./components/salary/SalaryView.jsx').then(m => ({ default: m.SalaryView })));
@@ -68,6 +73,7 @@ const DeductionReportsView = lazy(() => import('./components/deductions/Deductio
 
 const MainLayout = ({ handleSignOut }) => {
   const {
+    user,
     currentTab,
     userRole,
     setCurrentTab,
@@ -86,7 +92,60 @@ const MainLayout = ({ handleSignOut }) => {
   const [startingScreenCapture, setStartingScreenCapture] = useState(false);
   const [screenCaptureError, setScreenCaptureError] = useState('');
   const location = useLocation();
+  const navigate = useNavigate();
   const isFinanceRoute = location.pathname === '/finance' || location.pathname.startsWith('/finance/');
+  const userId =
+    user?._id ||
+    user?.id ||
+    user?.employee?._id ||
+    user?.employee?.id ||
+    user?.employeeId ||
+    user?.employee?.employeeID ||
+    user?.employeeID ||
+    user?.profile?.email ||
+    user?.employee?.email ||
+    user?.email ||
+    null;
+  const welcomeKey = `crm-welcome:${userRole}:${userId}`;
+  const [showWelcomeGuide, setShowWelcomeGuide] = useState(false);
+
+  useEffect(() => {
+    if (!userId) {
+      setShowWelcomeGuide(false);
+      return;
+    }
+
+    try {
+      setShowWelcomeGuide(localStorage.getItem(welcomeKey) !== 'seen');
+    } catch {
+      setShowWelcomeGuide(false);
+    }
+  }, [welcomeKey, userId]);
+
+  useEffect(() => {
+    if (location.pathname === '/user-guide') {
+      setShowWelcomeGuide(false);
+      if (!userId) return;
+      try {
+        localStorage.setItem(welcomeKey, 'seen');
+      } catch (error) {
+        console.warn('Could not save first-login welcome status:', error);
+      }
+    }
+  }, [location.pathname, welcomeKey]);
+
+  const dismissWelcomeGuide = (startLearning) => {
+    try {
+      localStorage.setItem(welcomeKey, 'seen');
+    } catch (error) {
+      console.warn('Could not save first-login welcome status:', error);
+    }
+    setShowWelcomeGuide(false);
+    if (startLearning) {
+      setCurrentTab('user-guide');
+      navigate('/user-guide');
+    }
+  };
 
   useEffect(() => () => stopScreenCapture(), []);
 
@@ -173,10 +232,15 @@ const MainLayout = ({ handleSignOut }) => {
       case 'admin-contacts': return <AdminContactsView />;
       case 'admin-audit-logs':
         return (userRole === 'admin' || userRole === 'hr') ? <AuditLogsView /> : <AdminDashboardView />;
+      case 'hr-policies': return userRole === 'hr' ? <HRPoliciesView /> : <AdminDashboardView />;
+      case 'employee-policies':
+        return userRole === 'employee' ? <HRPoliciesView audience="employee" /> : <AdminDashboardView />;
+      case 'team-lead-policies':
+        return userRole === 'team_leader' ? <HRPoliciesView audience="team-lead" /> : <AdminDashboardView />;
 
       // Existing Modules
       case 'dashboard': return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;
-      case 'attendance': return <AttendanceView />;
+      case 'attendance': return userRole === 'hr' ? <MyAttendanceView /> : <AttendanceView />;
       case 'daily-report': return <DailyReportView />;
       case 'tasks': return <TaskManagementView />;
       case 'leave': return <LeaveManagementView />;
@@ -204,6 +268,7 @@ const MainLayout = ({ handleSignOut }) => {
       case 'team-deductions':
       case 'my-deductions': return <EmployeeDeductionsView />;
       case 'deduction-reports': return <DeductionReportsView />;
+      case 'user-guide': return <UserGuideView />;
 
       default: return (userRole === 'admin' || userRole === 'hr') ? <AdminDashboardView /> : <DashboardView />;
     }
@@ -265,6 +330,17 @@ const MainLayout = ({ handleSignOut }) => {
         </div>
         <Suspense fallback={null}>
           <InactivityAlertModal />
+        </Suspense>
+        {showWelcomeGuide && (
+          <Suspense fallback={null}>
+            <WelcomeGuideModal
+              onStartLearning={() => dismissWelcomeGuide(true)}
+              onExplore={() => dismissWelcomeGuide(false)}
+            />
+          </Suspense>
+        )}
+        <Suspense fallback={null}>
+          <LiveTourOverlay />
         </Suspense>
       </div>
       {/* Screen monitoring pop-up modal commented out
@@ -398,7 +474,6 @@ export default function App() {
 
       if (isTokenExpired(token)) {
         if (isMounted) {
-          await performAutoCheckout(token);
           clearAuth();
           setIsAuthenticated(false);
           setIsCheckingAuth(false);
@@ -462,7 +537,6 @@ export default function App() {
   const handleSignOut = async () => {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     try {
-      await performAutoCheckout(token);
       if (token) {
         await fetch(`${BASE_URL}/api/users/logout`, {
           method: 'POST',

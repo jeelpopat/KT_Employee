@@ -11,7 +11,6 @@ import {
   isEmployeeRole,
   fetchEmployeeTeamLead
 } from '../../utils/teamLeadUtils.js';
-import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 const matchesEmployeeAssignment = (assignment, identifiers) => {
   if (!assignment || !identifiers) return false;
@@ -597,26 +596,6 @@ export const DailyReportView = () => {
           </div>
         )}
 
-        {/* Assigned Team Lead badge if present */}
-        {teamLead && (
-          <div className="mb-4 px-3.5 py-2.5 rounded-lg border border-slate-200 bg-slate-50/80 text-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <EmployeeAvatar
-                employee={teamLead}
-                alt={`${teamLead.name || 'Team Lead'} profile`}
-                className="h-5 w-5 border border-indigo-100"
-              />
-              <span className="text-slate-500 font-medium">Assigned Team Lead:</span>
-              <span className="font-semibold text-slate-900">{teamLead.name || 'Team Lead'}</span>
-              {teamLead.email && <span className="text-slate-400 font-mono hidden sm:inline">({teamLead.email})</span>}
-            </div>
-            {teamLead.designation && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
-                {teamLead.designation}
-              </span>
-            )}
-          </div>
-        )}
 
         {formMsg.text && (
           <div className={`mb-5 p-3 rounded-md text-sm font-medium border ${formMsg.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
@@ -822,7 +801,7 @@ export const DailyReportView = () => {
                 {historyReports.length} {historyReports.length === 1 ? 'Report' : 'Reports'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/list</p>
+            {/* <p className="text-xs text-slate-400 mt-0.5">Live updates synced via GET /api/dailyUpdate/list</p> */}
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">

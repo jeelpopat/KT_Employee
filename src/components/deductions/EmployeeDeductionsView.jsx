@@ -1510,35 +1510,33 @@ export const EmployeeDeductionsView = () => {
       {confirmationDialog}
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-xs">
+      <div className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins flex items-center justify-between gap-2 sm:gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <span>Payroll &amp; Salary</span>
-            <span>/</span>
-            <span className="font-semibold text-slate-800">
+          {/* <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+             <span className="font-semibold text-slate-800">
               {isAdminOrHr
                 ? 'Deduction Approval Dashboard'
                 : isTL
                 ? 'Team Deductions'
                 : 'My Deductions'}
-            </span>
-          </div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
+            </span> 
+          </div> */}
+          <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight font-poppins flex items-center gap-2 sm:gap-3">
+            {/* <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
               <FileText size={18} />
-            </span>
+            </span> */}
             {isAdminOrHr && 'Employee Deduction Management & Approvals'}
             {isTL && 'Team Leader Deduction Console'}
-            {isEmployee && 'My Salary Deductions & History'}
+            {isEmployee && 'My Deductions'}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          {/* <p className="text-xs text-slate-500 mt-1">
             {isAdminOrHr &&
               'Review, approve, or reject team deduction requests before inclusion in monthly salary payroll runs.'}
             {isTL &&
               'Submit and monitor penalty, asset damage, or operational deduction requests for your authorized team.'}
             {isEmployee &&
               'Review your itemized payroll deductions, approval statuses, and incident history.'}
-          </p>
+          </p> */}
         </div>
 
         <div className="flex items-center gap-2">
@@ -1568,62 +1566,36 @@ export const EmployeeDeductionsView = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Pending Approvals
-            </span>
-            <span className="text-xl sm:text-2xl font-bold text-amber-600 mt-1 block">
-              {metrics.pendingCount}
-            </span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 font-poppins">
+        {[
+          { label: "Pending Approvals", value: metrics.pendingCount },
+          { label: "Approved Deductions", value: metrics.approvedCount },
+          { label: "Applied to Payroll", value: metrics.lockedCount },
+          { label: "Total Approved Value", value: formatINR(metrics.totalDeductionAmount) }
+        ].map((item, idx) => (
+          <div
+            key={idx}
+            className="relative flex items-center h-[60px] w-full"
+          >
+            {/* Left card for the border */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[16px] h-[60px] rounded-tl-[10px] rounded-bl-[10px] z-0"
+              style={{ background: "#034665", opacity: 1 }}
+            />
+            {/* Inner card */}
+            <div
+              className="relative z-10 ml-[6px] flex-1 h-[60px] bg-white rounded-[10px] px-4 sm:px-5 flex items-center justify-between shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+              style={{ borderWidth: "0.2px", borderStyle: "solid", borderColor: "rgba(192, 209, 216, 0.8)", opacity: 1 }}
+            >
+              <p className="text-[11px] sm:text-[12px] font-medium text-[#718096] tracking-wider uppercase font-poppins select-none truncate mr-1">
+                {item.label}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-[#111827] font-poppins ml-2 shrink-0">
+                {item.value}
+              </p>
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-            <Clock size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Approved Deductions
-            </span>
-            <span className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1 block">
-              {metrics.approvedCount}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-            <CheckCircle2 size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Applied to Payroll
-            </span>
-            <span className="text-xl sm:text-2xl font-bold text-indigo-600 mt-1 block">
-              {metrics.lockedCount}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-            <Lock size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Total Approved Value
-            </span>
-            <span className="text-lg sm:text-xl font-mono font-bold text-slate-900 mt-1 block">
-              {formatINR(metrics.totalDeductionAmount)}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700">
-            <DollarSign size={20} />
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Main Container */}

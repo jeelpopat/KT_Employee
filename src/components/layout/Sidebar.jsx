@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeftRight, Banknote, Bell, BookOpen, Building2, CalendarDays, CircleDollarSign,
   FileMinus, FileText, GitBranch, HandCoins, Landmark, Package, Percent, Receipt,
-  ReceiptText, Scale, ScrollText, ShoppingCart, TrendingUp, Truck, UserRound, Users
+  ReceiptText, Scale, ScrollText, ShoppingCart, TrendingUp, Truck, UserRound, Users,
+  CircleHelp
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { tabToPath } from '../../utils/navigation.js';
@@ -415,6 +416,12 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'admin-audit-logs', label: 'Audit Logs', icon: AuditLogsIcon },
       ]
     },
+    {
+      title: "USER GUIDE & HELP",
+      items: [
+        { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
+      ]
+    },
     // {
     //   title: "RECRUITMENT AND LEADS",
     //   items: [
@@ -440,8 +447,15 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
+      title: "HR RESOURCES",
+      items: [
+        { tab: 'hr-policies', label: 'Company Policies', icon: BookOpen },
+      ]
+    },
+    {
       title: "ATTENDANCE AND LEAVES",
       items: [
+        { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
         { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon, requestCount: requestCounts.checkIn },
         { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
@@ -469,6 +483,12 @@ export const Sidebar = ({ onSignOut }) => {
       items: [
         // { tab: 'admin-screenshots', label: 'Screenshot Monitoring', icon: ScreenshotIcon },
         { tab: 'admin-audit-logs', label: 'Audit Logs', icon: AuditLogsIcon },
+      ]
+    },
+    {
+      title: "USER GUIDE & HELP",
+      items: [
+        { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
       ]
     },
     // {
@@ -508,6 +528,12 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
+      title: "POLICIES",
+      items: [
+        { tab: 'team-lead-policies', label: 'Team Lead Policies', icon: BookOpen },
+      ]
+    },
+    {
       title: "MY WORKSPACE",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
@@ -518,6 +544,12 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'my-deductions', label: 'My Deductions', icon: DeductionIcon },
         { tab: 'daily-report', label: 'Daily Report', icon: DailyReportIcon },
         { tab: 'holiday', label: 'Holidays', icon: HolidaysIcon },
+      ]
+    },
+    {
+      title: "USER GUIDE & HELP",
+      items: [
+        { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
       ]
     },
     {
@@ -554,6 +586,18 @@ export const Sidebar = ({ onSignOut }) => {
         { tab: 'holiday', label: 'Holidays', icon: HolidaysIcon },
         { tab: 'team-members', label: 'Team Members', icon: TeamMembersIcon },
         { tab: 'employees', label: 'Employees', icon: EmployeeIcon },
+      ]
+    },
+    {
+      title: "POLICIES",
+      items: [
+        { tab: 'employee-policies', label: 'Employee Policies', icon: BookOpen },
+      ]
+    },
+    {
+      title: "USER GUIDE & HELP",
+      items: [
+        { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
       ]
     },
     {
@@ -656,6 +700,12 @@ export const Sidebar = ({ onSignOut }) => {
       items: [
         { tab: 'profile', label: 'My Profile', icon: ProfileIcon },
       ]
+    },
+    {
+      title: 'USER GUIDE & HELP',
+      items: [
+        { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
+      ]
     }
   ];
 
@@ -709,6 +759,7 @@ export const Sidebar = ({ onSignOut }) => {
                   <button
                     key={item.tab}
                     type="button"
+                    data-guide-tour={item.tab}
                     onClick={() => handleNavClick(item.tab, item.path)}
                     className={`w-full flex items-center justify-between px-4 py-2.5 transition-colors cursor-pointer text-left border-b border-[#edf2f7] font-poppins relative select-none rounded-none ${isActive
                       ? "text-white font-medium shadow-none"

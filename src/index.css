@@ -258,6 +258,29 @@
   transition: all 0.2s ease-in-out;
 }
 
+.guide-tour-highlight {
+  position: relative;
+  z-index: 78 !important;
+  animation: guide-tour-pulse 1.35s ease-in-out infinite;
+}
+
+.guide-tour-page-highlight {
+  position: relative;
+  z-index: 77;
+  border-radius: 12px;
+  outline: 2px solid rgba(14, 165, 233, 0.75);
+  outline-offset: 6px;
+}
+
+@keyframes guide-tour-pulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.08);
+  }
+}
+
 .btn-brand-primary:hover {
   opacity: 0.95;
   filter: brightness(1.08);

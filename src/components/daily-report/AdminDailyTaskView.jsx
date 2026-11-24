@@ -178,10 +178,11 @@ export const AdminDailyTaskView = () => {
             </span>
             Employee Daily Reports
           </h1>
-          <p className="mt-1 text-xs text-slate-500">
+          {/* <p className="mt-1 text-xs text-slate-500">
             Review daily work updates submitted by employees in your company.
-          </p>
+          </p> */}
         </div>
+        
         <button
           type="button"
           onClick={fetchReports}
