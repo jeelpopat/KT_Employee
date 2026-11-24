@@ -4,6 +4,7 @@ export { BASE_URL, API_BASE_URL, getApiUrl } from './config.js';
 
 // In-memory cache store: Map<cacheKey, { data, status, statusText, headers, expiresAt }>
 const cache = new Map();
+const MAX_CACHE_ENTRIES = 500;
 
 // In-flight requests store: Map<cacheKey, Promise<response>> to deduplicate simultaneous identical calls
 const inFlight = new Map();
@@ -87,6 +88,15 @@ export const clearApiCache = () => {
   cache.clear();
 };
 
+const getAuthorizationPartition = (config) => {
+  const authorization = config.headers?.get?.('Authorization') || config.headers?.Authorization;
+  if (!authorization) return 'anonymous';
+
+  const token = String(authorization).replace(/^Bearer\s+/i, '');
+  const tokenParts = token.split('.');
+  return tokenParts.length === 3 ? tokenParts[2] : token;
+};
+
 const defaultAdapter = axios.getAdapter(axios.defaults.adapter);
 
 const emitDataSyncEvent = (detail) => {
@@ -123,12 +133,14 @@ const cachingAdapter = async (config) => {
 
   // Generate unique cache key based on method, URL, and query parameters
   const paramStr = config.params ? JSON.stringify(config.params) : '';
-  const cacheKey = `${method}:${url}:${paramStr}`;
+  const cacheKey = `${getAuthorizationPartition(config)}:${method}:${url}:${paramStr}`;
 
   // 1. Check if we have a valid cached response in memory
   const now = Date.now();
   const cached = cache.get(cacheKey);
   if (cached && now < cached.expiresAt) {
+    cache.delete(cacheKey);
+    cache.set(cacheKey, cached);
     emitDataSyncEvent({ type: 'cached', timestamp: now });
     return {
       data: JSON.parse(JSON.stringify(cached.data)),
@@ -159,6 +171,11 @@ const cachingAdapter = async (config) => {
       const response = await requestWithSyncFeedback(config);
       const ttl = config.ttl !== undefined ? config.ttl : getCacheTTL(url);
       if (ttl > 0 && response.status >= 200 && response.status < 300) {
+        const cacheTime = Date.now();
+        for (const [key, entry] of cache) {
+          if (cacheTime >= entry.expiresAt) cache.delete(key);
+        }
+        cache.delete(cacheKey);
         cache.set(cacheKey, {
           data: response.data,
           status: response.status,
@@ -166,6 +183,9 @@ const cachingAdapter = async (config) => {
           headers: response.headers,
           expiresAt: Date.now() + ttl
         });
+        while (cache.size > MAX_CACHE_ENTRIES) {
+          cache.delete(cache.keys().next().value);
+        }
       }
       return response;
     } finally {
