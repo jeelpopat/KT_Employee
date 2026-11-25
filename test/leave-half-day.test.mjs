@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   getHalfDayType,
   getLeaveDurationPayload,
+  getTeamLeadLeaveStatus,
   hasActiveLeaveDateOverlap,
   isHalfDayLeave,
   normalizeHalfDayType,
@@ -44,6 +45,9 @@ assert.equal(normalizeHalfDayType(' first_half '), 'first-half');
 assert.equal(normalizeHalfDayType('second_half'), 'second-half');
 assert.equal(getHalfDayType({ leaveType: 'half_day_2' }), 'second-half');
 assert.equal(isHalfDayLeave({ leaveType: 'full_day', isHalfDay: true }), true);
+assert.equal(getTeamLeadLeaveStatus({ status: 'pending', teamLeadStatus: 'Pending' }), 'pending');
+assert.equal(getTeamLeadLeaveStatus({ status: 'pending_hr', teamLeadStatus: 'approved' }), 'approved');
+assert.equal(getTeamLeadLeaveStatus({ status: 'rejected', teamLeadStatus: 'rejected' }), 'rejected');
 assert.equal(
   getHalfDayType({ leaveType: 'full_day', isHalfDay: true, halfDayType: 'second_half' }),
   'second-half'

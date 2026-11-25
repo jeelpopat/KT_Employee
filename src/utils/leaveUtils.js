@@ -35,6 +35,23 @@ export const isHalfDayLeave = (leave) => {
     Boolean(getHalfDayType(leave));
 };
 
+export const getTeamLeadLeaveStatus = (leave) => {
+  const teamLeadStatus = String(leave?.teamLeadStatus || "").trim().toLowerCase();
+  if (teamLeadStatus === "approved") return "approved";
+  if (teamLeadStatus === "rejected") return "rejected";
+
+  if (String(leave?.teamLeadRemark || "").toLowerCase().includes("approved")) {
+    return "approved";
+  }
+
+  const status = String(leave?.status || "").toLowerCase().trim();
+  if (status === "pending_hr" || status === "pending_admin") return "approved";
+  if (status.includes("approve")) return "approved";
+  if (status.includes("reject")) return "rejected";
+
+  return "pending";
+};
+
 export const getLeaveDurationPayload = (isHalfDay, halfDayType, totalDays) => {
   const normalizedHalfDayType = normalizeHalfDayType(halfDayType) || "first-half";
   const halfDay = Boolean(isHalfDay);
