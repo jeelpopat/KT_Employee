@@ -9,8 +9,6 @@ import {
   Search,
   Filter,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   History,
   CalendarDays,
   CheckCircle2,
@@ -66,21 +64,10 @@ const AVATAR_COLORS = [
 const WORKDAY_MINUTES = 9 * 60;
 
 /* =========================================================
-   GET TODAY & YESTERDAY
+   GET TODAY
 ========================================================= */
 const getTodayLocal = () => {
   const now = new Date();
-
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-};
-
-const getYesterdayLocal = () => {
-  const now = new Date();
-  now.setDate(now.getDate() - 1);
 
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -1794,33 +1781,8 @@ export default function AttendanceLogs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, viewMode]);
 
-  /* =========================================================
-     OLD LOG DATE NAVIGATION HELPERS
-  ========================================================= */
-  const handlePrevDay = () => {
-    const d = new Date(`${selectedDate}T00:00:00`);
-    d.setDate(d.getDate() - 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    setSelectedDate(`${y}-${m}-${day}`);
-  };
-
-  const handleNextDay = () => {
-    const d = new Date(`${selectedDate}T00:00:00`);
-    d.setDate(d.getDate() + 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    setSelectedDate(`${y}-${m}-${day}`);
-  };
-
   const handleJumpToday = () => {
     setSelectedDate(getTodayLocal());
-  };
-
-  const handleJumpYesterday = () => {
-    setSelectedDate(getYesterdayLocal());
   };
 
   const fetchLogs = (date = selectedDate, isSilent = false) => {
@@ -2682,19 +2644,8 @@ export default function AttendanceLogs() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-4 flex-wrap font-poppins">
-          {/* DATE NAVIGATION CONTROLS (FOR DAILY & PAST DATE CHECK) */}
+          {/* DATE PICKER */}
           <div className="flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
-            {/* Previous Day */}
-            <button
-              type="button"
-              onClick={handlePrevDay}
-              title="Previous Day (Check older logs)"
-              className="h-8 w-8 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition cursor-pointer"
-            >
-              <ChevronLeft size={16} />
-            </button>
-
-            {/* Date Picker Button */}
             <button
               type="button"
               onClick={() => {
@@ -2723,42 +2674,6 @@ export default function AttendanceLogs() {
                 className="absolute inset-0 opacity-0 pointer-events-auto cursor-pointer w-full h-full"
                 aria-label="Select Date"
               />
-            </button>
-
-            {/* Next Day */}
-            <button
-              type="button"
-              onClick={handleNextDay}
-              title="Next Day"
-              className="h-8 w-8 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md shadow-2xs flex items-center justify-center transition cursor-pointer"
-            >
-              <ChevronRight size={16} />
-            </button>
-
-            {/* Today quick button */}
-            <button
-              type="button"
-              onClick={handleJumpToday}
-              className={`h-8 px-2.5 rounded-md text-xs font-semibold transition cursor-pointer border ${
-                selectedDate === getTodayLocal()
-                  ? 'bg-[#034665] text-white border-[#034665]'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              Today
-            </button>
-
-            {/* Yesterday quick button */}
-            <button
-              type="button"
-              onClick={handleJumpYesterday}
-              className={`h-8 px-2.5 rounded-md text-xs font-semibold transition cursor-pointer border ${
-                selectedDate === getYesterdayLocal()
-                  ? 'bg-[#034665] text-white border-[#034665]'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              Yesterday
             </button>
           </div>
 
@@ -3095,10 +3010,10 @@ export default function AttendanceLogs() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
+          <div className="max-h-[560px] overflow-auto border border-slate-200/80 rounded-lg font-poppins">
             <table className="w-full text-left text-xs border-collapse min-w-[800px] sm:min-w-full font-poppins">
-              <thead>
-                <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-[#e6eef1] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#e6eef1" }}>
                   <th className="py-3 px-4 w-12 text-left font-semibold">No.</th>
                   <th className="py-3 px-4 text-left font-semibold">Employee</th>
                   <th className="py-3 px-4 text-left font-semibold">Date</th>

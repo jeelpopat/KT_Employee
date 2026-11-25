@@ -11,7 +11,8 @@ import {
   isTodayDate,
   formatISOToLocalTime,
   normalizeAttendanceRecord,
-  deriveAttendanceStatus
+  deriveAttendanceStatus,
+  deduplicateAttendanceRecordsByDate
 } from '../../utils/timelineUtils.js';
 
 const getAttendanceTimelineRecords = (payload, depth = 0) => {
@@ -39,6 +40,7 @@ const getAttendanceSummary = (payload, depth = 0) => {
 };
 
 export const AttendanceView = () => {
+  const { userRole } = useApp();
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceError, setAttendanceError] = useState('');
   const [summaryStats, setSummaryStats] = useState({
@@ -223,11 +225,14 @@ export const AttendanceView = () => {
       const sortedRecords = [...mergedRecords].sort((a, b) => new Date(b.date || b.checkInTime) - new Date(a.date || a.checkInTime));
       // Normalize records without inventing a checkout time.
       const normalizedRecords = sortedRecords.map(normalizeAttendanceRecord);
-      setAttendanceRecords(normalizedRecords);
+      const visibleRecords = userRole === 'hr'
+        ? deduplicateAttendanceRecordsByDate(normalizedRecords)
+        : normalizedRecords;
+      setAttendanceRecords(visibleRecords);
 
       let totalWorkHrs = summary.totalWorkingHours || 0;
-      if (normalizedRecords.length > 0) {
-        const computedTotal = normalizedRecords.reduce((acc, r) => acc + (r.isRejected ? 0 : (parseFloat(r.totalWorkTime) || 0)), 0);
+      if (visibleRecords.length > 0) {
+        const computedTotal = visibleRecords.reduce((acc, r) => acc + (r.isRejected ? 0 : (parseFloat(r.totalWorkTime) || 0)), 0);
         if (computedTotal > totalWorkHrs) {
           totalWorkHrs = Number(computedTotal.toFixed(1));
         }
@@ -235,10 +240,10 @@ export const AttendanceView = () => {
 
       setSummaryStats({
         totalWorkingHours: totalWorkHrs,
-        presentDays: summary.presentDays || normalizedRecords.filter(r => (r.status === 'present' || r.checkInTime) && !r.isRejected && r.status !== 'rejected').length,
+        presentDays: summary.presentDays || visibleRecords.filter(r => (r.status === 'present' || r.checkInTime) && !r.isRejected && r.status !== 'rejected').length,
         absentDays: (summary.absentDays || 0) + (isTodayRejected ? 1 : 0),
         halfDays: summary.halfDays || 0,
-        averageWorkingHours: summary.averageWorkingHours || (normalizedRecords.length > 0 ? Number((totalWorkHrs / normalizedRecords.length).toFixed(1)) : 0)
+        averageWorkingHours: summary.averageWorkingHours || (visibleRecords.length > 0 ? Number((totalWorkHrs / visibleRecords.length).toFixed(1)) : 0)
       });
 
     } catch (error) {

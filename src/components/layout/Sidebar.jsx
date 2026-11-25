@@ -531,6 +531,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
+        { tab: 'leave', label: 'My Leaves', icon: LeaveRequestsIcon },
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
         { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon, requestCount: requestCounts.checkIn },
         { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
@@ -603,12 +604,6 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "POLICIES",
-      items: [
-        { tab: 'team-lead-policies', label: 'Team Lead Policies', icon: BookOpen },
-      ]
-    },
-    {
       title: "MY WORKSPACE",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
@@ -625,6 +620,12 @@ export const Sidebar = ({ onSignOut }) => {
       title: "USER GUIDE & HELP",
       items: [
         { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
+      ]
+    },
+    {
+      title: "POLICIES",
+      items: [
+        { tab: 'team-lead-policies', label: 'Team Lead Policies', icon: BookOpen },
       ]
     },
     {
@@ -664,15 +665,15 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "POLICIES",
-      items: [
-        { tab: 'employee-policies', label: 'Employee Policies', icon: BookOpen },
-      ]
-    },
-    {
       title: "USER GUIDE & HELP",
       items: [
         { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
+      ]
+    },
+    {
+      title: "POLICIES",
+      items: [
+        { tab: 'employee-policies', label: 'Employee Policies', icon: BookOpen },
       ]
     },
     {
