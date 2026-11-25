@@ -784,9 +784,9 @@ export const TeamMembersView = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900">My Team Members</h2>
-            <p className="text-xs sm:text-sm text-slate-500">
+            {/* <p className="text-xs sm:text-sm text-slate-500">
               Colleagues and team leaders in your assigned project teams
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -1138,9 +1138,9 @@ export const EmployeesView = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900">Company Employee Directory</h2>
-            <p className="text-xs sm:text-sm text-slate-500">
+            {/* <p className="text-xs sm:text-sm text-slate-500">
               Company staff directory including Employees, Team Leaders, HR, Accountants, and CAs
-            </p>
+            </p> */}
           </div>
         </div>
 
