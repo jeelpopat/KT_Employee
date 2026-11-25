@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LoadingScreen, TableSkeleton } from '../components/common/Loader.jsx';
 import {
   Users,
@@ -180,6 +181,9 @@ const EmployeeRequests = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [dateRange, setDateRange] = useState('30d');
   const [openActionsFor, setOpenActionsFor] = useState(null);
+  const [actionsMenuPosition, setActionsMenuPosition] = useState(null);
+  const actionsMenuRef = useRef(null);
+  const actionsTriggerRef = useRef(null);
 
   useEffect(() => {
     if (!selectedUser) return undefined;
@@ -191,6 +195,37 @@ const EmployeeRequests = () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [selectedUser]);
+
+  useEffect(() => {
+    if (openActionsFor === null) return undefined;
+
+    const closeMenu = () => {
+      setOpenActionsFor(null);
+      setActionsMenuPosition(null);
+      actionsTriggerRef.current = null;
+    };
+    const handlePointerDown = (event) => {
+      if (
+        actionsMenuRef.current?.contains(event.target) ||
+        actionsTriggerRef.current?.contains(event.target)
+      ) return;
+      closeMenu();
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('resize', closeMenu);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', closeMenu, true);
+      window.removeEventListener('resize', closeMenu);
+    };
+  }, [openActionsFor]);
 
   // ================= APPROVAL MODAL & METADATA STATE =================
   const [approvingUser, setApprovingUser] = useState(null);
@@ -2328,9 +2363,9 @@ const EmployeeRequests = () => {
                 )}
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Employee Requests</h1>
-              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm">
+              {/* <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm">
                 Review new staff accounts, assign team leads, and confirm organization details.
-              </p>
+              </p> */}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200/80 bg-white/80 px-3.5 py-2.5 shadow-sm sm:self-center">
@@ -2624,50 +2659,97 @@ const EmployeeRequests = () => {
                             <button
                               type="button"
                               aria-label={`More actions for ${name}`}
+                              aria-haspopup="menu"
                               aria-expanded={menuOpen}
-                              onClick={() => setOpenActionsFor(menuOpen ? null : userId)}
+                              onClick={(event) => {
+                                if (menuOpen) {
+                                  setOpenActionsFor(null);
+                                  setActionsMenuPosition(null);
+                                  actionsTriggerRef.current = null;
+                                  return;
+                                }
+
+                                const trigger = event.currentTarget;
+                                const bounds = trigger.getBoundingClientRect();
+                                const isReadOnly = isReadOnlyRequestRole(user);
+                                const itemCount = 1 + (isReadOnly ? 0 : 1) + (isApproved && !isReadOnly ? 1 : 0);
+                                const menuHeight = 12 + itemCount * 36;
+                                const spaceBelow = window.innerHeight - bounds.bottom;
+                                const openAbove = spaceBelow < menuHeight + 8 && bounds.top > menuHeight + 8;
+                                const maxTop = Math.max(8, window.innerHeight - menuHeight - 8);
+                                const top = openAbove
+                                  ? Math.max(8, bounds.top - menuHeight - 6)
+                                  : Math.max(8, Math.min(bounds.bottom + 6, maxTop));
+                                const left = Math.max(8, Math.min(bounds.right - 192, window.innerWidth - 200));
+
+                                actionsTriggerRef.current = trigger;
+                                setActionsMenuPosition({ top, left });
+                                setOpenActionsFor(userId);
+                              }}
                               className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
                             >
                               <MoreVertical size={16} />
                             </button>
-                            {menuOpen && (
-                              <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                            {menuOpen && actionsMenuPosition && typeof document !== 'undefined' && createPortal(
+                              <div
+                                ref={actionsMenuRef}
+                                role="menu"
+                                aria-label={`Actions for ${name}`}
+                                style={{ top: actionsMenuPosition.top, left: actionsMenuPosition.left }}
+                                className="fixed z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10 ring-1 ring-black/5"
+                              >
                                 <button
                                   type="button"
+                                  role="menuitem"
                                   onClick={() => {
                                     setSelectedUser(user);
                                     setOpenActionsFor(null);
+                                    setActionsMenuPosition(null);
+                                    actionsTriggerRef.current = null;
                                   }}
-                                  className="w-full rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
                                 >
-                                  View profile
+                                  <User size={15} className="shrink-0 text-slate-400" />
+                                  <span>View profile</span>
                                 </button>
                                 {!isReadOnlyRequestRole(user) && (
                                   <button
                                     type="button"
+                                    role="menuitem"
                                     onClick={() => {
                                       setOpenActionsFor(null);
+                                      setActionsMenuPosition(null);
+                                      actionsTriggerRef.current = null;
                                       handleApproveClick(user);
                                     }}
-                                    className="w-full rounded-md px-2.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
                                   >
+                                    <UserCheck size={15} className="shrink-0 text-slate-400" />
                                     {isApproved ? 'Change team lead' : 'Review request'}
                                   </button>
                                 )}
                                 {isApproved && !isReadOnlyRequestRole(user) && (
+                                  <div className="my-1 border-t border-slate-100" />
+                                )}
+                                {isApproved && !isReadOnlyRequestRole(user) && (
                                   <button
                                     type="button"
+                                    role="menuitem"
                                     disabled={isProcessing}
                                     onClick={() => {
                                       setOpenActionsFor(null);
+                                      setActionsMenuPosition(null);
+                                      actionsTriggerRef.current = null;
                                       handleAction(user, 'revoke');
                                     }}
-                                    className="w-full rounded-md px-2.5 py-2 text-left text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50"
                                   >
+                                    <XCircle size={15} className="shrink-0" />
                                     {isProcessing ? 'Updating…' : 'Revoke approval'}
                                   </button>
                                 )}
-                              </div>
+                              </div>,
+                              document.body
                             )}
                           </div>
                         </div>
