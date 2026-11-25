@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Clock,
   FileText,
+  Paperclip,
   Search,
   Filter,
   ChevronDown,
@@ -155,6 +156,20 @@ const normalizeLeaveType = (type) => {
 const formatLeaveType = (type) =>
   normalizeLeaveType(type)
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const getLeaveAttachment = (leave) => {
+  const attachment =
+    leave?.attachment ||
+    leave?.documentLink ||
+    leave?.documentUrl ||
+    leave?.attachmentUrl;
+
+  if (typeof attachment === "string") return attachment.trim();
+  if (attachment && typeof attachment === "object") {
+    return attachment.url || attachment.fileUrl || attachment.href || "";
+  }
+  return "";
+};
 
 const getCanonicalLeaveType = (type, leave) => {
   const rawLeave = leave?.rawLeave || leave || {};
@@ -840,6 +855,8 @@ export default function LeaveRequest() {
             ),
 
             reason: leave?.reason || "",
+
+            attachment: getLeaveAttachment(leave),
 
             teamLeadStatus,
 
@@ -2190,6 +2207,18 @@ export default function LeaveRequest() {
                         ) : (
                           <span className="text-xs text-slate-400 font-medium select-none">-</span>
                         )}
+                        {request.attachment && (
+                          <a
+                            href={request.attachment}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:underline"
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            View Document
+                          </a>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -2330,6 +2359,18 @@ export default function LeaveRequest() {
                       )}
                     </div>
                   )}
+                  {request.attachment && (
+                    <a
+                      href={request.attachment}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex items-center gap-1.5 pt-2 border-t border-slate-100 text-xs font-medium text-indigo-600 hover:underline"
+                    >
+                      <Paperclip className="h-3.5 w-3.5" />
+                      View Document
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
@@ -2468,6 +2509,25 @@ export default function LeaveRequest() {
                   {selectedLeave.reason || "No reason provided by applicant."}
                 </p>
               </div>
+
+              {selectedLeave.attachment && (
+                <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-2xs">
+                  <div className="flex items-center gap-2 text-slate-700 mb-2 font-poppins">
+                    <Paperclip className="w-4 h-4 text-[#034665]" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Document Link
+                    </span>
+                  </div>
+                  <a
+                    href={selectedLeave.attachment}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-indigo-600 hover:underline break-all"
+                  >
+                    View attached document
+                  </a>
+                </div>
+              )}
 
               {/* APPROVAL FLOW */}
               <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-2xs">
