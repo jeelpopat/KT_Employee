@@ -3,7 +3,6 @@ import api, { clearApiCache } from '../api/axios.js';
 import { clearAuth, normalizeRole } from '../utils/auth.js';
 import { getProgressForStatus } from '../utils/taskUtils.js';
 import {
-  getGPSLocation,
   breakIn,
   TARGET_LAT,
   TARGET_LNG,
@@ -801,8 +800,7 @@ export const AppProvider = ({ children }) => {
     }
 
     try {
-      const location = await getGPSLocation();
-      await breakIn(location);
+      await breakIn();
 
       const now = new Date();
       const nowIso = now.toISOString();

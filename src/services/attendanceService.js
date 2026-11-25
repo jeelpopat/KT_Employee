@@ -116,33 +116,13 @@ export const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
 };
 
 const attendanceRequest = (method, url, location) => {
-  const isCheckIn = url.includes('check-in') || url.includes('checkin');
-  const isBreakStart = url.includes('break/start') || url.includes('break-in') || url.includes('break/in');
-  const isBreakEnd = url.includes('break/end') || url.includes('break-out');
-  const isGeofencedAction = isCheckIn || isBreakStart || isBreakEnd;
-
-  if (isGeofencedAction) {
-    const hasLocation = location?.latitude !== undefined &&
-      location?.latitude !== null &&
-      location?.longitude !== undefined &&
-      location?.longitude !== null;
-    const latitude = Number(location?.latitude);
-    const longitude = Number(location?.longitude);
-    if (!hasLocation || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return Promise.reject(new Error('A fresh device location is required for this attendance action.'));
-    }
-
-    const dist = calculateDistanceInMeters(latitude, longitude, TARGET_LAT, TARGET_LNG);
-    if (!isWithinOfficeRadius(dist)) {
-      const actionName = isCheckIn ? 'Check-in' : isBreakStart ? 'Starting a break' : 'Resuming work';
-      return Promise.reject(new Error(`Outside office area (${Math.round(dist)}m away). ${actionName} is allowed only within ${GEOFENCE_RADIUS_METERS}m of office coordinates.`));
-    }
-  }
-
   return api({
     method,
     url,
-    data: { latitude: Number(location.latitude), longitude: Number(location.longitude) }
+    data: location ? {
+      latitude: Number(location.latitude),
+      longitude: Number(location.longitude)
+    } : {}
   });
 };
 
