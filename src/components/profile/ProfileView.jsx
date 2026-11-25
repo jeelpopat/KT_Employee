@@ -2514,11 +2514,11 @@ export const ProfileView = () => {
       </div>
 
       {/* Main Tab Navigation Bar */}
-      <div className="flex border-b border-slate-200 bg-white rounded-xl px-2 pt-1 shadow-xs transition-colors">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-b border-slate-200 bg-white rounded-xl p-2 shadow-xs transition-colors">
         <button
           type="button"
           onClick={() => setActiveTab('details')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`w-full flex flex-wrap items-center justify-center gap-2 px-4 py-3 text-center text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'details'
               ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
               : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2531,7 +2531,7 @@ export const ProfileView = () => {
         <button
           type="button"
           onClick={() => setActiveTab('documents')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`w-full flex flex-wrap items-center justify-center gap-2 px-4 py-3 text-center text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'documents'
               ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
               : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2551,7 +2551,7 @@ export const ProfileView = () => {
         <button
           type="button"
           onClick={() => setActiveTab('security')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`w-full flex flex-wrap items-center justify-center gap-2 px-4 py-3 text-center text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'security'
               ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
               : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
