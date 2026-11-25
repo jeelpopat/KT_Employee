@@ -179,6 +179,7 @@ const getTeamLeadCandidates = (team) => {
   ].filter(Boolean);
 };
 
+
 const buildTeamLeadOptions = (teamRoster, companyStaff) => {
   const options = new Map();
 
