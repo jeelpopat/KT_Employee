@@ -45,6 +45,38 @@ const showDesktopNotification = () => {
   }
 };
 
+const extractPhoto = (source) => {
+  if (!source) return '';
+  const empData = resolveEmployeeData(source);
+  const profData = source.profile || source.user || source;
+  return (
+    empData.profilePhoto ||
+    empData.profileImage ||
+    empData.avatar ||
+    empData.photoUrl ||
+    empData.photo ||
+    profData.profilePhoto ||
+    profData.profileImage ||
+    profData.avatar ||
+    profData.photoUrl ||
+    profData.photo ||
+    source.profilePhoto ||
+    source.profileImage ||
+    source.avatar ||
+    source.photoUrl ||
+    source.photo ||
+    ''
+  );
+};
+
+const hasProfilePhotoFields = (source) => {
+  if (!source || typeof source !== 'object') return false;
+  const fields = ['profilePhoto', 'profileImage', 'avatar', 'photoUrl', 'photo', 'image'];
+  if (fields.some(field => Object.prototype.hasOwnProperty.call(source, field))) return true;
+  return ['profile', 'user', 'employee', 'employeeId', 'employeeID', 'emp', 'employeeDetails', 'data']
+    .some(key => hasProfilePhotoFields(source[key]));
+};
+
 const getNotificationKey = (notification) => {
   const id = notification?._id || notification?.id;
   return id ? String(id) : null;
@@ -958,6 +990,33 @@ export const Header = ({ onSignOut }) => {
       try {
         const pData = await fetchLiveUserProfile();
         if (pData && isMounted) {
+          const serverPhoto = extractPhoto(pData);
+          if (serverPhoto) {
+            profilePhotoResetRef.current = false;
+            setIsProfilePhotoReset(false);
+            localStorage.removeItem(profilePhotoResetKey);
+            updateUserProfile({
+              profilePhoto: serverPhoto,
+              profileImage: serverPhoto,
+              photoUrl: serverPhoto,
+              avatar: serverPhoto,
+              image: serverPhoto,
+              photo: serverPhoto
+            });
+          } else if (hasProfilePhotoFields(pData)) {
+            const clearedPhotoFields = {
+              profilePhoto: '',
+              profileImage: '',
+              photoUrl: '',
+              avatar: '',
+              image: '',
+              photo: ''
+            };
+            profilePhotoResetRef.current = true;
+            setIsProfilePhotoReset(true);
+            localStorage.setItem(profilePhotoResetKey, 'true');
+            updateUserProfile(clearedPhotoFields);
+          }
           setHeaderProfileData(profilePhotoResetRef.current ? null : pData);
           const resolved = resolveEmployeeName(pData);
           if (resolved && updateUserProfile && user?.name !== resolved) {
@@ -998,30 +1057,6 @@ export const Header = ({ onSignOut }) => {
     window.addEventListener('kt_profile_photo_updated', handleProfilePhotoUpdated);
     return () => window.removeEventListener('kt_profile_photo_updated', handleProfilePhotoUpdated);
   }, [profilePhotoResetKey]);
-
-  const extractPhoto = (source) => {
-    if (!source) return '';
-    const empData = resolveEmployeeData(source);
-    const profData = source.profile || source.user || source;
-    return (
-      empData.profilePhoto ||
-      empData.profileImage ||
-      empData.avatar ||
-      empData.photoUrl ||
-      empData.photo ||
-      profData.profilePhoto ||
-      profData.profileImage ||
-      profData.avatar ||
-      profData.photoUrl ||
-      profData.photo ||
-      source.profilePhoto ||
-      source.profileImage ||
-      source.avatar ||
-      source.photoUrl ||
-      source.photo ||
-      ''
-    );
-  };
 
   const displayName = resolveEmployeeName(headerProfileData) || resolveEmployeeName(user) || (user?.email ? user.email.split('@')[0] : '') || '';
   const displayEmail =
@@ -1547,6 +1582,7 @@ export const Header = ({ onSignOut }) => {
                   employee={headerProfileData}
                   user={user}
                   src={displayPhoto}
+                  forceCompanyLogo={isProfilePhotoReset}
                   alt={`${displayName || 'User'} profile`}
                   className="h-8 w-8 shadow-xs"
                 />
@@ -1571,6 +1607,7 @@ export const Header = ({ onSignOut }) => {
                     employee={headerProfileData}
                     user={user}
                     src={displayPhoto}
+                    forceCompanyLogo={isProfilePhotoReset}
                     alt={`${displayName || 'User'} profile`}
                     className="h-8 w-8 rounded-lg border border-slate-200 bg-slate-50"
                   />

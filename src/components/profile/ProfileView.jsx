@@ -436,6 +436,14 @@ const normalizeCoreDocuments = (documents) => documents.reduce((normalized, docu
   return [...normalized, document];
 }, []);
 
+const normalizeIndianMobileNumber = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  return digits;
+};
+
+const isValidIndianMobileNumber = (value) => /^[6-9]\d{9}$/.test(normalizeIndianMobileNumber(value));
+
 export const ProfileView = () => {
   const { user: contextUser, updateUserProfile, userRole, roleDetails } = useApp();
   const isAdmin = userRole === 'admin';
@@ -634,8 +642,40 @@ export const ProfileView = () => {
 
       const emp = resolveEmployeeData(effectiveData);
       const prof = effectiveData?.profile || effectiveData?.user || effectiveData || {};
+      const livePhotoUrl = (
+        emp.profilePhoto ||
+        emp.profileImage ||
+        emp.avatar ||
+        emp.photoUrl ||
+        emp.photo ||
+        prof.profilePhoto ||
+        prof.profileImage ||
+        prof.avatar ||
+        prof.photoUrl ||
+        prof.photo ||
+        effectiveData?.profilePhoto ||
+        effectiveData?.profileImage ||
+        effectiveData?.avatar ||
+        effectiveData?.photoUrl ||
+        effectiveData?.photo ||
+        ''
+      );
+      const photoFields = ['profilePhoto', 'profileImage', 'avatar', 'photoUrl', 'photo', 'image'];
+      const hasLivePhotoField = [effectiveData, prof, emp].some(source =>
+        source && photoFields.some(field => Object.prototype.hasOwnProperty.call(source, field))
+      );
 
-      const extractedName = resolveEmployeeName(effectiveData) || resolveEmployeeName(contextUser) || '';
+      const isPrivilegedRole = userRole === 'admin' || userRole === 'hr';
+      const extractedName = (
+        isPrivilegedRole
+          ? (
+              prof.fullName ||
+              prof.name ||
+              (prof.firstName && prof.lastName ? `${prof.firstName} ${prof.lastName}`.trim() : '') ||
+              resolveEmployeeName(effectiveData)
+            )
+          : (resolveEmployeeName(effectiveData) || resolveEmployeeName(contextUser))
+      ) || '';
 
       if (extractedName) {
         setName(extractedName);
@@ -645,35 +685,65 @@ export const ProfileView = () => {
       }
       setPhone(
         prof.phoneNumber ||
-        emp.phoneNumber ||
-        emp.mobile ||
         prof.mobile ||
         prof.phone ||
+        emp.phoneNumber ||
+        emp.mobile ||
         effectiveData.phoneNumber ||
         effectiveData.mobile ||
         contextUser?.phoneNumber ||
+        contextUser?.mobile ||
+        contextUser?.phone ||
         ''
       );
-      setEmail(emp.email || prof.email || effectiveData.email || contextUser?.email || '');
-      setAddress(emp.currentAddress || prof.address || effectiveData.address || effectiveData.currentAddress || '');
+      setEmail(isPrivilegedRole
+        ? (prof.email || effectiveData.email || emp.email || contextUser?.email || '')
+        : (emp.email || prof.email || effectiveData.email || contextUser?.email || '')
+      );
+      setAddress(
+        emp.currentAddress ||
+        emp.address ||
+        prof.address ||
+        prof.currentAddress ||
+        effectiveData.address ||
+        effectiveData.currentAddress ||
+        ''
+      );
 
       const rawDob = prof.dob || emp.dob || effectiveData.dob || contextUser?.dob || '';
-      if (rawDob) {
-        setDobInput(typeof rawDob === 'string' && rawDob.includes('T') ? rawDob.split('T')[0] : rawDob);
-      }
+      setDobInput(typeof rawDob === 'string' && rawDob.includes('T') ? rawDob.split('T')[0] : rawDob);
+      setDobValidationError(getDateOfBirthValidationError(
+        typeof rawDob === 'string' && rawDob.includes('T') ? rawDob.split('T')[0] : rawDob
+      ));
       const rawGender = prof.gender || emp.gender || effectiveData.gender || contextUser?.gender || '';
-      if (rawGender) {
-        setGenderInput(rawGender);
-      }
+      setGenderInput(rawGender);
       const rawBloodGroup = prof.bloodGroup || emp.bloodGroup || effectiveData.bloodGroup || contextUser?.bloodGroup || '';
-      if (rawBloodGroup) {
-        setBloodGroupInput(rawBloodGroup);
-      }
+      setBloodGroupInput(rawBloodGroup);
 
-      // Load cached photo if available
-      const cachedPhoto = localStorage.getItem(localStoragePhotoKey);
-      if (cachedPhoto) {
-        setLocalPhotoUrl(cachedPhoto);
+      if (livePhotoUrl) {
+        setLocalPhotoUrl(livePhotoUrl);
+        setIsProfilePhotoReset(false);
+        clearProfilePhotoReset();
+        localStorage.setItem(localStoragePhotoKey, livePhotoUrl);
+        updateUserProfile({
+          profilePhoto: livePhotoUrl,
+          profileImage: livePhotoUrl,
+          photoUrl: livePhotoUrl,
+          avatar: livePhotoUrl,
+          image: livePhotoUrl,
+          photo: livePhotoUrl
+        });
+        window.dispatchEvent(new CustomEvent('kt_profile_photo_updated', { detail: { photoUrl: livePhotoUrl } }));
+      } else if (hasLivePhotoField) {
+        setLocalPhotoUrl('');
+        setIsProfilePhotoReset(true);
+        localStorage.removeItem(localStoragePhotoKey);
+        localStorage.setItem(localStoragePhotoResetKey, 'true');
+        updateUserProfile({ profilePhoto: '', profileImage: '', photoUrl: '', avatar: '', image: '', photo: '' });
+        window.dispatchEvent(new CustomEvent('kt_profile_photo_updated', { detail: { photoUrl: '' } }));
+      } else if (localStorage.getItem(localStoragePhotoResetKey) !== 'true') {
+        const cachedPhoto = localStorage.getItem(localStoragePhotoKey);
+        if (cachedPhoto) setLocalPhotoUrl(cachedPhoto);
       }
 
     } catch (error) {
@@ -684,14 +754,14 @@ export const ProfileView = () => {
       setEmail(contextUser?.email || '');
 
       const cachedPhoto = localStorage.getItem(localStoragePhotoKey);
-      if (cachedPhoto) {
+      if (cachedPhoto && localStorage.getItem(localStoragePhotoResetKey) !== 'true') {
         setLocalPhotoUrl(cachedPhoto);
       }
     } finally {
       setIsLoadingData(false);
       if (manual) setIsRefreshing(false);
     }
-  }, [contextUser?._id, localStoragePhotoKey]);
+  }, [contextUser?._id, contextUser?.name, userRole, updateUserProfile, localStoragePhotoKey, localStoragePhotoResetKey]);
 
   useEffect(() => {
     fetchProfile(false);
@@ -1717,8 +1787,9 @@ export const ProfileView = () => {
     }
     setDobValidationError('');
 
-    if (!/^\d{10}$/.test(phone)) {
-      showToast("Please enter a valid 10-digit mobile number.", "error");
+    const cleanPhone = normalizeIndianMobileNumber(phone);
+    if (!isValidIndianMobileNumber(cleanPhone)) {
+      showToast("Please enter a valid 10-digit Indian mobile number.", "error");
       return;
     }
     setIsSaving(true);
@@ -1735,8 +1806,8 @@ export const ProfileView = () => {
         name: cleanName,
         fullName: cleanName,
         employeeName: cleanName,
-        phoneNumber: phone, 
-        mobile: phone,
+        phoneNumber: cleanPhone, 
+        mobile: cleanPhone,
         address,
         currentAddress: address,
         dob: dobInput || undefined,
@@ -1745,20 +1816,37 @@ export const ProfileView = () => {
       };
 
       // 3. Update user profile on backend
+      let updateSucceeded = false;
+      let updateError = null;
       try {
-        await api.put('/api/users/profile/update', payload);
+        const response = await api.put('/api/users/profile/update', payload);
+        if (response.data?.success === false) {
+          throw new Error(response.data?.message || 'Profile update was rejected.');
+        }
+        updateSucceeded = true;
       } catch (err) {
         console.warn('PUT /api/users/profile/update notice:', err?.message);
+        updateError = err;
         try {
-          await api.put('/api/users/profile', payload);
-        } catch {}
+          const fallbackResponse = await api.put('/api/users/profile', payload);
+          if (fallbackResponse.data?.success === false) {
+            throw new Error(fallbackResponse.data?.message || 'Profile update was rejected.');
+          }
+          updateSucceeded = true;
+        } catch (fallbackErr) {
+          updateError = fallbackErr;
+        }
+      }
+      if (!updateSucceeded) {
+        throw updateError || new Error('Could not update profile on the server.');
       }
 
       const updatedFields = {
         name: cleanName,
         fullName: cleanName,
-        phone,
-        mobile: phone,
+        phone: cleanPhone,
+        mobile: cleanPhone,
+        phoneNumber: cleanPhone,
         address,
         currentAddress: address,
         dob: dobInput,
@@ -1769,6 +1857,7 @@ export const ProfileView = () => {
       if (updateUserProfile) {
         updateUserProfile(updatedFields);
       }
+      setPhone(cleanPhone);
 
       setProfileData(prev => ({
         ...prev,
@@ -1781,7 +1870,8 @@ export const ProfileView = () => {
           ...(prev?.employee || {}), 
           name: cleanName, 
           fullName: cleanName, 
-          mobile: phone, 
+          phoneNumber: cleanPhone,
+          mobile: cleanPhone, 
           currentAddress: address,
           dob: dobInput || prev?.employee?.dob,
           gender: genderInput || prev?.employee?.gender,
@@ -1791,7 +1881,7 @@ export const ProfileView = () => {
           ...(prev?.profile || {}), 
           name: cleanName, 
           fullName: cleanName, 
-          phoneNumber: phone, 
+          phoneNumber: cleanPhone, 
           address,
           dob: dobInput || prev?.profile?.dob,
           gender: genderInput || prev?.profile?.gender,

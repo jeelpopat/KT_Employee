@@ -50,6 +50,7 @@ export const EmployeeAvatar = ({
   user,
   profile,
   src,
+  forceCompanyLogo = false,
   alt = 'Employee profile',
   className = '',
 }) => {
@@ -58,7 +59,7 @@ export const EmployeeAvatar = ({
     findPhotoUrl(user) ||
     findPhotoUrl(profile);
   const [failedPhotoUrl, setFailedPhotoUrl] = useState('');
-  const showCompanyLogo = !photoUrl || failedPhotoUrl === photoUrl;
+  const showCompanyLogo = forceCompanyLogo || !photoUrl || failedPhotoUrl === photoUrl;
 
   return (
     <span
