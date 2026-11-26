@@ -254,6 +254,24 @@ export const normalizeAttendanceRecord = (record) => {
   return record;
 };
 
+export const deduplicateAttendanceRecordsByDate = (records) => {
+  const seenDates = new Set();
+
+  return records.filter((record) => {
+    const dateValue = record?.date || record?.checkInTime || record?.inTime;
+    if (!dateValue) return true;
+
+    const date = new Date(dateValue);
+    const dateKey = Number.isNaN(date.getTime())
+      ? String(dateValue).trim()
+      : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+    if (seenDates.has(dateKey)) return false;
+    seenDates.add(dateKey);
+    return true;
+  });
+};
+
 /**
  * Safely resolves timeline segment minutes to local minutes from midnight.
  * Backend timeline segments (fromMinutes, toMinutes) are generated in local shift minutes

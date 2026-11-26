@@ -10,6 +10,77 @@ import { useApp } from '../../context/AppContext.jsx';
 import { tabToPath } from '../../utils/navigation.js';
 import api from '../../api/axios.js';
 import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
+import { getTeamLeadLeaveStatus } from '../../utils/leaveUtils.js';
+import {
+  extractAssignedTeamEmployees,
+  fetchTeamsList,
+  getLoggedInUserIdentifiers,
+  isLeaveOfAssignedTeam,
+  isTeamOwnedByLead,
+} from '../../utils/teamLeadUtils.js';
+
+const extractLeaveList = (responseData) => {
+  const candidates = [
+    responseData,
+    responseData?.data,
+    responseData?.leaves,
+    responseData?.history,
+    responseData?.requests,
+    responseData?.result,
+    responseData?.data?.leaves,
+    responseData?.data?.history,
+    responseData?.data?.requests,
+    responseData?.data?.result,
+  ];
+
+  return candidates.find((candidate) => Array.isArray(candidate) && candidate.length > 0) ||
+    candidates.find(Array.isArray) ||
+    [];
+};
+
+const getAssignedTeamPendingLeaveCount = async (user) => {
+  const [teamsResult, usersResult] = await Promise.allSettled([
+    fetchTeamsList(),
+    api.get('/api/users/all'),
+  ]);
+  const allTeams = teamsResult.status === 'fulfilled' ? teamsResult.value : [];
+  const usersData = usersResult.status === 'fulfilled' ? usersResult.value.data : {};
+  const rawUsers = usersData?.users || usersData?.data || (Array.isArray(usersData) ? usersData : []);
+  const usersMap = {};
+
+  if (Array.isArray(rawUsers)) {
+    rawUsers.forEach((userRecord) => {
+      [
+        userRecord._id, userRecord.id, userRecord.userId, userRecord.userID,
+        userRecord.employeeId, userRecord.employeeID, userRecord.empId,
+        userRecord.uniqueID, userRecord.uniqueId, userRecord.employeeCode,
+      ].filter(Boolean).forEach((id) => {
+        usersMap[String(id).toLowerCase().trim()] = userRecord;
+      });
+      if (userRecord.email) usersMap[userRecord.email.toLowerCase().trim()] = userRecord;
+    });
+  }
+
+  let leaveResponse;
+  try {
+    leaveResponse = await api.get('/api/leave/all');
+  } catch (leaveError) {
+    try {
+      leaveResponse = await api.get('/api/employee-panel/leaves/history');
+    } catch {
+      throw leaveError;
+    }
+  }
+
+  const userIdent = getLoggedInUserIdentifiers(user);
+  const assignedTeams = allTeams.filter((team) => isTeamOwnedByLead(team, userIdent));
+  const teamScope = extractAssignedTeamEmployees(assignedTeams, usersMap);
+
+  return extractLeaveList(leaveResponse.data).filter((leave) =>
+    isLeaveOfAssignedTeam(leave, teamScope, usersMap) &&
+    getTeamLeadLeaveStatus(leave) === 'pending'
+  ).length;
+};
 
 // ==========================================================
 // EXACT REFERENCE ICONS MATCHING USER SCREENSHOT (media_1792663861944.png)
@@ -277,11 +348,15 @@ export const Sidebar = ({ onSignOut }) => {
           throw new TypeError('Sidebar counts response is incomplete.');
         }
 
+        const leaveCount = userRole === 'team_leader'
+          ? await getAssignedTeamPendingLeaveCount(user)
+          : Number(counts.leave);
+
         if (isMounted) {
           setRequestCountState({
             role: userRole,
             checkIn: Number(counts.checkIn),
-            leave: Number(counts.leave),
+            leave: leaveCount,
             employee: Number(counts.employee),
             deduction: Number(counts.deduction),
           });
@@ -456,6 +531,7 @@ export const Sidebar = ({ onSignOut }) => {
       title: "ATTENDANCE AND LEAVES",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
+        { tab: 'leave', label: 'My Leaves', icon: LeaveRequestsIcon },
         { tab: 'admin-attendance-logs', label: 'Attendance Logs', icon: AttendanceLogsIcon },
         { tab: 'admin-checkin-requests', label: 'Check-in Requests', icon: CheckInsIcon, requestCount: requestCounts.checkIn },
         { tab: 'admin-leave-requests', label: 'Leave Requests', icon: LeaveRequestsIcon, requestCount: requestCounts.leave },
@@ -528,12 +604,6 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "POLICIES",
-      items: [
-        { tab: 'team-lead-policies', label: 'Team Lead Policies', icon: BookOpen },
-      ]
-    },
-    {
       title: "MY WORKSPACE",
       items: [
         { tab: 'attendance', label: 'My Attendance', icon: CheckInsIcon, badge: attendanceStatus === 'checked_in' ? 'Active' : undefined },
@@ -550,6 +620,12 @@ export const Sidebar = ({ onSignOut }) => {
       title: "USER GUIDE & HELP",
       items: [
         { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
+      ]
+    },
+    {
+      title: "POLICIES",
+      items: [
+        { tab: 'team-lead-policies', label: 'Team Lead Policies', icon: BookOpen },
       ]
     },
     {
@@ -589,15 +665,15 @@ export const Sidebar = ({ onSignOut }) => {
       ]
     },
     {
-      title: "POLICIES",
-      items: [
-        { tab: 'employee-policies', label: 'Employee Policies', icon: BookOpen },
-      ]
-    },
-    {
       title: "USER GUIDE & HELP",
       items: [
         { tab: 'user-guide', label: 'How to Use CRM', icon: CircleHelp }
+      ]
+    },
+    {
+      title: "POLICIES",
+      items: [
+        { tab: 'employee-policies', label: 'Employee Policies', icon: BookOpen },
       ]
     },
     {

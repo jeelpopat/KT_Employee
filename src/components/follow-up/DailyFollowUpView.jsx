@@ -370,9 +370,9 @@ export const DailyFollowUpView = () => {
                 Live Data
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            {/* <p className="text-xs text-slate-500 mt-0.5">
               Review daily standup submissions, hours worked, task progress, and blockers by person
-            </p>
+            </p> */}
           </div>
         </div>
 

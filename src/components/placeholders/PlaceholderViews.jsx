@@ -13,7 +13,7 @@ import { useApp } from '../../context/AppContext.jsx';
 import api from '../../api/axios.js';
 import { ProjectView } from '../projects/ProjectView.jsx';
 import { calculateLeaveDays, expandHolidayDates } from '../../utils/holidayUtils.js';
-import { getHalfDayType, isHalfDayLeave } from '../../utils/leaveUtils.js';
+import { getHalfDayType, getTeamLeadLeaveStatus, isHalfDayLeave } from '../../utils/leaveUtils.js';
 import {
   getLoggedInUserIdentifiers,
   fetchTeamsList,
@@ -784,9 +784,9 @@ export const TeamMembersView = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900">My Team Members</h2>
-            <p className="text-xs sm:text-sm text-slate-500">
+            {/* <p className="text-xs sm:text-sm text-slate-500">
               Colleagues and team leaders in your assigned project teams
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -1138,9 +1138,9 @@ export const EmployeesView = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900">Company Employee Directory</h2>
-            <p className="text-xs sm:text-sm text-slate-500">
+            {/* <p className="text-xs sm:text-sm text-slate-500">
               Company staff directory including Employees, Team Leaders, HR, Accountants, and CAs
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -2594,22 +2594,7 @@ export const TeamLeaveManagementView = () => {
     return { name, role, email, photo };
   };
 
-  // Determine Team Leader approval status for a leave
-  const getTlStatus = (l) => {
-    const tl = String(l.teamLeadStatus || '').toLowerCase().trim();
-    if (tl === 'approved') return 'approved';
-    if (tl === 'rejected') return 'rejected';
-
-    // If TL note already approved or state advanced to HR/Admin, consider TL approved
-    if (l.teamLeadRemark && l.teamLeadRemark.toLowerCase().includes('approved')) return 'approved';
-    if (l.status === 'pending_hr' || l.status === 'pending_admin') return 'approved';
-
-    const overall = String(l.status || '').toLowerCase().trim();
-    if (overall.includes('approve')) return 'approved';
-    if (overall.includes('reject')) return 'rejected';
-
-    return 'pending';
-  };
+  const getTlStatus = getTeamLeadLeaveStatus;
 
   // Fetch Live Leaves and User Directory with Team Scope filter
   const fetchLeaves = async (isSilent = false) => {
@@ -2855,9 +2840,9 @@ export const TeamLeaveManagementView = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900">Team Leave Approvals</h2>
-            <p className="text-xs sm:text-sm text-slate-500">
+            {/* <p className="text-xs sm:text-sm text-slate-500">
               Review and approve leave applications for your assigned team members before they proceed to HR
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -2884,14 +2869,14 @@ export const TeamLeaveManagementView = () => {
             Requests forward to HR upon your approval
           </span>
         </div>
-      ) : (
+      ) : !isLoading ? (
         <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
           <AlertCircle size={16} className="text-amber-600 shrink-0" />
           <span>
             No specific team currently assigned to your Team Lead account in <code>/api/teamLead/team</code>. Only leave requests from your assigned team members will appear here.
           </span>
         </div>
-      )}
+      ) : null}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

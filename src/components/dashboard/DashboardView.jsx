@@ -1515,19 +1515,6 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     return () => window.removeEventListener('kt_auto_checkout_triggered', handleExternalAutoCheckout);
   }, [fetchTodayAttendance]);
 
-  const executeAttendanceAction = async (actionCallback) => {
-    setGeoError('');
-    setIsActionLoading(true);
-
-    try {
-      await actionCallback();
-    } catch (error) {
-      setGeoError(error?.message || 'Attendance action failed. Please try again.');
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
   // Extract real user ID from JWT token or user profile (never employee document ID)
   const getRealAuthUserId = () => {
     try {
@@ -1592,6 +1579,8 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     };
 
     const payloadVariants = [attendancePayload];
+    setGeoError('');
+    setIsActionLoading(true);
 
     try {
       let response = null;
@@ -1922,18 +1911,15 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
   };
 
   // --- Strict Mapped Action Payloads (matching attendanceService protocol) ---
-  const onCheckInClick = () => {
+  const onCheckInClick = async () => {
     if (!actionsAvailable.canCheckIn) return;
-    executeAttendanceAction(async () => {
-      const payload = {
-        officeStartTime: "10:00",
-        presentHours: 8
-      };
-      await handleAttendanceAction('/api/attendance/check-in', payload, 'check_in');
-    });
+    await handleAttendanceAction('/api/attendance/check-in', {
+      officeStartTime: "10:00",
+      presentHours: 8
+    }, 'check_in');
   };
 
-  const onStartBreakClick = () => {
+  const onStartBreakClick = async () => {
     if (!actionsAvailable.canStartBreak) return;
     const todayKey = new Date().toISOString().split('T')[0];
     const currentBreaks = parseInt(
@@ -1946,13 +1932,10 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     }
     const isoNow = new Date().toISOString();
     setActiveBreakIsoStart(isoNow);
-    executeAttendanceAction(async () => {
-      const payload = {};
-      await handleAttendanceAction('/api/attendance/break/start', payload, 'break_start');
-    });
+    await handleAttendanceAction('/api/attendance/break/start', {}, 'break_start');
   };
 
-  const onResumeWorkClick = () => {
+  const onResumeWorkClick = async () => {
     if (!actionsAvailable.canEndBreak) return;
     const todayStr = new Date().toISOString().split('T')[0];
     const todayLocalStr = new Date().toLocaleDateString('en-CA');
@@ -1960,26 +1943,20 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     localStorage.setItem('kt_break_out_action_ts_' + todayStr, breakOutActionTimestamp);
     localStorage.setItem('kt_break_out_action_ts_' + todayLocalStr, breakOutActionTimestamp);
 
-    executeAttendanceAction(async () => {
-      try {
-        const payload = {};
-        await handleAttendanceAction('/api/attendance/break/end', payload, 'break_end');
-      } finally {
-        localStorage.removeItem('kt_break_out_action_ts_' + todayStr);
-        localStorage.removeItem('kt_break_out_action_ts_' + todayLocalStr);
-      }
-    });
+    try {
+      await handleAttendanceAction('/api/attendance/break/end', {}, 'break_end');
+    } finally {
+      localStorage.removeItem('kt_break_out_action_ts_' + todayStr);
+      localStorage.removeItem('kt_break_out_action_ts_' + todayLocalStr);
+    }
   };
 
-  const onCheckOutClick = () => {
+  const onCheckOutClick = async () => {
     if (!actionsAvailable.canCheckOut) return;
-    executeAttendanceAction(async () => {
-      const payload = {
-        checkoutType: 'MANUAL',
-        remarks: 'Manual checkout'
-      };
-      await handleAttendanceAction('/api/attendance/check-out', payload, 'check_out');
-    });
+    await handleAttendanceAction('/api/attendance/check-out', {
+      checkoutType: 'MANUAL',
+      remarks: 'Manual checkout'
+    }, 'check_out');
   };
 
   const formatDateDayMonth = (isoString) => {

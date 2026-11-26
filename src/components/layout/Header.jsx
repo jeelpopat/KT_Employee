@@ -1163,9 +1163,9 @@ export const Header = ({ onSignOut }) => {
 
             {/* Notification Dropdown - Tailored per role */}
             {isNotificationsOpen && (
-              <div className="fixed inset-x-2.5 top-[68px] sm:top-full sm:mt-2 sm:absolute sm:right-0 sm:left-auto sm:inset-x-auto sm:w-[420px] sm:max-w-[calc(100vw-2rem)] bg-white border border-slate-200/90 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in text-xs">
+              <div className="fixed inset-x-2.5 top-[68px] sm:top-full sm:mt-2 sm:absolute sm:right-0 sm:left-auto sm:inset-x-auto sm:w-[440px] sm:max-w-[calc(100vw-2rem)] bg-white border border-slate-200/90 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in text-xs">
                 <div className="flex items-center justify-between gap-3 px-3.5 py-2 border-b border-slate-100 bg-white">
-                  <span className="text-[11px] text-slate-600">
+                  <span className="min-w-0 text-[11px] leading-4 text-slate-600">
                     {desktopNotificationPermission === 'granted'
                       ? pushSetupStatus === 'ready'
                         ? 'Background push notifications enabled'
@@ -1187,7 +1187,7 @@ export const Header = ({ onSignOut }) => {
                       pushSetupStatus === 'ready' ||
                       pushSetupStatus === 'loading'
                     }
-                    className="rounded-md bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="shrink-0 whitespace-nowrap rounded-md bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {pushSetupStatus === 'loading'
                       ? 'Setting up...'
@@ -1201,22 +1201,22 @@ export const Header = ({ onSignOut }) => {
                 {isAdmin ? (
                   <>
                     {/* Admin Header */}
-                    <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/80">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/80">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-slate-900 text-sm">Notifications</h3>
+                        <h3 className="whitespace-nowrap font-semibold text-slate-900 text-sm">Notifications</h3>
                         {adminUnreadCount > 0 && (
-                          <span className="bg-rose-100 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                          <span className="whitespace-nowrap bg-rose-100 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
                             {adminUnreadCount} unread
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
                         {adminNotifications.some(isDeletableAdminNotification) && (
                           <button
                             type="button"
                             onClick={handleDeleteAllNotifications}
                             disabled={isDeletingAllNotifications || deletingNotificationIds.size > 0}
-                            className="text-[11px] font-medium text-rose-600 hover:text-rose-800 flex items-center gap-1 transition-colors hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="shrink-0 whitespace-nowrap text-[11px] font-medium text-rose-600 hover:text-rose-800 flex items-center gap-1 transition-colors hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Delete all notifications"
                           >
                             <Trash2 size={13} /> Delete all
@@ -1227,7 +1227,7 @@ export const Header = ({ onSignOut }) => {
                             type="button"
                             onClick={handleAdminMarkAllAsRead}
                             disabled={isDeletingAllNotifications}
-                            className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors hover:underline cursor-pointer"
+                            className="shrink-0 whitespace-nowrap text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors hover:underline cursor-pointer"
                             title="Mark all as read"
                           >
                             <CheckCheck size={13} /> Mark all read
@@ -1241,7 +1241,7 @@ export const Header = ({ onSignOut }) => {
                             setEditingAnnouncementId(null);
                             setShowAnnouncementModal(true);
                           }}
-                          className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-md border border-indigo-100 cursor-pointer transition-colors"
+                          className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-md border border-indigo-100 cursor-pointer transition-colors"
                         >
                           <Plus size={13} /> New
                         </button>

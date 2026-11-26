@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Clock,
   FileText,
+  Paperclip,
   Search,
   Filter,
   ChevronDown,
@@ -155,6 +156,27 @@ const normalizeLeaveType = (type) => {
 const formatLeaveType = (type) =>
   normalizeLeaveType(type)
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const getLeaveAttachment = (leave) => {
+  const attachment =
+    leave?.attachment ||
+    leave?.attachments ||
+    leave?.documentLink ||
+    leave?.documentUrl ||
+    leave?.attachmentUrl ||
+    leave?.fileUrl ||
+    leave?.fileURL;
+
+  const candidates = Array.isArray(attachment) ? attachment : [attachment];
+  return candidates.map((candidate) => {
+    if (typeof candidate === "string") return candidate.trim();
+    if (candidate && typeof candidate === "object") {
+      return candidate.url || candidate.fileUrl || candidate.fileURL ||
+        candidate.secure_url || candidate.href || candidate.path || "";
+    }
+    return "";
+  }).find(Boolean) || "";
+};
 
 const getCanonicalLeaveType = (type, leave) => {
   const rawLeave = leave?.rawLeave || leave || {};
@@ -840,6 +862,8 @@ export default function LeaveRequest() {
             ),
 
             reason: leave?.reason || "",
+
+            attachment: getLeaveAttachment(leave),
 
             teamLeadStatus,
 
@@ -2024,14 +2048,15 @@ export default function LeaveRequest() {
               <table className="w-full min-w-[1280px] table-fixed text-xs font-poppins">
                 <colgroup>
                   <col className="w-[4%]" />
-                  <col className="w-[14%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[8%]" />
                   <col className="w-[10%]" />
-                  <col className="w-[9%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
                   <col className="w-[11%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[12%]" />
+                  <col className="w-[8%]" />
                   <col className="w-[13%]" />
                 </colgroup>
 
@@ -2063,6 +2088,9 @@ export default function LeaveRequest() {
                     </th>
                     <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[140px]">
                       Workflow
+                    </th>
+                    <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[110px]">
+                      Attachment
                     </th>
                     <th className="px-3 py-3.5 text-left text-xs font-semibold text-[#034665] font-poppins min-w-[150px]">
                       Approve / Reject Reason
@@ -2158,6 +2186,23 @@ export default function LeaveRequest() {
                         <span className="text-xs font-medium text-slate-700 font-poppins whitespace-nowrap">
                           {getWorkflowText(request)}
                         </span>
+                      </td>
+
+                      <td className="px-3 py-3">
+                        {request.attachment ? (
+                          <a
+                            href={request.attachment}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:underline"
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            View Attachment
+                          </a>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium select-none">-</span>
+                        )}
                       </td>
 
                       <td className="px-3 py-3">
@@ -2330,6 +2375,18 @@ export default function LeaveRequest() {
                       )}
                     </div>
                   )}
+                  {request.attachment && (
+                    <a
+                      href={request.attachment}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex items-center gap-1.5 pt-2 border-t border-slate-100 text-xs font-medium text-indigo-600 hover:underline"
+                    >
+                      <Paperclip className="h-3.5 w-3.5" />
+                      View Attachment
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
@@ -2468,6 +2525,26 @@ export default function LeaveRequest() {
                   {selectedLeave.reason || "No reason provided by applicant."}
                 </p>
               </div>
+
+              {selectedLeave.attachment && (
+                <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-2xs">
+                  <div className="flex items-center gap-2 text-slate-700 mb-2 font-poppins">
+                    <Paperclip className="w-4 h-4 text-[#034665]" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Attachment
+                    </span>
+                  </div>
+                  <a
+                    href={selectedLeave.attachment}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(event) => event.stopPropagation()}
+                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-indigo-600 hover:underline break-all"
+                  >
+                    View Attachment
+                  </a>
+                </div>
+              )}
 
               {/* APPROVAL FLOW */}
               <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-2xs">

@@ -13,7 +13,8 @@ import {
   getLoggedInUserIdentifiers, 
   isProjectAssignedToLead, 
   isTeamLeadRole, 
-  isAdminRole 
+  isAdminRole,
+  fetchTeamsList
 } from '../../utils/teamLeadUtils.js';
 import { normalizeTaskStatus, getProgressForStatus } from '../../utils/taskUtils.js';
 import { showToast } from '../common/Toast.jsx';
@@ -137,6 +138,95 @@ const matchesUserAssignment = (assignment, userIdentifiers) => {
     idValues.some(value => typeof value === 'object' && matchesUserAssignment(value, userIdentifiers));
 };
 
+const getStaffIdentity = (staff) => {
+  if (!staff) return null;
+  const id = staff._id || staff.id || staff.userId || staff.employeeId || staff.employeeID;
+  const email = String(staff.email || '').toLowerCase().trim();
+  const name = String(staff.fullName || staff.name || '').toLowerCase().trim();
+  return { id: id ? String(id) : '', email, name };
+};
+
+const getStaffRole = (staff) => String(
+  staff?.role?.name ||
+  staff?.roleName ||
+  staff?.userRole ||
+  staff?.position ||
+  staff?.designation ||
+  staff?.role ||
+  ''
+).toLowerCase().trim();
+
+const isEmployeeStaff = (staff) => {
+  const role = getStaffRole(staff);
+  if (!role) return true;
+  if (isTeamLeadRole(role, staff) || isAdminRole(role, staff)) return false;
+  return ['employee', 'team member', 'staff', 'user'].includes(role) ||
+    role.includes('employee') ||
+    role.includes('team member');
+};
+
+const getTeamLeadCandidates = (team) => {
+  if (!team) return [];
+  return [
+    team.teamLeadUser,
+    team.teamLeadEmployee,
+    team.teamLead,
+    team.lead,
+    team.leader,
+    team.teamLeader,
+    team.teamLeaderId,
+    team.teamLeadId
+  ].filter(Boolean);
+};
+
+
+const buildTeamLeadOptions = (teamRoster, companyStaff) => {
+  const options = new Map();
+
+  teamRoster.forEach(team => {
+    getTeamLeadCandidates(team).forEach(candidate => {
+      if (typeof candidate !== 'object') {
+        const key = String(candidate).trim();
+        if (!key) return;
+        const match = companyStaff.find(st => {
+          const identity = getStaffIdentity(st);
+          return identity.id === key || identity.email === key.toLowerCase() ||
+            identity.name === key.toLowerCase();
+        });
+        const enriched = match ? { ...match } : { _id: key, id: key, name: key };
+        const id = String(enriched._id || enriched.id || key);
+        if (!options.has(id)) options.set(id, enriched);
+        return;
+      }
+
+      const enriched = companyStaff.find(st => {
+        const staffIdentity = getStaffIdentity(st);
+        const candidateIdentity = getStaffIdentity(candidate);
+        return [candidateIdentity.id, candidateIdentity.email, candidateIdentity.name]
+          .some(key => key && (
+            staffIdentity.id === key ||
+            staffIdentity.email === key ||
+            staffIdentity.name === key
+          ));
+      });
+      const lead = enriched ? { ...enriched } : { ...candidate };
+      const id = String(lead._id || lead.id || lead.userId || lead.employeeId || lead.employeeID || '');
+      if (id && !options.has(id)) options.set(id, lead);
+    });
+  });
+
+  if (options.size === 0) {
+    companyStaff.forEach(st => {
+      if (isTeamLeadRole(getStaffRole(st), st)) {
+        const id = String(st._id || st.id || '');
+        if (id) options.set(id, st);
+      }
+    });
+  }
+
+  return Array.from(options.values());
+};
+
 export const ProjectView = () => {
   const { user, userRole, setSelectedTask } = useApp();
 
@@ -172,6 +262,7 @@ export const ProjectView = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const lastProjectClickTimeRef = useRef(0);
   const [companyStaff, setCompanyStaff] = useState([]);
+  const [teamRoster, setTeamRoster] = useState([]);
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
@@ -199,13 +290,77 @@ export const ProjectView = () => {
   };
   const [formData, setFormData] = useState(initialFormState);
 
+  const teamLeads = useMemo(
+    () => buildTeamLeadOptions(teamRoster, companyStaff),
+    [teamRoster, companyStaff]
+  );
+
+  const employeeOptions = useMemo(() => {
+    if (!formData.teamLeadUser) return [];
+
+    const selectedLead = companyStaff.find(st => String(st._id || st.id) === String(formData.teamLeadUser));
+    if (!selectedLead) return [];
+
+    const leadIdentity = getStaffIdentity(selectedLead);
+    const leadKeys = new Set(
+      [leadIdentity.id, leadIdentity.email, leadIdentity.name].filter(Boolean)
+    );
+
+    const matchesLead = (value) => {
+      if (!value) return false;
+      if (typeof value === 'object') {
+        const nested = getStaffIdentity(value);
+        return [nested.id, nested.email, nested.name].some(key => key && leadKeys.has(key));
+      }
+      const key = String(value).toLowerCase().trim();
+      return leadKeys.has(key);
+    };
+
+    const memberIds = new Set();
+    teamRoster.forEach(team => {
+      const leadValue = team.teamLeadUser || team.teamLeadEmployee || team.teamLead ||
+        team.lead || team.leader || team.teamLeader || team.teamLeaderId || team.teamLeadId;
+      if (!matchesLead(leadValue)) return;
+
+      const members = [
+        ...(Array.isArray(team.employees) ? team.employees : []),
+        ...(Array.isArray(team.teamMembers) ? team.teamMembers : []),
+        ...(Array.isArray(team.members) ? team.members : []),
+        ...(Array.isArray(team.team?.members) ? team.team.members : [])
+      ];
+      members.forEach(member => {
+        if (!member) return;
+        const identity = getStaffIdentity(member);
+        [identity.id, identity.email, identity.name].filter(Boolean).forEach(key => memberIds.add(key));
+      });
+    });
+
+    return companyStaff.filter(st => {
+      if (!isEmployeeStaff(st)) return false;
+      const identity = getStaffIdentity(st);
+      if (memberIds.size > 0) {
+        return [identity.id, identity.email, identity.name].some(key => key && memberIds.has(key));
+      }
+
+      const reportingLead = st.teamLeadId || st.teamLead || st.reportingManager ||
+        st.teamLeader || st.manager;
+      return matchesLead(reportingLead);
+    });
+  }, [companyStaff, teamRoster, formData.teamLeadUser]);
+
   // Fetch company staff for assigning team leads, employees
   useEffect(() => {
     const fetchStaff = async () => {
       try {
-        const res = await api.get('/api/users/all');
-        const list = res.data?.users || res.data?.data || [];
+        const [staffRes, teams] = await Promise.allSettled([
+          api.get('/api/users/all'),
+          fetchTeamsList()
+        ]);
+        const list = staffRes.status === 'fulfilled'
+          ? (staffRes.value.data?.users || staffRes.value.data?.data || [])
+          : [];
         setCompanyStaff(Array.isArray(list) ? list : []);
+        setTeamRoster(teams.status === 'fulfilled' && Array.isArray(teams.value) ? teams.value : []);
       } catch (e) {
         console.warn('Could not load company staff for project assignments', e);
       }
@@ -276,7 +431,7 @@ export const ProjectView = () => {
         return;
       }
       if (formData.teamLeadUser) payload.teamLeadUser = formData.teamLeadUser;
-      if (formData.employees && formData.employees.length > 0) payload.employees = formData.employees;
+      payload.employees = formData.employees || [];
 
       if (editingProject) {
         // UPDATE PROJECT: PUT /api/projectManage/project/:id
@@ -1448,17 +1603,59 @@ export const ProjectView = () => {
                   </label>
                   <select
                     value={formData.teamLeadUser}
-                    onChange={e => setFormData({ ...formData, teamLeadUser: e.target.value })}
+                    onChange={e => setFormData(prev => ({
+                      ...prev,
+                      teamLeadUser: e.target.value,
+                      employees: []
+                    }))}
                     className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="">-- Select Team Leader --</option>
-                    {companyStaff.map(st => (
-                      <option key={st._id} value={st._id}>
-                        {st.name} ({st.role || 'Staff'}) - {st.email}
+                    {teamLeads.map(st => (
+                      <option key={st._id || st.id || st.employeeId} value={st._id || st.id || st.employeeId}>
+                        {st.fullName || st.name || st.email} ({getStaffRole(st) || 'Team Leader'}) - {st.email}
                       </option>
                     ))}
                   </select>
                 </div>
+
+                {formData.teamLeadUser && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Assign Employees <span className="text-slate-400">(Multiple)</span>
+                    </label>
+                    {employeeOptions.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-3 border border-slate-200 rounded-lg bg-slate-50">
+                        {employeeOptions.map(st => {
+                          const id = String(st._id || st.id);
+                          const checked = formData.employees.includes(id);
+                          return (
+                            <label key={id} className="flex items-center gap-2 p-2 rounded-md bg-white border border-slate-200 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={e => setFormData(prev => ({
+                                  ...prev,
+                                  employees: e.target.checked
+                                    ? [...prev.employees, id]
+                                    : prev.employees.filter(employeeId => employeeId !== id)
+                                }))}
+                                className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                              />
+                              <span className="text-xs text-slate-700">
+                                {st.fullName || st.name || st.email}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-slate-500 border border-slate-200 rounded-lg bg-slate-50">
+                        No employees assigned to this Team Leader.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Description */}
                 <div className="sm:col-span-2">

@@ -97,7 +97,7 @@ export default function HRPoliciesView({ audience = 'hr' }) {
               {isEmployeeView
                 ? 'Browse shared company and employee policies by topic or search by title, description, or policy number.'
                 : isTeamLeadView
-                  ? 'Browse shared company and team lead policies by topic or search by title, description, or policy number.'
+                  ? ''
                 : ''}
             </p>
           </div>

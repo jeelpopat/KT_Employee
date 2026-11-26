@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useApp, resolveEmployeeName, resolveEmployeeData, fetchLiveUserProfile } from '../../context/AppContext.jsx';
 import api, { BASE_URL } from '../../api/axios.js'; 
+import { getDateOfBirthValidationError, getTodayDateString } from '../../utils/dateOfBirthValidation.js';
 import companyLogo from '../../assets/Logo.png';
 import aadharProofIcon from '../../assets/profile/aadhar-proof-icon.png';
 import panProofIcon from '../../assets/profile/pan-proof-icon.png';
@@ -474,6 +475,7 @@ export const ProfileView = () => {
     const d = contextUser?.dob || emp?.dob || '';
     return typeof d === 'string' && d.includes('T') ? d.split('T')[0] : d;
   });
+  const [dobValidationError, setDobValidationError] = useState('');
   const [genderInput, setGenderInput] = useState(() => {
     const emp = resolveEmployeeData(contextUser);
     return contextUser?.gender || emp?.gender || '';
@@ -1707,6 +1709,14 @@ export const ProfileView = () => {
   // --- Personal & Contact Form Save ---
   const handleSaveContact = async (e) => {
     e.preventDefault();
+    const dobError = getDateOfBirthValidationError(dobInput);
+    if (dobError) {
+      setDobValidationError(dobError);
+      showToast(dobError, "error");
+      return;
+    }
+    setDobValidationError('');
+
     if (!/^\d{10}$/.test(phone)) {
       showToast("Please enter a valid 10-digit mobile number.", "error");
       return;
@@ -2504,11 +2514,11 @@ export const ProfileView = () => {
       </div>
 
       {/* Main Tab Navigation Bar */}
-      <div className="flex border-b border-slate-200 bg-white rounded-xl px-2 pt-1 shadow-xs transition-colors">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-b border-slate-200 bg-white rounded-xl p-2 shadow-xs transition-colors">
         <button
           type="button"
           onClick={() => setActiveTab('details')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`w-full flex flex-wrap items-center justify-center gap-2 px-4 py-3 text-center text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'details'
               ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
               : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2521,7 +2531,7 @@ export const ProfileView = () => {
         <button
           type="button"
           onClick={() => setActiveTab('documents')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`w-full flex flex-wrap items-center justify-center gap-2 px-4 py-3 text-center text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'documents'
               ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
               : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2541,7 +2551,7 @@ export const ProfileView = () => {
         <button
           type="button"
           onClick={() => setActiveTab('security')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`w-full flex flex-wrap items-center justify-center gap-2 px-4 py-3 text-center text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer ${
             activeTab === 'security'
               ? 'border-[#034665] text-[#034665] bg-sky-50/50 rounded-t-lg'
               : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-t-lg'
@@ -2906,11 +2916,26 @@ export const ProfileView = () => {
                     <input 
                       type="date"
                       value={dobInput} 
-                      onChange={e => setDobInput(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 font-medium font-mono focus:outline-none focus:border-[#034665] transition shadow-2xs"
+                      max={getTodayDateString()}
+                      onChange={e => {
+                        const value = e.target.value;
+                        setDobInput(value);
+                        setDobValidationError(getDateOfBirthValidationError(value));
+                      }}
+                      aria-invalid={Boolean(dobValidationError)}
+                      aria-describedby={dobValidationError ? 'profile-dob-error' : 'profile-dob-hint'}
+                      className={`w-full px-3.5 py-2.5 text-sm bg-white border rounded-lg text-slate-900 font-medium font-mono focus:outline-none transition shadow-2xs ${
+                        dobValidationError
+                          ? 'border-rose-500 focus:border-rose-500'
+                          : 'border-slate-300 focus:border-[#034665]'
+                      }`}
                     />
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Date of birth for identity and statutory records.
+                    <p
+                      id={dobValidationError ? 'profile-dob-error' : 'profile-dob-hint'}
+                      className={`text-[11px] mt-1 ${dobValidationError ? 'text-rose-600' : 'text-slate-400'}`}
+                      role={dobValidationError ? 'alert' : undefined}
+                    >
+                      {dobValidationError || 'Date of birth for identity and statutory records.'}
                     </p>
                   </div>
 

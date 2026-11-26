@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "node test/hrms-payroll-leave.test.mjs && node test/deduction-verification.test.mjs && node test/holiday-dynamic-verification.test.mjs && node test/leave-half-day.test.mjs && node test/geofence-auto-checkout.test.mjs && node test/attendance-web-actions.test.mjs && node test/hr-policies.test.mjs",
+    "test": "node test/hrms-payroll-leave.test.mjs && node test/deduction-verification.test.mjs && node test/holiday-dynamic-verification.test.mjs && node test/leave-half-day.test.mjs && node test/profile-dob-validation.test.mjs && node test/geofence-auto-checkout.test.mjs && node test/attendance-web-actions.test.mjs && node test/hr-policies.test.mjs && node test/hr-attendance-duplicates.test.mjs && node test/web-attendance-no-gps.test.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
