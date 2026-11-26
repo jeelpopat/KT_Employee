@@ -1579,7 +1579,6 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
     };
 
     const payloadVariants = [attendancePayload];
-
     setGeoError('');
     setIsActionLoading(true);
 
@@ -1591,7 +1590,9 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       for (const ep of endpointCandidates) {
         for (const pl of payloadVariants) {
           try {
-            response = await api.post(ep, pl);
+            response = await api.post(ep, pl, {
+              headers: { 'x-client-platform': 'web' }
+            });
             if (response && (response.status === 200 || response.status === 201)) {
               break outerLoop;
             }
