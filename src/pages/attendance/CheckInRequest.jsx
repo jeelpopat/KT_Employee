@@ -13,7 +13,6 @@ import {
   ChevronDown,
   Users,
   Calendar,
-  X,
   Building2,
   Phone,
   Mail,
@@ -237,15 +236,6 @@ const normalizeRequests = (payload) => {
 // ============================================================
 const getTodayLocal = () => {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-};
-
-const getYesterdayLocal = () => {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -744,7 +734,7 @@ export default function CheckInRequest() {
 
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(getTodayLocal());
 
   const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
 
@@ -999,8 +989,9 @@ export default function CheckInRequest() {
   };
 
   const handleDateChange = (newDate) => {
-    setSelectedDate(newDate);
-    fetchPendingRequests(filterStatus, newDate, false);
+    const date = newDate || getTodayLocal();
+    setSelectedDate(date);
+    fetchPendingRequests(filterStatus, date, false);
   };
 
   // ============================================================
@@ -1667,53 +1658,8 @@ export default function CheckInRequest() {
                 value={selectedDate}
                 onChange={(e) => handleDateChange(e.target.value)}
                 title="Filter attendance by date"
-                className="h-9 pl-8 pr-7 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] font-poppins cursor-pointer"
+                className="h-9 pl-8 pr-2 text-xs bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0088cc] focus:border-[#0088cc] font-poppins cursor-pointer"
               />
-              {selectedDate && (
-                <button
-                  type="button"
-                  onClick={() => handleDateChange("")}
-                  title="Clear date filter"
-                  className="absolute right-2 text-slate-400 hover:text-slate-600 transition cursor-pointer"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-
-            {/* Quick Date Presets */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => handleDateChange(getTodayLocal())}
-                className={`h-9 px-2.5 text-[11px] font-medium rounded-md border transition cursor-pointer select-none ${
-                  selectedDate === getTodayLocal()
-                    ? "bg-[#034665] text-white border-[#034665]"
-                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                Today
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDateChange(getYesterdayLocal())}
-                className={`h-9 px-2.5 text-[11px] font-medium rounded-md border transition cursor-pointer select-none ${
-                  selectedDate === getYesterdayLocal()
-                    ? "bg-[#034665] text-white border-[#034665]"
-                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                Yesterday
-              </button>
-              {selectedDate && (
-                <button
-                  type="button"
-                  onClick={() => handleDateChange("")}
-                  className="h-9 px-2.5 text-[11px] font-medium rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition cursor-pointer select-none"
-                >
-                  All Dates
-                </button>
-              )}
             </div>
 
             {/* Status Dropdown */}
@@ -1759,10 +1705,10 @@ export default function CheckInRequest() {
           </div>
         ) : (
           /* Table Container with responsive scroll */
-          <div className="overflow-x-auto border border-slate-200/80 rounded-lg font-poppins">
+          <div className="max-h-[520px] overflow-auto border border-slate-200/80 rounded-lg font-poppins">
             <table className="w-full text-left text-xs border-collapse min-w-[760px] sm:min-w-full font-poppins">
-              <thead>
-                <tr className="bg-[#0346651A] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#0346651A" }}>
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-[#e6eff2] text-[#034665] text-xs font-semibold font-poppins" style={{ backgroundColor: "#e6eff2" }}>
                   <th className="py-3 px-4 w-12 text-left font-semibold">
                     No.
                   </th>
