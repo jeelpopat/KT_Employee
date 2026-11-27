@@ -24,6 +24,7 @@ import {
   alignBreakRecordsToShift
 } from '../../utils/timelineUtils.js';
 import { filterOutFinanceUsers, filterOutUnknownUsers } from '../../utils/roleFilters.js';
+import { isAttendanceRequestPending } from '../../utils/attendanceApproval.js';
 import { EmployeeAvatar } from '../common/EmployeeAvatar.jsx';
 
 const parseBirthdayDate = (value) => {
@@ -540,14 +541,15 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
 
     const checkInApprovalStatusLower = String(ta?.checkInApprovalStatus || '').toLowerCase().trim();
     const adminDecisionLower = String(ta?.adminDecision || '').toLowerCase().trim();
-    const hasExplicitPendingStatus = Boolean(
-      statusLower.includes('pending') ||
-      approvalStatusLower.includes('pending') ||
-      adminStatusLower.includes('pending') ||
-      checkInStatusLower.includes('pending') ||
-      checkInApprovalStatusLower.includes('pending') ||
-      adminDecisionLower.includes('pending') ||
-      ta?.isApproved === false
+    const hasCheckInActivity = Boolean(
+      localPending ||
+      hasValidCheckInTime ||
+      isPresentStatus ||
+      isCheckedOutStatus
+    );
+    const hasExplicitPendingStatus = isAttendanceRequestPending(
+      ta,
+      hasCheckInActivity
     );
     const hasExplicitApprovedStatus = Boolean(
       ta?.isApproved === true ||
@@ -939,13 +941,13 @@ export const DashboardView = ({ attendanceOnly = false } = {}) => {
       checkInTime: inVal,
       checkOutTime: outVal,
       totalBreakMinutes: breakMins,
-      adminStatus: ta?.adminStatus || ta?.approvalStatus,
-      approvalStatus: ta?.approvalStatus,
-      checkInStatus: ta?.checkInStatus,
+      adminStatus: hasCheckInActivity ? ta?.adminStatus || ta?.approvalStatus : null,
+      approvalStatus: hasCheckInActivity ? ta?.approvalStatus : null,
+      checkInStatus: hasCheckInActivity ? ta?.checkInStatus : null,
       isRejected: isRejected,
       isPending: isPendingApproval,
       rejectionReason: rejectionReasonText,
-      status: ta?.status,
+      status: hasCheckInActivity ? ta?.status : null,
       isCompleted: hasCheckedOut
     });
     setAttendanceEvaluation(evalStatus);
